@@ -416,19 +416,27 @@ export async function setManualCompletion(
 	})
 	if (!emp) error(404, 'Employee not found')
 
-	if (done) {
-		await db.onboardingCompletion.upsert({
-			where: { itemId_employeeId: { itemId, employeeId } },
-			create: { itemId, employeeId, completedById: ctx.actorId },
-			update: {}
-		})
-	} else {
-		await db.onboardingCompletion.deleteMany({ where: { itemId, employeeId } })
-	}
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'OnboardingCompletion',
-		entityId: employeeId,
-		newValue: { itemId, done }
+	// One transaction: a failed audit write must not leave a manual tick standing unrecorded.
+	await db.$transaction(async (tx) => {
+		if (done) {
+			await tx.onboardingCompletion.upsert({
+				where: { itemId_employeeId: { itemId, employeeId } },
+				create: { itemId, employeeId, completedById: ctx.actorId },
+				update: {}
+			})
+		} else {
+			await tx.onboardingCompletion.deleteMany({ where: { itemId, employeeId } })
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'OnboardingCompletion',
+				entityId: employeeId,
+				newValue: { itemId, done }
+			},
+			tx
+		)
 	})
 }

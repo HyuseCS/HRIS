@@ -8,12 +8,18 @@ import type { AuditContext } from '$lib/server/services/types'
  * deliberately not repeated here.
  */
 
-const { dbMock } = vi.hoisted(() => ({
-	dbMock: {
+const { dbMock, tx } = vi.hoisted(() => {
+	const tx = {
 		separationRecord: { updateMany: vi.fn() },
-		clearanceItem: { findFirst: vi.fn(), update: vi.fn(), count: vi.fn() }
+		clearanceItem: { update: vi.fn(), count: vi.fn() }
 	}
-}))
+	return {
+		tx,
+		// No write methods on `dbMock` on purpose: if the writes ever move back outside the
+		// transaction, they throw here rather than passing silently.
+		dbMock: { clearanceItem: { findFirst: vi.fn() }, $transaction: vi.fn() }
+	}
+})
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
@@ -23,6 +29,7 @@ vi.mock('$lib/server/notifications', () => ({
 }))
 
 const { setClearanceItem } = await import('$lib/server/services/separation')
+const { writeAuditLog } = await import('$lib/server/audit')
 
 const CTX: AuditContext = {
 	organizationId: 'org1',
@@ -39,8 +46,9 @@ beforeEach(() => {
 		clearedById: null,
 		separation: { id: 'sep1', status: 'OPEN' }
 	})
-	dbMock.clearanceItem.count.mockResolvedValue(0)
-	dbMock.separationRecord.updateMany.mockResolvedValue({ count: 1 })
+	tx.clearanceItem.count.mockResolvedValue(0)
+	tx.separationRecord.updateMany.mockResolvedValue({ count: 1 })
+	dbMock.$transaction.mockImplementation((fn: (c: typeof tx) => unknown) => fn(tx))
 })
 
 describe('setClearanceItem — untested branches', () => {
@@ -57,7 +65,7 @@ describe('setClearanceItem — untested branches', () => {
 		expect(dbMock.clearanceItem.findFirst.mock.calls[0][0]).toMatchObject({
 			where: { id: 'ci1', separation: { organizationId: 'org1' } }
 		})
-		expect(dbMock.clearanceItem.update).not.toHaveBeenCalled()
+		expect(tx.clearanceItem.update).not.toHaveBeenCalled()
 	})
 
 	it('refuses to touch an item on a finalized case', async () => {
@@ -72,21 +80,30 @@ describe('setClearanceItem — untested branches', () => {
 			status: 409,
 			body: { message: 'Separation is already finalized' }
 		})
-		expect(dbMock.clearanceItem.update).not.toHaveBeenCalled()
-		expect(dbMock.separationRecord.updateMany).not.toHaveBeenCalled()
+		expect(tx.clearanceItem.update).not.toHaveBeenCalled()
+		expect(tx.separationRecord.updateMany).not.toHaveBeenCalled()
 	})
 
 	it('rolls the parent back to OPEN while items remain pending', async () => {
 		// Two items still PENDING after this write, so the parent must go back to OPEN —
 		// and the write keeps its `status: { not: 'FINALIZED' }` floor, which is what stops a
 		// finalize that landed after the read from being silently reopened.
-		dbMock.clearanceItem.count.mockResolvedValue(2)
+		tx.clearanceItem.count.mockResolvedValue(2)
 
 		await setClearanceItem('ci1', 'org1', true, CTX)
 
-		expect(dbMock.separationRecord.updateMany).toHaveBeenCalledWith({
+		expect(tx.separationRecord.updateMany).toHaveBeenCalledWith({
 			where: { id: 'sep1', status: { not: 'FINALIZED' } },
 			data: { status: 'OPEN' }
 		})
+		// AVIPA #5: the tick, the roll-forward and the audit all share one transaction.
+		expect(tx.clearanceItem.update).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { id: 'ci1' } })
+		)
+		expect(writeAuditLog).toHaveBeenCalledWith(
+			CTX,
+			expect.objectContaining({ action: 'UPDATE', entityType: 'ClearanceItem', entityId: 'ci1' }),
+			tx
+		)
 	})
 })

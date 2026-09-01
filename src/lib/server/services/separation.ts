@@ -51,22 +51,36 @@ export async function createSeparation(
 	// falling back to the built-in defaults when none are configured.
 	const clearance = await clearanceTemplateForOrg(organizationId)
 
-	const record = await db.separationRecord.create({
-		data: {
-			organizationId,
-			employeeId: input.employeeId,
-			type: input.type,
-			effectiveDate: input.effectiveDate,
-			reason: input.reason || null,
-			clearanceItems: { create: clearance }
-		}
-	})
+	// One transaction: a failed audit write must not leave an opened separation case
+	// standing unrecorded.
+	const record = await db.$transaction(async (tx) => {
+		const created = await tx.separationRecord.create({
+			data: {
+				organizationId,
+				employeeId: input.employeeId,
+				type: input.type,
+				effectiveDate: input.effectiveDate,
+				reason: input.reason || null,
+				clearanceItems: { create: clearance }
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'SeparationRecord',
-		entityId: record.id,
-		newValue: { employeeId: input.employeeId, type: input.type, effectiveDate: input.effectiveDate }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'SeparationRecord',
+				entityId: created.id,
+				newValue: {
+					employeeId: input.employeeId,
+					type: input.type,
+					effectiveDate: input.effectiveDate
+				}
+			},
+			tx
+		)
+
+		return created
 	})
 
 	// Email the departing employee a due-diligence / transition-period notice with their
@@ -216,33 +230,41 @@ export async function setClearanceItem(
 	// exists precisely because this path is reachable by any MANAGE_HR holder and `clearedById` is
 	// therefore not a safe place to keep the #297 bar. Adding it to this data object re-opens the
 	// laundering route.
-	await db.clearanceItem.update({
-		where: { id: itemId },
-		data: {
-			status: cleared ? 'CLEARED' : 'PENDING',
-			clearedById: cleared ? ctx.actorId : null,
-			clearedAt: cleared ? new Date() : null
-		}
-	})
+	// One transaction: a failed audit write must not leave a clearance tick standing
+	// unrecorded, and it also narrows the count-then-write race on the parent status below.
+	await db.$transaction(async (tx) => {
+		await tx.clearanceItem.update({
+			where: { id: itemId },
+			data: {
+				status: cleared ? 'CLEARED' : 'PENDING',
+				clearedById: cleared ? ctx.actorId : null,
+				clearedAt: cleared ? new Date() : null
+			}
+		})
 
-	// Roll the parent status forward/back so the finalize gate reflects the checklist.
-	const remaining = await db.clearanceItem.count({
-		where: { separationId: item.separation.id, status: 'PENDING' }
-	})
-	// `updateMany` with a status floor, NOT `update`: the FINALIZED check at the top of this
-	// function is a read, and a finalize landing between it and here would be silently rolled
-	// back to CLEARED/OPEN by this line — leaving a record that says OPEN while still carrying
-	// `finalizedAt` and `finalizedById`. A finalized case is closed; the roll-forward skips it.
-	await db.separationRecord.updateMany({
-		where: { id: item.separation.id, status: { not: 'FINALIZED' } },
-		data: { status: remaining === 0 ? 'CLEARED' : 'OPEN' }
-	})
+		// Roll the parent status forward/back so the finalize gate reflects the checklist.
+		const remaining = await tx.clearanceItem.count({
+			where: { separationId: item.separation.id, status: 'PENDING' }
+		})
+		// `updateMany` with a status floor, NOT `update`: the FINALIZED check at the top of this
+		// function is a read, and a finalize landing between it and here would be silently rolled
+		// back to CLEARED/OPEN by this line — leaving a record that says OPEN while still carrying
+		// `finalizedAt` and `finalizedById`. A finalized case is closed; the roll-forward skips it.
+		await tx.separationRecord.updateMany({
+			where: { id: item.separation.id, status: { not: 'FINALIZED' } },
+			data: { status: remaining === 0 ? 'CLEARED' : 'OPEN' }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'ClearanceItem',
-		entityId: itemId,
-		newValue: { status: cleared ? 'CLEARED' : 'PENDING' }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'ClearanceItem',
+				entityId: itemId,
+				newValue: { status: cleared ? 'CLEARED' : 'PENDING' }
+			},
+			tx
+		)
 	})
 }
 

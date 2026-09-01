@@ -553,3 +553,78 @@ describe('proposal notifications name the domain (#265)', () => {
 		)
 	})
 })
+
+/**
+ * AVIPA #5 — each audit row is written on the same client as the mutation it records, so a
+ * failed audit write rolls the mutation back with it.
+ *
+ * A DISTINCT `tx` object, not the shared `fn(dbMock)` stand-in the rest of this file uses: with
+ * `tx === db` neither half of the assertion can tell the two clients apart, so a revert to a bare
+ * `db.` write would still pass.
+ */
+describe('audit rows share their mutation transaction (AVIPA #5)', () => {
+	const tx = {
+		actionProposal: {
+			create: vi.fn(),
+			updateMany: vi.fn(),
+			findUniqueOrThrow: vi.fn()
+		}
+	}
+
+	beforeEach(() => {
+		tx.actionProposal.create.mockResolvedValue({ id: 'p1' })
+		tx.actionProposal.updateMany.mockResolvedValue({ count: 1 })
+		tx.actionProposal.findUniqueOrThrow.mockResolvedValue({ id: 'p1', status: 'APPLIED' })
+		dbMock.$transaction.mockImplementation(async (fn: (c: typeof tx) => unknown) => fn(tx))
+	})
+
+	it('files a proposal and audits it on one client', async () => {
+		await createProposal(
+			'org1',
+			{ targetEmployeeId: TARGET_EMP, targetUserId: CEO_USER, domain: 'COMPENSATION', payload: {} },
+			ctxOf({ actorId: CEO_USER, actorRoles: ['CEO'] })
+		)
+
+		expect(tx.actionProposal.create).toHaveBeenCalled()
+		expect(dbMock.actionProposal.create).not.toHaveBeenCalled()
+		expect(writeAuditLog).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({ action: 'CREATE', entityType: 'ActionProposal' }),
+			tx
+		)
+	})
+
+	it('claims a proposal and audits it on one client', async () => {
+		pendOnBehalf()
+		await confirmProposal('org1', 'p1', vi.fn().mockResolvedValue(undefined), ctxOf())
+
+		expect(tx.actionProposal.updateMany).toHaveBeenCalled()
+		expect(dbMock.actionProposal.updateMany).not.toHaveBeenCalled()
+		expect(writeAuditLog).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				action: 'UPDATE',
+				entityType: 'ActionProposal',
+				newValue: expect.objectContaining({ status: 'APPLIED' })
+			}),
+			tx
+		)
+	})
+
+	it('rejects a proposal and audits it on one client', async () => {
+		pendOnBehalf()
+		await rejectProposal('org1', 'p1', 'over the band', ctxOf())
+
+		expect(tx.actionProposal.updateMany).toHaveBeenCalled()
+		expect(dbMock.actionProposal.updateMany).not.toHaveBeenCalled()
+		expect(writeAuditLog).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				action: 'UPDATE',
+				entityType: 'ActionProposal',
+				newValue: expect.objectContaining({ status: 'REJECTED' })
+			}),
+			tx
+		)
+	})
+})

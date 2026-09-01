@@ -151,30 +151,39 @@ export async function createProposal(
 		)
 	}
 
-	const proposal = await db.actionProposal.create({
-		data: {
-			organizationId,
-			initiatorId: ctx.actorId,
-			targetEmployeeId: input.targetEmployeeId,
-			domain: input.domain,
-			payload: input.payload as Prisma.InputJsonValue
-		}
-	})
+	// One transaction: a failed audit write must not leave a filed proposal standing unrecorded.
+	const proposal = await db.$transaction(async (tx) => {
+		const created = await tx.actionProposal.create({
+			data: {
+				organizationId,
+				initiatorId: ctx.actorId,
+				targetEmployeeId: input.targetEmployeeId,
+				domain: input.domain,
+				payload: input.payload as Prisma.InputJsonValue
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'ActionProposal',
-		entityId: proposal.id,
-		// Field NAMES, never their values: the payload of a compensation proposal is the salary in
-		// cleartext, and `/reports/audit-log` renders `newValue` to every ADMINISTER_SYSTEM holder
-		// with no record of the read. Same shape `revealEmployeeSensitive` uses (#111/#242). The
-		// values themselves stay on the proposal row, behind the audited reveal.
-		newValue: {
-			domain: input.domain,
-			targetEmployeeId: input.targetEmployeeId,
-			isSelfAction,
-			fields: Object.keys((input.payload ?? {}) as Record<string, unknown>)
-		}
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'ActionProposal',
+				entityId: created.id,
+				// Field NAMES, never their values: the payload of a compensation proposal is the salary in
+				// cleartext, and `/reports/audit-log` renders `newValue` to every ADMINISTER_SYSTEM holder
+				// with no record of the read. Same shape `revealEmployeeSensitive` uses (#111/#242). The
+				// values themselves stay on the proposal row, behind the audited reveal.
+				newValue: {
+					domain: input.domain,
+					targetEmployeeId: input.targetEmployeeId,
+					isSelfAction,
+					fields: Object.keys((input.payload ?? {}) as Record<string, unknown>)
+				}
+			},
+			tx
+		)
+
+		return created
 	})
 
 	await notifyMany(
@@ -221,15 +230,21 @@ export async function confirmProposal(
 			},
 			tx
 		)
-		return tx.actionProposal.findUniqueOrThrow({ where: { id: proposalId } })
-	})
+		// The audit shares the claim's transaction: a failed audit write must not leave an applied
+		// proposal standing unrecorded.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'ActionProposal',
+				entityId: proposalId,
+				oldValue: { status: 'PENDING' },
+				newValue: { status: 'APPLIED', decidedById: ctx.actorId }
+			},
+			tx
+		)
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'ActionProposal',
-		entityId: proposalId,
-		oldValue: { status: 'PENDING' },
-		newValue: { status: 'APPLIED', decidedById: ctx.actorId }
+		return tx.actionProposal.findUniqueOrThrow({ where: { id: proposalId } })
 	})
 	await notifyMany(
 		[pending.initiatorId],
@@ -250,27 +265,34 @@ export async function rejectProposal(
 
 	const pending = await assertMayConfirmProposal(organizationId, proposalId, ctx)
 
-	const claim = await db.actionProposal.updateMany({
-		where: { id: proposalId, organizationId, status: 'PENDING' },
-		data: {
-			status: 'REJECTED',
-			decidedById: ctx.actorId,
-			decidedAt: new Date(),
-			decisionNote: note
-		}
-	})
-	if (claim.count === 0) error(404, 'Pending proposal not found')
+	// One transaction: a failed audit write must not leave a rejection standing unrecorded.
+	await db.$transaction(async (tx) => {
+		const claim = await tx.actionProposal.updateMany({
+			where: { id: proposalId, organizationId, status: 'PENDING' },
+			data: {
+				status: 'REJECTED',
+				decidedById: ctx.actorId,
+				decidedAt: new Date(),
+				decisionNote: note
+			}
+		})
+		if (claim.count === 0) error(404, 'Pending proposal not found')
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'ActionProposal',
-		entityId: proposalId,
-		oldValue: { status: 'PENDING' },
-		// The reason is free text a confirmer typed about someone's pay, so it stays off the audit
-		// log for the same reason the payload's values do (#111/#242) — `/reports/audit-log` renders
-		// `newValue` to every ADMINISTER_SYSTEM holder with no record of the read. It is still on
-		// `ActionProposal.decisionNote` and still reaches the initiator by notification.
-		newValue: { status: 'REJECTED', decidedById: ctx.actorId }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'ActionProposal',
+				entityId: proposalId,
+				oldValue: { status: 'PENDING' },
+				// The reason is free text a confirmer typed about someone's pay, so it stays off the audit
+				// log for the same reason the payload's values do (#111/#242) — `/reports/audit-log` renders
+				// `newValue` to every ADMINISTER_SYSTEM holder with no record of the read. It is still on
+				// `ActionProposal.decisionNote` and still reaches the initiator by notification.
+				newValue: { status: 'REJECTED', decidedById: ctx.actorId }
+			},
+			tx
+		)
 	})
 	// "rejected", matching the REJECTED status the row actually carries — there is no RETURNED
 	// state here, and the old wording read as one to anyone comparing the audit log to the message.
