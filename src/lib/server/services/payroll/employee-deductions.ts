@@ -38,21 +38,29 @@ export async function createEmployeeDeduction(
 	if (!type.isActive) error(400, 'Deduction code is inactive')
 	if (type.isStatutory) error(400, 'Statutory deductions are computed automatically')
 
-	const deduction = await db.employeeDeduction.create({
-		data: {
-			employeeId,
-			deductionTypeId: type.id,
-			label: data.label?.trim() || null,
-			monthlyAmount: data.monthlyAmount
-		}
+	// One transaction: a failed audit write must not leave a recurring deduction standing
+	// unrecorded — it takes money off the payslip every period from here on.
+	return await db.$transaction(async (tx) => {
+		const deduction = await tx.employeeDeduction.create({
+			data: {
+				employeeId,
+				deductionTypeId: type.id,
+				label: data.label?.trim() || null,
+				monthlyAmount: data.monthlyAmount
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'EmployeeDeduction',
+				entityId: deduction.id,
+				newValue: { code: type.code, label: data.label ?? null, monthlyAmount: data.monthlyAmount }
+			},
+			tx
+		)
+		return deduction
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'EmployeeDeduction',
-		entityId: deduction.id,
-		newValue: { code: type.code, label: data.label ?? null, monthlyAmount: data.monthlyAmount }
-	})
-	return deduction
 }
 
 // Deactivate instead of delete so already-generated payslips keep their context.
@@ -67,14 +75,22 @@ export async function endEmployeeDeduction(id: string, organizationId: string, c
 	assertNotSelf(ctx.actorId, deduction.employee)
 	if (!deduction.isActive) error(409, 'Recurring deduction is already ended')
 
-	const updated = await db.employeeDeduction.update({ where: { id }, data: { isActive: false } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'EmployeeDeduction',
-		entityId: id,
-		newValue: { isActive: false }
+	// One transaction: a failed audit write must not leave the deduction ended with no record of
+	// who ended it.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.employeeDeduction.update({ where: { id }, data: { isActive: false } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'EmployeeDeduction',
+				entityId: id,
+				newValue: { isActive: false }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 /**

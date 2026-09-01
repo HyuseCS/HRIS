@@ -24,21 +24,29 @@ export async function createEmployeeEarning(
 	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
 	if (data.monthlyAmount <= 0) error(400, 'Monthly amount must be positive')
 
-	const earning = await db.employeeEarning.create({
-		data: {
-			employeeId,
-			kind: data.kind,
-			label: data.label,
-			monthlyAmount: data.monthlyAmount
-		}
+	// One transaction: a failed audit write must not leave a recurring allowance standing
+	// unrecorded — it pays out every period from here on.
+	return await db.$transaction(async (tx) => {
+		const earning = await tx.employeeEarning.create({
+			data: {
+				employeeId,
+				kind: data.kind,
+				label: data.label,
+				monthlyAmount: data.monthlyAmount
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'EmployeeEarning',
+				entityId: earning.id,
+				newValue: { kind: data.kind, label: data.label, monthlyAmount: data.monthlyAmount }
+			},
+			tx
+		)
+		return earning
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'EmployeeEarning',
-		entityId: earning.id,
-		newValue: { kind: data.kind, label: data.label, monthlyAmount: data.monthlyAmount }
-	})
-	return earning
 }
 
 // Deactivate instead of delete so already-generated payslips keep their context.
@@ -51,12 +59,20 @@ export async function endEmployeeEarning(id: string, organizationId: string, ctx
 	assertNotSelf(ctx.actorId, earning.employee)
 	if (!earning.isActive) error(409, 'Recurring earning is already ended')
 
-	const updated = await db.employeeEarning.update({ where: { id }, data: { isActive: false } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'EmployeeEarning',
-		entityId: id,
-		newValue: { isActive: false }
+	// One transaction: a failed audit write must not leave the earning ended with no record of
+	// who ended it.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.employeeEarning.update({ where: { id }, data: { isActive: false } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'EmployeeEarning',
+				entityId: id,
+				newValue: { isActive: false }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
