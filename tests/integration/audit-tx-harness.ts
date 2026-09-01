@@ -109,6 +109,10 @@ export async function createOrgFixture() {
  * reference `Organization` WITHOUT cascade, so they must go first or the org delete throws
  * and the fixtures accumulate silently. `BackupConfig` cascades with the org.
  *
+ * `AttendanceDay` and `TimeLog` reference `Employee`, `Employee` references `User` and
+ * `Department`, and `Department` references `Organization` — all without cascade — so the
+ * attendance fixtures unwind innermost-first, and Employee must go before User.
+ *
  * Sweeping by MARKER (not by the ids of this run) also clears rows stranded by a crashed
  * earlier run, so the database is left as it was found.
  */
@@ -119,7 +123,17 @@ export async function cleanupFixtures() {
 	})
 	if (orgs.length === 0) return
 	const organizationId = { in: orgs.map((o) => o.id) }
+
+	const employees = await verifyDb.employee.findMany({ where: { organizationId }, select: { id: true } })
+	if (employees.length > 0) {
+		const employeeId = { in: employees.map((e) => e.id) }
+		await verifyDb.attendanceDay.deleteMany({ where: { employeeId } })
+		await verifyDb.timeLog.deleteMany({ where: { employeeId } })
+		await verifyDb.employee.deleteMany({ where: { id: employeeId } })
+	}
+
 	await verifyDb.auditLog.deleteMany({ where: { organizationId } })
 	await verifyDb.user.deleteMany({ where: { organizationId } })
+	await verifyDb.department.deleteMany({ where: { organizationId } })
 	await verifyDb.organization.deleteMany({ where: { id: organizationId } })
 }
