@@ -21,6 +21,19 @@ import { db } from '$lib/server/db'
 import { z } from 'zod'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
+/**
+ * #6 — the caller's OWN employee row, scoped to the ACTIVE org. A cross-org account (the CEO,
+ * #224) carries a profile in its home tenant only, so an unscoped `userId` lookup resolves that
+ * home-tenant employee whichever org the session is currently in. Same shape as
+ * `findSelfEmployee` in punch/+page.server.ts. Only `id` is ever read off the row.
+ */
+function findSelfEmployee(user: { id: string; organizationId: string }) {
+	return db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
+}
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	const isManager = canAny(user.roles, 'VIEW_TEAM')
@@ -36,7 +49,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const status = url.searchParams.get('status') ?? undefined
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	const myEmployee = await findSelfEmployee(user)
 
 	// #64: "mine" and "team" are separate server queries with independent page
 	// params (myPage / teamPage), one count + one page query each. The row
@@ -53,6 +66,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// A non-manager without an employee record owns no timesheets — empty rather
 	// than an undefined employeeId (which would list the whole org).
 	const teamParams = isManager
+		// #6: for a cross-org actor `myEmployee` is now null and this self-exclusion goes
+		// undefined, which services/timesheets.ts drops from the where clause. Safe: dropping a
+		// NEGATIVE self-exclusion re-admits only the actor's own rows, and those are already
+		// outside `organizationId`. Dropping a POSITIVE restriction is what widens a query.
 		? { organizationId: user.organizationId, excludeEmployeeId: myEmployee?.id, status }
 		: null
 	const teamTotal = teamParams ? await countTimesheets(teamParams) : 0
@@ -300,7 +317,7 @@ export const actions: Actions = {
 	submit: async (event) => {
 		requireModify(event)
 		const user = event.locals.user!
-		const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found' })
 
 		const id = (await event.request.formData()).get('id') as string
@@ -353,10 +370,7 @@ export const actions: Actions = {
 	submitMany: async (event) => {
 		requireModify(event)
 		const user = event.locals.user!
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found' })
 		const ids = String((await event.request.formData()).get('ids') ?? '')
 			.split(',')

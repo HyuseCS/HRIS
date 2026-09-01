@@ -12,8 +12,10 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	// Non-managers only ever see their own requests.
 	const isManager = canAny(user.roles, 'VIEW_TEAM')
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
+	// #6: scoped to the ACTIVE org, so a cross-org account no longer resolves its home-tenant
+	// profile here.
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
 
@@ -47,8 +49,10 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	if (!locals.user) error(401, 'Unauthorized')
 	const user = locals.user
 
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
+	// #6: scoped to the ACTIVE org, so a cross-org account no longer resolves its home-tenant
+	// profile here.
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
 	if (!myEmployee) error(400, 'No employee profile found')
