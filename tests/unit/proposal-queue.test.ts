@@ -45,6 +45,20 @@ vi.mock('$lib/server/services/notifications', () => ({
 	notifyMany: vi.fn().mockResolvedValue(undefined)
 }))
 
+// #5: the confirm path writes through a transaction client. Making it a DIFFERENT object from `db`
+// is what gives the class-D assertion below its teeth — the reveal audits a read and must keep
+// taking `db`, and only a distinct `tx` can catch someone later wrapping it in the transaction.
+// Same delegate mocks throughout, so every other assertion still reads them off `dbMock`.
+const tx = {
+	actionProposal: dbMock.actionProposal,
+	employee: dbMock.employee,
+	employeeCompensation: dbMock.employeeCompensation,
+	employeeEmploymentType: dbMock.employeeEmploymentType,
+	payrollRun: dbMock.payrollRun,
+	position: dbMock.position,
+	user: dbMock.user
+}
+
 const { writeAuditLog } = await import('$lib/server/audit')
 const { load, actions } = await import('../../src/routes/(app)/requests/proposals/+page.server')
 
@@ -92,7 +106,7 @@ const event = (user: { id: string; roles: Role[] }, body: Record<string, string>
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(dbMock))
+	dbMock.$transaction.mockImplementation(async (fn: (client: typeof tx) => unknown) => fn(tx))
 	dbMock.actionProposal.findMany.mockResolvedValue([])
 	dbMock.actionProposal.findFirst.mockResolvedValue(onBehalf)
 	dbMock.actionProposal.updateMany.mockResolvedValue({ count: 1 })
