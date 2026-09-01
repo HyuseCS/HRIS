@@ -144,7 +144,7 @@ export async function assignSchedule(
 	ctx: AuditContext
 ) {
 	const emp = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true }
 	})
 	if (!emp) error(404, 'Employee not found')

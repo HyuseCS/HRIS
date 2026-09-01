@@ -57,7 +57,7 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 
 	if (canManage) {
 		employees = await db.employee.findMany({
-			where: { user: { organizationId: user.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: user.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		})

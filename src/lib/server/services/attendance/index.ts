@@ -112,7 +112,7 @@ export function listAttendanceDays(
 export async function listTeamDay(organizationId: string, dateKey: string) {
 	const date = new Date(dateKey)
 	const employees = await db.employee.findMany({
-		where: { user: { organizationId }, employmentStatus: 'ACTIVE' },
+		where: { organizationId, employmentStatus: 'ACTIVE' },
 		select: {
 			id: true,
 			firstName: true,
@@ -147,7 +147,7 @@ export async function deriveRange(
 
 	const employees = await db.employee.findMany({
 		where: {
-			user: { organizationId },
+			organizationId,
 			employmentStatus: 'ACTIVE',
 			...(range.employeeId ? { id: range.employeeId } : {})
 		},
@@ -338,7 +338,7 @@ export async function autoDeriveFromPunches(
 
 	const punchCount = await db.timeLog.count({
 		where: {
-			employee: { user: { organizationId } },
+			employee: { organizationId },
 			timestamp: { gte: phtStart, lt: phtEndExclusive },
 			...(range.employeeId ? { employeeId: range.employeeId } : {})
 		}
@@ -424,7 +424,7 @@ export async function correctDay(
 	ctx: AuditContext
 ) {
 	const day = await db.attendanceDay.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		include: { employee: { include: { workSchedule: { include: { days: true } } } } }
 	})
 	if (!day) error(404, 'Attendance day not found')
@@ -553,7 +553,7 @@ export async function correctDay(
  */
 export async function resetDayToDerived(id: string, organizationId: string, ctx: AuditContext) {
 	const day = await db.attendanceDay.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		select: {
 			employeeId: true,
 			date: true,
@@ -595,7 +595,7 @@ export async function lockRange(
 	const res = await db.attendanceDay.updateMany({
 		where: {
 			date: { gte: new Date(fromKey), lte: new Date(toKey) },
-			employee: { user: { organizationId } },
+			employee: { organizationId },
 			...(range.employeeId ? { employeeId: range.employeeId } : {})
 		},
 		data: { isLocked: true }
@@ -624,7 +624,7 @@ export async function unlockRange(
 	const res = await db.attendanceDay.updateMany({
 		where: {
 			date: { gte: new Date(fromKey), lte: new Date(toKey) },
-			employee: { user: { organizationId } },
+			employee: { organizationId },
 			...(range.employeeId ? { employeeId: range.employeeId } : {})
 		},
 		data: { isLocked: false }
