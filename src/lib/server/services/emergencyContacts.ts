@@ -26,23 +26,30 @@ export async function addEmergencyContact(
 ) {
 	await assertEmployeeInOrg(employeeId, organizationId)
 
-	const contact = await db.emergencyContact.create({
-		data: {
-			employeeId,
-			name: input.name,
-			relationship: input.relationship,
-			phone: input.phone
-		}
-	})
+	// One transaction (#5): a failed audit write must not leave a new contact standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const contact = await tx.emergencyContact.create({
+			data: {
+				employeeId,
+				name: input.name,
+				relationship: input.relationship,
+				phone: input.phone
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'EmergencyContact',
-		entityId: contact.id,
-		newValue: { employeeId, name: input.name, relationship: input.relationship }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'EmergencyContact',
+				entityId: contact.id,
+				newValue: { employeeId, name: input.name, relationship: input.relationship }
+			},
+			tx
+		)
 
-	return contact
+		return contact
+	})
 }
 
 export async function deleteEmergencyContact(
@@ -55,12 +62,20 @@ export async function deleteEmergencyContact(
 	})
 	if (!contact) error(404, 'Emergency contact not found')
 
-	await db.emergencyContact.delete({ where: { id: contactId } })
+	// One transaction (#5): a failed audit write must not leave a contact deleted with no record
+	// of who deleted it.
+	await db.$transaction(async (tx) => {
+		await tx.emergencyContact.delete({ where: { id: contactId } })
 
-	await writeAuditLog(ctx, {
-		action: 'DELETE',
-		entityType: 'EmergencyContact',
-		entityId: contactId,
-		oldValue: { employeeId: contact.employeeId, name: contact.name }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'DELETE',
+				entityType: 'EmergencyContact',
+				entityId: contactId,
+				oldValue: { employeeId: contact.employeeId, name: contact.name }
+			},
+			tx
+		)
 	})
 }

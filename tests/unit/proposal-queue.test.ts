@@ -357,7 +357,10 @@ describe('?/revealAmount', () => {
 				entityType: 'Employee',
 				entityId: CREW_EMP,
 				newValue: { fields: expect.arrayContaining(['basicMonthlySalary']) }
-			})
+			}),
+			// #5: class D — this audits a READ, so it takes `db`, never a transaction client.
+			// Wrapping it would let an unrelated rollback erase the record of a PII access.
+			dbMock
 		)
 	})
 

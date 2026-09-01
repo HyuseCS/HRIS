@@ -19,9 +19,13 @@ const { dbMock, writeAuditLog } = vi.hoisted(() => ({
 	dbMock: {
 		employee: { findFirst: vi.fn() },
 		benefitPlan: { findFirst: vi.fn() },
-		benefitEnrollment: { create: vi.fn() }
+		$transaction: vi.fn()
 	}
 }))
+
+// #5: the enrollment row and its audit entry now share one transaction, so the create lives on
+// the transaction client.
+const tx = { benefitEnrollment: { create: vi.fn() } }
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog }))
@@ -38,14 +42,15 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.employee.findFirst.mockResolvedValue({ id: EMPLOYEE, userId: 'user-emp' })
 	dbMock.benefitPlan.findFirst.mockResolvedValue({ id: PLAN, organizationId: ORG })
-	dbMock.benefitEnrollment.create.mockResolvedValue({ id: 'enr1', status: 'ACTIVE' })
+	tx.benefitEnrollment.create.mockResolvedValue({ id: 'enr1', status: 'ACTIVE' })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('enrollEmployee', () => {
 	it('404s on an employee outside the acting organization, and writes nothing', async () => {
 		dbMock.employee.findFirst.mockResolvedValue(null)
 		await expect(enrollEmployee(EMPLOYEE, PLAN, data, ctx)).rejects.toMatchObject({ status: 404 })
-		expect(dbMock.benefitEnrollment.create).not.toHaveBeenCalled()
+		expect(tx.benefitEnrollment.create).not.toHaveBeenCalled()
 		expect(writeAuditLog).not.toHaveBeenCalled()
 	})
 
@@ -68,12 +73,14 @@ describe('enrollEmployee', () => {
 	it('still enrolls an in-org employee', async () => {
 		const enrollment = await enrollEmployee(EMPLOYEE, PLAN, data, ctx)
 		expect(enrollment).toMatchObject({ id: 'enr1' })
-		expect(dbMock.benefitEnrollment.create).toHaveBeenCalled()
+		expect(tx.benefitEnrollment.create).toHaveBeenCalled()
+		// #5: the audit write shares the enrollment's transaction.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('still 404s a plan from another organization', async () => {
 		dbMock.benefitPlan.findFirst.mockResolvedValue(null)
 		await expect(enrollEmployee(EMPLOYEE, PLAN, data, ctx)).rejects.toMatchObject({ status: 404 })
-		expect(dbMock.benefitEnrollment.create).not.toHaveBeenCalled()
+		expect(tx.benefitEnrollment.create).not.toHaveBeenCalled()
 	})
 })

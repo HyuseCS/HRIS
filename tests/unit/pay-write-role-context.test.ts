@@ -22,7 +22,11 @@ import type { Role } from '@prisma/client'
 
 const { dbMock, txMock, listReportIdsFor } = vi.hoisted(() => {
 	const txMock = {
-		employeeCompensation: { create: vi.fn(), findFirst: vi.fn() },
+		employeeCompensation: {
+			create: vi.fn(),
+			findFirst: vi.fn(),
+			findMany: vi.fn().mockResolvedValue([])
+		},
 		employeeEmploymentType: { create: vi.fn(), findFirst: vi.fn() },
 		employee: { update: vi.fn() }
 	}

@@ -329,12 +329,18 @@ export async function revealEmployeeSensitive(
 
 	// Constitution P1/P4: reading PII is itself an auditable event.
 	if (opts.audit) {
-		await writeAuditLog(ctx, {
-			action: 'VIEW',
-			entityType: 'Employee',
-			entityId: employee.id,
-			newValue: { fields: [...SENSITIVE_FIELDS] }
-		})
+		// #5: deliberately NOT transactional — `db`, not a `tx`. This audits a READ, so there is no
+		// mutation to roll back with, and a rollback would destroy the record of the PII access.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'VIEW',
+				entityType: 'Employee',
+				entityId: employee.id,
+				newValue: { fields: [...SENSITIVE_FIELDS] }
+			},
+			db
+		)
 	}
 
 	return employee
@@ -421,15 +427,7 @@ export async function createEmployee(
 	// the password does not change between attempts.
 	const passwordHash = await bcrypt.hash(input.password, 12)
 
-	const employee = await allocateAndCreate(organizationId, input, passwordHash)
-
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Employee',
-		// From the created row, not a variable computed up front: a retry changes the number.
-		newValue: { employeeNumber: employee.employeeNumber, email: input.email },
-		entityId: employee.id
-	})
+	const employee = await allocateAndCreate(organizationId, input, passwordHash, ctx)
 
 	// On onboarding, invite the new hire to the company Discord server (#186) — only when
 	// the org has configured an invite link (currently just Veent). Sent to their working
@@ -466,7 +464,8 @@ export async function createEmployee(
 async function allocateAndCreate(
 	organizationId: string,
 	input: CreateEmployeeInput,
-	passwordHash: string
+	passwordHash: string,
+	ctx: AuditContext
 ) {
 	for (let attempt = 1; ; attempt++) {
 		try {
@@ -554,6 +553,20 @@ async function allocateAndCreate(
 					}
 				})
 
+				// #5: inside the hire transaction — a failed audit write must not leave a new employee
+				// standing unrecorded. A retry replays this along with the rest of the closure.
+				await writeAuditLog(
+					ctx,
+					{
+						action: 'CREATE',
+						entityType: 'Employee',
+						// From the created row, not a variable computed up front: a retry changes the number.
+						newValue: { employeeNumber: created.employeeNumber, email: input.email },
+						entityId: created.id
+					},
+					tx
+				)
+
 				return created
 			})
 		} catch (e) {
@@ -606,45 +619,58 @@ export async function updateEmployee(
 		await assertManagerInOrg(input.reportsToId, organizationId, id)
 	}
 
-	const updated = await db.employee.update({
-		where: { id },
-		data: input,
-		include: { department: true, user: { select: { email: true, roles: true } } }
-	})
+	// One transaction (#5): a failed audit write must not leave an edit standing unrecorded. The
+	// `before` snapshot the diff reads is taken inside it too — `existing` above is read through
+	// `getEmployee`, several queries and a heal-on-read write earlier, so a concurrent edit could
+	// make this row's oldValue describe a state this call never overwrote. Only the READ moves;
+	// `existing` still feeds the guards above, which must run before a transaction is opened.
+	return await db.$transaction(async (tx) => {
+		const before = await tx.employee.findUniqueOrThrow({ where: { id } })
 
-	// Curated audit diff: before/after values for the employment-history fields
-	// only, plus the names (not values) of any other changed fields. This powers
-	// the history timeline (FR-051) and keeps sensitive PII out of the audit log.
-	const norm = (v: unknown) =>
-		v == null ? null : typeof v === 'object' && 'toString' in v ? (v as object).toString() : v
-	const oldValue: Record<string, unknown> = {}
-	const newValue: Record<string, unknown> = {}
-	const otherChanged: string[] = []
-	for (const key of Object.keys(input) as (keyof UpdateEmployeeInput)[]) {
-		const before = norm((existing as Record<string, unknown>)[key])
-		const after = norm((updated as Record<string, unknown>)[key])
-		if (String(before) === String(after)) continue
-		if ((HISTORY_FIELDS as readonly string[]).includes(key)) {
-			oldValue[key] = before
-			newValue[key] = after
-		} else {
-			otherChanged.push(key)
-		}
-	}
-
-	// Only record an audit entry when something actually changed.
-	if (Object.keys(newValue).length > 0 || otherChanged.length > 0) {
-		if (otherChanged.length > 0) newValue._otherFields = otherChanged
-		await writeAuditLog(ctx, {
-			action: 'UPDATE',
-			entityType: 'Employee',
-			entityId: id,
-			oldValue,
-			newValue
+		const updated = await tx.employee.update({
+			where: { id },
+			data: input,
+			include: { department: true, user: { select: { email: true, roles: true } } }
 		})
-	}
 
-	return updated
+		// Curated audit diff: before/after values for the employment-history fields
+		// only, plus the names (not values) of any other changed fields. This powers
+		// the history timeline (FR-051) and keeps sensitive PII out of the audit log.
+		const norm = (v: unknown) =>
+			v == null ? null : typeof v === 'object' && 'toString' in v ? (v as object).toString() : v
+		const oldValue: Record<string, unknown> = {}
+		const newValue: Record<string, unknown> = {}
+		const otherChanged: string[] = []
+		for (const key of Object.keys(input) as (keyof UpdateEmployeeInput)[]) {
+			const beforeValue = norm((before as Record<string, unknown>)[key])
+			const after = norm((updated as Record<string, unknown>)[key])
+			if (String(beforeValue) === String(after)) continue
+			if ((HISTORY_FIELDS as readonly string[]).includes(key)) {
+				oldValue[key] = beforeValue
+				newValue[key] = after
+			} else {
+				otherChanged.push(key)
+			}
+		}
+
+		// Only record an audit entry when something actually changed.
+		if (Object.keys(newValue).length > 0 || otherChanged.length > 0) {
+			if (otherChanged.length > 0) newValue._otherFields = otherChanged
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: 'Employee',
+					entityId: id,
+					oldValue,
+					newValue
+				},
+				tx
+			)
+		}
+
+		return updated
+	})
 }
 
 /**
@@ -787,6 +813,18 @@ export async function recordCompensationChange(
 	}
 
 	const write = async (tx: Prisma.TransactionClient) => {
+		// The audit's "before" is re-derived from a tx-scoped read, not from `atEff` above: that one
+		// was read before this transaction opened, so two concurrent changes to the same employee
+		// would both log the same prior pay — one of them a value it never replaced. Read before the
+		// insert, or the new snapshot is itself in the history.
+		const before = currentCompensation(
+			await tx.employeeCompensation.findMany({
+				where: { employeeId: id },
+				select: { basicMonthlySalary: true, rateType: true, effectiveDate: true, changedAt: true }
+			}),
+			input.effectiveDate,
+			{ basicMonthlySalary: currentSalary, rateType: employee.rateType }
+		)
 		const current = await insertCompensationSnapshot(
 			tx,
 			id,
@@ -806,7 +844,7 @@ export async function recordCompensationChange(
 				action: 'UPDATE',
 				entityType: 'Employee',
 				entityId: id,
-				oldValue: { basicMonthlySalary: atEff.salary.toNumber(), rateType: atEff.rateType },
+				oldValue: { basicMonthlySalary: before.salary.toNumber(), rateType: before.rateType },
 				newValue: { basicMonthlySalary, rateType, effectiveDate: eff }
 			},
 			tx

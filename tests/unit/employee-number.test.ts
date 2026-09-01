@@ -176,7 +176,9 @@ describe('losing the allocation race', () => {
 
 		expect(writeAuditLog).toHaveBeenCalledWith(
 			ctx,
-			expect.objectContaining({ newValue: expect.objectContaining({ employeeNumber: 'EMP-006' }) })
+			expect.objectContaining({ newValue: expect.objectContaining({ employeeNumber: 'EMP-006' }) }),
+			// #5: the audit row is written inside the hire transaction, on its client.
+			dbMock
 		)
 	})
 })
