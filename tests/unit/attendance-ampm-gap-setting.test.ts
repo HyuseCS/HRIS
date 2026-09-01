@@ -14,7 +14,8 @@ import {
  * MOCKING CONSTRAINT (contract instruction A-E5): mock ONLY `$lib/server/db` and
  * `$lib/server/audit`. `attendance/schedules` must stay REAL, or the service's own bounds check
  * (the second layer, and the one that protects any future non-form caller) would never run and
- * A21 would be vacuous. Every assertion below therefore lands on `organization.update`, which is
+ * A21 would be vacuous. Every assertion below therefore lands on `organization.update` — on the
+ * transaction client since #324 — which is
  * the one call that cannot happen unless the whole chain ran.
  *
  * The `organization.findUnique` mock branches on the `where`/`select` shape rather than returning
@@ -27,9 +28,15 @@ const { dbMock, writeAuditLog } = vi.hoisted(() => ({
 	writeAuditLog: vi.fn().mockResolvedValue(undefined),
 	dbMock: {
 		organization: { findUnique: vi.fn(), update: vi.fn() },
-		workSchedule: { findMany: vi.fn() }
+		workSchedule: { findMany: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
+
+// #324: the threshold write and its audit row now share a transaction, so the update lands on the
+// transaction client. Asserting on `tx.organization.update` rather than `tx.organization.update`
+// is what makes a revert to the untransacted shape fail here.
+const tx = { organization: { update: vi.fn() } }
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog }))
@@ -74,7 +81,8 @@ const CTX = {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.organization.update.mockResolvedValue({})
+	tx.organization.update.mockResolvedValue({})
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<void>) => fn(tx))
 	dbMock.workSchedule.findMany.mockResolvedValue([])
 	dbMock.organization.findUnique.mockImplementation(
 		({ where, select }: { where: { id: string }; select: Record<string, boolean> }) =>
@@ -111,7 +119,7 @@ describe('A14 — isValidAmPmMinGap bounds table', () => {
 describe('#162 Amendment 1 — the setAmPmMinGap action (A15–A19)', () => {
 	it('A15 an empty field clears the column back to NULL (the built-in default)', async () => {
 		const res = await actions.setAmPmMinGap!(event(JOJO, { minutes: '' }))
-		expect(dbMock.organization.update).toHaveBeenCalledWith({
+		expect(tx.organization.update).toHaveBeenCalledWith({
 			where: { id: JOJO },
 			data: { amPmMinGapMinutes: null }
 		})
@@ -120,7 +128,7 @@ describe('#162 Amendment 1 — the setAmPmMinGap action (A15–A19)', () => {
 
 	it('A15b a whitespace-only field clears too — the value is trimmed before it is parsed', async () => {
 		await actions.setAmPmMinGap!(event(JOJO, { minutes: '   ' }))
-		expect(dbMock.organization.update).toHaveBeenCalledWith({
+		expect(tx.organization.update).toHaveBeenCalledWith({
 			where: { id: JOJO },
 			data: { amPmMinGapMinutes: null }
 		})
@@ -143,7 +151,7 @@ describe('#162 Amendment 1 — the setAmPmMinGap action (A15–A19)', () => {
 			// the input instead of dropping it in the shared page-top banner (#142 convention).
 			expect(res.data.field, raw).toBe('minutes')
 		}
-		expect(dbMock.organization.update).not.toHaveBeenCalled()
+		expect(tx.organization.update).not.toHaveBeenCalled()
 	})
 
 	it('A16b a whole number outside 5–240 is rejected with the bounds message', async () => {
@@ -156,12 +164,12 @@ describe('#162 Amendment 1 — the setAmPmMinGap action (A15–A19)', () => {
 			expect(res.data.error, raw).toBe('The AM/PM gap must be between 5 and 240 minutes.')
 			expect(res.data.field, raw).toBe('minutes')
 		}
-		expect(dbMock.organization.update).not.toHaveBeenCalled()
+		expect(tx.organization.update).not.toHaveBeenCalled()
 	})
 
 	it('A17 a valid value is written to the session org', async () => {
 		const res = await actions.setAmPmMinGap!(event(JOJO, { minutes: '45' }))
-		expect(dbMock.organization.update).toHaveBeenCalledWith({
+		expect(tx.organization.update).toHaveBeenCalledWith({
 			where: { id: JOJO },
 			data: { amPmMinGapMinutes: 45 }
 		})
@@ -172,21 +180,21 @@ describe('#162 Amendment 1 — the setAmPmMinGap action (A15–A19)', () => {
 		await expect(actions.setAmPmMinGap!(event(VEENT, { minutes: '45' }))).rejects.toMatchObject({
 			status: 404
 		})
-		expect(dbMock.organization.update).not.toHaveBeenCalled()
+		expect(tx.organization.update).not.toHaveBeenCalled()
 	})
 
 	it('A18b a user without MANAGE_HR gets a 403 and never reaches the setter', async () => {
 		await expect(
 			actions.setAmPmMinGap!(event(JOJO, { minutes: '45' }, ['EMPLOYEE']))
 		).rejects.toMatchObject({ status: 403 })
-		expect(dbMock.organization.update).not.toHaveBeenCalled()
+		expect(tx.organization.update).not.toHaveBeenCalled()
 	})
 
 	it('A19 a form-supplied organizationId is ignored — one tenant cannot move another’s', async () => {
 		await actions.setAmPmMinGap!(
 			event(JOJO, { minutes: '45', organizationId: SWEETLEAF, id: SWEETLEAF })
 		)
-		expect(dbMock.organization.update).toHaveBeenCalledWith({
+		expect(tx.organization.update).toHaveBeenCalledWith({
 			where: { id: JOJO },
 			data: { amPmMinGapMinutes: 45 }
 		})
@@ -202,7 +210,9 @@ describe('#162 Amendment 1 — the setAmPmMinGap action (A15–A19)', () => {
 				entityType: 'Organization',
 				entityId: JOJO,
 				newValue: { amPmMinGapMinutes: 45 }
-			})
+			}),
+			// #324: the audit write shares the transaction that made the change.
+			tx
 		)
 	})
 })
@@ -212,7 +222,7 @@ describe('A21 — the service enforces the bounds itself (second layer)', () => 
 		await expect(setOrgAmPmMinGap(JOJO, 241, CTX)).rejects.toMatchObject({ status: 400 })
 		await expect(setOrgAmPmMinGap(JOJO, 4, CTX)).rejects.toMatchObject({ status: 400 })
 		await expect(setOrgAmPmMinGap(JOJO, 12.5, CTX)).rejects.toMatchObject({ status: 400 })
-		expect(dbMock.organization.update).not.toHaveBeenCalled()
+		expect(tx.organization.update).not.toHaveBeenCalled()
 		expect(writeAuditLog).not.toHaveBeenCalled()
 	})
 
@@ -220,7 +230,7 @@ describe('A21 — the service enforces the bounds itself (second layer)', () => 
 		await setOrgAmPmMinGap(JOJO, null, CTX)
 		await setOrgAmPmMinGap(JOJO, 5, CTX)
 		await setOrgAmPmMinGap(JOJO, 240, CTX)
-		expect(dbMock.organization.update).toHaveBeenCalledTimes(3)
+		expect(tx.organization.update).toHaveBeenCalledTimes(3)
 	})
 })
 

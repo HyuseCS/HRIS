@@ -20,9 +20,16 @@ const { dbMock, writeAuditLog } = vi.hoisted(() => ({
 	writeAuditLog: vi.fn(),
 	dbMock: {
 		employee: { findUnique: vi.fn() },
-		timeLog: { findFirst: vi.fn(), create: vi.fn() }
+		timeLog: { findFirst: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
+
+// #324: the punch insert and its audit row now share a transaction, so the create lands on the
+// transaction client. `dbMock.timeLog` deliberately carries NO `create` — a revert to the
+// untransacted `db.timeLog.create` fails here rather than passing on a stale mock. The dedup
+// pre-check read stays on `dbMock`, outside the transaction, where the service still does it.
+const tx = { timeLog: { create: vi.fn() } }
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog }))
@@ -50,11 +57,14 @@ beforeEach(() => {
 		Promise.resolve(where.id === EMP_ID || where.discordId === DISCORD_ID ? EMPLOYEE : null)
 	)
 	dbMock.timeLog.findFirst.mockResolvedValue(null)
-	dbMock.timeLog.create.mockResolvedValue({ id: 'tl1', timestamp: AT })
+	tx.timeLog.create.mockResolvedValue({ id: 'tl1', timestamp: AT })
+	// Mirrors Prisma's interactive transaction: the callback's rejection propagates out unchanged,
+	// which is what keeps the P2002 -> 409 mapping in C6 working from outside the transaction.
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 /** The `data` object the last `timeLog.create` was called with. */
-const createdData = () => dbMock.timeLog.create.mock.calls.at(-1)![0].data
+const createdData = () => tx.timeLog.create.mock.calls.at(-1)![0].data
 
 describe('C1 — a WEB punch persists its location', () => {
 	it('writes source, coordinates, accuracy and a capture timestamp', async () => {
@@ -93,6 +103,8 @@ describe('C1 — a WEB punch persists its location', () => {
 		expect(newValue).not.toHaveProperty('longitude')
 		expect(newValue).not.toHaveProperty('locationAccuracyM')
 		expect(JSON.stringify(newValue)).not.toContain('124.64')
+		// #324: the audit write shares the transaction that inserted the punch.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('records an accuracy-less reading as null rather than dropping the reading', async () => {
@@ -168,7 +180,7 @@ describe('C4 — employee resolution branches on which key was given', () => {
 		await expect(
 			recordPunch({ employeeId: 'not-an-employee', punchType: 'IN', timestamp: AT })
 		).rejects.toMatchObject({ status: 404 })
-		expect(dbMock.timeLog.create).not.toHaveBeenCalled()
+		expect(tx.timeLog.create).not.toHaveBeenCalled()
 	})
 })
 
@@ -189,14 +201,14 @@ describe('C5 — dedupKey debounces a repeated web punch', () => {
 		dbMock.timeLog.findFirst.mockImplementation(({ where }) =>
 			Promise.resolve(written.includes(where.dedupKey) ? { id: 'tl1' } : null)
 		)
-		dbMock.timeLog.create.mockImplementation(({ data }) => {
+		tx.timeLog.create.mockImplementation(({ data }) => {
 			written.push(data.dedupKey)
 			return Promise.resolve({ id: 'tl1', timestamp: AT })
 		})
 
 		await recordPunch(args)
 		await expect(recordPunch(args)).rejects.toMatchObject({ status: 409 })
-		expect(dbMock.timeLog.create).toHaveBeenCalledTimes(1)
+		expect(tx.timeLog.create).toHaveBeenCalledTimes(1)
 	})
 
 	it('checks the dedupKey against the punching employee, not globally', async () => {
@@ -218,8 +230,11 @@ describe('C5 — dedupKey debounces a repeated web punch', () => {
 })
 
 describe('C6 — a P2002 race is a 409, never a 500', () => {
+	// #324: the create moved inside a transaction and the try/catch stayed outside it. Prisma
+	// rethrows the original error object after rolling back, so the P2002 test still matches —
+	// this is the test that proves a duplicate punch is still a 409 and not a 500.
 	it('maps the unique violation the pre-check raced past', async () => {
-		dbMock.timeLog.create.mockRejectedValue(
+		tx.timeLog.create.mockRejectedValue(
 			new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: '5' })
 		)
 		await expect(

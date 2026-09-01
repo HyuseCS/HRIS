@@ -213,7 +213,7 @@ export async function createTimesheet(
 		})
 		if (existing) error(409, 'Timesheet for this period already exists')
 
-		return tx.timesheet.create({
+		const created = await tx.timesheet.create({
 			data: {
 				employeeId,
 				periodStart,
@@ -223,13 +223,21 @@ export async function createTimesheet(
 			},
 			include: { entries: true }
 		})
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Timesheet',
-		entityId: ts.id,
-		newValue: { periodStart, periodEnd, totalHours }
+		// #324: the audit row joins the transaction that already holds the lock and the insert, so
+		// a failed audit write can no longer leave a new timesheet standing unrecorded. The advisory
+		// lock above stays the first statement — nothing added here comes before it.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Timesheet',
+				entityId: created.id,
+				newValue: { periodStart, periodEnd, totalHours }
+			},
+			tx
+		)
+		return created
 	})
 
 	return ts
@@ -255,9 +263,17 @@ export async function updateTimesheetEntries(
 
 	const totalHours = entries.reduce((sum, e) => sum + e.hoursWorked, 0)
 
+	// #324: the audit row joins the transaction that replaces the entries. The before-image is
+	// re-read inside it rather than carried from the `getTimesheet` above, where two concurrent
+	// edits both read the same pre-edit state and log the same oldValue.
 	const updated = await db.$transaction(async (tx) => {
+		const before = await tx.timesheet.findUniqueOrThrow({
+			where: { id },
+			select: { totalHours: true, _count: { select: { entries: true } } }
+		})
+
 		await tx.timesheetEntry.deleteMany({ where: { timesheetId: id } })
-		return tx.timesheet.update({
+		const row = await tx.timesheet.update({
 			where: { id },
 			data: {
 				totalHours,
@@ -267,14 +283,19 @@ export async function updateTimesheetEntries(
 			},
 			include: { entries: { orderBy: { date: 'asc' } } }
 		})
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Timesheet',
-		entityId: id,
-		oldValue: { entries: ts.entries.length, totalHours: Number(ts.totalHours) },
-		newValue: { entries: entries.length, totalHours }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Timesheet',
+				entityId: id,
+				oldValue: { entries: before._count.entries, totalHours: Number(before.totalHours) },
+				newValue: { entries: entries.length, totalHours }
+			},
+			tx
+		)
+		return row
 	})
 
 	return updated
@@ -293,14 +314,20 @@ export async function submitTimesheet(id: string, employeeId: string, ctx: Audit
 		// Self-submit lane (owner submits their own sheet). Post-#165 only Manager/HR reach
 		// this — employees are view-only — so MAKE stays pending for a different checker (#134/#214).
 		await createTimesheetChain(tx, id, null)
-		return ts2
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Timesheet',
-		entityId: id,
-		newValue: { status: 'SUBMITTED' }
+		// #324: the audit row joins the transaction that opens the approval chain — a failed audit
+		// write must not leave a sheet SUBMITTED with no record of the submission.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Timesheet',
+				entityId: id,
+				newValue: { status: 'SUBMITTED' }
+			},
+			tx
+		)
+		return ts2
 	})
 
 	return updated
@@ -318,18 +345,27 @@ export async function deleteTimesheet(id: string, organizationId: string, ctx: A
 	if (isOwner && ts.status !== 'DRAFT' && ts.status !== 'REJECTED')
 		error(400, 'You can only delete your own draft timesheet')
 
-	await db.timesheet.delete({ where: { id } })
+	// #324: the delete and its audit row commit together. This is the one audit row that cannot be
+	// reconstructed from the surviving data — the timesheet and its entries are gone — so a failed
+	// audit write here destroyed the record outright.
+	await db.$transaction(async (tx) => {
+		await tx.timesheet.delete({ where: { id } })
 
-	await writeAuditLog(ctx, {
-		action: 'DELETE',
-		entityType: 'Timesheet',
-		entityId: id,
-		oldValue: {
-			periodStart: ts.periodStart,
-			periodEnd: ts.periodEnd,
-			status: ts.status,
-			entries: ts.entries.length
-		}
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'DELETE',
+				entityType: 'Timesheet',
+				entityId: id,
+				oldValue: {
+					periodStart: ts.periodStart,
+					periodEnd: ts.periodEnd,
+					status: ts.status,
+					entries: ts.entries.length
+				}
+			},
+			tx
+		)
 	})
 
 	return { deleted: true }
@@ -349,6 +385,14 @@ export async function submitDraftByHr(id: string, organizationId: string, ctx: A
 	if (ts.status !== 'DRAFT') error(400, 'Only draft timesheets can be submitted here')
 
 	return db.$transaction(async (tx) => {
+		// #324: the before-image is read inside the transaction that overwrites it. Carrying
+		// `ts.status` down from the `getTimesheet` above let two concurrent submits log the same
+		// oldValue; the `updateMany` guard below already makes DRAFT the only state that commits.
+		const before = await tx.timesheet.findUniqueOrThrow({
+			where: { id },
+			select: { status: true }
+		})
+
 		// Re-check DRAFT inside the write itself — a concurrent submit or review between
 		// the read above and this update must not be stomped back to SUBMITTED.
 		const res = await tx.timesheet.updateMany({
@@ -366,7 +410,7 @@ export async function submitDraftByHr(id: string, organizationId: string, ctx: A
 				action: 'UPDATE',
 				entityType: 'Timesheet',
 				entityId: id,
-				oldValue: { status: ts.status },
+				oldValue: { status: before.status },
 				newValue: { status: 'SUBMITTED', source: 'hr_submit_on_behalf' }
 			},
 			tx
@@ -408,22 +452,32 @@ export async function reviewTimesheet(
 	// Legacy fallback: a step-less timesheet reviews directly under the caller's org scope
 	// (the route already required the reviewer role; the self-review guard is above).
 	if (!live || !live.currentStep) {
-		const updated = await db.timesheet.update({
-			where: { id },
-			data: {
-				status: approved ? 'APPROVED' : 'REJECTED',
-				reviewedAt: new Date(),
-				reviewedById: ctx.actorId,
-				rejectionReason: approved ? null : rejectionReason
-			}
+		// #324: this legacy path is a second, separate write in this function — the chain path
+		// below has its own transaction and does not cover it. The decision and its audit row
+		// commit together here too: an approval that reaches payroll with no record of who
+		// approved it is the worst version of this bug.
+		return await db.$transaction(async (tx) => {
+			const updated = await tx.timesheet.update({
+				where: { id },
+				data: {
+					status: approved ? 'APPROVED' : 'REJECTED',
+					reviewedAt: new Date(),
+					reviewedById: ctx.actorId,
+					rejectionReason: approved ? null : rejectionReason
+				}
+			})
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: 'Timesheet',
+					entityId: id,
+					newValue: { status: updated.status, rejectionReason }
+				},
+				tx
+			)
+			return updated
 		})
-		await writeAuditLog(ctx, {
-			action: 'UPDATE',
-			entityType: 'Timesheet',
-			entityId: id,
-			newValue: { status: updated.status, rejectionReason }
-		})
-		return updated
 	}
 
 	const step = live.currentStep
@@ -462,7 +516,7 @@ export async function reviewTimesheet(
 				decidedAt: new Date()
 			}
 		})
-		return tx.timesheet.update({
+		const row = await tx.timesheet.update({
 			where: { id },
 			data: {
 				status: tsStatus,
@@ -470,13 +524,19 @@ export async function reviewTimesheet(
 				rejectionReason: tsStatus === 'REJECTED' ? (rejectionReason ?? null) : null
 			}
 		})
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Timesheet',
-		entityId: id,
-		newValue: { stage: step.stage, decision, status: tsStatus }
+		// #324: the audit row joins the transaction that records the stage decision.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Timesheet',
+				entityId: id,
+				newValue: { stage: step.stage, decision, status: tsStatus }
+			},
+			tx
+		)
+		return row
 	})
 
 	return updated
