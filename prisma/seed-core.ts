@@ -461,8 +461,8 @@ export async function seedProd(db: PrismaClient) {
 		}
 	})
 
-	// CEO (#132): the exclusive role-changer, member of all three tenants. Executive
-	// access account — no Employee record; its authority is cross-org via memberships.
+	// CEO (#132): the exclusive role-changer, member of all three tenants. Its authority is
+	// cross-org via memberships; it also gets an Employee profile below (#6).
 	const ceoHash = await bcrypt.hash('Ceo@1234', 12)
 	const ceo = await db.user.upsert({
 		where: { email: 'ceo@veent.ph' },
