@@ -138,6 +138,8 @@ export const actions: Actions = {
 
 		// Written before the payload is returned, so a failed write means no reveal — a reveal
 		// that outlived its record is exactly the defect this fixes.
+		// #5: deliberately NOT transactional — `db`, not a `tx`. This audits a READ; that ordering
+		// is the whole guarantee, and there is no mutation to roll back with.
 		await writeAuditLog(
 			{
 				organizationId: user.organizationId,
@@ -146,7 +148,8 @@ export const actions: Actions = {
 				ipAddress: getClientAddress(),
 				userAgent: request.headers.get('user-agent') ?? undefined
 			},
-			{ action: 'VIEW', entityType: 'AuditLog', entityId: entry.id }
+			{ action: 'VIEW', entityType: 'AuditLog', entityId: entry.id },
+			db
 		)
 
 		return { revealed: entry }
