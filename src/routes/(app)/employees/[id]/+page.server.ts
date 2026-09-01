@@ -616,8 +616,10 @@ export const actions: Actions = scopedToEmployee({
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		// A self-reveal (an HR user opening their own 201 file) is exempt from the audit log —
 		// own data, decision #2. Same identity comparison as load's object-level access check.
-		const self = await db.employee.findUnique({
-			where: { userId: locals.user!.id },
+		// #6: the ACTIVE org, not the home tenant. Null here means `isSelf` is false and the
+		// reveal IS audited — the safe direction for a lookup that only suppresses the audit row.
+		const self = await db.employee.findFirst({
+			where: { userId: locals.user!.id, organizationId: locals.user!.organizationId },
 			select: { id: true }
 		})
 		const isSelf = self?.id === params.id

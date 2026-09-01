@@ -10,8 +10,10 @@ import type { RequestHandler } from './$types'
 // The current user's own reviews (as subject) and reviews assigned to them (as reviewer).
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) error(401, 'Unauthorized')
-	const me = await db.employee.findUnique({
-		where: { userId: locals.user.id },
+	// #6: the ACTIVE org, not the home tenant — the page twin
+	// (`/performance/+page.server.ts`) scopes the same lookup the same way.
+	const me = await db.employee.findFirst({
+		where: { userId: locals.user.id, organizationId: locals.user.organizationId },
 		select: { id: true }
 	})
 	if (!me) return json({ asSubject: [], asReviewer: [] })

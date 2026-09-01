@@ -35,10 +35,10 @@ function structureOf(templateSnapshot: unknown) {
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const user = locals.user!
 	const review = await getReview(params.id, user.organizationId)
-	const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+	const meId = await myEmployeeId(user)
 
-	const isSubject = me?.id === review.employee.id
-	const isReviewer = me?.id === review.reviewer.id
+	const isSubject = meId === review.employee.id
+	const isReviewer = meId === review.reviewer.id
 
 	// A review is private to its two participants. Org scoping alone let any colleague
 	// read someone's self-assessment, manager comments and rating by walking ids —
@@ -143,8 +143,23 @@ function ctxOf(locals: App.Locals, ip: string) {
 		ipAddress: ip
 	}
 }
-async function myEmployeeId(userId: string) {
-	return (await db.employee.findUnique({ where: { userId }, select: { id: true } }))?.id ?? ''
+/**
+ * The caller's employee row IN THE ACTIVE ORG, or `null` when they have none there (#6).
+ *
+ * Takes the user object rather than a bare id so the org value is in the signature, matching
+ * `findSelfEmployee(user)` at `punch/+page.server.ts:40`.
+ *
+ * Returns `null`, never `''`: an empty string type-checks as a valid employee id and reads as a
+ * person who does not exist. The services already reject it (they compare it against the review's
+ * own participants and throw 409), so this is a message-quality fix — the caller now gets "No
+ * employee profile found." instead of "Only the review subject can submit a self-assessment".
+ */
+async function myEmployeeId(user: { id: string; organizationId: string }) {
+	const me = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
+	return me?.id ?? null
 }
 async function run(fn: () => Promise<unknown>) {
 	try {
@@ -160,7 +175,8 @@ export const actions: Actions = {
 	saveSelf: async ({ request, locals, params, getClientAddress }) => {
 		const text = (await request.formData()).get('selfAssessment') as string
 		if (!text?.trim()) return fail(422, { error: 'Self-assessment cannot be empty' })
-		const employeeId = await myEmployeeId(locals.user!.id)
+		const employeeId = await myEmployeeId(locals.user!)
+		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 		return run(() =>
 			saveSelfAssessment(params.id, employeeId, text, ctxOf(locals, getClientAddress()))
 		)
@@ -182,7 +198,8 @@ export const actions: Actions = {
 	 */
 	submitScores: async ({ request, locals, params, getClientAddress }) => {
 		const data = await request.formData()
-		const reviewerId = await myEmployeeId(locals.user!.id)
+		const reviewerId = await myEmployeeId(locals.user!)
+		if (!reviewerId) return fail(400, { error: 'No employee profile found.' })
 		const review = await getReview(params.id, locals.user!.organizationId)
 
 		// IDENTITY BEFORE CONTENT, matching the service's own guard order: a non-reviewer never
@@ -221,7 +238,8 @@ export const actions: Actions = {
 		if (!parsed.success) {
 			return fail(422, { error: parsed.error.issues[0]?.message ?? 'Comments cannot be empty' })
 		}
-		const employeeId = await myEmployeeId(locals.user!.id)
+		const employeeId = await myEmployeeId(locals.user!)
+		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 		return run(() =>
 			saveEmployeeComments(
 				params.id,
@@ -233,7 +251,8 @@ export const actions: Actions = {
 	},
 
 	acknowledge: async ({ locals, params, getClientAddress }) => {
-		const employeeId = await myEmployeeId(locals.user!.id)
+		const employeeId = await myEmployeeId(locals.user!)
+		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 		return run(() => acknowledgeReview(params.id, employeeId, ctxOf(locals, getClientAddress())))
 	},
 

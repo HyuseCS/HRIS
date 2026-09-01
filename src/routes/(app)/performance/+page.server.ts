@@ -31,7 +31,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		: 0
 	const stalledSignoffs = canHrOrgwide ? await listStalledSignoffs(user.organizationId) : []
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	// #6: the ACTIVE org, not the home tenant — a multi-org account must not see the other
+	// tenant's reviews here. Only `.id` is read below, so the select stays narrow.
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
 	if (!myEmployee) {
 		return {
 			myReviews: [],
