@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		where: {
 			status: 'SUBMITTED',
 			...(myEmployee ? { employeeId: { not: myEmployee.id } } : {}),
-			employee: { user: { organizationId: user.organizationId } }
+			employee: { organizationId: user.organizationId }
 		},
 		include: {
 			employee: { select: { id: true, firstName: true, lastName: true } },

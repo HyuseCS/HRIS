@@ -65,7 +65,7 @@ interface TimesheetListParams {
 
 function timesheetListWhere(params: TimesheetListParams) {
 	return {
-		employee: { user: { organizationId: params.organizationId } },
+		employee: { organizationId: params.organizationId },
 		...(params.employeeId && { employeeId: params.employeeId }),
 		...(params.excludeEmployeeId && { employeeId: { not: params.excludeEmployeeId } }),
 		...(params.status && { status: params.status as never })
@@ -93,7 +93,7 @@ export async function listTimesheets(
 
 export async function getTimesheet(id: string, organizationId: string) {
 	const ts = await db.timesheet.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		include: {
 			employee: { select: { id: true, firstName: true, lastName: true, reportsToId: true } },
 			entries: { orderBy: { date: 'asc' } }
@@ -388,7 +388,7 @@ export async function reviewTimesheet(
 	ctx: AuditContext
 ) {
 	const ts = await db.timesheet.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		include: { employee: { select: { reportsToId: true } }, approvalSteps: true }
 	})
 	if (!ts) error(404, 'Timesheet not found')

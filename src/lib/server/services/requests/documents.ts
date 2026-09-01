@@ -88,7 +88,7 @@ export async function saveRequestDocuments(
 	if (!files.length) return []
 
 	const req = await db.request.findFirst({
-		where: { id: requestId, employeeId, employee: { user: { organizationId } } },
+		where: { id: requestId, employeeId, employee: { organizationId } },
 		// #299/D-5: the cap means 5 LIVE documents. Tombstones are kept forever, so counting them
 		// would lock a requester out of their own request after two swaps — the cap would ratchet
 		// down instead of holding. Filtered `_count` is supported by the installed Prisma 5.22.
@@ -158,7 +158,7 @@ export async function saveRequestDocuments(
 // three for everyone.
 export async function getRequestDocument(docId: string, organizationId: string) {
 	const doc = await db.requestDocument.findFirst({
-		where: { id: docId, request: { employee: { user: { organizationId } } } },
+		where: { id: docId, request: { employee: { organizationId } } },
 		include: { request: { select: { id: true, employeeId: true } } }
 	})
 	if (!doc) error(404, 'Document not found')

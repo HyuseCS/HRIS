@@ -206,7 +206,7 @@ export async function decide(
 	actorEmployeeId: string | null
 ) {
 	const req = await db.request.findFirst({
-		where: { id: requestId, employee: { user: { organizationId: ctx.organizationId } } },
+		where: { id: requestId, employee: { organizationId: ctx.organizationId } },
 		include: {
 			steps: { orderBy: [{ attempt: 'asc' }, { stageIndex: 'asc' }] },
 			employee: { select: { reportsToId: true, userId: true } },
@@ -355,7 +355,7 @@ export async function listPendingRequestsForApprover(
 	actorUserId: string
 ) {
 	const pending = await db.request.findMany({
-		where: { status: 'PENDING', employee: { user: { organizationId } } },
+		where: { status: 'PENDING', employee: { organizationId } },
 		include: {
 			steps: { orderBy: [{ attempt: 'asc' }, { stageIndex: 'asc' }] },
 			employee: { select: { id: true, firstName: true, lastName: true, reportsToId: true } },
@@ -515,7 +515,7 @@ export async function countActionableTimesheets(
 		where: {
 			status: 'SUBMITTED',
 			...(actorEmployeeId ? { employeeId: { not: actorEmployeeId } } : {}),
-			employee: { user: { organizationId } }
+			employee: { organizationId }
 		},
 		select: {
 			employeeId: true,

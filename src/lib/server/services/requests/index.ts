@@ -27,7 +27,7 @@ export async function createRequest(
 	const cols = deriveRequestColumns(parsed)
 
 	const employee = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, reportsToId: true, startDate: true }
 	})
 	if (!employee) error(404, 'Employee not found')
@@ -96,7 +96,7 @@ interface RequestListParams {
 
 function requestListWhere(params: RequestListParams): Prisma.RequestWhereInput {
 	return {
-		employee: { user: { organizationId: params.organizationId } },
+		employee: { organizationId: params.organizationId },
 		// Both forms combine rather than overwrite. As two spreads onto the same key the allow-list
 		// won, so a caller supplying both would have had its single-id filter silently widened to the
 		// whole list — the fail-open direction, and the exact class of bug #275 is about.
@@ -147,7 +147,7 @@ export async function listRequests(
 // the easiest place in the codebase to reintroduce the bug by "tidying up".
 export async function getRequest(id: string, organizationId: string) {
 	const req = await db.request.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		include: {
 			employee: { select: { id: true, firstName: true, lastName: true } },
 			steps: {
@@ -235,7 +235,7 @@ export async function cancelRequest(id: string, employeeId: string, ctx: AuditCo
 // delete only their own requests; HR_ADMIN / SUPER_ADMIN may delete any request in their org.
 export async function deleteRequest(id: string, organizationId: string, ctx: AuditContext) {
 	const req = await db.request.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		select: {
 			id: true,
 			status: true,
