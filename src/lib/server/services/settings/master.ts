@@ -25,23 +25,30 @@ export async function updateCompanyInfo(
 	},
 	ctx: AuditContext
 ) {
-	const updated = await db.organization.update({
-		where: { id: organizationId },
-		data: {
-			name: input.name.trim(),
-			address: input.address ?? null,
-			logoUrl: input.logoUrl ?? null,
-			discordInviteUrl: input.discordInviteUrl ?? null
-		},
-		select: { id: true, name: true, address: true, logoUrl: true, discordInviteUrl: true }
+	// Mutation + audit share a transaction so a failed audit write rolls back the change.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.organization.update({
+			where: { id: organizationId },
+			data: {
+				name: input.name.trim(),
+				address: input.address ?? null,
+				logoUrl: input.logoUrl ?? null,
+				discordInviteUrl: input.discordInviteUrl ?? null
+			},
+			select: { id: true, name: true, address: true, logoUrl: true, discordInviteUrl: true }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Organization',
+				entityId: organizationId,
+				newValue: { name: updated.name }
+			},
+			tx
+		)
+		return updated
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Organization',
-		entityId: organizationId,
-		newValue: { name: updated.name }
-	})
-	return updated
 }
 
 // ─── Earning / deduction codes ────────────────────────────────────────────────
@@ -62,22 +69,23 @@ export async function createEarningType(
 	const code = input.code.trim().toUpperCase()
 	const exists = await db.earningType.findFirst({ where: { organizationId, code } })
 	if (exists) error(409, `Earning code "${code}" already exists`)
-	const created = await db.earningType.create({
-		data: {
-			organizationId,
-			code,
-			label: input.label.trim(),
-			taxable: input.taxable,
-			multiplier: input.multiplier ?? null
-		}
+	return await db.$transaction(async (tx) => {
+		const created = await tx.earningType.create({
+			data: {
+				organizationId,
+				code,
+				label: input.label.trim(),
+				taxable: input.taxable,
+				multiplier: input.multiplier ?? null
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{ action: 'CREATE', entityType: 'EarningType', entityId: created.id, newValue: { code } },
+			tx
+		)
+		return created
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'EarningType',
-		entityId: created.id,
-		newValue: { code }
-	})
-	return created
 }
 
 export async function createDeductionType(
@@ -88,16 +96,17 @@ export async function createDeductionType(
 	const code = input.code.trim().toUpperCase()
 	const exists = await db.deductionType.findFirst({ where: { organizationId, code } })
 	if (exists) error(409, `Deduction code "${code}" already exists`)
-	const created = await db.deductionType.create({
-		data: { organizationId, code, label: input.label.trim(), isStatutory: input.isStatutory }
+	return await db.$transaction(async (tx) => {
+		const created = await tx.deductionType.create({
+			data: { organizationId, code, label: input.label.trim(), isStatutory: input.isStatutory }
+		})
+		await writeAuditLog(
+			ctx,
+			{ action: 'CREATE', entityType: 'DeductionType', entityId: created.id, newValue: { code } },
+			tx
+		)
+		return created
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'DeductionType',
-		entityId: created.id,
-		newValue: { code }
-	})
-	return created
 }
 
 // Codes are referenced by historical payroll rows, so we deactivate rather than delete.
@@ -107,14 +116,20 @@ export async function toggleEarningType(organizationId: string, id: string, ctx:
 		select: { id: true, isActive: true }
 	})
 	if (!et) error(404, 'Earning code not found')
-	const updated = await db.earningType.update({ where: { id }, data: { isActive: !et.isActive } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'EarningType',
-		entityId: id,
-		newValue: { isActive: updated.isActive }
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.earningType.update({ where: { id }, data: { isActive: !et.isActive } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'EarningType',
+				entityId: id,
+				newValue: { isActive: updated.isActive }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 export async function toggleDeductionType(organizationId: string, id: string, ctx: AuditContext) {
@@ -123,14 +138,23 @@ export async function toggleDeductionType(organizationId: string, id: string, ct
 		select: { id: true, isActive: true }
 	})
 	if (!dt) error(404, 'Deduction code not found')
-	const updated = await db.deductionType.update({ where: { id }, data: { isActive: !dt.isActive } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'DeductionType',
-		entityId: id,
-		newValue: { isActive: updated.isActive }
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.deductionType.update({
+			where: { id },
+			data: { isActive: !dt.isActive }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'DeductionType',
+				entityId: id,
+				newValue: { isActive: updated.isActive }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 // ─── Salary grades / bands ────────────────────────────────────────────────────
@@ -165,22 +189,23 @@ export async function createSalaryGrade(
 	}
 	const exists = await db.salaryGrade.findFirst({ where: { organizationId, name } })
 	if (exists) error(409, `Grade "${name}" already exists`)
-	const created = await db.salaryGrade.create({
-		data: {
-			organizationId,
-			name,
-			minSalary: input.minSalary,
-			midSalary: input.midSalary,
-			maxSalary: input.maxSalary
-		}
+	return await db.$transaction(async (tx) => {
+		const created = await tx.salaryGrade.create({
+			data: {
+				organizationId,
+				name,
+				minSalary: input.minSalary,
+				midSalary: input.midSalary,
+				maxSalary: input.maxSalary
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{ action: 'CREATE', entityType: 'SalaryGrade', entityId: created.id, newValue: { name } },
+			tx
+		)
+		return created
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'SalaryGrade',
-		entityId: created.id,
-		newValue: { name }
-	})
-	return created
 }
 
 export async function toggleSalaryGrade(organizationId: string, id: string, ctx: AuditContext) {
@@ -189,14 +214,20 @@ export async function toggleSalaryGrade(organizationId: string, id: string, ctx:
 		select: { id: true, isActive: true }
 	})
 	if (!g) error(404, 'Grade not found')
-	const updated = await db.salaryGrade.update({ where: { id }, data: { isActive: !g.isActive } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'SalaryGrade',
-		entityId: id,
-		newValue: { isActive: updated.isActive }
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.salaryGrade.update({ where: { id }, data: { isActive: !g.isActive } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'SalaryGrade',
+				entityId: id,
+				newValue: { isActive: updated.isActive }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 // Assign (or clear, with null) a position's grade.
@@ -218,14 +249,23 @@ export async function assignPositionGrade(
 		})
 		if (!grade) error(404, 'Grade not found')
 	}
-	const updated = await db.position.update({ where: { id: positionId }, data: { salaryGradeId } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Position',
-		entityId: positionId,
-		newValue: { salaryGradeId }
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.position.update({
+			where: { id: positionId },
+			data: { salaryGradeId }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Position',
+				entityId: positionId,
+				newValue: { salaryGradeId }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 // ─── Leave types ──────────────────────────────────────────────────────────────

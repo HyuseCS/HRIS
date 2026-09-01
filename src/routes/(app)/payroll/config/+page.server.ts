@@ -48,52 +48,58 @@ export const actions: Actions = {
 
 		const { payFrequency, cutoffDay1, cutoffDay2 } = parsed.data
 
-		const existing = await db.payrollConfig.findUnique({
-			where: { organizationId: user.organizationId }
-		})
+		// Mutation + audit share a transaction so a failed audit write rolls back the config
+		// change, and reading `existing` inside it stops two concurrent saves logging the same
+		// oldValue.
+		await db.$transaction(async (tx) => {
+			const existing = await tx.payrollConfig.findUnique({
+				where: { organizationId: user.organizationId }
+			})
 
-		const config = await db.payrollConfig.upsert({
-			where: { organizationId: user.organizationId },
-			create: {
-				organizationId: user.organizationId,
-				payFrequency,
-				firstCutoff: cutoffDay1 ?? null,
-				secondCutoff: cutoffDay2 ?? null,
-				sssTable: {},
-				birTaxTable: {}
-			},
-			update: {
-				payFrequency,
-				firstCutoff: cutoffDay1 ?? null,
-				secondCutoff: cutoffDay2 ?? null
-			}
-		})
-
-		await writeAuditLog(
-			{
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			},
-			{
-				action: 'UPDATE',
-				entityType: 'PayrollConfig',
-				entityId: config.id,
-				oldValue: existing
-					? {
-							payFrequency: existing.payFrequency,
-							firstCutoff: existing.firstCutoff,
-							secondCutoff: existing.secondCutoff
-						}
-					: undefined,
-				newValue: {
+			const config = await tx.payrollConfig.upsert({
+				where: { organizationId: user.organizationId },
+				create: {
+					organizationId: user.organizationId,
+					payFrequency,
+					firstCutoff: cutoffDay1 ?? null,
+					secondCutoff: cutoffDay2 ?? null,
+					sssTable: {},
+					birTaxTable: {}
+				},
+				update: {
 					payFrequency,
 					firstCutoff: cutoffDay1 ?? null,
 					secondCutoff: cutoffDay2 ?? null
 				}
-			}
-		)
+			})
+
+			await writeAuditLog(
+				{
+					organizationId: user.organizationId,
+					actorId: user.id,
+					actorRoles: user.roles,
+					ipAddress: getClientAddress()
+				},
+				{
+					action: 'UPDATE',
+					entityType: 'PayrollConfig',
+					entityId: config.id,
+					oldValue: existing
+						? {
+								payFrequency: existing.payFrequency,
+								firstCutoff: existing.firstCutoff,
+								secondCutoff: existing.secondCutoff
+							}
+						: undefined,
+					newValue: {
+						payFrequency,
+						firstCutoff: cutoffDay1 ?? null,
+						secondCutoff: cutoffDay2 ?? null
+					}
+				},
+				tx
+			)
+		})
 
 		return { success: true }
 	},
@@ -107,40 +113,43 @@ export const actions: Actions = {
 			return fail(400, { error: 'Invalid multiplier values (each must be between 0 and 10).' })
 		}
 
-		const existing = await db.payRateRule.findUnique({
-			where: { organizationId: user.organizationId }
-		})
+		await db.$transaction(async (tx) => {
+			const existing = await tx.payRateRule.findUnique({
+				where: { organizationId: user.organizationId }
+			})
 
-		const rule = await db.payRateRule.upsert({
-			where: { organizationId: user.organizationId },
-			create: { organizationId: user.organizationId, ...parsed.data },
-			update: parsed.data
-		})
+			const rule = await tx.payRateRule.upsert({
+				where: { organizationId: user.organizationId },
+				create: { organizationId: user.organizationId, ...parsed.data },
+				update: parsed.data
+			})
 
-		await writeAuditLog(
-			{
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			},
-			{
-				action: 'UPDATE',
-				entityType: 'PayRateRule',
-				entityId: rule.id,
-				oldValue: existing
-					? {
-							overtime: Number(existing.overtime),
-							overtimePremium: Number(existing.overtimePremium),
-							nightDiff: Number(existing.nightDiff),
-							restDay: Number(existing.restDay),
-							regularHoliday: Number(existing.regularHoliday),
-							specialHoliday: Number(existing.specialHoliday)
-						}
-					: undefined,
-				newValue: parsed.data
-			}
-		)
+			await writeAuditLog(
+				{
+					organizationId: user.organizationId,
+					actorId: user.id,
+					actorRoles: user.roles,
+					ipAddress: getClientAddress()
+				},
+				{
+					action: 'UPDATE',
+					entityType: 'PayRateRule',
+					entityId: rule.id,
+					oldValue: existing
+						? {
+								overtime: Number(existing.overtime),
+								overtimePremium: Number(existing.overtimePremium),
+								nightDiff: Number(existing.nightDiff),
+								restDay: Number(existing.restDay),
+								regularHoliday: Number(existing.regularHoliday),
+								specialHoliday: Number(existing.specialHoliday)
+							}
+						: undefined,
+					newValue: parsed.data
+				},
+				tx
+			)
+		})
 
 		return { success: true }
 	}

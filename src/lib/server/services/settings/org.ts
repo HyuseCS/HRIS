@@ -45,24 +45,31 @@ export async function createPosition(
 	ctx: AuditContext
 ) {
 	try {
-		const position = await db.position.create({
-			data: {
-				organizationId,
-				title: data.title,
-				level: data.level,
-				departmentId: data.departmentId,
-				salaryGradeId: data.salaryGradeId ?? undefined
-			}
-		})
+		// Mutation + audit share a transaction so a failed audit write rolls back the position.
+		return await db.$transaction(async (tx) => {
+			const position = await tx.position.create({
+				data: {
+					organizationId,
+					title: data.title,
+					level: data.level,
+					departmentId: data.departmentId,
+					salaryGradeId: data.salaryGradeId ?? undefined
+				}
+			})
 
-		await writeAuditLog(ctx, {
-			action: 'CREATE',
-			entityType: 'Position',
-			entityId: position.id,
-			newValue: { title: data.title, level: data.level, departmentId: data.departmentId }
-		})
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'CREATE',
+					entityType: 'Position',
+					entityId: position.id,
+					newValue: { title: data.title, level: data.level, departmentId: data.departmentId }
+				},
+				tx
+			)
 
-		return position
+			return position
+		})
 	} catch (err) {
 		// Prisma P2002 = unique constraint violation on @@unique([organizationId, title])
 		if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
@@ -84,38 +91,44 @@ export async function updatePosition(
 	if (!existing) error(404, 'Position not found')
 
 	try {
-		const position = await db.position.update({
-			where: { id },
-			data: {
-				title: data.title,
-				level: data.level,
-				departmentId: data.departmentId,
-				salaryGradeId: data.salaryGradeId,
-				isActive: data.isActive
-			}
-		})
+		return await db.$transaction(async (tx) => {
+			const position = await tx.position.update({
+				where: { id },
+				data: {
+					title: data.title,
+					level: data.level,
+					departmentId: data.departmentId,
+					salaryGradeId: data.salaryGradeId,
+					isActive: data.isActive
+				}
+			})
 
-		await writeAuditLog(ctx, {
-			action: 'UPDATE',
-			entityType: 'Position',
-			entityId: id,
-			oldValue: {
-				title: existing.title,
-				level: existing.level,
-				departmentId: existing.departmentId,
-				salaryGradeId: existing.salaryGradeId,
-				isActive: existing.isActive
-			},
-			newValue: {
-				title: data.title,
-				level: data.level,
-				departmentId: data.departmentId,
-				salaryGradeId: data.salaryGradeId,
-				isActive: data.isActive
-			}
-		})
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: 'Position',
+					entityId: id,
+					oldValue: {
+						title: existing.title,
+						level: existing.level,
+						departmentId: existing.departmentId,
+						salaryGradeId: existing.salaryGradeId,
+						isActive: existing.isActive
+					},
+					newValue: {
+						title: data.title,
+						level: data.level,
+						departmentId: data.departmentId,
+						salaryGradeId: data.salaryGradeId,
+						isActive: data.isActive
+					}
+				},
+				tx
+			)
 
-		return position
+			return position
+		})
 	} catch (err) {
 		if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
 			error(409, 'A position with this title already exists.')
@@ -278,7 +291,7 @@ export async function setUserRoles(
 	// transaction so two concurrent admin requests can't both read "another holder exists" and
 	// both proceed — Serializable makes Prisma throw (P2034) on that conflict instead of letting
 	// both writes land.
-	const { existing, updated } = await db.$transaction(
+	const updated = await db.$transaction(
 		async (tx) => {
 			// GUARDRAIL: user must belong to the same organization.
 			const existing = await tx.user.findFirst({
@@ -300,22 +313,26 @@ export async function setUserRoles(
 				data: { roles }
 			})
 
-			return { existing, updated }
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: 'User',
+					entityId: userId,
+					oldValue: { roles: existing.roles },
+					// #283/Q4: both sides are now the `roles` set, so an entry can be read without knowing
+					// which side of the change it fell on. Historical entries keep the singular `role` key
+					// and are deliberately NOT backfilled — rewriting an audit trail to look consistent is
+					// worse than a trail that shows its own history.
+					newValue: { roles: updated.roles }
+				},
+				tx
+			)
+
+			return updated
 		},
 		{ isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
 	)
-
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'User',
-		entityId: userId,
-		oldValue: { roles: existing.roles },
-		// #283/Q4: both sides are now the `roles` set, so an entry can be read without knowing
-		// which side of the change it fell on. Historical entries keep the singular `role` key and
-		// are deliberately NOT backfilled — rewriting an audit trail to look consistent is worse
-		// than a trail that shows its own history.
-		newValue: { roles: updated.roles }
-	})
 
 	return updated
 }
@@ -333,7 +350,7 @@ export async function setUserActive(
 
 	// See setUserRoles: same atomicity reasoning — target read, holder count and write share one
 	// serializable transaction so the count can't go stale between two concurrent requests.
-	const { existing, updated } = await db.$transaction(
+	const updated = await db.$transaction(
 		async (tx) => {
 			const existing = await tx.user.findFirst({
 				where: { id: userId, organizationId }
@@ -352,18 +369,22 @@ export async function setUserActive(
 				data: { isActive }
 			})
 
-			return { existing, updated }
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: 'User',
+					entityId: userId,
+					oldValue: { isActive: existing.isActive },
+					newValue: { isActive }
+				},
+				tx
+			)
+
+			return updated
 		},
 		{ isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
 	)
-
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'User',
-		entityId: userId,
-		oldValue: { isActive: existing.isActive },
-		newValue: { isActive }
-	})
 
 	return updated
 }
@@ -424,20 +445,26 @@ export async function assignEmployeePosition(
 		if (!position) error(404, 'Position not found')
 	}
 
-	const updated = await db.employee.update({
-		where: { id: employeeId },
-		data: { positionId }
-	})
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.employee.update({
+			where: { id: employeeId },
+			data: { positionId }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Employee',
-		entityId: employeeId,
-		oldValue: { positionId: employee.positionId },
-		newValue: { positionId }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Employee',
+				entityId: employeeId,
+				oldValue: { positionId: employee.positionId },
+				newValue: { positionId }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }
 
 // ─── Reporting hierarchy (org chart) ──────────────────────────────────────────

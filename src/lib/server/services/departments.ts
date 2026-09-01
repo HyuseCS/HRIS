@@ -25,18 +25,25 @@ export async function getDepartment(id: string, organizationId: string) {
 }
 
 export async function createDepartment(organizationId: string, name: string, ctx: AuditContext) {
-	const department = await db.department.create({
-		data: { organizationId, name }
-	})
+	// Mutation + audit share a transaction so a failed audit write rolls back the department.
+	return await db.$transaction(async (tx) => {
+		const department = await tx.department.create({
+			data: { organizationId, name }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Department',
-		entityId: department.id,
-		newValue: { name }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Department',
+				entityId: department.id,
+				newValue: { name }
+			},
+			tx
+		)
 
-	return department
+		return department
+	})
 }
 
 export async function updateDepartment(
@@ -47,20 +54,26 @@ export async function updateDepartment(
 ) {
 	const existing = await getDepartment(id, organizationId)
 
-	const department = await db.department.update({
-		where: { id },
-		data: { name }
-	})
+	return await db.$transaction(async (tx) => {
+		const department = await tx.department.update({
+			where: { id },
+			data: { name }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Department',
-		entityId: id,
-		oldValue: { name: existing.name },
-		newValue: { name }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Department',
+				entityId: id,
+				oldValue: { name: existing.name },
+				newValue: { name }
+			},
+			tx
+		)
 
-	return department
+		return department
+	})
 }
 
 /**
@@ -96,6 +109,12 @@ export async function setDepartmentHead(
 	}
 
 	await db.$transaction(async (tx) => {
+		// #324: the prior head is read inside the transaction — reading it outside lets two
+		// concurrent saves log the same oldValue.
+		const before = await tx.department.findUnique({
+			where: { id: existing.id },
+			select: { headEmployeeId: true }
+		})
 		await tx.department.update({ where: { id: existing.id }, data: { headEmployeeId } })
 		// #324: the audit write shares the transaction it belongs to.
 		await writeAuditLog(
@@ -104,7 +123,7 @@ export async function setDepartmentHead(
 				action: 'UPDATE',
 				entityType: 'Department',
 				entityId: existing.id,
-				oldValue: { headEmployeeId: existing.headEmployeeId },
+				oldValue: { headEmployeeId: before?.headEmployeeId ?? null },
 				newValue: { headEmployeeId }
 			},
 			tx

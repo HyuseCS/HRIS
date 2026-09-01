@@ -46,7 +46,7 @@ const EMPLOYEES = [
 
 const ctx: AuditContext = { organizationId: ORG, actorId: 'user-hr', actorRoles: ['HR_ADMIN'] }
 
-const tx = { department: { update: vi.fn() } }
+const tx = { department: { findUnique: vi.fn(), update: vi.fn() } }
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -67,6 +67,8 @@ beforeEach(() => {
 			) ?? null
 		)
 	)
+	// #324: the prior head is now read inside the transaction, so the tx client must serve it.
+	tx.department.findUnique.mockResolvedValue({ headEmployeeId: DEPARTMENT.headEmployeeId })
 	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<void>) => fn(tx))
 })
 
@@ -77,7 +79,8 @@ describe('setDepartmentHead — write-time invariants', () => {
 			where: { id: DEPT },
 			data: { headEmployeeId: 'emp-member' }
 		})
-		// #324: the audit write shares the transaction.
+		// #324: the audit write shares the transaction, and so does the oldValue read.
+		expect(tx.department.findUnique).toHaveBeenCalled()
 		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
