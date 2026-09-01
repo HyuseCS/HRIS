@@ -33,12 +33,20 @@ const { dbMock, uploadsFromForm, saveRequestDocuments, leaveHelpers } = vi.hoist
 	},
 	dbMock: {
 		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
-		request: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() }
+		request: { findFirst: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
 
+// #5: the create and the delete each share a transaction with their audit entry, so they run on
+// `tx`.
+const tx = { request: { create: vi.fn(), delete: vi.fn() } }
+
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
-vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const writeAuditLog = vi.fn().mockResolvedValue(undefined)
+vi.mock('$lib/server/audit', () => ({
+	writeAuditLog: (...args: unknown[]) => writeAuditLog(...args)
+}))
 vi.mock('$lib/server/services/requests/documents', () => ({
 	uploadsFromForm,
 	saveRequestDocuments
@@ -90,7 +98,7 @@ const LEAVE_FIELDS = {
 
 /** The chain `request.create` was asked to write. */
 const writtenChain = () => {
-	const data = dbMock.request.create.mock.calls[0][0].data
+	const data = tx.request.create.mock.calls[0][0].data
 	return { currentStage: data.currentStage, make: data.steps.create[0] }
 }
 
@@ -102,7 +110,7 @@ beforeEach(() => {
 		reportsToId: null,
 		startDate: new Date('2020-01-01')
 	})
-	dbMock.request.create.mockResolvedValue({ id: 'req-new', steps: [] })
+	tx.request.create.mockResolvedValue({ id: 'req-new', steps: [] })
 	// Someone else's pending leave request — deletable only by an HR-capable caller.
 	dbMock.request.findFirst.mockResolvedValue({
 		id: 'req-1',
@@ -111,7 +119,8 @@ beforeEach(() => {
 		employeeId: OTHER_EMP,
 		documents: []
 	})
-	dbMock.request.delete.mockResolvedValue({ id: 'req-1' })
+	tx.request.delete.mockResolvedValue({ id: 'req-1' })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('POST /api/v1/requests', () => {
@@ -170,13 +179,15 @@ describe('(app)/leave ?/deleteMany', () => {
 
 	it('refuses a plain [EMPLOYEE] deleting a request they do not own', async () => {
 		const res = await deleteOther(['EMPLOYEE'])
-		expect(dbMock.request.delete).not.toHaveBeenCalled()
+		expect(tx.request.delete).not.toHaveBeenCalled()
 		expect(res).toMatchObject({ saved: expect.stringContaining('1 skipped') })
 	})
 
 	it('lets an [EMPLOYEE, HR_ADMIN] deleter through on their secondary role', async () => {
 		const res = await deleteOther(['EMPLOYEE', 'HR_ADMIN'])
-		expect(dbMock.request.delete).toHaveBeenCalledWith({ where: { id: 'req-1' } })
+		expect(tx.request.delete).toHaveBeenCalledWith({ where: { id: 'req-1' } })
+		// #5: the audit write shares the transaction that commits the delete.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 		expect(res).toMatchObject({ saved: expect.not.stringContaining('skipped') })
 	})
 })

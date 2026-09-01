@@ -25,11 +25,19 @@ const { dbMock } = vi.hoisted(() => ({
 			create: vi.fn(),
 			delete: vi.fn(),
 			deleteMany: vi.fn()
-		}
+		},
+		$transaction: vi.fn()
 	}
 }))
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+
+// #5: the sign-off, attach and tombstone writes each share a transaction with their audit entry,
+// so those mutations run on `tx`. `evictTombstonedBytes` is deliberately NOT transactional and
+// still runs on `dbMock` — its tests below are unchanged.
+const tx = {
+	requestDocument: { update: vi.fn(), updateMany: vi.fn(), create: vi.fn() }
+}
 const { storageMock } = vi.hoisted(() => ({
 	storageMock: {
 		saveFile: vi.fn(),
@@ -63,20 +71,23 @@ beforeEach(() => {
 		storageKey: 'k',
 		request: { id: 'req1', employeeId: 'emp-owner' }
 	})
-	dbMock.requestDocument.update.mockResolvedValue({ id: 'doc1' })
+	tx.requestDocument.update.mockResolvedValue({ id: 'doc1' })
 	storageMock.deleteStoredFile.mockResolvedValue(undefined)
 	storageMock.isAllowedType.mockReturnValue(true)
 	storageMock.contentMatchesType.mockReturnValue(true)
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('setRequestDocumentVerified (#283/D11)', () => {
 	it('records the signer on a verify', async () => {
 		await setRequestDocumentVerified('doc1', 'org1', true, CTX)
 
-		expect(dbMock.requestDocument.update).toHaveBeenCalledWith({
+		expect(tx.requestDocument.update).toHaveBeenCalledWith({
 			where: { id: 'doc1' },
 			data: { verifiedById: 'user-signer', verifiedAt: expect.any(Date) }
 		})
+		// #5: the audit write shares the transaction that commits the sign-off.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	// The whole of AC-28's service half. Asserting the exact `data` payload is the point: the bug
@@ -84,11 +95,11 @@ describe('setRequestDocumentVerified (#283/D11)', () => {
 	it('clearing keeps verifiedById and nulls only verifiedAt (#283/AC-28)', async () => {
 		await setRequestDocumentVerified('doc1', 'org1', false, CTX)
 
-		expect(dbMock.requestDocument.update).toHaveBeenCalledWith({
+		expect(tx.requestDocument.update).toHaveBeenCalledWith({
 			where: { id: 'doc1' },
 			data: { verifiedAt: null }
 		})
-		expect(dbMock.requestDocument.update.mock.calls[0][0].data).not.toHaveProperty('verifiedById')
+		expect(tx.requestDocument.update.mock.calls[0][0].data).not.toHaveProperty('verifiedById')
 	})
 
 	// #299/D-1 — a tombstone can be neither verified nor un-verified. Asserting that `update` never
@@ -106,7 +117,7 @@ describe('setRequestDocumentVerified (#283/D11)', () => {
 			status: 409,
 			body: { message: 'Removed documents cannot be verified' }
 		})
-		expect(dbMock.requestDocument.update).not.toHaveBeenCalled()
+		expect(tx.requestDocument.update).not.toHaveBeenCalled()
 	})
 
 	// Un-verifying is refused on the same footing. The clear path writes a different payload, so it
@@ -123,7 +134,7 @@ describe('setRequestDocumentVerified (#283/D11)', () => {
 		await expect(setRequestDocumentVerified('doc1', 'org1', false, CTX)).rejects.toMatchObject({
 			status: 409
 		})
-		expect(dbMock.requestDocument.update).not.toHaveBeenCalled()
+		expect(tx.requestDocument.update).not.toHaveBeenCalled()
 	})
 })
 
@@ -277,7 +288,7 @@ describe('saveRequestDocuments counts live documents only (#299/AC-6)', () => {
 			_count: { documents: 0 }
 		})
 		storageMock.saveFile.mockResolvedValue({ storageKey: 'k', size: 1 })
-		dbMock.requestDocument.create.mockResolvedValue({ id: 'doc1' })
+		tx.requestDocument.create.mockResolvedValue({ id: 'doc1' })
 
 		await saveRequestDocuments(
 			'req1',
@@ -308,11 +319,11 @@ describe('deleteRequestDocument guards the transition it already checked (#299)'
 	})
 
 	it('re-asserts deletedAt and verifiedAt in the update WHERE', async () => {
-		dbMock.requestDocument.updateMany.mockResolvedValue({ count: 1 })
+		tx.requestDocument.updateMany.mockResolvedValue({ count: 1 })
 
 		await deleteRequestDocument('doc1', 'emp-owner', 'org1', CTX)
 
-		expect(dbMock.requestDocument.updateMany.mock.calls[0][0].where).toEqual({
+		expect(tx.requestDocument.updateMany.mock.calls[0][0].where).toEqual({
 			id: 'doc1',
 			deletedAt: null,
 			verifiedAt: null
@@ -322,7 +333,7 @@ describe('deleteRequestDocument guards the transition it already checked (#299)'
 	})
 
 	it('409s and writes no audit entry when the row moved under it', async () => {
-		dbMock.requestDocument.updateMany.mockResolvedValue({ count: 0 })
+		tx.requestDocument.updateMany.mockResolvedValue({ count: 0 })
 
 		await expect(deleteRequestDocument('doc1', 'emp-owner', 'org1', CTX)).rejects.toMatchObject({
 			status: 409

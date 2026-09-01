@@ -259,7 +259,7 @@ export async function decide(
 	// separate call after the flip, so a failure or crash between them left the request
 	// permanently APPROVED with the balance never deducted — free leave, with no reversal
 	// path. Running the effect on the same `tx` rolls the approval back if it fails.
-	const applied = await db.$transaction(async (tx): Promise<AppliedEffect | null> => {
+	await db.$transaction(async (tx): Promise<AppliedEffect | null> => {
 		await tx.approvalStep.update({
 			where: { id: step.id },
 			data: { decision, actorId: ctx.actorId, note: note ?? null, decidedAt: new Date() }
@@ -268,16 +268,62 @@ export async function decide(
 			where: { id: req.id },
 			data: { status: transition.status, currentStage: transition.currentStage }
 		})
-		if (transition.status === 'APPROVED') {
-			return applyApprovedRequest(tx, {
-				id: req.id,
-				type: req.type,
-				employeeId: req.employeeId,
-				dateFrom: req.dateFrom,
-				payload: req.payload
-			})
+		const effect =
+			transition.status === 'APPROVED'
+				? await applyApprovedRequest(tx, {
+						id: req.id,
+						type: req.type,
+						employeeId: req.employeeId,
+						dateFrom: req.dateFrom,
+						payload: req.payload
+					})
+				: null
+
+		// Both audit entries commit with the decision they record (#5).
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Request',
+				entityId: req.id,
+				newValue: {
+					attempt,
+					stage: step.stage,
+					decision,
+					status: transition.status,
+					// #283/D7: the ADMINISTER_SYSTEM carve-out let this actor decide a request whose
+					// evidence they signed off themselves. It is a privileged waiver of a two-person
+					// control, so it leaves a mark; the key is absent on every ordinary decision rather
+					// than set to false, so a search for it returns only real uses.
+					...(usedDocVerifierCarveOut(sod, ctx.actorRoles) && { selfVerifiedEvidence: true })
+				}
+			},
+			tx
+		)
+
+		// The applied effect is audited on the SAME tx as the effect itself, not after commit. This
+		// entry records a leave-balance deduction or an employee-column write, and an unrecorded
+		// money effect is the worst outcome available here — logging outside the transaction left
+		// exactly that gap whenever the audit write failed. The orphan-entry worry the old comment
+		// raised is gone either way: sharing the tx rolls the entry back with the effect it
+		// describes, so it can no longer outlive a rollback.
+		if (effect) {
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: effect.kind === 'LEAVE' ? 'LeaveBalance' : 'Employee',
+					entityId: req.employeeId,
+					newValue:
+						effect.kind === 'LEAVE'
+							? { leaveTypeId: effect.leaveTypeId, deducted: effect.deducted, viaRequest: req.id }
+							: { [effect.column]: effect.value, viaRequest: req.id }
+				},
+				tx
+			)
 		}
-		return null
+
+		return effect
 	})
 
 	// #299/D-6 + P-4: the request is now closed, so the FIFO cap stops applying and every tombstoned
@@ -292,37 +338,6 @@ export async function decide(
 		await evictTombstonedBytes(req.id, 0).catch((e) =>
 			console.error('[storage] failed to evict tombstoned bytes for', req.id, e)
 		)
-	}
-
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Request',
-		entityId: req.id,
-		newValue: {
-			attempt,
-			stage: step.stage,
-			decision,
-			status: transition.status,
-			// #283/D7: the ADMINISTER_SYSTEM carve-out let this actor decide a request whose evidence
-			// they signed off themselves. It is a privileged waiver of a two-person control, so it
-			// leaves a mark; the key is absent on every ordinary decision rather than set to false,
-			// so a search for it returns only real uses.
-			...(usedDocVerifierCarveOut(sod, ctx.actorRoles) && { selfVerifiedEvidence: true })
-		}
-	})
-
-	// Audit the applied effect after commit — mirrors the request-decision log above and
-	// avoids an orphan entry if the transaction had rolled back.
-	if (applied) {
-		await writeAuditLog(ctx, {
-			action: 'UPDATE',
-			entityType: applied.kind === 'LEAVE' ? 'LeaveBalance' : 'Employee',
-			entityId: req.employeeId,
-			newValue:
-				applied.kind === 'LEAVE'
-					? { leaveTypeId: applied.leaveTypeId, deducted: applied.deducted, viaRequest: req.id }
-					: { [applied.column]: applied.value, viaRequest: req.id }
-		})
 	}
 
 	// Notify the requester of the outcome.
@@ -673,24 +688,25 @@ export async function decidePayrollRun(
 				data: { status: 'APPROVED', approvedById: ctx.actorId, approvedAt: new Date() }
 			})
 		}
-	})
 
-	// A cross-tenant finance approval belongs in the run's tenant audit trail, not the
-	// approver's home org — log against the run's organization (#174).
-	await writeAuditLog(
-		{ ...ctx, organizationId: run.organizationId },
-		{
-			action: 'UPDATE',
-			entityType: 'PayrollRun',
-			entityId: runId,
-			newValue: {
-				attempt: live.attempt,
-				stage: step.stage,
-				decision,
-				status: finalApproved ? 'APPROVED' : 'COMPUTED'
-			}
-		}
-	)
+		// A cross-tenant finance approval belongs in the run's tenant audit trail, not the
+		// approver's home org — log against the run's organization (#174).
+		await writeAuditLog(
+			{ ...ctx, organizationId: run.organizationId },
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollRun',
+				entityId: runId,
+				newValue: {
+					attempt: live.attempt,
+					stage: step.stage,
+					decision,
+					status: finalApproved ? 'APPROVED' : 'COMPUTED'
+				}
+			},
+			tx
+		)
+	})
 
 	return { status: finalApproved ? 'APPROVED' : 'COMPUTED', stage: step.stage, decision }
 }

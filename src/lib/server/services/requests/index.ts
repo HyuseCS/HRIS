@@ -59,30 +59,37 @@ export async function createRequest(
 		decidedAt: new Date()
 	})
 
-	const created = await db.request.create({
-		data: {
-			employeeId,
-			type: parsed.type,
-			status: 'PENDING',
-			dateFrom: cols.dateFrom,
-			dateTo: cols.dateTo,
-			hours: cols.hours,
-			reason: cols.reason,
-			payload: payload as unknown as Prisma.InputJsonValue,
-			currentStage,
-			steps: { create: steps }
-		},
-		include: { steps: { orderBy: [{ attempt: 'asc' }, { stageIndex: 'asc' }] } }
-	})
+	// One transaction: a failed audit write must not leave a filed request standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const created = await tx.request.create({
+			data: {
+				employeeId,
+				type: parsed.type,
+				status: 'PENDING',
+				dateFrom: cols.dateFrom,
+				dateTo: cols.dateTo,
+				hours: cols.hours,
+				reason: cols.reason,
+				payload: payload as unknown as Prisma.InputJsonValue,
+				currentStage,
+				steps: { create: steps }
+			},
+			include: { steps: { orderBy: [{ attempt: 'asc' }, { stageIndex: 'asc' }] } }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Request',
-		entityId: created.id,
-		newValue: { type: parsed.type, dateFrom: cols.dateFrom, stages: steps.length }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Request',
+				entityId: created.id,
+				newValue: { type: parsed.type, dateFrom: cols.dateFrom, stages: steps.length }
+			},
+			tx
+		)
 
-	return created
+		return created
+	})
 }
 
 interface RequestListParams {
@@ -189,13 +196,21 @@ export async function resubmitRequest(id: string, employeeId: string, ctx: Audit
 
 	const updated = await db.$transaction(async (tx) => {
 		await tx.approvalStep.createMany({ data: steps.map((s) => ({ ...s, requestId: id })) })
-		return tx.request.update({ where: { id }, data: { status: 'PENDING', currentStage } })
-	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Request',
-		entityId: id,
-		newValue: { status: 'PENDING', resubmittedAttempt: nextAttempt }
+		const row = await tx.request.update({
+			where: { id },
+			data: { status: 'PENDING', currentStage }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Request',
+				entityId: id,
+				newValue: { status: 'PENDING', resubmittedAttempt: nextAttempt }
+			},
+			tx
+		)
+		return row
 	})
 	return updated
 }
@@ -210,22 +225,33 @@ export async function cancelRequest(id: string, employeeId: string, ctx: AuditCo
 	if (req.status !== 'PENDING' && req.status !== 'RETURNED') {
 		error(400, 'Only pending or returned requests can be cancelled')
 	}
-	const updated = await db.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+	// The status flip and its audit entry share one transaction (#5): a failed audit write must not
+	// leave a cancelled request standing unrecorded, which is what the bare update did before.
+	const updated = await db.$transaction(async (tx) => {
+		const row = await tx.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Request',
+				entityId: id,
+				newValue: { status: 'CANCELLED' }
+			},
+			tx
+		)
+		return row
+	})
+
 	// #299/D-6a: CANCELLED is terminal — there is no path back out of it (resubmitRequest requires
 	// RETURNED, decide() requires PENDING) — so the tombstoned bytes go, all of them (keepNewest 0).
-	// There is deliberately NO transaction here and none should be added: the #101 atomicity
-	// argument that puts decide()'s eviction after a $transaction is decide()-specific (a step flip,
-	// a status flip and a leave-balance deduction that must commit together). This is one update;
-	// wrapping it would be speculative structure. The bare update above IS the commit.
+	//
+	// Outside the transaction, and best-effort, on purpose — same reason as decide()'s eviction in
+	// approvals.ts. A filesystem unlink is not rollback-able: run it inside the $transaction above
+	// and a disk error rolls back a cancellation whose bytes are gone either way. Bytes are a
+	// cleanup concern; the cancellation already succeeded.
 	await evictTombstonedBytes(id, 0).catch((e) =>
 		console.error('[storage] failed to evict tombstoned bytes for', id, e)
 	)
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Request',
-		entityId: id,
-		newValue: { status: 'CANCELLED' }
-	})
 	return updated
 }
 
@@ -256,10 +282,29 @@ export async function deleteRequest(id: string, organizationId: string, ctx: Aud
 	}
 	if (req.status === 'APPROVED') error(409, 'Approved requests cannot be deleted')
 
-	await db.request.delete({ where: { id } })
+	// The row delete and its audit entry share one transaction (#5): a failed audit write must not
+	// leave a request deleted with no record of who deleted it.
+	await db.$transaction(async (tx) => {
+		await tx.request.delete({ where: { id } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'DELETE',
+				entityType: 'Request',
+				entityId: id,
+				oldValue: { type: req.type, status: req.status }
+			},
+			tx
+		)
+	})
+
 	// Row cascade removed the document rows; sweep their bytes off disk too. Each unlink
 	// is best-effort — the request is already gone, so one failed cleanup must not stop
-	// the rest of the sweep or skip the audit entry.
+	// the rest of the sweep.
+	//
+	// The sweep runs AFTER the transaction commits, never inside it: a filesystem unlink is not
+	// rollback-able, so a failure late in the loop would roll back a delete whose bytes are already
+	// destroyed.
 	//
 	// #299: the select above stays UNFILTERED — a tombstoned document's file must be swept here too,
 	// or deleting the request orphans it permanently. The skip below is the already-evicted case
@@ -271,11 +316,5 @@ export async function deleteRequest(id: string, organizationId: string, ctx: Aud
 			console.error('[storage] failed to remove', d.storageKey, e)
 		)
 	}
-	await writeAuditLog(ctx, {
-		action: 'DELETE',
-		entityType: 'Request',
-		entityId: id,
-		oldValue: { type: req.type, status: req.status }
-	})
 	return { deleted: true }
 }
