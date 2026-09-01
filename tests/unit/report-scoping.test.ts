@@ -168,7 +168,7 @@ describe('generateLoanSummary', () => {
 		// The pre-existing clauses must survive: dropping either would widen the report to other
 		// tenants or resurrect settled loans.
 		expect(where.status).toBe('ACTIVE')
-		expect(where.employee).toEqual({ user: { organizationId: 'org1' } })
+		expect(where.employee).toEqual({ organizationId: 'org1' })
 	})
 
 	it('returns every employee’s loans when unrestricted', async () => {

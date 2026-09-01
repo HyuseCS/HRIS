@@ -80,18 +80,20 @@ beforeEach(() => {
 	storedPairs = new Set()
 
 	// Resolve ONLY the numbers asked for, and only inside the org the query scopes to. Delete
-	// `user: { organizationId }` from the service and SL-009 starts resolving for JoJo — which is
+	// `organizationId` from the service and SL-009 starts resolving for JoJo — which is
 	// precisely what B7 asserts cannot happen.
 	dbMock.employee.findMany.mockImplementation(
 		({
 			where
 		}: {
-			where: { employeeNumber: { in: string[] }; user?: { organizationId: string } }
+			where: { employeeNumber: { in: string[] }; organizationId?: string }
 		}) =>
 			Promise.resolve(
 				where.employeeNumber.in
 					.filter(
-						(n) => DIRECTORY[n] && (!where.user || DIRECTORY[n].org === where.user.organizationId)
+						(n) =>
+							DIRECTORY[n] &&
+							(where.organizationId === undefined || DIRECTORY[n].org === where.organizationId)
 					)
 					.map((n) => ({ id: DIRECTORY[n].id, employeeNumber: n }))
 			)
@@ -255,13 +257,17 @@ describe('B7 — an employee number outside the caller’s org is rejected, neve
 		expect(written().some((r) => r.employeeId === 'e9')).toBe(false)
 	})
 
-	it('scopes the employee lookup through the user relation', async () => {
+	it('scopes the employee lookup on the employee’s own organizationId', async () => {
 		await importBacklogCsv(JOJO, upload(HEADER + 'JJ-001,2026-08-10,08:00,,,\n'), CTX)
 		expect(dbMock.employee.findMany).toHaveBeenCalledTimes(1)
-		expect(dbMock.employee.findMany.mock.calls[0][0].where).toMatchObject({
-			user: { organizationId: JOJO },
+		const { where } = dbMock.employee.findMany.mock.calls[0][0]
+		expect(where).toMatchObject({
+			organizationId: JOJO,
 			employmentStatus: 'ACTIVE'
 		})
+		// `User.organizationId` is the user's PRIMARY org, not the acting one — scoping through the
+		// relation would resolve numbers from the wrong tenant for a multi-org user.
+		expect(where.user).toBeUndefined()
 	})
 })
 

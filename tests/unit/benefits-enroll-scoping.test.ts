@@ -53,7 +53,7 @@ describe('enrollEmployee', () => {
 		await enrollEmployee(EMPLOYEE, PLAN, data, ctx)
 		expect(dbMock.employee.findFirst).toHaveBeenCalledWith(
 			expect.objectContaining({
-				where: { id: EMPLOYEE, user: { organizationId: ORG } }
+				where: { id: EMPLOYEE, organizationId: ORG }
 			})
 		)
 	})

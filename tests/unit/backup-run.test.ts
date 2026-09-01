@@ -366,10 +366,10 @@ describe('collectDocuments (T-U-15)', () => {
 		const { db, args } = fakeDb()
 		await collectDocuments(db as never, 'org_veent')
 		expect(args.employeeDocument).toMatchObject({
-			where: { employee: { user: { organizationId: 'org_veent' } } }
+			where: { employee: { organizationId: 'org_veent' } }
 		})
 		expect(args.requestDocument).toMatchObject({
-			where: { request: { employee: { user: { organizationId: 'org_veent' } } } }
+			where: { request: { employee: { organizationId: 'org_veent' } } }
 		})
 	})
 
