@@ -311,7 +311,7 @@ export async function computePayroll(runId: string, organizationId: string, ctx:
 		compensationAll,
 		holidays
 	] = await Promise.all([
-		db.employee.findMany({ where: { user: { organizationId }, employmentStatus: 'ACTIVE' } }),
+		db.employee.findMany({ where: { organizationId, employmentStatus: 'ACTIVE' } }),
 		// #163: payrollConfig is no longer read here — proration comes from the period shape alone.
 		db.earningType.findMany({ where: { organizationId }, select: { code: true, taxable: true } }),
 		db.loan.findMany({

@@ -50,14 +50,14 @@ async function assertMayWriteLoan(
 
 export function listLoans(employeeId: string, organizationId: string) {
 	return db.loan.findMany({
-		where: { employeeId, employee: { user: { organizationId } } },
+		where: { employeeId, employee: { organizationId } },
 		orderBy: { createdAt: 'desc' }
 	})
 }
 
 export function listCashAdvances(employeeId: string, organizationId: string) {
 	return db.cashAdvance.findMany({
-		where: { employeeId, employee: { user: { organizationId } } },
+		where: { employeeId, employee: { organizationId } },
 		orderBy: { createdAt: 'desc' }
 	})
 }
@@ -97,7 +97,7 @@ export async function updateLoan(
 	data: { installment?: number; status?: LoanStatus },
 	ctx: AuditContext
 ) {
-	const loan = await db.loan.findFirst({ where: { id, employee: { user: { organizationId } } } })
+	const loan = await db.loan.findFirst({ where: { id, employee: { organizationId } } })
 	if (!loan) error(404, 'Loan not found')
 	await assertMayWriteLoan(loan.employeeId, organizationId, ctx)
 
@@ -146,7 +146,7 @@ export async function updateCashAdvance(
 	ctx: AuditContext
 ) {
 	const ca = await db.cashAdvance.findFirst({
-		where: { id, employee: { user: { organizationId } } }
+		where: { id, employee: { organizationId } }
 	})
 	if (!ca) error(404, 'Cash advance not found')
 	await assertMayWriteLoan(ca.employeeId, organizationId, ctx)

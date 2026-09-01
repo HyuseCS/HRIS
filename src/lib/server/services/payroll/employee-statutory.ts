@@ -20,7 +20,7 @@ const CONTRIBUTIONS = ['SSS', 'PHILHEALTH', 'PAGIBIG'] as const satisfies Statut
 
 async function requireEmployee(employeeId: string, organizationId: string) {
 	const e = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, userId: true, basicMonthlySalary: true, rateType: true }
 	})
 	if (!e) error(404, 'Employee not found')

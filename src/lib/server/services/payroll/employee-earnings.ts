@@ -44,7 +44,7 @@ export async function createEmployeeEarning(
 // Deactivate instead of delete so already-generated payslips keep their context.
 export async function endEmployeeEarning(id: string, organizationId: string, ctx: AuditContext) {
 	const earning = await db.employeeEarning.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		include: { employee: { select: { userId: true } } }
 	})
 	if (!earning) error(404, 'Recurring earning not found')

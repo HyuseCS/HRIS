@@ -58,7 +58,7 @@ export async function createEmployeeDeduction(
 // Deactivate instead of delete so already-generated payslips keep their context.
 export async function endEmployeeDeduction(id: string, organizationId: string, ctx: AuditContext) {
 	const deduction = await db.employeeDeduction.findFirst({
-		where: { id, employee: { user: { organizationId } } },
+		where: { id, employee: { organizationId } },
 		include: { employee: { select: { userId: true } } }
 	})
 	if (!deduction) error(404, 'Recurring deduction not found')
