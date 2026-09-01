@@ -202,3 +202,70 @@ both static sweeps still clean. Unit count must rise from 2076, never fall.
 - An advisory lock around `deriveRange`. S2 closes the window this branch opened; a full
   serialisation guard is separate work.
 - Any headcount cap on `importAttendance`. The bulk rewrite removes the reason for one.
+
+---
+
+# Execution record
+
+Five commits on top of `eb1ae62`.
+
+| Commit | Section |
+|---|---|
+| `f040777` | this plan |
+| `6b6c7da` | S4 |
+| `d4dc603` | S3 |
+| `2e155ea` | S1 + S2 |
+| `57c8855` | S5 |
+
+Final gates: `pnpm check` 0 errors over 1078 files (1 pre-existing a11y warning on
+`CalculatorWindow.svelte`, untouched); unit 186 files / 2113 tests, up from 181 / 2076;
+integration 2/2; both static sweeps clean; no attribution trailer on any commit.
+
+`writeAuditLog` census after: 156 regex matches = 155 real calls plus one doc comment.
+152 pass a transaction client, 4 pass `db` deliberately, 0 pass nothing.
+
+## Deviations from the plan
+
+- **S1 and S2 landed as one commit, not two.** They interleave in a single hunk: the lock
+  re-check produces the very array the bulk statement consumes. Splitting them would have
+  meant authoring a throwaway intermediate version purely to manufacture a second commit.
+- **S1 requirement 2 was met differently.** The plan asked for a shared `COLS` array. The
+  implementation uses `Object.keys(rows[0])` instead, so the column list IS the derived
+  payload rather than a copy of it that can fall out of step. Strictly better; the test pins
+  the count at 23.
+- **One file outside the planned set changed.** `tests/unit/attendance-autoderive.test.ts`
+  mocked `tx.attendanceDay.update`, which no longer exists on the write path, so two of its
+  tests broke. Its `tx` now carries no `update` delegate at all, so a regression back to the
+  loop throws there instead of passing quietly.
+
+## Answers the plan asked for
+
+- **Serialisation (S1 requirement 4):** plain `number`, not `Prisma.Decimal`.
+  `AttendanceDayResult` in `attendance/derive.ts:105-127` declares every hour field as
+  `number` and every time field as `Date | null`, all non-optional, so `JSON.stringify` never
+  omits a key. Hours emit as bare JSON numbers, times as ISO strings. A later switch to
+  Decimal would emit `{"d":[...]}` and fail the pinned test.
+- **The `createMany` bind-parameter worry was false.** Tested at 15,500 rows against the live
+  database: it succeeds. No chunking was added.
+
+## Gap found while closing the others
+
+The unit tests mock `$executeRaw`, so nothing executes the generated SQL. A wrong entry in
+`DERIVED_COLUMN_TYPES`, a misspelled column, or a value that will not cast would pass every
+unit test and fail at runtime. The hand-run probe validated an equivalent statement, not the
+one this code builds. Closed by an integration test that runs `deriveRange` against real
+Postgres and asserts one column per type family, `updatedAt` movement, and that a row locked
+between the snapshot and the write is not overwritten.
+
+## Still open, carried to the PR
+
+- The 26 pass-through `$transaction` mocks remain (D2). The committed source scan is what
+  holds the line, not those files.
+- `job-boards.ts` writes no audit row when unticking a board that was never posted. Now
+  pinned by a test, so moving it is a visible decision rather than a silent drop.
+- No advisory lock serialises two concurrent `deriveRange` calls. S2 closed the window this
+  branch opened; it did not make concurrent derives mutually exclusive.
+- `importAttendance` still has no headcount cap. The bulk rewrite removed the reason to add
+  one, but nothing enforces a ceiling.
+- All timings are from one developer machine running four containers. Production hardware
+  will differ; the ratio between the two approaches is the durable part, not the absolutes.
