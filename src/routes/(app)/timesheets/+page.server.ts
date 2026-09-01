@@ -66,11 +66,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// A non-manager without an employee record owns no timesheets — empty rather
 	// than an undefined employeeId (which would list the whole org).
 	const teamParams = isManager
-		// #6: for a cross-org actor `myEmployee` is now null and this self-exclusion goes
-		// undefined, which services/timesheets.ts drops from the where clause. Safe: dropping a
-		// NEGATIVE self-exclusion re-admits only the actor's own rows, and those are already
-		// outside `organizationId`. Dropping a POSITIVE restriction is what widens a query.
-		? { organizationId: user.organizationId, excludeEmployeeId: myEmployee?.id, status }
+		? // #6: for a cross-org actor `myEmployee` is now null and this self-exclusion goes
+			// undefined, which services/timesheets.ts drops from the where clause. Safe: dropping a
+			// NEGATIVE self-exclusion re-admits only the actor's own rows, and those are already
+			// outside `organizationId`. Dropping a POSITIVE restriction is what widens a query.
+			{ organizationId: user.organizationId, excludeEmployeeId: myEmployee?.id, status }
 		: null
 	const teamTotal = teamParams ? await countTimesheets(teamParams) : 0
 	const teamPagination = paginate(url, teamTotal, { param: 'teamPage' })
