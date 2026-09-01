@@ -33,12 +33,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const [headcount, onLeaveToday, pending, lastPayrollRun, attendanceGroups] = await Promise.all([
 		db.employee.count({
-			where: { user: { organizationId: orgId }, employmentStatus: 'ACTIVE' }
+			where: { organizationId: orgId, employmentStatus: 'ACTIVE' }
 		}),
 		// Employees on approved leave that spans today.
 		db.request.count({
 			where: {
-				employee: { user: { organizationId: orgId } },
+				employee: { organizationId: orgId },
 				type: 'LEAVE',
 				status: 'APPROVED',
 				dateFrom: { lte: today },
@@ -61,7 +61,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// Today's derived attendance, grouped by status.
 		db.attendanceDay.groupBy({
 			by: ['status'],
-			where: { date: today, employee: { user: { organizationId: orgId } } },
+			where: { date: today, employee: { organizationId: orgId } },
 			_count: { _all: true }
 		})
 	])
@@ -92,7 +92,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// HR grants awards from the dashboard — roster for the recipient picker.
 	const awardEmployees = canPost
 		? await db.employee.findMany({
-				where: { user: { organizationId: orgId }, employmentStatus: 'ACTIVE' },
+				where: { organizationId: orgId, employmentStatus: 'ACTIVE' },
 				select: { id: true, firstName: true, lastName: true },
 				orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 			})
