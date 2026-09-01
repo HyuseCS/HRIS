@@ -49,31 +49,43 @@ export async function createAnnouncement(
 	input: { title: string; body: string },
 	ctx: AuditContext
 ) {
-	const created = await db.announcement.create({
-		data: {
-			organizationId,
-			authorId: ctx.actorId,
-			title: input.title.trim(),
-			body: input.body.trim()
-		}
-	})
-
+	// The recipient list is an org-wide scan, and only a read — gathering it before the
+	// transaction opens keeps the transaction short instead of holding it across the whole
+	// user table for no atomicity gain. The notification write itself stays INSIDE: it is a
+	// plain `createMany`, and notifications must not survive an announcement that rolled back.
 	const users = await db.user.findMany({
 		where: { organizationId, isActive: true },
 		select: { id: true }
 	})
-	await notifyMany(
-		users.map((u) => u.id),
-		created.title,
-		'/dashboard',
-		'ANNOUNCEMENT'
-	)
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Announcement',
-		entityId: created.id,
-		newValue: { title: created.title }
+	return await db.$transaction(async (tx) => {
+		const created = await tx.announcement.create({
+			data: {
+				organizationId,
+				authorId: ctx.actorId,
+				title: input.title.trim(),
+				body: input.body.trim()
+			}
+		})
+
+		await notifyMany(
+			users.map((u) => u.id),
+			created.title,
+			'/dashboard',
+			'ANNOUNCEMENT',
+			tx
+		)
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Announcement',
+				entityId: created.id,
+				newValue: { title: created.title }
+			},
+			tx
+		)
+		return created
 	})
-	return created
 }

@@ -41,21 +41,29 @@ export async function grantAward(
 	if (canAny(employee.user.roles, 'MANAGE_HR') && !canAny(ctx.actorRoles, 'ADMINISTER_SYSTEM'))
 		error(403, 'Only an executive may award a manager or HR admin.')
 
-	const award = await db.award.create({
-		data: {
-			organizationId,
-			employeeId: employee.id,
-			title,
-			note: input.note?.trim() || null,
-			awardedById: ctx.actorId
-		}
-	})
+	// One transaction: a failed audit write must not leave an award standing unrecorded.
+	const award = await db.$transaction(async (tx) => {
+		const created = await tx.award.create({
+			data: {
+				organizationId,
+				employeeId: employee.id,
+				title,
+				note: input.note?.trim() || null,
+				awardedById: ctx.actorId
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Award',
-		entityId: award.id,
-		newValue: { employeeId: employee.id, title }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Award',
+				entityId: created.id,
+				newValue: { employeeId: employee.id, title }
+			},
+			tx
+		)
+		return created
 	})
 
 	await notify(
