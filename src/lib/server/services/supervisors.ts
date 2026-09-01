@@ -56,7 +56,7 @@ export async function setAdditionalSupervisors(
 	ctx: AuditContext
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, reportsToId: true }
 	})
 	if (!employee) error(404, 'Employee not found')
@@ -65,7 +65,7 @@ export async function setAdditionalSupervisors(
 
 	if (clean.length) {
 		const valid = await db.employee.findMany({
-			where: { id: { in: clean }, user: { organizationId } },
+			where: { id: { in: clean }, organizationId },
 			select: { id: true }
 		})
 		if (valid.length !== clean.length)

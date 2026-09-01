@@ -176,7 +176,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const supervisorOptions = canManage
 		? await db.employee.findMany({
 				where: {
-					user: { organizationId: locals.user!.organizationId },
+					organizationId: locals.user!.organizationId,
 					employmentStatus: 'ACTIVE',
 					id: { not: params.id }
 				},

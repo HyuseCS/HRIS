@@ -157,7 +157,7 @@ function employeeListWhere(
 	filters?: EmployeeListFilters
 ): Prisma.EmployeeWhereInput {
 	return {
-		user: { organizationId },
+		organizationId,
 		...(filters?.ids !== undefined && { id: { in: filters.ids } }),
 		...(filters?.status
 			? { employmentStatus: filters.status }
@@ -218,7 +218,7 @@ export async function getEmployee(
 	opts?: { viewerRoles?: Role[]; isSelf?: boolean }
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id, user: { organizationId } },
+		where: { id, organizationId },
 		include: {
 			department: true,
 			user: { select: { email: true, roles: true, isActive: true, lastLoginAt: true } },
@@ -311,7 +311,7 @@ export async function revealEmployeeSensitive(
 	opts: { audit: boolean }
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id, user: { organizationId } },
+		where: { id, organizationId },
 		select: {
 			id: true,
 			sssNumber: true,
@@ -398,7 +398,7 @@ function isEmployeeNumberConflict(e: unknown) {
 async function assertManagerInOrg(reportsToId: string, organizationId: string, selfId?: string) {
 	if (reportsToId === selfId) error(400, 'An employee cannot report to themselves.')
 	const manager = await db.employee.findFirst({
-		where: { id: reportsToId, user: { organizationId } },
+		where: { id: reportsToId, organizationId },
 		select: { id: true }
 	})
 	if (!manager) error(404, 'Manager not found')

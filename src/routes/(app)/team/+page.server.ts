@@ -37,7 +37,8 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	}
 	const members = await db.employee.findMany({
 		where: {
-			user: { organizationId: user.organizationId, isActive: true },
+			organizationId: user.organizationId,
+			user: { isActive: true },
 			...memberScope
 		},
 		select: { id: true, firstName: true, lastName: true }
