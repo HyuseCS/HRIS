@@ -63,7 +63,10 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		})
 		selectedEmployeeId = url.searchParams.get('employeeId') ?? employees[0]?.id ?? null
 	} else {
-		const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+		const me = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
+			select: { id: true }
+		})
 		selectedEmployeeId = me?.id ?? null
 	}
 

@@ -18,7 +18,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// which would mean rendering every employee in the org on a self-service page.
 	const canViewOrgBalances = canAny(user.roles, 'MANAGE_HR')
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId }
+	})
 	const year = new Date().getFullYear()
 
 	// Non-managers without an employee record have no leave to show — return an empty
