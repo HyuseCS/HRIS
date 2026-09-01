@@ -11,9 +11,8 @@ import type { AuditContext } from '$lib/server/services/types'
 const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
 		employee: { findFirst: vi.fn() },
-		hrComplaint: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
-		hrComplaintMessage: { create: vi.fn() },
-		$transaction: vi.fn().mockResolvedValue([])
+		hrComplaint: { findFirst: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
 const { notifyMock } = vi.hoisted(() => ({ notifyMock: vi.fn().mockResolvedValue(undefined) }))
@@ -24,7 +23,10 @@ const { assertCanTouchEmployeeMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
-vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const writeAuditLog = vi.fn().mockResolvedValue(undefined)
+vi.mock('$lib/server/audit', () => ({
+	writeAuditLog: (...args: unknown[]) => writeAuditLog(...args)
+}))
 vi.mock('$lib/server/services/notifications', () => ({ notify: notifyMock }))
 vi.mock('$lib/server/services/employee-access', () => ({
 	assertCanTouchEmployee: assertCanTouchEmployeeMock
@@ -34,6 +36,13 @@ const { openComplaint, postComplaintMessage, resolveComplaint } =
 	await import('$lib/server/services/complaints')
 
 const CTX: AuditContext = { organizationId: 'org1', actorId: 'u-hr', actorRoles: ['HR_ADMIN'] }
+
+// #5: the writes now run inside `db.$transaction(async (tx) => …)`, so they land on the
+// transaction client, not on `db`.
+const tx = {
+	hrComplaint: { create: vi.fn(), update: vi.fn() },
+	hrComplaintMessage: { create: vi.fn() }
+}
 
 function mockComplaint(overrides: Record<string, unknown> = {}) {
 	dbMock.hrComplaint.findFirst.mockResolvedValue({
@@ -50,15 +59,15 @@ function mockComplaint(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.$transaction.mockResolvedValue([])
-	dbMock.hrComplaint.update.mockResolvedValue({})
-	dbMock.hrComplaintMessage.create.mockResolvedValue({})
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
+	tx.hrComplaint.update.mockResolvedValue({})
+	tx.hrComplaintMessage.create.mockResolvedValue({})
 })
 
 describe('complaints service (#112)', () => {
 	it('openComplaint seeds the thread and notifies the employee', async () => {
 		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp1', user: { id: 'u-emp' } })
-		dbMock.hrComplaint.create.mockResolvedValue({ id: 'c1' })
+		tx.hrComplaint.create.mockResolvedValue({ id: 'c1' })
 
 		await openComplaint(
 			{
@@ -70,7 +79,7 @@ describe('complaints service (#112)', () => {
 			CTX
 		)
 
-		const created = dbMock.hrComplaint.create.mock.calls[0][0]
+		const created = tx.hrComplaint.create.mock.calls[0][0]
 		expect(created.data.status).toBe('OPEN')
 		expect(created.data.messages.create.body).toBe('What is your rate type?')
 		expect(notifyMock).toHaveBeenCalledWith(
@@ -78,6 +87,8 @@ describe('complaints service (#112)', () => {
 			expect.stringContaining('HR opened'),
 			'/complaints/c1'
 		)
+		// #5: the audit write shares the transaction that created the thread.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('rejects opening an inquiry against an employee outside the org', async () => {
@@ -92,7 +103,10 @@ describe('complaints service (#112)', () => {
 		const res = await postComplaintMessage('c1', 'My rate is monthly.', CTX, 'emp1')
 
 		expect(res.status).toBe('RESPONDED')
-		expect(dbMock.hrComplaint.update.mock.calls[0][0].data.status).toBe('RESPONDED')
+		expect(tx.hrComplaint.update.mock.calls[0][0].data.status).toBe('RESPONDED')
+		// #5: the message, the status flip and the audit all share one transaction.
+		expect(tx.hrComplaintMessage.create).toHaveBeenCalled()
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 		expect(notifyMock).toHaveBeenCalledWith(
 			'u-hr',
 			expect.stringContaining('responded'),
@@ -121,11 +135,13 @@ describe('complaints service (#112)', () => {
 
 	it('resolveComplaint sets RESOLVED and notifies the employee', async () => {
 		mockComplaint({ status: 'RESPONDED', employee: { user: { id: 'u-emp' } } })
-		dbMock.hrComplaint.update.mockResolvedValue({ id: 'c1', status: 'RESOLVED' })
+		tx.hrComplaint.update.mockResolvedValue({ id: 'c1', status: 'RESOLVED' })
 
 		await resolveComplaint('c1', CTX)
 
-		expect(dbMock.hrComplaint.update.mock.calls[0][0].data.status).toBe('RESOLVED')
+		expect(tx.hrComplaint.update.mock.calls[0][0].data.status).toBe('RESOLVED')
+		// #5: the audit write shares the resolve transaction.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 		expect(notifyMock).toHaveBeenCalledWith(
 			'u-emp',
 			expect.stringContaining('resolved'),

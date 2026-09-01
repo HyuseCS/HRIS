@@ -18,19 +18,22 @@ const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
 		employee: { findFirst: vi.fn(), findMany: vi.fn() },
 		hrComplaint: {
-			create: vi.fn(),
 			findFirst: vi.fn(),
 			findMany: vi.fn(),
-			count: vi.fn(),
-			update: vi.fn()
+			count: vi.fn()
 		},
-		hrComplaintMessage: { create: vi.fn() },
-		$transaction: vi.fn().mockResolvedValue([])
+		$transaction: vi.fn()
 	}
 }))
 const { writeAuditLogMock } = vi.hoisted(() => ({
 	writeAuditLogMock: vi.fn().mockResolvedValue(undefined)
 }))
+// #5: the complaint writes now run inside `db.$transaction(async (tx) => …)`, so they land on
+// the transaction client, not on `db`.
+const tx = {
+	hrComplaint: { create: vi.fn(), update: vi.fn() },
+	hrComplaintMessage: { create: vi.fn() }
+}
 const { notifyMock } = vi.hoisted(() => ({ notifyMock: vi.fn().mockResolvedValue(undefined) }))
 const { assertCanTouchEmployeeMock, listVisibleEmployeeIdsMock } = vi.hoisted(() => ({
 	assertCanTouchEmployeeMock: vi.fn(),
@@ -141,11 +144,11 @@ beforeEach(() => {
 	dbMock.employee.findMany.mockResolvedValue([])
 	dbMock.hrComplaint.findMany.mockResolvedValue([])
 	dbMock.hrComplaint.count.mockResolvedValue(0)
-	dbMock.hrComplaint.create.mockResolvedValue({ id: 'c1' })
-	dbMock.hrComplaint.update.mockResolvedValue({ id: 'c1', status: 'RESOLVED' })
+	tx.hrComplaint.create.mockResolvedValue({ id: 'c1' })
+	tx.hrComplaint.update.mockResolvedValue({ id: 'c1', status: 'RESOLVED' })
 	dbMock.hrComplaint.findFirst.mockResolvedValue(complaint())
-	dbMock.hrComplaintMessage.create.mockResolvedValue({})
-	dbMock.$transaction.mockResolvedValue([])
+	tx.hrComplaintMessage.create.mockResolvedValue({})
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 	assertCanTouchEmployeeMock.mockResolvedValue(undefined)
 	listVisibleEmployeeIdsMock.mockResolvedValue(null)
 })
@@ -166,7 +169,9 @@ describe('complaints object-level admission (#112)', () => {
 	it('N2 — an HR_ADMIN may open an inquiry against any employee in the org', async () => {
 		const result = await listActions.open(openEvent(['HR_ADMIN'], OUTSIDER))
 
-		expect(dbMock.hrComplaint.create).toHaveBeenCalledTimes(1)
+		expect(tx.hrComplaint.create).toHaveBeenCalledTimes(1)
+		// #5: the audit write shares the transaction that created the thread.
+		expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 		expect(result).toMatchObject({ message: 'Inquiry opened.' })
 	})
 
@@ -174,7 +179,7 @@ describe('complaints object-level admission (#112)', () => {
 	it('N3 — a MANAGER may open an inquiry against a direct report', async () => {
 		await listActions.open(openEvent(['MANAGER'], REPORT))
 
-		const created = dbMock.hrComplaint.create.mock.calls[0][0]
+		const created = tx.hrComplaint.create.mock.calls[0][0]
 		expect(created.data.employeeId).toBe(REPORT)
 		expect(created.data.status).toBe('OPEN')
 	})
@@ -185,7 +190,7 @@ describe('complaints object-level admission (#112)', () => {
 		const result = await listActions.open(openEvent(['MANAGER'], OUTSIDER))
 
 		expect(result).toMatchObject({ status: 403 })
-		expect(dbMock.hrComplaint.create).not.toHaveBeenCalled()
+		expect(tx.hrComplaint.create).not.toHaveBeenCalled()
 	})
 
 	// A check placed after the write still throws, but the thread already exists by then.
@@ -193,7 +198,7 @@ describe('complaints object-level admission (#112)', () => {
 		await listActions.open(openEvent(['HR_ADMIN'], OUTSIDER))
 
 		expect(assertCanTouchEmployeeMock.mock.invocationCallOrder[0]).toBeLessThan(
-			dbMock.hrComplaint.create.mock.invocationCallOrder[0]
+			tx.hrComplaint.create.mock.invocationCallOrder[0]
 		)
 	})
 
@@ -222,7 +227,7 @@ describe('complaints object-level admission (#112)', () => {
 		const result = await threadActions.resolve(threadEvent(['MANAGER']))
 
 		expect(result).toMatchObject({ status: 403 })
-		expect(dbMock.hrComplaint.update).not.toHaveBeenCalled()
+		expect(tx.hrComplaint.update).not.toHaveBeenCalled()
 	})
 
 	// Below the already-resolved early return, an out-of-scope actor gets a silent 200 that

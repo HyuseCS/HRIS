@@ -90,24 +90,34 @@ export async function openComplaint(input: OpenComplaintInput, ctx: AuditContext
 	// subject arm must never admit here.
 	await assertCanReachComplaint(ctx, employee.id, null)
 
-	const complaint = await db.hrComplaint.create({
-		data: {
-			organizationId: ctx.organizationId,
-			employeeId: employee.id,
-			openedById: ctx.actorId,
-			subject: input.subject,
-			category: input.category,
-			status: 'OPEN',
-			messages: { create: { authorId: ctx.actorId, body: input.message } }
-		}
+	// One transaction: a failed audit write must not leave a new inquiry standing unrecorded.
+	const complaint = await db.$transaction(async (tx) => {
+		const created = await tx.hrComplaint.create({
+			data: {
+				organizationId: ctx.organizationId,
+				employeeId: employee.id,
+				openedById: ctx.actorId,
+				subject: input.subject,
+				category: input.category,
+				status: 'OPEN',
+				messages: { create: { authorId: ctx.actorId, body: input.message } }
+			}
+		})
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'HrComplaint',
+				entityId: created.id,
+				newValue: { subject: input.subject, category: input.category }
+			},
+			tx
+		)
+
+		return created
 	})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'HrComplaint',
-		entityId: complaint.id,
-		newValue: { subject: input.subject, category: input.category }
-	})
 	await notify(
 		employee.user.id,
 		`HR opened an inquiry: ${input.subject}`,
@@ -142,16 +152,21 @@ export async function postComplaintMessage(
 	const fromEmployee = actorEmployeeId != null && actorEmployeeId === complaint.employeeId
 	const status: ComplaintStatus = fromEmployee ? 'RESPONDED' : 'OPEN'
 
-	await db.$transaction([
-		db.hrComplaintMessage.create({ data: { complaintId, authorId: ctx.actorId, body } }),
-		db.hrComplaint.update({ where: { id: complaintId }, data: { status } })
-	])
+	// One transaction: a failed audit write must not leave a reply standing unrecorded.
+	await db.$transaction(async (tx) => {
+		await tx.hrComplaintMessage.create({ data: { complaintId, authorId: ctx.actorId, body } })
+		await tx.hrComplaint.update({ where: { id: complaintId }, data: { status } })
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'HrComplaint',
-		entityId: complaintId,
-		newValue: { reply: fromEmployee ? 'employee' : 'hr', status }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'HrComplaint',
+				entityId: complaintId,
+				newValue: { reply: fromEmployee ? 'employee' : 'hr', status }
+			},
+			tx
+		)
 	})
 
 	if (fromEmployee) {
@@ -182,18 +197,29 @@ export async function resolveComplaint(complaintId: string, ctx: AuditContext) {
 	await assertCanReachComplaint(ctx, complaint.employeeId, null)
 	if (complaint.status === 'RESOLVED') return complaint
 
-	const updated = await db.hrComplaint.update({
-		where: { id: complaintId },
-		data: { status: 'RESOLVED', resolvedAt: new Date() }
+	// One transaction: a failed audit write must not leave a resolved inquiry standing
+	// unrecorded.
+	const updated = await db.$transaction(async (tx) => {
+		const row = await tx.hrComplaint.update({
+			where: { id: complaintId },
+			data: { status: 'RESOLVED', resolvedAt: new Date() }
+		})
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'HrComplaint',
+				entityId: complaintId,
+				oldValue: { status: complaint.status },
+				newValue: { status: 'RESOLVED' }
+			},
+			tx
+		)
+
+		return row
 	})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'HrComplaint',
-		entityId: complaintId,
-		oldValue: { status: complaint.status },
-		newValue: { status: 'RESOLVED' }
-	})
 	await notify(
 		complaint.employee.user.id,
 		`Your HR inquiry was marked resolved: ${complaint.subject}`,

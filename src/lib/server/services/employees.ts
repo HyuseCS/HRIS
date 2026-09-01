@@ -1217,22 +1217,29 @@ export async function offboardEmployee(
 		error(400, 'You cannot offboard your own employee record — ask another admin to do it.')
 	}
 
-	const [employee] = await db.$transaction([
-		db.employee.update({
+	// One transaction: a failed audit write must not leave an offboarding standing unrecorded.
+	const employee = await db.$transaction(async (tx) => {
+		const updated = await tx.employee.update({
 			where: { id },
 			data: { employmentStatus: 'OFFBOARDED', endDate }
-		}),
-		db.user.updateMany({
+		})
+		await tx.user.updateMany({
 			where: { employee: { id } },
 			data: { isActive: false }
 		})
-	])
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Employee',
-		entityId: id,
-		newValue: { employmentStatus: 'OFFBOARDED', endDate }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Employee',
+				entityId: id,
+				newValue: { employmentStatus: 'OFFBOARDED', endDate }
+			},
+			tx
+		)
+
+		return updated
 	})
 
 	return employee
