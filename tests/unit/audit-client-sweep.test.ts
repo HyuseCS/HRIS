@@ -52,6 +52,20 @@ function args(src: string, open: number): string[] {
 			else if (c === quote) quote = ''
 			continue
 		}
+		// Comments first: these payloads carry prose, and one apostrophe in a `//` line ("Today's
+		// audit") would otherwise open a string that swallows the rest of the call.
+		if (c === '/' && src[i + 1] === '/') {
+			const nl = src.indexOf('\n', i)
+			if (nl === -1) break
+			i = nl
+			continue
+		}
+		if (c === '/' && src[i + 1] === '*') {
+			const end = src.indexOf('*/', i + 2)
+			if (end === -1) break
+			i = end + 1
+			continue
+		}
 		if (c === "'" || c === '"' || c === '`') quote = c
 		else if (c === '(' || c === '[' || c === '{') depth++
 		else if (c === ')' || c === ']' || c === '}') {
@@ -86,10 +100,21 @@ for (const path of walk(SRC)) {
 }
 
 const dbSites = sites.filter((s) => s.client === 'db')
+// A splitter miss yields `''`, which is not `'db'` — without this bucket such a site would
+// drop out of every assertion below and read as compliant. Unknown is not clean.
+const unparsedSites = sites.filter((s) => s.client === '')
 
 describe('writeAuditLog call sites', () => {
 	it('finds the call sites at all', () => {
 		expect(sites.length).toBeGreaterThan(100)
+	})
+
+	it('parses the client argument of every call site', () => {
+		const unknown = unparsedSites.map((s) => `${s.file}:${s.line}`)
+		expect(
+			unknown,
+			`the third argument of these calls could not be parsed, so this sweep says nothing about them:\n${unknown.join('\n')}`
+		).toEqual([])
 	})
 
 	it('passes a transaction client everywhere except the allow-list', () => {
