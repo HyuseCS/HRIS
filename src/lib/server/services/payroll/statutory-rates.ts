@@ -415,6 +415,9 @@ export async function rejectProposal(
 	proposalId: string,
 	ctx: AuditContext
 ) {
+	// NOT the race guard — the status-guarded claim inside the transaction is. This pre-read exists
+	// only to supply `oldValue.proposedById` for the audit payload and to give the normal path its
+	// 404. Do not delete it as redundant, and do not reinstate it as the check.
 	const proposal = await db.statutoryRateProposal.findFirst({
 		where: { id: proposalId, organizationId, status: 'PENDING' }
 	})
@@ -422,10 +425,15 @@ export async function rejectProposal(
 
 	// #5: the rejection and its audit row commit together.
 	return await db.$transaction(async (tx) => {
-		const updated = await tx.statutoryRateProposal.update({
-			where: { id: proposalId },
+		// Same atomic CLAIM shape as confirmProposal: status- and org-guarded, so a confirm that already
+		// applied the proposal (or a second racing reject) cannot be overwritten to REJECTED.
+		const claim = await tx.statutoryRateProposal.updateMany({
+			where: { id: proposalId, organizationId, status: 'PENDING' },
 			data: { status: 'REJECTED', decidedById: ctx.actorId, decidedAt: new Date() }
 		})
+		if (claim.count === 0) error(404, 'Pending proposal not found')
+
+		const updated = await tx.statutoryRateProposal.findUniqueOrThrow({ where: { id: proposalId } })
 
 		await writeAuditLog(
 			ctx,
