@@ -97,8 +97,11 @@ export async function reviewLeaveRequest(
 	rejectionReason: string | undefined,
 	ctx: AuditContext
 ) {
-	const actor = await db.employee.findUnique({
-		where: { userId: ctx.actorId },
+	// #6: a null actor SKIPS the "you cannot review your own" bar in `decide` rather than failing
+	// it. Safe because the target row is org-scoped independently first — approvals.ts:208-209
+	// scopes it, :225 404s on a miss, and the guard at :230 only runs after that.
+	const actor = await db.employee.findFirst({
+		where: { userId: ctx.actorId, organizationId: ctx.organizationId },
 		select: { id: true }
 	})
 	return decide(id, approved ? 'APPROVED' : 'REJECTED', rejectionReason, ctx, actor?.id ?? null)

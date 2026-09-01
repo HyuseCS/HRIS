@@ -439,8 +439,14 @@ export async function countPendingApprovals(user: {
 	if (!canAny(roles, 'APPROVE_REQUESTS'))
 		return { timesheets: 0, requests: 0, payrollRuns: 0, proposals: 0, total: 0 }
 
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
+	// #6: this is the badge counter's self lookup, and a null result SKIPS the "cannot act on your
+	// own" exclusions rather than failing them. Safe because both queues it feeds are org-scoped
+	// independently — `employee: { organizationId }` at :373 and :543 — so a cross-org actor can
+	// never own a counted row. The second separation-of-duties bar at :119 compares USER ids
+	// (`sod.actorId` / `decidedActorIds`), not Employee ids, so it keeps working across orgs and #6
+	// does not weaken it.
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
 
@@ -529,6 +535,10 @@ export async function countActionableTimesheets(
 	const submitted = await db.timesheet.findMany({
 		where: {
 			status: 'SUBMITTED',
+			// #6: this looks like /team's widening bug and is not. /team drops a POSITIVE restriction
+			// ("only my reports"), and removing that leaves no filter — the result widens to the whole
+			// org. This drops a NEGATIVE self-exclusion ("everyone except me"), which re-admits exactly
+			// one person's rows: the actor's own, already excluded by the independent org filter below.
 			...(actorEmployeeId ? { employeeId: { not: actorEmployeeId } } : {}),
 			employee: { organizationId }
 		},

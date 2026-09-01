@@ -122,8 +122,8 @@ export async function getTimesheet(id: string, organizationId: string) {
  * write happen and the check refuse afterwards.
  */
 export async function assertCanModifyTimesheet(ctx: AuditContext, ts: { employeeId: string }) {
-	const actorEmployee = await db.employee.findUnique({
-		where: { userId: ctx.actorId },
+	const actorEmployee = await db.employee.findFirst({
+		where: { userId: ctx.actorId, organizationId: ctx.organizationId },
 		select: { id: true }
 	})
 	const isOwner = actorEmployee?.id === ts.employeeId
@@ -439,8 +439,11 @@ export async function reviewTimesheet(
 	if (ts.status !== 'SUBMITTED') error(400, 'Only submitted timesheets can be reviewed')
 
 	// #75: separation of duties — nobody reviews their own timesheet.
-	const actorEmployee = await db.employee.findUnique({
-		where: { userId: ctx.actorId },
+	// #6: a null actor SKIPS this bar rather than failing it, which is safe because the target row
+	// is independently org-scoped first — `employee: { organizationId }` at the findFirst above,
+	// 404 if it misses. A cross-org actor can therefore never be this timesheet's owner.
+	const actorEmployee = await db.employee.findFirst({
+		where: { userId: ctx.actorId, organizationId },
 		select: { id: true }
 	})
 	if (actorEmployee && actorEmployee.id === ts.employeeId) {

@@ -274,8 +274,8 @@ export async function deleteRequest(id: string, organizationId: string, ctx: Aud
 
 	const isPrivileged = canAny(ctx.actorRoles, 'ADMINISTER_HR_RECORDS')
 	if (!isPrivileged) {
-		const me = await db.employee.findUnique({
-			where: { userId: ctx.actorId },
+		const me = await db.employee.findFirst({
+			where: { userId: ctx.actorId, organizationId },
 			select: { id: true }
 		})
 		if (!me || me.id !== req.employeeId) error(403, 'You can only delete your own requests')
