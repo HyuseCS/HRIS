@@ -26,13 +26,21 @@ const { dbMock } = vi.hoisted(() => ({
 		timeLog: { findMany: vi.fn() },
 		request: { findMany: vi.fn() },
 		workSchedule: { findFirst: vi.fn() },
-		attendanceDay: { findUnique: vi.fn(), upsert: vi.fn() },
-		organization: { findUnique: vi.fn() }
+		attendanceDay: { findMany: vi.fn() },
+		organization: { findUnique: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
-vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const writeAuditLog = vi.fn().mockResolvedValue(undefined)
+vi.mock('$lib/server/audit', () => ({
+	writeAuditLog: (...args: unknown[]) => writeAuditLog(...args)
+}))
+
+// #324/D8: deriveRange batches its writes into one transaction — new days through `createMany`,
+// changed ones through a per-row `update`. A distinct client makes a bare-`db.` regression visible.
+const tx = { attendanceDay: { createMany: vi.fn(), update: vi.fn() } }
 
 const { deriveRange } = await import('$lib/server/services/attendance')
 
@@ -55,8 +63,9 @@ const NARROW_GAP = [
 	{ punchType: 'OUT' as const, timestamp: new Date('2026-07-13T09:00:00Z') }
 ]
 
-/** Whatever `deriveRange` upserted for the single day. */
-const written = () => dbMock.attendanceDay.upsert.mock.calls[0][0].update
+/** Whatever `deriveRange` wrote for the single day. Every case here starts with no stored row,
+ *  so the day always lands as an insert in the batch `createMany`. */
+const written = () => tx.attendanceDay.createMany.mock.calls[0][0].data[0]
 
 function orgRow(gapMinutes: number | null) {
 	dbMock.organization.findUnique.mockImplementation(
@@ -80,8 +89,9 @@ beforeEach(() => {
 	dbMock.publicHoliday.findMany.mockResolvedValue([])
 	dbMock.request.findMany.mockResolvedValue([])
 	dbMock.workSchedule.findFirst.mockResolvedValue(null)
-	dbMock.attendanceDay.findUnique.mockResolvedValue(null)
-	dbMock.attendanceDay.upsert.mockResolvedValue({})
+	dbMock.attendanceDay.findMany.mockResolvedValue([])
+	tx.attendanceDay.createMany.mockResolvedValue({ count: 1 })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 	dbMock.timeLog.findMany.mockResolvedValue(NARROW_GAP)
 	orgRow(null)
 })
@@ -92,6 +102,9 @@ describe('#162 — deriveRange gates the split on the org (criterion 20)', () =>
 		await deriveRange(JOJO, RANGE, ctxFor(JOJO))
 		expect(written().amTimeIn).toBeInstanceOf(Date)
 		expect(written().pmTimeIn).toBeInstanceOf(Date)
+		// #324: the write and the audit share one transaction.
+		expect(tx.attendanceDay.createMany).toHaveBeenCalledTimes(1)
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('writes four nulls for a non-food-service tenant, even with a threshold stored', async () => {
@@ -148,8 +161,9 @@ describe('#162 Amendment 1 — deriveRange reads the stored threshold', () => {
 		dbMock.publicHoliday.findMany.mockResolvedValue([])
 		dbMock.request.findMany.mockResolvedValue([])
 		dbMock.workSchedule.findFirst.mockResolvedValue(null)
-		dbMock.attendanceDay.findUnique.mockResolvedValue(null)
-		dbMock.attendanceDay.upsert.mockResolvedValue({})
+		dbMock.attendanceDay.findMany.mockResolvedValue([])
+		tx.attendanceDay.createMany.mockResolvedValue({ count: 1 })
+		dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 		dbMock.timeLog.findMany.mockResolvedValue(NARROW_GAP)
 		orgRow(15)
 		await deriveRange(JOJO, RANGE, ctxFor(JOJO))

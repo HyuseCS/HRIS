@@ -7,7 +7,7 @@ import { createTimesheet } from '../timesheets'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { isFoodServiceOrg } from '$lib/orgs'
 import type { AuditContext } from '../types'
-import type { HolidayType } from '@prisma/client'
+import type { HolidayType, Prisma } from '@prisma/client'
 
 /**
  * Attendance service (Slice 2): derive AttendanceDay records from TimeLog punches against each
@@ -134,6 +134,27 @@ export async function listTeamDay(organizationId: string, dateKey: string) {
 }
 
 /**
+ * True when the stored day already holds exactly what this run derived, so the row can be dropped
+ * from the write set. The hours columns come back as Prisma `Decimal` and are compared
+ * numerically; the punch columns are `Date | null`; status and dayType are plain strings.
+ */
+function rowMatches(existing: Record<string, unknown>, data: Record<string, unknown>): boolean {
+	for (const [key, next] of Object.entries(data)) {
+		const cur = existing[key]
+		if (next instanceof Date || cur instanceof Date) {
+			if (
+				(next instanceof Date ? next.getTime() : null) !==
+				(cur instanceof Date ? cur.getTime() : null)
+			)
+				return false
+		} else if (typeof next === 'number') {
+			if (Number(cur) !== next) return false
+		} else if (cur !== next) return false
+	}
+	return true
+}
+
+/**
  * Derive AttendanceDay records for [from, to] (PHT days). Idempotent — skips locked days.
  */
 export async function deriveRange(
@@ -187,6 +208,50 @@ export async function deriveRange(
 	const phtEndExclusive = new Date(`${toKey}T00:00:00+08:00`)
 	phtEndExclusive.setUTCDate(phtEndExclusive.getUTCDate() + 1)
 
+	// One batch read replaces the per-day findUnique this loop used to do: a full-org month was
+	// headcount × days round-trips. The select carries every column the write below sets, which is
+	// what makes the unchanged-row diff possible. Still one query.
+	const existingDays = await db.attendanceDay.findMany({
+		where: {
+			employeeId: { in: employees.map((e) => e.id) },
+			date: { gte: new Date(`${fromKey}T00:00:00Z`), lte: new Date(`${toKey}T00:00:00Z`) }
+		},
+		select: {
+			id: true,
+			employeeId: true,
+			date: true,
+			isLocked: true,
+			manuallyEdited: true,
+			status: true,
+			dayType: true,
+			timeIn: true,
+			timeOut: true,
+			amTimeIn: true,
+			amTimeOut: true,
+			pmTimeIn: true,
+			pmTimeOut: true,
+			workedHours: true,
+			regularHours: true,
+			overtimeHours: true,
+			rawOvertimeHours: true,
+			nightDiffHours: true,
+			restDayHours: true,
+			restDayOtHours: true,
+			regularHolidayHours: true,
+			regularHolidayOtHours: true,
+			specialHolidayHours: true,
+			specialHolidayOtHours: true,
+			lateMinutes: true,
+			undertimeMinutes: true,
+			breakMinutes: true
+		}
+	})
+	const existingByKey = new Map(
+		existingDays.map((d) => [`${d.employeeId}|${d.date.toISOString().slice(0, 10)}`, d])
+	)
+
+	const inserts: Prisma.AttendanceDayCreateManyInput[] = []
+	const updates: { id: string; data: Prisma.AttendanceDayUncheckedUpdateInput }[] = []
 	let derived = 0
 	const flagged: { employeeId: string; date: string; status: string }[] = []
 
@@ -250,10 +315,7 @@ export async function deriveRange(
 					l.endDate.toISOString().slice(0, 10) >= dayKey
 			)
 
-			const existing = await db.attendanceDay.findUnique({
-				where: { employeeId_date: { employeeId: emp.id, date: cur } },
-				select: { isLocked: true, manuallyEdited: true }
-			})
+			const existing = existingByKey.get(`${emp.id}|${dayKey}`)
 			if (existing?.isLocked) continue
 			// Never overwrite a manual HR override, even on a full Refresh re-derive.
 			if (existing?.manuallyEdited) continue
@@ -298,23 +360,46 @@ export async function deriveRange(
 				undertimeMinutes: r.undertimeMinutes,
 				breakMinutes: r.breakMinutes
 			}
-			await db.attendanceDay.upsert({
-				where: { employeeId_date: { employeeId: emp.id, date: cur } },
-				create: { employeeId: emp.id, date: new Date(dayKey), ...data },
-				update: data
-			})
+			// Diff against the batch-read row: a day that already holds exactly this needs no write,
+			// which is what keeps the transaction below near-empty on a re-derive. `derived` still
+			// counts every day this run produced, unchanged ones included, so the reported figure and
+			// the audit payload are the same as before the restructure.
+			if (!existing) inserts.push({ employeeId: emp.id, date: new Date(dayKey), ...data })
+			else if (!rowMatches(existing, data)) updates.push({ id: existing.id, data })
 			derived++
 			if (r.status === 'ABSENT' || r.status === 'INCOMPLETE')
 				flagged.push({ employeeId: emp.id, date: dayKey, status: r.status })
 		}
 	}
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'AttendanceDay',
-		entityId: range.employeeId ?? organizationId,
-		newValue: { from: fromKey, to: toKey, derived, flagged: flagged.length }
-	})
+	// #324: one transaction holding only the writes plus the audit row — a failed audit write must
+	// not leave a re-derived range standing unrecorded. The reads and the compute above stay outside
+	// it deliberately, so the lock window is the write set alone.
+	//
+	// This is the one place in the branch that overrides Prisma's 5s interactive-transaction default:
+	// the batch scales with headcount × days, and a first-ever full-org month derive carries
+	// thousands of rows. Inserts go in one createMany; changed rows are updated one by one because
+	// the data differs per row and Prisma 5 has no bulk upsert. Unchanged days were diffed out above,
+	// so a re-derive of an already-correct range writes close to nothing.
+	await db.$transaction(
+		async (tx) => {
+			if (inserts.length > 0)
+				await tx.attendanceDay.createMany({ data: inserts, skipDuplicates: true })
+			for (const u of updates) await tx.attendanceDay.update({ where: { id: u.id }, data: u.data })
+
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'CREATE',
+					entityType: 'AttendanceDay',
+					entityId: range.employeeId ?? organizationId,
+					newValue: { from: fromKey, to: toKey, derived, flagged: flagged.length }
+				},
+				tx
+			)
+		},
+		{ timeout: 30_000, maxWait: 10_000 }
+	)
 	return { derived, flagged }
 }
 
@@ -528,23 +613,38 @@ export async function correctDay(
 		}
 	}
 
-	// Flag the day so a later re-derive (Refresh) won't overwrite this manual override.
-	const updated = await db.attendanceDay.update({
-		where: { id },
-		data: { ...write, manuallyEdited: true }
+	// #324: one transaction. A failed audit write must not leave a hand-correction standing
+	// unrecorded, and reading the before-image outside it lets two concurrent corrections log the
+	// same oldValue. The re-read is deliberate: the `day` fetched at the top drives the re-derive
+	// above, while the audit's before-image has to be read inside the transaction that overwrites it.
+	return await db.$transaction(async (tx) => {
+		const before = await tx.attendanceDay.findUniqueOrThrow({
+			where: { id },
+			select: { regularHours: true, overtimeHours: true, status: true }
+		})
+
+		// Flag the day so a later re-derive (Refresh) won't overwrite this manual override.
+		const updated = await tx.attendanceDay.update({
+			where: { id },
+			data: { ...write, manuallyEdited: true }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'AttendanceDay',
+				entityId: id,
+				oldValue: {
+					regularHours: Number(before.regularHours),
+					overtimeHours: Number(before.overtimeHours),
+					status: before.status
+				},
+				newValue: write as Record<string, unknown>
+			},
+			tx
+		)
+		return updated
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'AttendanceDay',
-		entityId: id,
-		oldValue: {
-			regularHours: Number(day.regularHours),
-			overtimeHours: Number(day.overtimeHours),
-			status: day.status
-		},
-		newValue: write as Record<string, unknown>
-	})
-	return updated
 }
 
 /**
@@ -568,19 +668,37 @@ export async function resetDayToDerived(id: string, organizationId: string, ctx:
 	if (day.employee.employmentStatus !== 'ACTIVE')
 		error(409, 'Cannot reset — employee is not active, so the day cannot be re-derived.')
 
-	await db.attendanceDay.update({ where: { id }, data: { manuallyEdited: false } })
+	// #324: the flag clear and its audit row commit together, so a failed audit write can no longer
+	// leave a discarded override standing unrecorded.
+	//
+	// The re-derive stays OUTSIDE this transaction. `deriveRange` opens its own, and Prisma has no
+	// nested interactive transactions — an inner one would run on a second connection and could
+	// commit while this one rolled back. That is also why the audit is now written before the
+	// re-derive instead of after: the ordering is the only behaviour that changed, and it fails in
+	// the safer direction (a recorded reset whose re-derive failed, rather than an unrecorded one).
+	await db.$transaction(async (tx) => {
+		await tx.attendanceDay.update({ where: { id }, data: { manuallyEdited: false } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'AttendanceDay',
+				entityId: id,
+				newValue: { resetToDerived: true }
+			},
+			tx
+		)
+	})
+
+	// Both audit rows are kept and neither is redundant: this one records the human act of
+	// discarding an override on this day, deriveRange's records the machine re-derive batch that
+	// followed. Dropping either loses a distinct fact.
 	await deriveRange(
 		organizationId,
 		{ from: day.date, to: day.date, employeeId: day.employeeId },
 		ctx
 	)
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'AttendanceDay',
-		entityId: id,
-		newValue: { resetToDerived: true }
-	})
 	return { reset: true }
 }
 
@@ -592,19 +710,28 @@ export async function lockRange(
 ) {
 	const fromKey = manilaDayKey(range.from)
 	const toKey = manilaDayKey(range.to)
-	const res = await db.attendanceDay.updateMany({
-		where: {
-			date: { gte: new Date(fromKey), lte: new Date(toKey) },
-			employee: { organizationId },
-			...(range.employeeId ? { employeeId: range.employeeId } : {})
-		},
-		data: { isLocked: true }
-	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'AttendanceDay',
-		entityId: range.employeeId ?? organizationId,
-		newValue: { locked: res.count, from: fromKey, to: toKey }
+	// #324: the lock and its audit row commit together — a failed audit write must not leave a
+	// range locked against payroll with no record of who locked it.
+	const res = await db.$transaction(async (tx) => {
+		const r = await tx.attendanceDay.updateMany({
+			where: {
+				date: { gte: new Date(fromKey), lte: new Date(toKey) },
+				employee: { organizationId },
+				...(range.employeeId ? { employeeId: range.employeeId } : {})
+			},
+			data: { isLocked: true }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'AttendanceDay',
+				entityId: range.employeeId ?? organizationId,
+				newValue: { locked: r.count, from: fromKey, to: toKey }
+			},
+			tx
+		)
+		return r
 	})
 	return { locked: res.count }
 }
@@ -621,19 +748,28 @@ export async function unlockRange(
 
 	const fromKey = manilaDayKey(range.from)
 	const toKey = manilaDayKey(range.to)
-	const res = await db.attendanceDay.updateMany({
-		where: {
-			date: { gte: new Date(fromKey), lte: new Date(toKey) },
-			employee: { organizationId },
-			...(range.employeeId ? { employeeId: range.employeeId } : {})
-		},
-		data: { isLocked: false }
-	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'AttendanceDay',
-		entityId: range.employeeId ?? organizationId,
-		newValue: { unlocked: res.count, from: fromKey, to: toKey }
+	// #324: the unlock and its audit row commit together — reopening a finalized range with no
+	// record of it is exactly the change someone needs to find later.
+	const res = await db.$transaction(async (tx) => {
+		const r = await tx.attendanceDay.updateMany({
+			where: {
+				date: { gte: new Date(fromKey), lte: new Date(toKey) },
+				employee: { organizationId },
+				...(range.employeeId ? { employeeId: range.employeeId } : {})
+			},
+			data: { isLocked: false }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'AttendanceDay',
+				entityId: range.employeeId ?? organizationId,
+				newValue: { unlocked: r.count, from: fromKey, to: toKey }
+			},
+			tx
+		)
+		return r
 	})
 	return { unlocked: res.count }
 }
