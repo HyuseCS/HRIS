@@ -13,7 +13,7 @@ import type { AuditContext } from './types'
 
 async function assertEmployeeInOrg(employeeId: string, organizationId: string) {
 	const emp = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true }
 	})
 	if (!emp) error(404, 'Employee not found')
@@ -88,7 +88,7 @@ export async function saveEmployeeDocument(
 // Returns the row incl. storageKey so the download route can stream the file.
 export async function getEmployeeDocument(docId: string, organizationId: string) {
 	const doc = await db.employeeDocument.findFirst({
-		where: { id: docId, employee: { user: { organizationId } } }
+		where: { id: docId, employee: { organizationId } }
 	})
 	if (!doc) error(404, 'Document not found')
 	return doc

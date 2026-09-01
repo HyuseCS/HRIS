@@ -19,7 +19,7 @@ export async function grantAward(
 	const title = input.title.trim()
 	if (!title) error(400, 'An award title is required')
 	const employee = await db.employee.findFirst({
-		where: { id: input.employeeId, user: { organizationId } },
+		where: { id: input.employeeId, organizationId },
 		select: {
 			id: true,
 			userId: true,

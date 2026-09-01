@@ -12,7 +12,7 @@ interface EmergencyContactInput {
 // Confirms the employee belongs to the actor's organization before mutating.
 async function assertEmployeeInOrg(employeeId: string, organizationId: string) {
 	const employee = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true }
 	})
 	if (!employee) error(404, 'Employee not found')
@@ -51,7 +51,7 @@ export async function deleteEmergencyContact(
 	ctx: AuditContext
 ) {
 	const contact = await db.emergencyContact.findFirst({
-		where: { id: contactId, employee: { user: { organizationId } } }
+		where: { id: contactId, employee: { organizationId } }
 	})
 	if (!contact) error(404, 'Emergency contact not found')
 

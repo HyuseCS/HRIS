@@ -62,7 +62,7 @@ export async function setPostingApprover(
 	const [dept, emp] = await Promise.all([
 		db.department.findFirst({ where: { id: departmentId, organizationId }, select: { id: true } }),
 		db.employee.findFirst({
-			where: { id: approverId, user: { organizationId } },
+			where: { id: approverId, organizationId },
 			select: { id: true }
 		})
 	])
