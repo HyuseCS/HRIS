@@ -6,9 +6,9 @@ import type { Role } from '@prisma/client'
  * these stay in the pure/fast unit suite; the assertions are on which days get written.
  *
  * #324/D8: the per-day findUnique + upsert became one batch `attendanceDay.findMany` read, an
- * in-memory diff, and one short transaction holding a `createMany` for new days, a per-row
- * `update` for changed ones, and the audit row. So the mocks feed `findMany` and the assertions
- * read `tx`, not the bare client.
+ * in-memory diff, and one short transaction holding a `createMany` for new days, one set-based
+ * bulk `UPDATE` for changed ones, and the audit row. So the mocks feed `findMany` and the
+ * assertions read `tx`, not the bare client.
  *
  * Regression target: a day materialised as ABSENT *before* the employee punched used to freeze,
  * because the old `onlyMissing` guard skipped every existing day. `skipUnpunched` instead skips
@@ -37,7 +37,16 @@ vi.mock('$lib/server/audit', () => ({
 
 // A distinct transaction client, so a regression back to a bare `db.` write is visible here
 // instead of silently committing outside the transaction.
-const tx = { attendanceDay: { createMany: vi.fn(), update: vi.fn() } }
+const tx = {
+	attendanceDay: { createMany: vi.fn(), findMany: vi.fn() },
+	$executeRaw: vi.fn()
+}
+
+/** Rows carried by the single bulk UPDATE, if it was issued. */
+const bulkRows = (): Record<string, unknown>[] =>
+	tx.$executeRaw.mock.calls.length
+		? JSON.parse(tx.$executeRaw.mock.calls[0][2] as string)
+		: []
 
 const { deriveRange, autoDeriveFromPunches } = await import('$lib/server/services/attendance')
 
@@ -66,15 +75,13 @@ const existingDay = (over: Record<string, unknown> = {}) => ({
 	...over
 })
 
-/** How many AttendanceDay rows the transaction actually wrote (inserts + per-row updates). */
+/** How many AttendanceDay rows the transaction actually wrote (inserts + bulk-updated rows). */
 const writeCount = () =>
-	(tx.attendanceDay.createMany.mock.calls[0]?.[0].data.length ?? 0) +
-	tx.attendanceDay.update.mock.calls.length
+	(tx.attendanceDay.createMany.mock.calls[0]?.[0].data.length ?? 0) + bulkRows().length
 
 /** The single row that landed, whether it went in as an insert or as an update. */
 const written = () =>
-	tx.attendanceDay.createMany.mock.calls[0]?.[0].data[0] ??
-	tx.attendanceDay.update.mock.calls[0][0].data
+	tx.attendanceDay.createMany.mock.calls[0]?.[0].data[0] ?? bulkRows()[0]
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -86,7 +93,11 @@ beforeEach(() => {
 	dbMock.attendanceDay.findMany.mockResolvedValue([])
 	dbMock.organization.findUnique.mockResolvedValue({ trackTardiness: true }) // #190 master on
 	tx.attendanceDay.createMany.mockResolvedValue({ count: 1 })
-	tx.attendanceDay.update.mockResolvedValue({})
+	tx.$executeRaw.mockResolvedValue(0)
+	// Nothing locked between the batch snapshot and the write.
+	tx.attendanceDay.findMany.mockImplementation(
+		async (args: { where: { id: { in: string[] } } }) => args.where.id.in.map((id) => ({ id }))
+	)
 	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
@@ -100,7 +111,7 @@ describe('deriveRange — skipUnpunched guard', () => {
 		const res = await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
 		expect(writeCount()).toBe(1)
-		expect(tx.attendanceDay.update).toHaveBeenCalledTimes(1)
+		expect(tx.$executeRaw).toHaveBeenCalledTimes(1)
 		expect(written().status).toBe('PRESENT')
 		expect(res.derived).toBe(1)
 		// #324: the audit write shares the transaction.

@@ -7,7 +7,8 @@ import { createTimesheet } from '../timesheets'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { isFoodServiceOrg } from '$lib/orgs'
 import type { AuditContext } from '../types'
-import type { HolidayType, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { HolidayType } from '@prisma/client'
 
 /**
  * Attendance service (Slice 2): derive AttendanceDay records from TimeLog punches against each
@@ -152,6 +153,26 @@ function rowMatches(existing: Record<string, unknown>, data: Record<string, unkn
 		} else if (cur !== next) return false
 	}
 	return true
+}
+
+/**
+ * Postgres column type for one derived AttendanceDay column, used to type the `jsonb_to_recordset`
+ * record definition in the bulk update below. Anything not listed is one of the eleven hour
+ * columns, all `numeric(5,2)`. The column *names* are never listed here — they come from the
+ * derived `data` object's own keys, so the two cannot drift apart.
+ */
+const DERIVED_COLUMN_TYPES: Record<string, string> = {
+	status: '"AttendanceStatus"',
+	dayType: '"DayType"',
+	timeIn: 'timestamp(3)',
+	timeOut: 'timestamp(3)',
+	amTimeIn: 'timestamp(3)',
+	amTimeOut: 'timestamp(3)',
+	pmTimeIn: 'timestamp(3)',
+	pmTimeOut: 'timestamp(3)',
+	lateMinutes: 'integer',
+	undertimeMinutes: 'integer',
+	breakMinutes: 'integer'
 }
 
 /**
@@ -376,16 +397,57 @@ export async function deriveRange(
 	// not leave a re-derived range standing unrecorded. The reads and the compute above stay outside
 	// it deliberately, so the lock window is the write set alone.
 	//
-	// This is the one place in the branch that overrides Prisma's 5s interactive-transaction default:
-	// the batch scales with headcount × days, and a first-ever full-org month derive carries
-	// thousands of rows. Inserts go in one createMany; changed rows are updated one by one because
-	// the data differs per row and Prisma 5 has no bulk upsert. Unchanged days were diffed out above,
-	// so a re-derive of an already-correct range writes close to nothing.
+	// Both writes are set-based. Measured on dev Postgres 18 at 15,500 rows: a sequential
+	// `update` loop took 38,079 ms (2.457 ms/row) and blew the old 30 s budget at ~12,200 changed
+	// rows — about 394 employees over a 31-day month, which `importAttendance` reaches with no
+	// headcount cap. One `UPDATE ... FROM jsonb_to_recordset(...)` does the same work in 1,092 ms
+	// (0.070 ms/row) and stores identical values. `createMany` of the same 15,500 rows took
+	// 2,224 ms and did NOT hit the 65535 bind-parameter ceiling, so neither write is chunked.
+	//
+	// Worst measured content is therefore ~3.3 s. The 15 s override stands because Prisma's 5 s
+	// default would leave under 2x headroom; 15 s is ~4.5x.
 	await db.$transaction(
 		async (tx) => {
 			if (inserts.length > 0)
 				await tx.attendanceDay.createMany({ data: inserts, skipDuplicates: true })
-			for (const u of updates) await tx.attendanceDay.update({ where: { id: u.id }, data: u.data })
+
+			if (updates.length > 0) {
+				// The lock/edit flags were read in the batch snapshot before the whole compute pass, so
+				// a concurrent lockRange can have landed since. Re-read them here, inside the write
+				// transaction, and drop anything that is now locked or hand-edited. Inserts need no
+				// such check — a row that does not exist yet cannot have been locked.
+				const writable = await tx.attendanceDay.findMany({
+					where: { id: { in: updates.map((u) => u.id) }, isLocked: false, manuallyEdited: false },
+					select: { id: true }
+				})
+				const writableIds = new Set(writable.map((r) => r.id))
+				const rows = updates
+					.filter((u) => writableIds.has(u.id))
+					.map((u) => ({ id: u.id, ...u.data }))
+
+				if (rows.length > 0) {
+					// Column names come from the derived payload itself, so a column added to `data`
+					// above is carried here automatically instead of being silently dropped.
+					const cols = Object.keys(rows[0]).filter((c) => c !== 'id')
+					const setList = Prisma.join(
+						cols.map((c) => Prisma.sql`${Prisma.raw(`"${c}"`)} = v.${Prisma.raw(`"${c}"`)}`),
+						', '
+					)
+					const colDefs = Prisma.raw(
+						[
+							'"id" text',
+							...cols.map((c) => `"${c}" ${DERIVED_COLUMN_TYPES[c] ?? 'numeric(5,2)'}`)
+						].join(', ')
+					)
+					// `updatedAt` has no database default and Prisma's @updatedAt is client-side only,
+					// so raw SQL must set it explicitly or every bulk-updated row keeps a stale stamp.
+					await tx.$executeRaw`
+						UPDATE "attendance_days" AS a
+						SET ${setList}, "updatedAt" = now()
+						FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS v(${colDefs})
+						WHERE a."id" = v."id"`
+				}
+			}
 
 			await writeAuditLog(
 				ctx,
@@ -398,7 +460,7 @@ export async function deriveRange(
 				tx
 			)
 		},
-		{ timeout: 30_000, maxWait: 10_000 }
+		{ timeout: 15_000, maxWait: 10_000 }
 	)
 	return { derived, flagged }
 }
