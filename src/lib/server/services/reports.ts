@@ -22,7 +22,7 @@ export async function getLeaveUtilizationReport(organizationId: string, year: nu
 	return db.leaveBalance.findMany({
 		where: {
 			year,
-			employee: { user: { organizationId }, employmentStatus: 'ACTIVE' }
+			employee: { organizationId, employmentStatus: 'ACTIVE' }
 		},
 		include: {
 			employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
@@ -57,7 +57,7 @@ export async function getAttritionReport(organizationId: string, year: number) {
 	const [hired, offboarded] = await Promise.all([
 		db.employee.count({
 			where: {
-				user: { organizationId },
+				organizationId,
 				startDate: {
 					gte: new Date(`${year}-01-01`),
 					lte: new Date(`${year}-12-31`)
@@ -66,7 +66,7 @@ export async function getAttritionReport(organizationId: string, year: number) {
 		}),
 		db.employee.count({
 			where: {
-				user: { organizationId },
+				organizationId,
 				employmentStatus: 'OFFBOARDED',
 				endDate: {
 					gte: new Date(`${year}-01-01`),
@@ -96,7 +96,7 @@ export async function generateHeadcount(
 	{ startDate, endDate, departmentId }: DateRangeFilter
 ) {
 	const where = {
-		user: { organizationId },
+		organizationId,
 		startDate: { lte: endDate },
 		OR: [{ endDate: null }, { endDate: { gte: startDate } }],
 		...(departmentId ? { departmentId } : {})
@@ -163,7 +163,7 @@ export async function generateAttendance(
 			periodStart: { gte: startDate },
 			periodEnd: { lte: endDate },
 			employee: {
-				user: { organizationId },
+				organizationId,
 				...(departmentId ? { departmentId } : {})
 			}
 		},
@@ -281,7 +281,7 @@ export async function generateLeaveUtilization(
 			status: 'APPROVED',
 			dateFrom: { gte: startDate },
 			dateTo: { lte: endDate },
-			employee: { user: { organizationId } }
+			employee: { organizationId }
 		},
 		select: { payload: true, employeeId: true }
 	})
@@ -384,7 +384,7 @@ export async function generateTardiness(
 	const days = await db.attendanceDay.findMany({
 		where: {
 			date: { gte: startDate, lte: endDate },
-			employee: { user: { organizationId }, ...(departmentId ? { departmentId } : {}) }
+			employee: { organizationId, ...(departmentId ? { departmentId } : {}) }
 		},
 		select: {
 			lateMinutes: true,
@@ -429,7 +429,7 @@ export async function generateOvertime(
 	const days = await db.attendanceDay.findMany({
 		where: {
 			date: { gte: startDate, lte: endDate },
-			employee: { user: { organizationId }, ...(departmentId ? { departmentId } : {}) }
+			employee: { organizationId, ...(departmentId ? { departmentId } : {}) }
 		},
 		select: {
 			overtimeHours: true,
@@ -479,7 +479,7 @@ export async function generateLoanSummary(
 ) {
 	const loans = await db.loan.findMany({
 		where: {
-			employee: { user: { organizationId } },
+			employee: { organizationId },
 			status: 'ACTIVE',
 			...(visibleEmployeeIds != null && { employeeId: { in: visibleEmployeeIds } })
 		},
