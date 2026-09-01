@@ -88,7 +88,7 @@ export async function saveRequestDocuments(
 	if (!files.length) return []
 
 	const req = await db.request.findFirst({
-		where: { id: requestId, employeeId, employee: { user: { organizationId } } },
+		where: { id: requestId, employeeId, employee: { organizationId } },
 		// #299/D-5: the cap means 5 LIVE documents. Tombstones are kept forever, so counting them
 		// would lock a requester out of their own request after two swaps — the cap would ratchet
 		// down instead of holding. Filtered `_count` is supported by the installed Prisma 5.22.
@@ -116,23 +116,33 @@ export async function saveRequestDocuments(
 		for (const f of files) {
 			const saved = await saveFile(f.bytes, f.mimeType, `requests/${requestId}`)
 			savedKeys.push(saved.storageKey)
-			const doc = await db.requestDocument.create({
-				data: {
-					requestId,
-					label: f.fileName,
-					fileName: f.fileName,
-					mimeType: f.mimeType,
-					size: saved.size,
-					storageKey: saved.storageKey
-				}
+			// One transaction per file: a failed audit write must not leave an attached document
+			// standing unrecorded. saveFile stays outside it — the bytes are already on disk and an
+			// unlink is not rollback-able; the catch below is what cleans them up.
+			const doc = await db.$transaction(async (tx) => {
+				const row = await tx.requestDocument.create({
+					data: {
+						requestId,
+						label: f.fileName,
+						fileName: f.fileName,
+						mimeType: f.mimeType,
+						size: saved.size,
+						storageKey: saved.storageKey
+					}
+				})
+				await writeAuditLog(
+					ctx,
+					{
+						action: 'CREATE',
+						entityType: 'RequestDocument',
+						entityId: row.id,
+						newValue: { requestId, fileName: f.fileName, size: saved.size }
+					},
+					tx
+				)
+				return row
 			})
 			docs.push(doc)
-			await writeAuditLog(ctx, {
-				action: 'CREATE',
-				entityType: 'RequestDocument',
-				entityId: doc.id,
-				newValue: { requestId, fileName: f.fileName, size: saved.size }
-			})
 		}
 	} catch (e) {
 		// A mid-batch failure must not leave earlier uploads half-attached: drop the rows
@@ -158,7 +168,7 @@ export async function saveRequestDocuments(
 // three for everyone.
 export async function getRequestDocument(docId: string, organizationId: string) {
 	const doc = await db.requestDocument.findFirst({
-		where: { id: docId, request: { employee: { user: { organizationId } } } },
+		where: { id: docId, request: { employee: { organizationId } } },
 		include: { request: { select: { id: true, employeeId: true } } }
 	})
 	if (!doc) error(404, 'Document not found')
@@ -180,32 +190,39 @@ export async function setRequestDocumentVerified(
 	// "not found" for a row on their screen produces a bug report. 409 is the code this file
 	// already uses for "you can see it, you may not do this to it" (the delete lock below).
 	if (doc.deletedAt) error(409, 'Removed documents cannot be verified')
-	const updated = await db.requestDocument.update({
-		where: { id: doc.id },
-		data: verified
-			? { verifiedById: ctx.actorId, verifiedAt: new Date() }
-			: // #283/D11: clearing the sign-off clears verifiedAt ONLY. Nulling verifiedById too would
-				// let a barred approver un-verify their own sign-off and then decide the request, which
-				// is the whole F3 bypass — no ADMINISTER_SYSTEM needed, and the selfVerifiedEvidence
-				// audit marker never fires. Every other consumer keys on verifiedAt (approvals.ts's
-				// queue filter, the delete lock below, requests/[id] and requests/approvals), so
-				// "currently verified" still means verifiedAt != null and the ordinary un-verify
-				// correction path is unchanged.
-				//
-				// ponytail: known ceiling — if a DIFFERENT actor later verifies this same document,
-				// verifiedById is overwritten and the earlier signer's bar is forgotten. Two people
-				// must collude, so it is accepted for now; the upgrade path is a
-				// RequestDocumentVerification history table (one row per sign-off), at which point the
-				// F3 bar reads the whole history instead of a scalar.
-				{ verifiedAt: null }
+	// One transaction: a failed audit write must not leave a sign-off change standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.requestDocument.update({
+			where: { id: doc.id },
+			data: verified
+				? { verifiedById: ctx.actorId, verifiedAt: new Date() }
+				: // #283/D11: clearing the sign-off clears verifiedAt ONLY. Nulling verifiedById too would
+					// let a barred approver un-verify their own sign-off and then decide the request, which
+					// is the whole F3 bypass — no ADMINISTER_SYSTEM needed, and the selfVerifiedEvidence
+					// audit marker never fires. Every other consumer keys on verifiedAt (approvals.ts's
+					// queue filter, the delete lock below, requests/[id] and requests/approvals), so
+					// "currently verified" still means verifiedAt != null and the ordinary un-verify
+					// correction path is unchanged.
+					//
+					// ponytail: known ceiling — if a DIFFERENT actor later verifies this same document,
+					// verifiedById is overwritten and the earlier signer's bar is forgotten. Two people
+					// must collude, so it is accepted for now; the upgrade path is a
+					// RequestDocumentVerification history table (one row per sign-off), at which point the
+					// F3 bar reads the whole history instead of a scalar.
+					{ verifiedAt: null }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'RequestDocument',
+				entityId: doc.id,
+				newValue: { requestId: doc.requestId, verified }
+			},
+			tx
+		)
+		return updated
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'RequestDocument',
-		entityId: doc.id,
-		newValue: { requestId: doc.requestId, verified }
-	})
-	return updated
 }
 
 // #299/I-3 — the ONE place bytes are ever evicted. Two modes, one helper, because the ordering
@@ -282,28 +299,41 @@ export async function deleteRequestDocument(
 	// that, two concurrent removals of one id each write a `deletedAt` AND a DELETE audit entry, and
 	// a verify landing between the read and this write tombstones a document that is now verified —
 	// exactly what the 409 above promises it will not do.
-	const { count } = await db.requestDocument.updateMany({
-		where: { id: doc.id, deletedAt: null, verifiedAt: null },
-		data: { deletedAt: new Date() }
+	//
+	// The tombstone write and its audit entry share one transaction (#5): a failed audit write must
+	// not leave a document removed with no record of who removed it.
+	await db.$transaction(async (tx) => {
+		const { count } = await tx.requestDocument.updateMany({
+			where: { id: doc.id, deletedAt: null, verifiedAt: null },
+			data: { deletedAt: new Date() }
+		})
+		if (count === 0) error(409, 'This document changed while it was being removed')
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'DELETE',
+				entityType: 'RequestDocument',
+				entityId: doc.id,
+				// #299: `verifiedById` joins the entry. Today's audit cannot reconstruct who signed a
+				// removed document — the same amnesia this issue exists to close, one layer up.
+				oldValue: {
+					requestId: doc.requestId,
+					fileName: doc.fileName,
+					verifiedById: doc.verifiedById
+				}
+			},
+			tx
+		)
 	})
-	if (count === 0) error(409, 'This document changed while it was being removed')
+
 	// Bytes are a cleanup concern and the user's removal already succeeded, so a storage failure
-	// must not surface as an error or skip the DELETE audit entry — same reasoning as the inline
-	// unlink this replaced.
+	// must not surface as an error — same reasoning as the inline unlink this replaced.
+	//
+	// Outside the transaction above, and best-effort, on purpose — same reason as decide()'s
+	// eviction in approvals.ts. A filesystem unlink is not rollback-able: run it inside and a disk
+	// error rolls back a removal whose bytes are gone either way.
 	await evictTombstonedBytes(doc.requestId, 3).catch((e) =>
 		console.error('[storage] failed to evict tombstoned bytes for', doc.requestId, e)
 	)
-	await writeAuditLog(ctx, {
-		action: 'DELETE',
-		entityType: 'RequestDocument',
-		entityId: doc.id,
-		// #299: `verifiedById` joins the entry. Today's audit cannot reconstruct who signed a
-		// removed document — the same amnesia this issue exists to close, one layer up.
-		oldValue: {
-			requestId: doc.requestId,
-			fileName: doc.fileName,
-			verifiedById: doc.verifiedById
-		}
-	})
 	return { deleted: true }
 }

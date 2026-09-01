@@ -28,7 +28,7 @@ export async function listLeaveRequests(params: {
 	const rows = await db.request.findMany({
 		where: {
 			type: 'LEAVE',
-			employee: { user: { organizationId: params.organizationId } },
+			employee: { organizationId: params.organizationId },
 			...(params.employeeId && { employeeId: params.employeeId }),
 			...(params.status && { status: params.status as never })
 		},
@@ -180,7 +180,7 @@ export async function listOrgLeaveBalances(filters: OrgBalanceFilters) {
 
 	return db.employee.findMany({
 		where: {
-			user: { organizationId },
+			organizationId,
 			employmentStatus: 'ACTIVE',
 			...(departmentId && { departmentId }),
 			...(term && {

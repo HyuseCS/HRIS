@@ -21,13 +21,20 @@ import type { Role } from '@prisma/client'
  * production, but a direct handler call rejects.
  */
 
-const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
+const { dbMock, tx, listReportIdsFor } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
+	// #324: the four writers run the mutation on the transaction client, so the mutation mocks
+	// live on `tx`. The guard reads stay on `dbMock` — they run before the transaction opens.
+	tx: {
+		loan: { create: vi.fn(), update: vi.fn() },
+		cashAdvance: { create: vi.fn(), update: vi.fn() }
+	},
 	dbMock: {
+		$transaction: vi.fn(),
 		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
 		branch: { findMany: vi.fn() },
-		loan: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-		cashAdvance: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() }
+		loan: { findFirst: vi.fn() },
+		cashAdvance: { findFirst: vi.fn() }
 	}
 }))
 
@@ -78,10 +85,11 @@ beforeEach(() => {
 	dbMock.employee.findFirst.mockResolvedValue(STRANGER)
 	dbMock.loan.findFirst.mockResolvedValue({ id: 'loan1', employeeId: STRANGER.id })
 	dbMock.cashAdvance.findFirst.mockResolvedValue({ id: 'ca1', employeeId: STRANGER.id })
-	dbMock.loan.create.mockResolvedValue({ id: 'loan-new' })
-	dbMock.cashAdvance.create.mockResolvedValue({ id: 'ca-new' })
-	dbMock.loan.update.mockResolvedValue({ id: 'loan1' })
-	dbMock.cashAdvance.update.mockResolvedValue({ id: 'ca1' })
+	tx.loan.create.mockResolvedValue({ id: 'loan-new' })
+	tx.cashAdvance.create.mockResolvedValue({ id: 'ca-new' })
+	tx.loan.update.mockResolvedValue({ id: 'loan1' })
+	tx.cashAdvance.update.mockResolvedValue({ id: 'ca1' })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('POST /api/v1/payroll/loans', () => {
@@ -90,13 +98,13 @@ describe('POST /api/v1/payroll/loans', () => {
 			status: 403,
 			body: { message: DENIED }
 		})
-		expect(dbMock.loan.create).not.toHaveBeenCalled()
+		expect(tx.loan.create).not.toHaveBeenCalled()
 	})
 
 	it('admits [MANAGER, FINANCE] on the same stranger', async () => {
 		const res = await createLoanRoute(event(['MANAGER', 'FINANCE'], LOAN_BODY))
 		expect(res.status).toBe(201)
-		expect(dbMock.loan.create).toHaveBeenCalled()
+		expect(tx.loan.create).toHaveBeenCalled()
 	})
 })
 
@@ -106,13 +114,13 @@ describe('PATCH /api/v1/payroll/loans/[id]', () => {
 			status: 403,
 			body: { message: DENIED }
 		})
-		expect(dbMock.loan.update).not.toHaveBeenCalled()
+		expect(tx.loan.update).not.toHaveBeenCalled()
 	})
 
 	it('admits [MANAGER, FINANCE] on the same stranger', async () => {
 		const res = await updateLoanRoute(event(['MANAGER', 'FINANCE'], PATCH_BODY, 'loan1'))
 		expect(res.status).toBe(200)
-		expect(dbMock.loan.update).toHaveBeenCalled()
+		expect(tx.loan.update).toHaveBeenCalled()
 	})
 })
 
@@ -122,13 +130,13 @@ describe('POST /api/v1/payroll/cash-advances', () => {
 			status: 403,
 			body: { message: DENIED }
 		})
-		expect(dbMock.cashAdvance.create).not.toHaveBeenCalled()
+		expect(tx.cashAdvance.create).not.toHaveBeenCalled()
 	})
 
 	it('admits [MANAGER, FINANCE] on the same stranger', async () => {
 		const res = await createCaRoute(event(['MANAGER', 'FINANCE'], CA_BODY))
 		expect(res.status).toBe(201)
-		expect(dbMock.cashAdvance.create).toHaveBeenCalled()
+		expect(tx.cashAdvance.create).toHaveBeenCalled()
 	})
 })
 
@@ -138,12 +146,12 @@ describe('PATCH /api/v1/payroll/cash-advances/[id]', () => {
 			status: 403,
 			body: { message: DENIED }
 		})
-		expect(dbMock.cashAdvance.update).not.toHaveBeenCalled()
+		expect(tx.cashAdvance.update).not.toHaveBeenCalled()
 	})
 
 	it('admits [MANAGER, FINANCE] on the same stranger', async () => {
 		const res = await updateCaRoute(event(['MANAGER', 'FINANCE'], PATCH_BODY, 'ca1'))
 		expect(res.status).toBe(200)
-		expect(dbMock.cashAdvance.update).toHaveBeenCalled()
+		expect(tx.cashAdvance.update).toHaveBeenCalled()
 	})
 })

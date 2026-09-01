@@ -96,26 +96,29 @@ export async function getRunWithEntries(
 export async function voidRun(id: string, organizationId: string, ctx: AuditContext) {
 	requireAnyCapability(ctx.actorRoles, 'OVERRIDE_FINALIZED')
 
-	const run = await db.payrollRun.findFirst({
-		where: { id, organizationId },
-		include: { period: true }
-	})
-	if (!run) error(404, 'Payroll run not found')
-	// Only an already-VOIDED run is refused: it was never meaningful to void, and voiding it twice
-	// would credit the amortization back a SECOND time. DRAFT and APPROVED voids stay allowed
-	// deliberately — refusing them would newly block somebody who can act today (#298 AC-7.4).
-	if (run.status === 'VOIDED') error(400, 'Payroll run is already voided')
-
-	// `period` is optional on PayrollRun (schema: `periodId String?`, `period PayrollPeriod?`), and
-	// period-less runs exist in real data. Amortization is only ever applied at a period lock, so a
-	// run with no period has nothing to reverse: `wasLocked` is false and the reversal is skipped.
-	// The void itself still succeeds — refusing it would newly block a caller (AC-7.4).
-	const wasLocked = run.period?.status === 'LOCKED' || run.period?.status === 'RELEASED'
-
 	// One transaction: a crash between the reversal and the status flip would otherwise leave a
 	// VOIDED run with half its balances credited back. The audit write joins it too — a void that
 	// is not findable is the whole defect #298 exists to close, so it must not survive alone.
 	const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		// #5: the prior state is read INSIDE the transaction. Read outside it, two concurrent voids
+		// log the same `oldValue`, and worse — `wasLocked` decides whether the amortization is
+		// reversed, so a period locked between the read and the claim reverses nothing at all.
+		const run = await tx.payrollRun.findFirst({
+			where: { id, organizationId },
+			include: { period: true }
+		})
+		if (!run) error(404, 'Payroll run not found')
+		// Only an already-VOIDED run is refused: it was never meaningful to void, and voiding it twice
+		// would credit the amortization back a SECOND time. DRAFT and APPROVED voids stay allowed
+		// deliberately — refusing them would newly block somebody who can act today (#298 AC-7.4).
+		if (run.status === 'VOIDED') error(400, 'Payroll run is already voided')
+
+		// `period` is optional on PayrollRun (schema: `periodId String?`, `period PayrollPeriod?`), and
+		// period-less runs exist in real data. Amortization is only ever applied at a period lock, so a
+		// run with no period has nothing to reverse: `wasLocked` is false and the reversal is skipped.
+		// The void itself still succeeds — refusing it would newly block a caller (AC-7.4).
+		const wasLocked = run.period?.status === 'LOCKED' || run.period?.status === 'RELEASED'
+
 		// Compare-and-set. The status check above is only preliminary: two concurrent voids would
 		// both pass it and both call `reverseAmortization`, crediting the instalment back TWICE —
 		// exactly the double-credit the already-voided refusal exists to prevent.

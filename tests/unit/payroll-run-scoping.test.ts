@@ -14,10 +14,16 @@ import type { Role } from '@prisma/client'
  * both open, because the UI would then imply a boundary the server does not enforce.
  */
 
-const { dbMock, listReportIdsFor, writeAuditLog } = vi.hoisted(() => ({
+const { dbMock, tx, listReportIdsFor, writeAuditLog } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	writeAuditLog: vi.fn(),
+	// #5: the override writes now run on the transaction client, not on `db`.
+	tx: {
+		payrollEntry: { update: vi.fn() },
+		payrollRun: { update: vi.fn() }
+	},
 	dbMock: {
+		$transaction: vi.fn(),
 		employee: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
 		branch: { findMany: vi.fn() },
 		payrollEntry: { findFirst: vi.fn(), update: vi.fn() },
@@ -59,6 +65,7 @@ beforeEach(() => {
 		Promise.resolve((where.id?.in ?? []).map((id: string) => ({ id })))
 	)
 	dbMock.employee.findFirst.mockResolvedValue({ branchId: null })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('listVisiblePayEmployeeIds', () => {
@@ -106,8 +113,8 @@ describe('overridePayrollEntry — the write path', () => {
 	})
 
 	beforeEach(() => {
-		dbMock.payrollEntry.update.mockResolvedValue({ id: 'entry1' })
-		dbMock.payrollRun.update.mockResolvedValue({ id: 'run1' })
+		tx.payrollEntry.update.mockResolvedValue({ id: 'entry1' })
+		tx.payrollRun.update.mockResolvedValue({ id: 'run1' })
 	})
 
 	/**
@@ -120,14 +127,16 @@ describe('overridePayrollEntry — the write path', () => {
 		await expect(
 			overridePayrollEntry('entry1', 'org1', { netPay: 1 }, 'note', ctxOf('MANAGER'))
 		).rejects.toMatchObject({ status: 403 })
-		expect(dbMock.payrollEntry.update).not.toHaveBeenCalled()
+		expect(tx.payrollEntry.update).not.toHaveBeenCalled()
 	})
 
 	it('allows a MANAGER overriding their own direct report', async () => {
 		listReportIdsFor.mockResolvedValue([REPORT_EMP])
 		dbMock.payrollEntry.findFirst.mockResolvedValue(entryFor(REPORT_EMP))
 		await overridePayrollEntry('entry1', 'org1', { netPay: 1 }, 'note', ctxOf('MANAGER'))
-		expect(dbMock.payrollEntry.update).toHaveBeenCalled()
+		expect(tx.payrollEntry.update).toHaveBeenCalled()
+		// #5: the audit write shares the transaction with the override it records.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	// The counterweight: the payroll specialists must keep working. A PAYROLL_OFFICER has no
@@ -136,13 +145,13 @@ describe('overridePayrollEntry — the write path', () => {
 		dbMock.employee.findUnique.mockResolvedValue(null)
 		dbMock.payrollEntry.findFirst.mockResolvedValue(entryFor(STRANGER_EMP))
 		await overridePayrollEntry('entry1', 'org1', { netPay: 1 }, 'note', ctxOf('PAYROLL_OFFICER'))
-		expect(dbMock.payrollEntry.update).toHaveBeenCalled()
+		expect(tx.payrollEntry.update).toHaveBeenCalled()
 	})
 
 	it('leaves an HR_ADMIN unrestricted', async () => {
 		dbMock.payrollEntry.findFirst.mockResolvedValue(entryFor(STRANGER_EMP))
 		await overridePayrollEntry('entry1', 'org1', { netPay: 1 }, 'note', ctxOf('HR_ADMIN'))
-		expect(dbMock.payrollEntry.update).toHaveBeenCalled()
+		expect(tx.payrollEntry.update).toHaveBeenCalled()
 	})
 
 	// Order matters: the approved-run refusal must still come first, so an org-wide role gets the
@@ -155,7 +164,7 @@ describe('overridePayrollEntry — the write path', () => {
 		await expect(
 			overridePayrollEntry('entry1', 'org1', { netPay: 1 }, 'note', ctxOf('HR_ADMIN'))
 		).rejects.toMatchObject({ status: 400 })
-		expect(dbMock.payrollEntry.update).not.toHaveBeenCalled()
+		expect(tx.payrollEntry.update).not.toHaveBeenCalled()
 	})
 })
 

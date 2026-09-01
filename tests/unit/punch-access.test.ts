@@ -52,12 +52,13 @@ beforeEach(() => {
 	listReportIdsFor.mockResolvedValue([])
 	dbMock.branch.findMany.mockResolvedValue([])
 	dbMock.employee.findUnique.mockResolvedValue({ id: SELF })
-	// Two different findFirst calls share one mock: the route resolves the target (org-scoped by
-	// `organizationId`), and `canTouchEmployee` re-resolves it for the branch arm (scoped through
-	// the `user` relation). Discriminate on the where-shape, not call order.
-	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+	// Two different findFirst calls share one mock: the route resolves the target (`select: { id }`)
+	// and `canTouchEmployee` re-resolves it for the branch arm (`select: { branchId }`). Both now
+	// scope on the same `organizationId` column, so discriminate on the `select` — never on the
+	// where-shape, which is the thing under test — and not on call order.
+	dbMock.employee.findFirst.mockImplementation(({ where, select }) =>
 		Promise.resolve(
-			where.user
+			select?.branchId
 				? { branchId: branchOf[where.id] ?? null }
 				: { id: where.id, userId: `user-${where.id}`, reportsToId: null }
 		)

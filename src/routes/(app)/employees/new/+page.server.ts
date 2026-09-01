@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}),
 		db.employee.findMany({
 			where: {
-				user: { organizationId: orgId },
+				organizationId: orgId,
 				employmentStatus: 'ACTIVE'
 			},
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },

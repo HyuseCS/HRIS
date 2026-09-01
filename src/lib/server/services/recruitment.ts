@@ -51,18 +51,25 @@ export async function createJobPosting(
 	input: { departmentId: string; title: string; description: string },
 	ctx: AuditContext
 ) {
-	const jp = await db.jobPosting.create({
-		data: { organizationId, ...input, createdById: ctx.actorId }
-	})
+	// One transaction: a failed audit write must not leave the new posting standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const jp = await tx.jobPosting.create({
+			data: { organizationId, ...input, createdById: ctx.actorId }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'JobPosting',
-		entityId: jp.id,
-		newValue: { title: input.title }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'JobPosting',
+				entityId: jp.id,
+				newValue: { title: input.title }
+			},
+			tx
+		)
 
-	return jp
+		return jp
+	})
 }
 
 // A posting must be approved before it goes OPEN (#195). Submitting sends a DRAFT to
@@ -76,16 +83,25 @@ export async function submitJobPostingForApproval(
 	if (!jp) error(404, 'Job posting not found')
 	if (jp.status !== 'DRAFT') error(400, 'Only draft postings can be submitted for approval')
 
-	const updated = await db.jobPosting.update({
-		where: { id },
-		data: { status: 'PENDING_APPROVAL', submittedById: ctx.actorId, rejectionReason: null }
-	})
+	// One transaction: a failed audit write must not leave the status change standing unrecorded.
+	const updated = await db.$transaction(async (tx) => {
+		const u = await tx.jobPosting.update({
+			where: { id },
+			data: { status: 'PENDING_APPROVAL', submittedById: ctx.actorId, rejectionReason: null }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'JobPosting',
-		entityId: id,
-		newValue: { status: 'PENDING_APPROVAL' }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'JobPosting',
+				entityId: id,
+				newValue: { status: 'PENDING_APPROVAL' }
+			},
+			tx
+		)
+
+		return u
 	})
 
 	// Notify the resolved approver so it lands on their dashboard; HR-fallback postings are
@@ -168,18 +184,27 @@ export async function decideJobPosting(
 		error(400, 'A reason is required to send a posting back to draft')
 	}
 
-	const updated = await db.jobPosting.update({
-		where: { id },
-		data: decision.approve
-			? { status: 'OPEN', postedAt: new Date(), approvedById: ctx.actorId, rejectionReason: null }
-			: { status: 'DRAFT', rejectionReason: decision.note!.trim() }
-	})
+	// One transaction: a failed audit write must not leave the decision standing unrecorded.
+	const updated = await db.$transaction(async (tx) => {
+		const u = await tx.jobPosting.update({
+			where: { id },
+			data: decision.approve
+				? { status: 'OPEN', postedAt: new Date(), approvedById: ctx.actorId, rejectionReason: null }
+				: { status: 'DRAFT', rejectionReason: decision.note!.trim() }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'JobPosting',
-		entityId: id,
-		newValue: { status: updated.status, ...(decision.approve ? {} : { rejected: true }) }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'JobPosting',
+				entityId: id,
+				newValue: { status: u.status, ...(decision.approve ? {} : { rejected: true }) }
+			},
+			tx
+		)
+
+		return u
 	})
 
 	// Tell whoever submitted it the outcome.
@@ -285,14 +310,18 @@ export async function advanceApplicant(
 			data: { applicantId, stage, notes, changedById: ctx.actorId }
 		})
 
-		return a
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Applicant',
+				entityId: applicantId,
+				newValue: { stage }
+			},
+			tx
+		)
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Applicant',
-		entityId: applicantId,
-		newValue: { stage }
+		return a
 	})
 
 	return updated
@@ -332,35 +361,45 @@ export async function scheduleInterview(
 ) {
 	const applicant = await requireApplicant(applicantId, organizationId)
 
-	const interview = await db.interview.create({
-		data: {
-			applicantId,
-			scheduledAt: input.scheduledAt,
-			mode: input.mode,
-			interviewer: input.interviewer,
-			location: input.location ?? null,
-			createdById: ctx.actorId
-		}
-	})
-
-	// Nudge the applicant into the INTERVIEW stage if they're still earlier.
-	if (applicant.currentStage === 'APPLIED' || applicant.currentStage === 'SCREENING') {
-		await db.applicant.update({ where: { id: applicantId }, data: { currentStage: 'INTERVIEW' } })
-		await db.applicantStageHistory.create({
+	// One transaction: the interview, the stage nudge and the audit row commit together, so a
+	// failed audit write cannot leave a booked interview standing unrecorded.
+	const interview = await db.$transaction(async (tx) => {
+		const created = await tx.interview.create({
 			data: {
 				applicantId,
-				stage: 'INTERVIEW',
-				notes: 'Interview scheduled',
-				changedById: ctx.actorId
+				scheduledAt: input.scheduledAt,
+				mode: input.mode,
+				interviewer: input.interviewer,
+				location: input.location ?? null,
+				createdById: ctx.actorId
 			}
 		})
-	}
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Interview',
-		entityId: interview.id,
-		newValue: { applicantId, scheduledAt: input.scheduledAt.toISOString(), mode: input.mode }
+		// Nudge the applicant into the INTERVIEW stage if they're still earlier.
+		if (applicant.currentStage === 'APPLIED' || applicant.currentStage === 'SCREENING') {
+			await tx.applicant.update({ where: { id: applicantId }, data: { currentStage: 'INTERVIEW' } })
+			await tx.applicantStageHistory.create({
+				data: {
+					applicantId,
+					stage: 'INTERVIEW',
+					notes: 'Interview scheduled',
+					changedById: ctx.actorId
+				}
+			})
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Interview',
+				entityId: created.id,
+				newValue: { applicantId, scheduledAt: input.scheduledAt.toISOString(), mode: input.mode }
+			},
+			tx
+		)
+
+		return created
 	})
 
 	// Email the details to the applicant and to HR (#196). The applicant row carries their
@@ -412,23 +451,32 @@ export async function recordInterviewFeedback(
 	})
 	if (!interview) error(404, 'Interview not found')
 
-	const updated = await db.interview.update({ where: { id: interviewId }, data: { feedback } })
+	// One transaction: the feedback, its timeline entry and the audit row commit together.
+	const updated = await db.$transaction(async (tx) => {
+		const u = await tx.interview.update({ where: { id: interviewId }, data: { feedback } })
 
-	// Surface the feedback in the stage-history timeline (keeps the current stage).
-	await db.applicantStageHistory.create({
-		data: {
-			applicantId: interview.applicantId,
-			stage: interview.applicant.currentStage,
-			notes: 'Interview feedback recorded',
-			changedById: ctx.actorId
-		}
-	})
+		// Surface the feedback in the stage-history timeline (keeps the current stage).
+		await tx.applicantStageHistory.create({
+			data: {
+				applicantId: interview.applicantId,
+				stage: interview.applicant.currentStage,
+				notes: 'Interview feedback recorded',
+				changedById: ctx.actorId
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Interview',
-		entityId: interviewId,
-		newValue: { feedbackRecorded: true }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Interview',
+				entityId: interviewId,
+				newValue: { feedbackRecorded: true }
+			},
+			tx
+		)
+
+		return u
 	})
 	return updated
 }
@@ -444,27 +492,36 @@ export async function deleteInterview(
 	})
 	if (!interview) error(404, 'Interview not found')
 
-	await db.interview.delete({ where: { id: interviewId } })
+	// One transaction: the delete, the roll-back-to-SCREENING it may trigger and the audit row
+	// commit together. The remaining-interview count reads inside it too — the decision below
+	// depends on it, so two concurrent deletes must not both see the same count.
+	await db.$transaction(async (tx) => {
+		await tx.interview.delete({ where: { id: interviewId } })
 
-	// If that was the last interview and the applicant is still at the INTERVIEW
-	// stage (scheduling had auto-advanced them), send them back to SCREENING.
-	const remaining = await db.interview.count({ where: { applicantId: interview.applicantId } })
-	if (remaining === 0 && interview.applicant.currentStage === 'INTERVIEW') {
-		await db.applicant.update({
-			where: { id: interview.applicantId },
-			data: { currentStage: 'SCREENING' }
-		})
-		await db.applicantStageHistory.create({
-			data: {
-				applicantId: interview.applicantId,
-				stage: 'SCREENING',
-				notes: 'Interview removed',
-				changedById: ctx.actorId
-			}
-		})
-	}
+		// If that was the last interview and the applicant is still at the INTERVIEW
+		// stage (scheduling had auto-advanced them), send them back to SCREENING.
+		const remaining = await tx.interview.count({ where: { applicantId: interview.applicantId } })
+		if (remaining === 0 && interview.applicant.currentStage === 'INTERVIEW') {
+			await tx.applicant.update({
+				where: { id: interview.applicantId },
+				data: { currentStage: 'SCREENING' }
+			})
+			await tx.applicantStageHistory.create({
+				data: {
+					applicantId: interview.applicantId,
+					stage: 'SCREENING',
+					notes: 'Interview removed',
+					changedById: ctx.actorId
+				}
+			})
+		}
 
-	await writeAuditLog(ctx, { action: 'DELETE', entityType: 'Interview', entityId: interviewId })
+		await writeAuditLog(
+			ctx,
+			{ action: 'DELETE', entityType: 'Interview', entityId: interviewId },
+			tx
+		)
+	})
 }
 
 export async function issueOffer(
@@ -495,24 +552,33 @@ export async function issueOffer(
 		startDate: input.startDate,
 		notes: input.notes ?? null
 	}
-	const offer = await db.offer.upsert({
-		where: { applicantId },
-		create: { applicantId, ...data, status: 'SENT', createdById: ctx.actorId },
-		update: { ...data, status: 'SENT', respondedAt: null }
-	})
-
-	if (applicant.currentStage !== 'OFFER' && applicant.currentStage !== 'HIRED') {
-		await db.applicant.update({ where: { id: applicantId }, data: { currentStage: 'OFFER' } })
-		await db.applicantStageHistory.create({
-			data: { applicantId, stage: 'OFFER', notes: 'Offer issued', changedById: ctx.actorId }
+	// One transaction: the offer, the stage move and the audit row commit together.
+	const offer = await db.$transaction(async (tx) => {
+		const o = await tx.offer.upsert({
+			where: { applicantId },
+			create: { applicantId, ...data, status: 'SENT', createdById: ctx.actorId },
+			update: { ...data, status: 'SENT', respondedAt: null }
 		})
-	}
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Offer',
-		entityId: offer.id,
-		newValue: { jobTitle: input.jobTitle, monthlySalary: input.monthlySalary }
+		if (applicant.currentStage !== 'OFFER' && applicant.currentStage !== 'HIRED') {
+			await tx.applicant.update({ where: { id: applicantId }, data: { currentStage: 'OFFER' } })
+			await tx.applicantStageHistory.create({
+				data: { applicantId, stage: 'OFFER', notes: 'Offer issued', changedById: ctx.actorId }
+			})
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Offer',
+				entityId: o.id,
+				newValue: { jobTitle: input.jobTitle, monthlySalary: input.monthlySalary }
+			},
+			tx
+		)
+
+		return o
 	})
 	return offer
 }
@@ -549,14 +615,19 @@ export async function respondToOffer(
 				changedById: ctx.actorId
 			}
 		})
-		return o
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Offer',
-		entityId: offerId,
-		newValue: { status }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Offer',
+				entityId: offerId,
+				newValue: { status }
+			},
+			tx
+		)
+
+		return o
 	})
 	return updated
 }
@@ -573,25 +644,29 @@ export async function deleteOffer(offerId: string, organizationId: string, ctx: 
 	if (offer.applicant.convertedToEmployeeId)
 		error(409, 'Cannot withdraw — the applicant has already been converted to an employee.')
 
-	await db.offer.delete({ where: { id: offerId } })
+	// One transaction: the withdrawal, the stage roll-back and the audit row commit together. The
+	// interview count reads inside it too — the stage it picks depends on that count.
+	await db.$transaction(async (tx) => {
+		await tx.offer.delete({ where: { id: offerId } })
 
-	// Roll back from OFFER/HIRED to the most recent meaningful stage.
-	if (offer.applicant.currentStage === 'OFFER' || offer.applicant.currentStage === 'HIRED') {
-		const hasInterviews =
-			(await db.interview.count({ where: { applicantId: offer.applicantId } })) > 0
-		const stage = hasInterviews ? 'INTERVIEW' : 'SCREENING'
-		await db.applicant.update({ where: { id: offer.applicantId }, data: { currentStage: stage } })
-		await db.applicantStageHistory.create({
-			data: {
-				applicantId: offer.applicantId,
-				stage,
-				notes: 'Offer withdrawn',
-				changedById: ctx.actorId
-			}
-		})
-	}
+		// Roll back from OFFER/HIRED to the most recent meaningful stage.
+		if (offer.applicant.currentStage === 'OFFER' || offer.applicant.currentStage === 'HIRED') {
+			const hasInterviews =
+				(await tx.interview.count({ where: { applicantId: offer.applicantId } })) > 0
+			const stage = hasInterviews ? 'INTERVIEW' : 'SCREENING'
+			await tx.applicant.update({ where: { id: offer.applicantId }, data: { currentStage: stage } })
+			await tx.applicantStageHistory.create({
+				data: {
+					applicantId: offer.applicantId,
+					stage,
+					notes: 'Offer withdrawn',
+					changedById: ctx.actorId
+				}
+			})
+		}
 
-	await writeAuditLog(ctx, { action: 'DELETE', entityType: 'Offer', entityId: offerId })
+		await writeAuditLog(ctx, { action: 'DELETE', entityType: 'Offer', entityId: offerId }, tx)
+	})
 }
 
 // Transition an applicant into an employee record (onboarding). When an accepted

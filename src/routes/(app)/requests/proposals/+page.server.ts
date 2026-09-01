@@ -88,7 +88,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			: [],
 		managerIds.size
 			? db.employee.findMany({
-					where: { id: { in: [...managerIds] }, user: { organizationId: user.organizationId } },
+					where: { id: { in: [...managerIds] }, organizationId: user.organizationId },
 					select: { id: true, firstName: true, lastName: true }
 				})
 			: [],

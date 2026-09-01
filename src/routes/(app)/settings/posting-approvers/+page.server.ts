@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const [rows, employees] = await Promise.all([
 		listPostingApprovers(locals.user!.organizationId),
 		db.employee.findMany({
-			where: { user: { organizationId: locals.user!.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: locals.user!.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, jobTitle: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		})

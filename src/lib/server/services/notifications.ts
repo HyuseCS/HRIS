@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db'
-import type { NotificationKind } from '@prisma/client'
+import type { NotificationKind, Prisma } from '@prisma/client'
 
 // In-app notifications (distinct from the email stubs in $lib/server/notifications).
 // Created on domain events (e.g. request decisions); surfaced to the user as a toast
@@ -18,10 +18,11 @@ export async function notifyMany(
 	userIds: string[],
 	message: string,
 	link?: string,
-	kind: NotificationKind = 'GENERAL'
+	kind: NotificationKind = 'GENERAL',
+	client: Prisma.TransactionClient = db
 ) {
 	if (userIds.length === 0) return
-	await db.notification.createMany({
+	await client.notification.createMany({
 		data: userIds.map((userId) => ({ userId, message, kind, link: link ?? null }))
 	})
 }

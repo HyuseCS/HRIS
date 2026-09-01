@@ -21,7 +21,7 @@ export async function listUpcomingRegularizations(organizationId: string, asOf: 
 
 	const employees = await db.employee.findMany({
 		where: {
-			user: { organizationId },
+			organizationId,
 			employmentType: 'PROBATIONARY',
 			employmentStatus: 'ACTIVE',
 			startDate: { lte: startCeiling }
@@ -61,8 +61,7 @@ export async function listTodaysBirthdays(organizationId: string, today: Date = 
 	const rows = await db.$queryRaw<{ firstName: string; lastName: string }[]>`
 		SELECT e."firstName", e."lastName"
 		FROM employees e
-		JOIN users u ON u.id = e."userId"
-		WHERE u."organizationId" = ${organizationId}
+		WHERE e."organizationId" = ${organizationId}
 			AND e."employmentStatus" = 'ACTIVE'
 			AND e."dateOfBirth" IS NOT NULL
 			AND EXTRACT(MONTH FROM e."dateOfBirth") = ${mm}
@@ -270,7 +269,7 @@ export async function getManagerMetrics(userId: string, organizationId: string) 
 	// itself. Same re-check every other consumer of this relation does (`canTouchEmployee`,
 	// `listVisibleEmployeeIds`).
 	const directReports = await db.employee.findMany({
-		where: { reportsToId: employee.id, user: { organizationId } },
+		where: { reportsToId: employee.id, organizationId },
 		select: { id: true }
 	})
 	const directReportIds = directReports.map((e) => e.id)
@@ -293,7 +292,7 @@ export async function getManagerMetrics(userId: string, organizationId: string) 
 			where: {
 				reportsToId: employee.id,
 				employmentStatus: 'ACTIVE',
-				user: { organizationId }
+				organizationId
 			}
 		}),
 		// #242: an explicit column list, not `include` — a bare include ships every AuditLog
@@ -343,13 +342,13 @@ export async function getAdminMetrics(organizationId: string) {
 	] = await Promise.all([
 		db.employee.count({
 			where: {
-				user: { organizationId },
+				organizationId,
 				employmentStatus: 'ACTIVE'
 			}
 		}),
 		db.request.count({
 			where: {
-				employee: { user: { organizationId } },
+				employee: { organizationId },
 				type: 'LEAVE',
 				status: 'APPROVED',
 				dateFrom: { lte: tomorrow },
@@ -358,13 +357,13 @@ export async function getAdminMetrics(organizationId: string) {
 		}),
 		db.timesheet.count({
 			where: {
-				employee: { user: { organizationId } },
+				employee: { organizationId },
 				status: 'SUBMITTED'
 			}
 		}),
 		db.request.count({
 			where: {
-				employee: { user: { organizationId } },
+				employee: { organizationId },
 				type: 'LEAVE',
 				status: 'PENDING'
 			}

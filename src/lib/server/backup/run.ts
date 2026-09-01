@@ -67,7 +67,7 @@ export async function collectDocuments(
 
 	const [employeeDocs, requestDocs] = await Promise.all([
 		db.employeeDocument.findMany({
-			where: { employee: { user: { organizationId } } },
+			where: { employee: { organizationId } },
 			select: {
 				id: true,
 				storageKey: true,
@@ -82,7 +82,7 @@ export async function collectDocuments(
 		}),
 		db.requestDocument.findMany({
 			// NO deletedAt filter, deliberately (#299 / #164 D3).
-			where: { request: { employee: { user: { organizationId } } } },
+			where: { request: { employee: { organizationId } } },
 			select: {
 				id: true,
 				requestId: true,

@@ -34,6 +34,19 @@ vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('bcrypt', () => ({ default: { hash: vi.fn().mockResolvedValue('hashed') } }))
 
+// #5: the hire's audit row is written on the transaction's client, so the client the closure
+// receives must be a DIFFERENT object from `db` or the assertion below cannot fail. It carries the
+// same delegate mocks, so every other assertion in this file still reads them off `dbMock`.
+const tx = {
+	user: dbMock.user,
+	employee: dbMock.employee,
+	organization: dbMock.organization,
+	leaveType: dbMock.leaveType,
+	leaveBalance: dbMock.leaveBalance,
+	employeeCompensation: dbMock.employeeCompensation,
+	employeeEmploymentType: dbMock.employeeEmploymentType
+}
+
 const { createEmployee } = await import('$lib/server/services/employees')
 
 const ORG = 'org1'
@@ -69,7 +82,7 @@ function conflictOn(field: string) {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof dbMock) => unknown) => fn(dbMock))
+	dbMock.$transaction.mockImplementation(async (fn: (client: typeof tx) => unknown) => fn(tx))
 	dbMock.user.findUnique.mockResolvedValue(null)
 	dbMock.user.create.mockResolvedValue({ id: 'user-new' })
 	dbMock.organization.findUniqueOrThrow.mockResolvedValue({ employeeNumberPrefix: 'EMP' })
@@ -176,7 +189,10 @@ describe('losing the allocation race', () => {
 
 		expect(writeAuditLog).toHaveBeenCalledWith(
 			ctx,
-			expect.objectContaining({ newValue: expect.objectContaining({ employeeNumber: 'EMP-006' }) })
+			expect.objectContaining({ newValue: expect.objectContaining({ employeeNumber: 'EMP-006' }) }),
+			// #5: the audit row is written inside the hire transaction, on its client — `tx`, which is
+			// a distinct object from `db`, so a regression to the bare client fails here.
+			tx
 		)
 	})
 })

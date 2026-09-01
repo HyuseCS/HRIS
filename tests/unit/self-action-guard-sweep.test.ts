@@ -13,7 +13,10 @@ const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
 		employee: { findFirst: vi.fn(), update: vi.fn() },
 		position: { findFirst: vi.fn() },
-		award: { create: vi.fn() }
+		award: { create: vi.fn() },
+		// #324: mutation + audit now share a transaction; the callback gets the same mock client
+		// so the assertions below still read from `dbMock`.
+		$transaction: vi.fn()
 	}
 }))
 
@@ -35,6 +38,7 @@ beforeEach(() => {
 	// `resetAllMocks`, not `clearAllMocks`: the latter clears recorded calls but LEAVES queued
 	// `mockResolvedValueOnce` values, which then surface in an unrelated later test.
 	vi.resetAllMocks()
+	dbMock.$transaction.mockImplementation((fn: (client: typeof dbMock) => unknown) => fn(dbMock))
 	dbMock.employee.update.mockResolvedValue({ id: 'emp-1' })
 	dbMock.position.findFirst.mockResolvedValue({ id: 'pos-senior' })
 	dbMock.award.create.mockResolvedValue({ id: 'award-1' })

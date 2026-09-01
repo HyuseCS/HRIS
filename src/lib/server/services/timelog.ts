@@ -107,26 +107,67 @@ export async function recordPunch(
 
 	let timeLog
 	try {
-		timeLog = await db.timeLog.create({
-			data: {
-				employeeId: employee.id,
-				punchType: resolvedType,
-				source: input.source ?? 'DISCORD',
-				timestamp: input.timestamp,
-				discordMessageId: input.discordMessageId,
-				dedupKey: input.dedupKey,
-				// #177 — spread, not four `?? null`s: a punch with no reading must leave the four
-				// columns ABSENT from the write, so a DISCORD or MANUAL punch can never be the
-				// thing that introduced a location value.
-				...(input.location
-					? {
-							latitude: input.location.latitude,
-							longitude: input.location.longitude,
-							locationAccuracyM: input.location.accuracyM ?? null,
-							locationCapturedAt: new Date()
-						}
-					: {})
-			}
+		// #324: the punch and its audit row commit together — a failed audit write must not leave a
+		// punch standing unrecorded.
+		//
+		// The try/catch stays OUTSIDE the transaction, deliberately. Prisma's interactive
+		// transaction awaits the rollback and then rethrows the ORIGINAL error object unchanged, so
+		// the P2002 test below still matches from out here; and `AuditLog` carries no unique
+		// constraint, so the audit insert cannot raise a P2002 of its own that this catch would
+		// mislabel as a duplicate punch. A 409 stays a 409.
+		timeLog = await db.$transaction(async (tx) => {
+			const created = await tx.timeLog.create({
+				data: {
+					employeeId: employee.id,
+					punchType: resolvedType,
+					source: input.source ?? 'DISCORD',
+					timestamp: input.timestamp,
+					discordMessageId: input.discordMessageId,
+					dedupKey: input.dedupKey,
+					// #177 — spread, not four `?? null`s: a punch with no reading must leave the four
+					// columns ABSENT from the write, so a DISCORD or MANUAL punch can never be the
+					// thing that introduced a location value.
+					...(input.location
+						? {
+								latitude: input.location.latitude,
+								longitude: input.location.longitude,
+								locationAccuracyM: input.location.accuracyM ?? null,
+								locationCapturedAt: new Date()
+							}
+						: {})
+				}
+			})
+
+			await writeAuditLog(
+				{
+					organizationId: employee.organizationId,
+					actorId: employee.user.id,
+					actorRoles: employee.user.roles,
+					ipAddress: meta?.ipAddress
+				},
+				{
+					action: 'CREATE',
+					entityType: 'TimeLog',
+					entityId: created.id,
+					newValue: {
+						punchType: resolvedType,
+						timestamp: input.timestamp.toISOString(),
+						// #177 — NEVER the coordinates themselves. The audit log has a different read gate
+						// than the punches API, and #242 is the case on this repo where the audit log
+						// bypassed a masking rule; `hasLocation` is enough to open an investigation with,
+						// and the punch row is where the coordinates are read from under their own gate.
+						//
+						// Added ONLY when a reading exists (plan correction P6). Emitting
+						// `hasLocation: false` unconditionally would change the audit payload of every
+						// Discord punch — a behaviour change in a flow whose route file has a zero-line
+						// diff, which is exactly the kind of drift nobody would notice. An absent key and
+						// `false` carry the same meaning here, and absent is the one that changes nothing.
+						...(input.location ? { hasLocation: true } : {})
+					}
+				},
+				tx
+			)
+			return created
 		})
 	} catch (e) {
 		// P2002 = unique violation on (discordMessageId | dedupKey, employeeId): a replay
@@ -137,35 +178,6 @@ export async function recordPunch(
 		}
 		throw e
 	}
-
-	await writeAuditLog(
-		{
-			organizationId: employee.organizationId,
-			actorId: employee.user.id,
-			actorRoles: employee.user.roles,
-			ipAddress: meta?.ipAddress
-		},
-		{
-			action: 'CREATE',
-			entityType: 'TimeLog',
-			entityId: timeLog.id,
-			newValue: {
-				punchType: resolvedType,
-				timestamp: input.timestamp.toISOString(),
-				// #177 — NEVER the coordinates themselves. The audit log has a different read gate
-				// than the punches API, and #242 is the case on this repo where the audit log
-				// bypassed a masking rule; `hasLocation` is enough to open an investigation with,
-				// and the punch row is where the coordinates are read from under their own gate.
-				//
-				// Added ONLY when a reading exists (plan correction P6). Emitting
-				// `hasLocation: false` unconditionally would change the audit payload of every
-				// Discord punch — a behaviour change in a flow whose route file has a zero-line
-				// diff, which is exactly the kind of drift nobody would notice. An absent key and
-				// `false` carry the same meaning here, and absent is the one that changes nothing.
-				...(input.location ? { hasLocation: true } : {})
-			}
-		}
-	)
 
 	return {
 		timeLog,
@@ -368,19 +380,26 @@ export async function aggregateTimeLogsToTimesheet(
 			data: { timesheetId: ts.id }
 		})
 
-		return ts
-	})
+		// #324: the audit row joins the transaction that upserts the timesheet, rewrites its entries
+		// and re-links the source punches — a failed audit write must not leave that aggregate
+		// standing unrecorded.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Timesheet',
+				entityId: ts.id,
+				newValue: {
+					source: 'timelog_aggregation',
+					totalHours,
+					daysWithHours: Object.keys(hoursByDay).length,
+					warnings: warnings.length
+				}
+			},
+			tx
+		)
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Timesheet',
-		entityId: timesheet.id,
-		newValue: {
-			source: 'timelog_aggregation',
-			totalHours,
-			daysWithHours: Object.keys(hoursByDay).length,
-			warnings: warnings.length
-		}
+		return ts
 	})
 
 	return { timesheet, hoursByDay, totalHours, warnings }

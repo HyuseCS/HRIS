@@ -50,14 +50,14 @@ async function assertMayWriteLoan(
 
 export function listLoans(employeeId: string, organizationId: string) {
 	return db.loan.findMany({
-		where: { employeeId, employee: { user: { organizationId } } },
+		where: { employeeId, employee: { organizationId } },
 		orderBy: { createdAt: 'desc' }
 	})
 }
 
 export function listCashAdvances(employeeId: string, organizationId: string) {
 	return db.cashAdvance.findMany({
-		where: { employeeId, employee: { user: { organizationId } } },
+		where: { employeeId, employee: { organizationId } },
 		orderBy: { createdAt: 'desc' }
 	})
 }
@@ -72,23 +72,31 @@ export async function createLoan(
 	if (data.installment <= 0 || data.principal <= 0)
 		error(400, 'Principal and installment must be positive')
 
-	const loan = await db.loan.create({
-		data: {
-			employeeId,
-			type: data.type,
-			principal: data.principal,
-			balance: data.principal,
-			installment: data.installment,
-			status: 'ACTIVE'
-		}
+	// One transaction: a loan create is a plain insert with no unique key, so a failed audit
+	// write would leave money owed on record with no trace of who set it up and no safe retry.
+	return await db.$transaction(async (tx) => {
+		const loan = await tx.loan.create({
+			data: {
+				employeeId,
+				type: data.type,
+				principal: data.principal,
+				balance: data.principal,
+				installment: data.installment,
+				status: 'ACTIVE'
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Loan',
+				entityId: loan.id,
+				newValue: { type: data.type, principal: data.principal, installment: data.installment }
+			},
+			tx
+		)
+		return loan
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Loan',
-		entityId: loan.id,
-		newValue: { type: data.type, principal: data.principal, installment: data.installment }
-	})
-	return loan
 }
 
 export async function updateLoan(
@@ -97,18 +105,26 @@ export async function updateLoan(
 	data: { installment?: number; status?: LoanStatus },
 	ctx: AuditContext
 ) {
-	const loan = await db.loan.findFirst({ where: { id, employee: { user: { organizationId } } } })
+	const loan = await db.loan.findFirst({ where: { id, employee: { organizationId } } })
 	if (!loan) error(404, 'Loan not found')
 	await assertMayWriteLoan(loan.employeeId, organizationId, ctx)
 
-	const updated = await db.loan.update({ where: { id }, data })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Loan',
-		entityId: id,
-		newValue: data as Record<string, unknown>
+	// One transaction: a failed audit write must not leave the changed installment or status
+	// standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.loan.update({ where: { id }, data })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Loan',
+				entityId: id,
+				newValue: data as Record<string, unknown>
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 export async function createCashAdvance(
@@ -121,22 +137,30 @@ export async function createCashAdvance(
 	if (data.installment <= 0 || data.amount <= 0)
 		error(400, 'Amount and installment must be positive')
 
-	const ca = await db.cashAdvance.create({
-		data: {
-			employeeId,
-			amount: data.amount,
-			balance: data.amount,
-			installment: data.installment,
-			status: 'ACTIVE'
-		}
+	// One transaction: like a loan create, this is a plain insert with no unique key — a failed
+	// audit write would leave the advance standing with no record of who granted it.
+	return await db.$transaction(async (tx) => {
+		const ca = await tx.cashAdvance.create({
+			data: {
+				employeeId,
+				amount: data.amount,
+				balance: data.amount,
+				installment: data.installment,
+				status: 'ACTIVE'
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'CashAdvance',
+				entityId: ca.id,
+				newValue: { amount: data.amount, installment: data.installment }
+			},
+			tx
+		)
+		return ca
 	})
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'CashAdvance',
-		entityId: ca.id,
-		newValue: { amount: data.amount, installment: data.installment }
-	})
-	return ca
 }
 
 export async function updateCashAdvance(
@@ -146,17 +170,25 @@ export async function updateCashAdvance(
 	ctx: AuditContext
 ) {
 	const ca = await db.cashAdvance.findFirst({
-		where: { id, employee: { user: { organizationId } } }
+		where: { id, employee: { organizationId } }
 	})
 	if (!ca) error(404, 'Cash advance not found')
 	await assertMayWriteLoan(ca.employeeId, organizationId, ctx)
 
-	const updated = await db.cashAdvance.update({ where: { id }, data })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'CashAdvance',
-		entityId: id,
-		newValue: data as Record<string, unknown>
+	// One transaction: a failed audit write must not leave the changed installment or status
+	// standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.cashAdvance.update({ where: { id }, data })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'CashAdvance',
+				entityId: id,
+				newValue: data as Record<string, unknown>
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }

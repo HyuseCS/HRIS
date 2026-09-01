@@ -139,10 +139,13 @@ describe('computeEmployeeResult — employer share paid externally (#173)', () =
 
 // ─── Service: setStatutoryExemption ────────────────────────────────────────────
 
-const { dbMock } = vi.hoisted(() => ({
+const { dbMock, tx } = vi.hoisted(() => ({
+	// #324: the setters now upsert on the transaction client, so the upsert mock lives on `tx`.
+	tx: { employeeStatutoryConfig: { upsert: vi.fn() } },
 	dbMock: {
+		$transaction: vi.fn(),
 		employee: { findFirst: vi.fn() },
-		employeeStatutoryConfig: { upsert: vi.fn(), findMany: vi.fn() }
+		employeeStatutoryConfig: { findMany: vi.fn() }
 	}
 }))
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
@@ -166,14 +169,15 @@ describe('setStatutoryExemption', () => {
 			basicMonthlySalary: 30000,
 			rateType: 'MONTHLY'
 		})
-		dbMock.employeeStatutoryConfig.upsert.mockResolvedValue({ id: 'cfg1' })
+		tx.employeeStatutoryConfig.upsert.mockResolvedValue({ id: 'cfg1' })
+		dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 	})
 
 	it('upserts the exemption row and audits the change', async () => {
 		const { writeAuditLog } = await import('$lib/server/audit')
 		await setStatutoryExemption('emp1', 'org1', 'SSS', true, ctx)
 
-		expect(dbMock.employeeStatutoryConfig.upsert).toHaveBeenCalledWith({
+		expect(tx.employeeStatutoryConfig.upsert).toHaveBeenCalledWith({
 			where: { employeeId_contribution: { employeeId: 'emp1', contribution: 'SSS' } },
 			create: { employeeId: 'emp1', contribution: 'SSS', exempt: true },
 			update: { exempt: true }
@@ -184,13 +188,15 @@ describe('setStatutoryExemption', () => {
 				entityType: 'EmployeeStatutoryConfig',
 				entityId: 'cfg1',
 				newValue: { contribution: 'SSS', exempt: true }
-			})
+			}),
+			// #324: the audit write shares the transaction.
+			tx
 		)
 	})
 
 	it('toggling back to enrolled clears the exemption', async () => {
 		await setStatutoryExemption('emp1', 'org1', 'PHILHEALTH', false, ctx)
-		expect(dbMock.employeeStatutoryConfig.upsert).toHaveBeenCalledWith(
+		expect(tx.employeeStatutoryConfig.upsert).toHaveBeenCalledWith(
 			expect.objectContaining({ update: { exempt: false } })
 		)
 	})
@@ -200,7 +206,7 @@ describe('setStatutoryExemption', () => {
 		await expect(setStatutoryExemption('emp1', 'org1', 'SSS', true, ctx)).rejects.toMatchObject({
 			status: 404
 		})
-		expect(dbMock.employeeStatutoryConfig.upsert).not.toHaveBeenCalled()
+		expect(tx.employeeStatutoryConfig.upsert).not.toHaveBeenCalled()
 	})
 })
 
@@ -212,7 +218,8 @@ describe('setEmployerShareExternal (#173)', () => {
 			basicMonthlySalary: 30000,
 			rateType: 'MONTHLY'
 		})
-		dbMock.employeeStatutoryConfig.upsert.mockResolvedValue({ id: 'cfg1' })
+		tx.employeeStatutoryConfig.upsert.mockResolvedValue({ id: 'cfg1' })
+		dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 	})
 
 	it('upserts only the external flag (preserving exempt) and audits it', async () => {
@@ -221,7 +228,7 @@ describe('setEmployerShareExternal (#173)', () => {
 
 		// Neither create nor update mentions `exempt` — the shared row's exempt flag is preserved
 		// (create defaults it to false; update leaves it as-is).
-		expect(dbMock.employeeStatutoryConfig.upsert).toHaveBeenCalledWith({
+		expect(tx.employeeStatutoryConfig.upsert).toHaveBeenCalledWith({
 			where: { employeeId_contribution: { employeeId: 'emp1', contribution: 'SSS' } },
 			create: { employeeId: 'emp1', contribution: 'SSS', employerSharePaidExternally: true },
 			update: { employerSharePaidExternally: true }
@@ -232,7 +239,9 @@ describe('setEmployerShareExternal (#173)', () => {
 				entityType: 'EmployeeStatutoryConfig',
 				entityId: 'cfg1',
 				newValue: { contribution: 'SSS', employerSharePaidExternally: true }
-			})
+			}),
+			// #324: the audit write shares the transaction.
+			tx
 		)
 	})
 
@@ -241,6 +250,6 @@ describe('setEmployerShareExternal (#173)', () => {
 		await expect(setEmployerShareExternal('emp1', 'org1', 'SSS', true, ctx)).rejects.toMatchObject({
 			status: 404
 		})
-		expect(dbMock.employeeStatutoryConfig.upsert).not.toHaveBeenCalled()
+		expect(tx.employeeStatutoryConfig.upsert).not.toHaveBeenCalled()
 	})
 })

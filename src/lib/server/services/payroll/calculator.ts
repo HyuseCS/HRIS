@@ -306,7 +306,7 @@ export async function loadCalculatorData(actor: EmployeeAccessActor) {
 
 	const [employees, config, recurring] = await Promise.all([
 		db.employee.findMany({
-			where: { user: { organizationId }, employmentStatus: 'ACTIVE', ...idFilter },
+			where: { organizationId, employmentStatus: 'ACTIVE', ...idFilter },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		}),
@@ -344,7 +344,7 @@ export async function previewPayroll(
 	input: { attendance: AttendanceInput; adjustments?: PayAdjustments }
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, firstName: true, lastName: true, basicMonthlySalary: true, rateType: true }
 	})
 	if (!employee) error(404, 'Employee not found')

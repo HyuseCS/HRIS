@@ -181,20 +181,29 @@ describe('confirmProposal', () => {
 })
 
 describe('rejectProposal', () => {
-	it('marks the proposal REJECTED and discards it (live config untouched)', async () => {
+	// The pre-read is the payload source and the normal-path 404 — the claim below is the guard.
+	const pendingPreRead = () =>
 		dbMock.statutoryRateProposal.findFirst.mockResolvedValue({
 			id: 'prop1',
 			organizationId: 'org1',
 			proposedById: 'hr1',
 			status: 'PENDING'
 		})
-		dbMock.statutoryRateProposal.update.mockResolvedValue({ id: 'prop1', status: 'REJECTED' })
+
+	it('marks the proposal REJECTED and discards it (live config untouched)', async () => {
+		pendingPreRead()
+		dbMock.statutoryRateProposal.updateMany.mockResolvedValue({ count: 1 })
+		dbMock.statutoryRateProposal.findUniqueOrThrow.mockResolvedValue({
+			id: 'prop1',
+			status: 'REJECTED'
+		})
 
 		await rejectProposal('org1', 'prop1', CEO)
 
-		expect(dbMock.statutoryRateProposal.update).toHaveBeenCalledWith(
+		// Claim is status- AND org-guarded, so a confirm that already applied it cannot be overwritten.
+		expect(dbMock.statutoryRateProposal.updateMany).toHaveBeenCalledWith(
 			expect.objectContaining({
-				where: { id: 'prop1' },
+				where: { id: 'prop1', organizationId: 'org1', status: 'PENDING' },
 				data: expect.objectContaining({ status: 'REJECTED', decidedById: 'ceo1' })
 			})
 		)
@@ -202,23 +211,64 @@ describe('rejectProposal', () => {
 	})
 
 	/**
+	 * The race the claim exists for: the pre-read saw PENDING, then a confirm claimed and applied the
+	 * proposal before this transaction ran. The claim matches zero rows, so the reject must 404 rather
+	 * than stamp REJECTED over an APPLIED row — and it must leave no audit trail saying it did.
+	 */
+	it('404s and writes no audit row when the claim matches zero rows', async () => {
+		pendingPreRead()
+		dbMock.statutoryRateProposal.updateMany.mockResolvedValue({ count: 0 })
+
+		await expect(rejectProposal('org1', 'prop1', CEO)).rejects.toMatchObject({
+			status: 404,
+			body: { message: 'Pending proposal not found' }
+		})
+
+		expect(writeAuditLogMock).not.toHaveBeenCalled()
+		expect(dbMock.statutoryRateProposal.findUniqueOrThrow).not.toHaveBeenCalled()
+	})
+
+	// #5: the audit row goes on the transaction client, and still carries the proposer from the
+	// pre-read (which is why the pre-read stays even though it is no longer the guard).
+	it('audits the rejection on the transaction client with the proposer from the pre-read', async () => {
+		pendingPreRead()
+		dbMock.statutoryRateProposal.updateMany.mockResolvedValue({ count: 1 })
+		dbMock.statutoryRateProposal.findUniqueOrThrow.mockResolvedValue({
+			id: 'prop1',
+			status: 'REJECTED'
+		})
+
+		await rejectProposal('org1', 'prop1', CEO)
+
+		expect(writeAuditLogMock).toHaveBeenCalledWith(
+			CEO,
+			expect.objectContaining({
+				entityType: 'StatutoryRateProposal',
+				entityId: 'prop1',
+				oldValue: { status: 'PENDING', proposedById: 'hr1' },
+				newValue: { status: 'REJECTED', decidedById: 'ceo1' }
+			}),
+			dbMock
+		)
+	})
+
+	/**
 	 * Q2: the bar is CONFIRM-only. A self-reject is the proposer withdrawing their own mistake — it
 	 * applies nothing and leaves the tax tables untouched, so there is no two-person rule to collapse.
 	 */
 	it('allows the proposer to withdraw their own proposal', async () => {
-		dbMock.statutoryRateProposal.findFirst.mockResolvedValue({
+		pendingPreRead()
+		dbMock.statutoryRateProposal.updateMany.mockResolvedValue({ count: 1 })
+		dbMock.statutoryRateProposal.findUniqueOrThrow.mockResolvedValue({
 			id: 'prop1',
-			organizationId: 'org1',
-			proposedById: 'hr1',
-			status: 'PENDING'
+			status: 'REJECTED'
 		})
-		dbMock.statutoryRateProposal.update.mockResolvedValue({ id: 'prop1', status: 'REJECTED' })
 
 		await rejectProposal('org1', 'prop1', HR)
 
-		expect(dbMock.statutoryRateProposal.update).toHaveBeenCalledWith(
+		expect(dbMock.statutoryRateProposal.updateMany).toHaveBeenCalledWith(
 			expect.objectContaining({
-				where: { id: 'prop1' },
+				where: { id: 'prop1', organizationId: 'org1', status: 'PENDING' },
 				data: expect.objectContaining({ status: 'REJECTED', decidedById: 'hr1' })
 			})
 		)

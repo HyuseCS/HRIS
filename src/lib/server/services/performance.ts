@@ -110,23 +110,31 @@ export async function saveSelfAssessment(
 		error(409, 'Only the review subject can submit a self-assessment')
 	}
 
-	const updated = await db.performanceReview.update({
-		where: { id },
-		data: {
-			selfAssessment: text,
-			status: 'SELF_ASSESSMENT',
-			submittedAt: new Date()
-		}
-	})
+	// #324 — one transaction: a failed audit write must not leave the change standing
+	// unrecorded while the caller sees a 500.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.performanceReview.update({
+			where: { id },
+			data: {
+				selfAssessment: text,
+				status: 'SELF_ASSESSMENT',
+				submittedAt: new Date()
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PerformanceReview',
-		entityId: id,
-		newValue: { status: updated.status, submittedAt: updated.submittedAt }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PerformanceReview',
+				entityId: id,
+				newValue: { status: updated.status, submittedAt: updated.submittedAt }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }
 
 /**
@@ -161,25 +169,34 @@ export async function submitScores(
 	const parsed = answersSchemaFor(structure.data).safeParse(answers)
 	if (!parsed.success) error(422, parsed.error.issues[0]?.message ?? 'Invalid scores')
 
-	const updated = await db.performanceReview.update({
-		where: { id },
-		data: {
-			answers: parsed.data as unknown as Prisma.InputJsonValue,
-			status: 'SCORED'
-		}
-	})
+	// #324 — one transaction: a failed audit write must not leave the change standing
+	// unrecorded while the caller sees a 500.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.performanceReview.update({
+			where: { id },
+			data: {
+				answers: parsed.data as unknown as Prisma.InputJsonValue,
+				status: 'SCORED'
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PerformanceReview',
-		entityId: id,
-		// STATUS ONLY. The answers must NEVER go in here: the audit log is readable by more people
-		// than the review is, so logging them would hand every rating to readers the release gate
-		// is meant to hold back. #242 already burned this codebase in exactly this way.
-		newValue: { status: updated.status }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PerformanceReview',
+				entityId: id,
+				// STATUS ONLY. The answers must NEVER go in here: the audit log is readable by more
+				// people than the review is, so logging them would hand every rating to readers the
+				// release gate is meant to hold back. #242 already burned this codebase in exactly
+				// this way.
+				newValue: { status: updated.status }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }
 
 /**
@@ -199,20 +216,28 @@ export async function saveEmployeeComments(
 		error(409, 'Only the review subject can leave employee comments')
 	}
 
-	const updated = await db.performanceReview.update({
-		where: { id },
-		data: { employeeComments: text }
-	})
+	// #324 — one transaction: a failed audit write must not leave the change standing
+	// unrecorded while the caller sees a 500.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.performanceReview.update({
+			where: { id },
+			data: { employeeComments: text }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PerformanceReview',
-		entityId: id,
-		// That it happened and when — not the text. Same reason as `submitScores`.
-		newValue: { employeeCommentsAt: updated.updatedAt }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PerformanceReview',
+				entityId: id,
+				// That it happened and when — not the text. Same reason as `submitScores`.
+				newValue: { employeeCommentsAt: updated.updatedAt }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }
 
 /**
@@ -300,17 +325,25 @@ export async function acknowledgeReview(id: string, employeeId: string, ctx: Aud
 	if (review.employeeId !== employeeId) error(409, 'Only the review subject can acknowledge')
 	if (review.status !== 'COMPLETED') error(400, 'Only a completed review can be acknowledged')
 
-	const updated = await db.performanceReview.update({
-		where: { id },
-		data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() }
+	// #324 — one transaction: a failed audit write must not leave the change standing
+	// unrecorded while the caller sees a 500.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.performanceReview.update({
+			where: { id },
+			data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PerformanceReview',
+				entityId: id,
+				newValue: { status: 'ACKNOWLEDGED' }
+			},
+			tx
+		)
+		return updated
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PerformanceReview',
-		entityId: id,
-		newValue: { status: 'ACKNOWLEDGED' }
-	})
-	return updated
 }
 
 // ── Automatic cycle generation (#178) ────────────────────────────────────────

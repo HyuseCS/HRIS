@@ -18,7 +18,7 @@ import type { Role } from '@prisma/client'
  * need a mocked db: they run through `decideJobPosting` (which resolves the mapping itself) and
  * `listPostingsAwaitingApprover`.
  *
- * Every case asserts arguments or contents — that `db.jobPosting.update` was NOT called, which
+ * Every case asserts arguments or contents — that `jobPosting.update` was NOT called, which
  * posting ids came back — never that a call resolved.
  *
  * KEY TYPES: `submittedById` and `ctx.actorId` are USER ids; `approverId` and the actor's
@@ -27,16 +27,21 @@ import type { Role } from '@prisma/client'
  * "refused" test still passed.
  */
 
-const { dbMock, notifyMock } = vi.hoisted(() => ({
+const { dbMock, txMock, notifyMock } = vi.hoisted(() => ({
 	dbMock: {
-		jobPosting: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+		jobPosting: { findFirst: vi.fn(), findMany: vi.fn() },
 		postingApprover: { findUnique: vi.fn(), findMany: vi.fn() },
-		employee: { findUnique: vi.fn() }
+		employee: { findUnique: vi.fn() },
+		$transaction: vi.fn()
 	},
+	// #5: the posting write and its audit row now share one transaction, so the update runs on
+	// the tx client — asserting on txMock.jobPosting.update would silently stop observing it.
+	txMock: { jobPosting: { update: vi.fn() } },
 	notifyMock: vi.fn().mockResolvedValue(undefined)
 }))
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const { writeAuditLog } = await import('$lib/server/audit')
 vi.mock('$lib/server/services/notifications', () => ({ notify: notifyMock }))
 
 const { decideJobPosting, listPostingsAwaitingApprover, submitJobPostingForApproval } =
@@ -86,7 +91,10 @@ const postingRow = (over: { departmentId?: string; submittedById?: string | null
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.jobPosting.findFirst.mockImplementation(async (args) => project(postingRow(), args))
-	dbMock.jobPosting.update.mockResolvedValue({ id: 'jp1', status: 'OPEN' })
+	txMock.jobPosting.update.mockResolvedValue({ id: 'jp1', status: 'OPEN' })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof txMock) => Promise<unknown>) =>
+		fn(txMock)
+	)
 	// APPROVER_EMP is an EMPLOYEE id; the notification needs the USER behind it.
 	dbMock.employee.findUnique.mockResolvedValue({ userId: 'user-approver' })
 	// Only MAPPED_DEPT has a row; anything else resolves to null (the HR fallback).
@@ -112,7 +120,7 @@ describe('canApprovePosting (#283/D8, through decideJobPosting)', () => {
 			status: 403,
 			body: { message: 'You are not the approver for this posting' }
 		})
-		expect(dbMock.jobPosting.update).not.toHaveBeenCalled()
+		expect(txMock.jobPosting.update).not.toHaveBeenCalled()
 	})
 
 	it('lets the mapped department’s designated approver decide, without any HR role', async () => {
@@ -123,12 +131,14 @@ describe('canApprovePosting (#283/D8, through decideJobPosting)', () => {
 			{ employeeId: APPROVER_EMP, roles: EMP },
 			ctxOf('user-approver', EMP)
 		)
-		expect(dbMock.jobPosting.update).toHaveBeenCalledWith(
+		expect(txMock.jobPosting.update).toHaveBeenCalledWith(
 			expect.objectContaining({
 				where: { id: 'jp1' },
 				data: expect.objectContaining({ status: 'OPEN', approvedById: 'user-approver' })
 			})
 		)
+		// #5: the audit write shares the transaction that commits the decision.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), txMock)
 	})
 
 	// AC-24. The fallback survives D8 — it is the whole point of "HR is the fallback, not an
@@ -144,7 +154,7 @@ describe('canApprovePosting (#283/D8, through decideJobPosting)', () => {
 			{ employeeId: 'emp-hr', roles: HR },
 			ctxOf('user-hr', HR)
 		)
-		expect(dbMock.jobPosting.update).toHaveBeenCalledWith(
+		expect(txMock.jobPosting.update).toHaveBeenCalledWith(
 			expect.objectContaining({
 				where: { id: 'jp1' },
 				data: expect.objectContaining({ status: 'OPEN', approvedById: 'user-hr' })
@@ -172,7 +182,7 @@ describe('decideJobPosting — the submitter may not decide (#283/D9)', () => {
 
 		expect(err).toMatchObject({ status: 403 })
 		expect(err.body.message).toContain('Settings → Posting approvers')
-		expect(dbMock.jobPosting.update).not.toHaveBeenCalled()
+		expect(txMock.jobPosting.update).not.toHaveBeenCalled()
 	})
 
 	// The negative control for the message above. On an UNMAPPED department HR is the fallback, so
@@ -194,7 +204,7 @@ describe('decideJobPosting — the submitter may not decide (#283/D9)', () => {
 		expect(err).toMatchObject({ status: 403 })
 		expect(err.body.message).not.toContain('Settings → Posting approvers')
 		expect(err.body.message).toContain('Another HR admin must decide it')
-		expect(dbMock.jobPosting.update).not.toHaveBeenCalled()
+		expect(txMock.jobPosting.update).not.toHaveBeenCalled()
 
 		// ...and a DIFFERENT MANAGE_HR holder really can, which is what makes that advice true.
 		await decideJobPosting(
@@ -204,7 +214,7 @@ describe('decideJobPosting — the submitter may not decide (#283/D9)', () => {
 			{ employeeId: 'emp-hr2', roles: HR },
 			ctxOf('user-hr2', HR)
 		)
-		expect(dbMock.jobPosting.update).toHaveBeenCalledWith(
+		expect(txMock.jobPosting.update).toHaveBeenCalledWith(
 			expect.objectContaining({
 				where: { id: 'jp1' },
 				data: expect.objectContaining({ status: 'OPEN', approvedById: 'user-hr2' })
@@ -225,7 +235,7 @@ describe('decideJobPosting — the submitter may not decide (#283/D9)', () => {
 			{ employeeId: APPROVER_EMP, roles: EMP },
 			ctxOf('user-approver', EMP)
 		)
-		expect(dbMock.jobPosting.update).toHaveBeenCalledWith(
+		expect(txMock.jobPosting.update).toHaveBeenCalledWith(
 			expect.objectContaining({ data: expect.objectContaining({ status: 'OPEN' }) })
 		)
 	})

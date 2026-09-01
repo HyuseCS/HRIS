@@ -256,14 +256,24 @@ export async function createPayrollRun(
 		await assertNoOverlappingRun(organizationId, periodStart, periodEnd, tx)
 		await assertCustomRangeClearOfCutoff(organizationId, periodStart, periodEnd, tx)
 
-		return tx.payrollRun.create({ data: { organizationId, periodStart, periodEnd } })
-	})
+		const created = await tx.payrollRun.create({
+			data: { organizationId, periodStart, periodEnd }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'PayrollRun',
-		entityId: run.id,
-		newValue: { periodStart, periodEnd }
+		// #5: the audit row commits with the run it records. Outside this closure a failed audit
+		// write returned a 500 while the run itself stayed committed and unrecorded.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'PayrollRun',
+				entityId: created.id,
+				newValue: { periodStart, periodEnd }
+			},
+			tx
+		)
+
+		return created
 	})
 
 	// Compute in the same request (#138): the numbers are deterministic given attendance, so
@@ -311,7 +321,7 @@ export async function computePayroll(runId: string, organizationId: string, ctx:
 		compensationAll,
 		holidays
 	] = await Promise.all([
-		db.employee.findMany({ where: { user: { organizationId }, employmentStatus: 'ACTIVE' } }),
+		db.employee.findMany({ where: { organizationId, employmentStatus: 'ACTIVE' } }),
 		// #163: payrollConfig is no longer read here — proration comes from the period shape alone.
 		db.earningType.findMany({ where: { organizationId }, select: { code: true, taxable: true } }),
 		db.loan.findMany({
@@ -674,17 +684,22 @@ export async function computePayroll(runId: string, organizationId: string, ctx:
 				totalNet
 			}
 		})
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollRun',
-		entityId: runId,
-		newValue: {
-			status: 'COMPUTED',
-			totalGross: totalGross.toNumber(),
-			totalNet: totalNet.toNumber()
-		}
+		// #5: the audit row commits with the recompute it records.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollRun',
+				entityId: runId,
+				newValue: {
+					status: 'COMPUTED',
+					totalGross: totalGross.toNumber(),
+					totalNet: totalNet.toNumber()
+				}
+			},
+			tx
+		)
 	})
 
 	// Open (or reopen, after a return) the maker-checker chain (#134). The computing
@@ -711,19 +726,26 @@ export async function approvePayroll(runId: string, organizationId: string, ctx:
 	if (!run) error(404, 'Payroll run not found')
 	if (run.status !== 'COMPUTED') error(400, 'Only computed payroll runs can be approved')
 
-	const updated = await db.payrollRun.update({
-		where: { id: runId },
-		data: { status: 'APPROVED', approvedById: ctx.actorId, approvedAt: new Date() }
-	})
+	// #5: one transaction — a failed audit write must not leave the approval standing unrecorded.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const updated = await tx.payrollRun.update({
+			where: { id: runId },
+			data: { status: 'APPROVED', approvedById: ctx.actorId, approvedAt: new Date() }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollRun',
-		entityId: runId,
-		newValue: { status: 'APPROVED' }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollRun',
+				entityId: runId,
+				newValue: { status: 'APPROVED' }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }
 
 export async function overridePayrollEntry(
@@ -761,25 +783,33 @@ export async function overridePayrollEntry(
 		)
 	}
 
-	const updated = await db.payrollEntry.update({
-		where: { id: entryId },
-		data: { ...overrides, isFlagged: false }
-	})
+	// #5: one transaction — a failed audit write must not leave an override standing unrecorded.
+	// The two updates keep their original order inside it.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const updated = await tx.payrollEntry.update({
+			where: { id: entryId },
+			data: { ...overrides, isFlagged: false }
+		})
 
-	await db.payrollRun.update({
-		where: { id: entry.payrollRunId },
-		data: { hasOverride: true, overrideNote: note }
-	})
+		await tx.payrollRun.update({
+			where: { id: entry.payrollRunId },
+			data: { hasOverride: true, overrideNote: note }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'PAYROLL_OVERRIDE',
-		entityType: 'PayrollEntry',
-		entityId: entryId,
-		oldValue: { netPay: Number(entry.netPay) },
-		newValue: { ...overrides, note }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'PAYROLL_OVERRIDE',
+				entityType: 'PayrollEntry',
+				entityId: entryId,
+				oldValue: { netPay: Number(entry.netPay) },
+				newValue: { ...overrides, note }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }
 
 // Finance approvers (CEO / Super Admin) are the company-wide finance authority and reach

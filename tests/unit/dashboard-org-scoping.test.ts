@@ -32,14 +32,14 @@ const ORG_B = 'orgB'
 
 // The actor: a PAYROLL_OFFICER/FINANCE user in org A (the only roles the dashboard route sends to
 // getManagerMetrics — MANAGE_HR holders, MANAGER included, get getAdminMetrics instead).
-const ACTOR = { id: 'empA', userId: 'uA', user: { organizationId: ORG_A } }
+const ACTOR = { id: 'empA', userId: 'uA', organizationId: ORG_A }
 
 const EMPLOYEES = [
 	ACTOR,
 	// A genuine report, same org.
-	{ id: 'empA1', reportsToId: 'empA', employmentStatus: 'ACTIVE', user: { organizationId: ORG_A } },
+	{ id: 'empA1', reportsToId: 'empA', employmentStatus: 'ACTIVE', organizationId: ORG_A },
 	// The planted row: another tenant's employee naming our actor as their manager.
-	{ id: 'empB1', reportsToId: 'empA', employmentStatus: 'ACTIVE', user: { organizationId: ORG_B } }
+	{ id: 'empB1', reportsToId: 'empA', employmentStatus: 'ACTIVE', organizationId: ORG_B }
 ]
 
 const TIMESHEETS = [
@@ -102,10 +102,6 @@ const project = (row: Record<string, unknown>, args: Record<string, unknown>) =>
 type Where = Record<string, unknown>
 const matches = (row: Record<string, unknown>, where: Where): boolean =>
 	Object.entries(where).every(([key, cond]) => {
-		if (key === 'user') {
-			const org = (cond as { organizationId?: string }).organizationId
-			return org === undefined || (row.user as { organizationId: string }).organizationId === org
-		}
 		if (cond && typeof cond === 'object' && 'in' in cond) {
 			return (cond.in as unknown[]).includes(row[key])
 		}
@@ -151,7 +147,10 @@ describe('getManagerMetrics — a cross-tenant reportsToId must not leak counts 
 		await getManagerMetrics('uA', ORG_A)
 
 		const { where } = dbMock.employee.findMany.mock.calls[0][0]
-		expect(where).toMatchObject({ reportsToId: 'empA', user: { organizationId: ORG_A } })
+		expect(where).toMatchObject({ reportsToId: 'empA', organizationId: ORG_A })
+		// The Employee's own column, never the `user` relation: `User.organizationId` is the user's
+		// PRIMARY org, which is not necessarily the org this request is acting in.
+		expect(where.user).toBeUndefined()
 	})
 })
 

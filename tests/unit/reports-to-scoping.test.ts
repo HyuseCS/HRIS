@@ -20,7 +20,13 @@ const { dbMock, bcryptHash } = vi.hoisted(() => {
 			user: { findUnique: vi.fn(), create: vi.fn() },
 			// findFirst answers BOTH getEmployee's subject lookup and the new manager lookup, so the
 			// per-path call order below is what each test pins.
-			employee: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+			employee: {
+				findFirst: vi.fn(),
+				findMany: vi.fn(),
+				findUniqueOrThrow: vi.fn(),
+				create: vi.fn(),
+				update: vi.fn()
+			},
 			organization: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
 			// createEmployee allocates leave entitlement (#137) and seeds the #170/#171 comp and #222
 			// employment-type baselines inside the same transaction.
@@ -103,6 +109,8 @@ beforeEach(() => {
 	dbMock.employee.findMany.mockResolvedValue([])
 	dbMock.employee.create.mockResolvedValue({ id: 'emp-new', employeeNumber: 'EMP-001' })
 	dbMock.employee.update.mockResolvedValue(EMP)
+	// #5: updateEmployee reads its `before` snapshot inside the transaction.
+	dbMock.employee.findUniqueOrThrow.mockResolvedValue(EMP)
 	dbMock.leaveType.findMany.mockResolvedValue([])
 	dbMock.leaveBalance.findMany.mockResolvedValue([])
 	dbMock.leaveBalance.createMany.mockResolvedValue({ count: 0 })

@@ -8,12 +8,17 @@ import type { AuditContext } from '$lib/server/services/types'
  * `area`, the enum that replaced the old free-text `department` column.
  */
 
-const { dbMock } = vi.hoisted(() => ({
-	dbMock: {
-		employee: { findFirst: vi.fn() },
-		separationRecord: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() }
+const { dbMock, tx } = vi.hoisted(() => {
+	const tx = { separationRecord: { create: vi.fn() } }
+	return {
+		tx,
+		dbMock: {
+			employee: { findFirst: vi.fn() },
+			separationRecord: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+			$transaction: vi.fn()
+		}
 	}
-}))
+})
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
@@ -62,7 +67,8 @@ beforeEach(() => {
 	dbMock.employee.findFirst.mockResolvedValue(activeEmployee)
 	dbMock.separationRecord.findFirst.mockResolvedValue(null)
 	dbMock.separationRecord.findMany.mockResolvedValue([])
-	dbMock.separationRecord.create.mockResolvedValue({ id: 'sep-new' })
+	tx.separationRecord.create.mockResolvedValue({ id: 'sep-new' })
+	dbMock.$transaction.mockImplementation((fn: (c: typeof tx) => unknown) => fn(tx))
 	vi.mocked(clearanceTemplateForOrg).mockResolvedValue(TEMPLATE)
 })
 
@@ -74,7 +80,7 @@ describe('createSeparation — guards (#305)', () => {
 			status: 404,
 			body: { message: 'Employee not found' }
 		})
-		expect(dbMock.separationRecord.create).not.toHaveBeenCalled()
+		expect(tx.separationRecord.create).not.toHaveBeenCalled()
 	})
 
 	it('refuses an already-offboarded employee', async () => {
@@ -87,7 +93,7 @@ describe('createSeparation — guards (#305)', () => {
 			status: 409,
 			body: { message: 'Employee is already offboarded' }
 		})
-		expect(dbMock.separationRecord.create).not.toHaveBeenCalled()
+		expect(tx.separationRecord.create).not.toHaveBeenCalled()
 	})
 
 	it('refuses a second open case', async () => {
@@ -102,7 +108,7 @@ describe('createSeparation — guards (#305)', () => {
 		expect(dbMock.separationRecord.findFirst.mock.calls[0][0]).toMatchObject({
 			where: { employeeId: 'emp1', status: { not: 'FINALIZED' } }
 		})
-		expect(dbMock.separationRecord.create).not.toHaveBeenCalled()
+		expect(tx.separationRecord.create).not.toHaveBeenCalled()
 	})
 })
 
@@ -111,7 +117,7 @@ describe('createSeparation — seeding and audit (#305)', () => {
 		await createSeparation('org1', input, ctx)
 
 		expect(clearanceTemplateForOrg).toHaveBeenCalledWith('org1')
-		expect(dbMock.separationRecord.create.mock.calls[0][0]).toEqual(
+		expect(tx.separationRecord.create.mock.calls[0][0]).toEqual(
 			expect.objectContaining({
 				data: expect.objectContaining({
 					organizationId: 'org1',
@@ -137,7 +143,9 @@ describe('createSeparation — seeding and audit (#305)', () => {
 				action: 'CREATE',
 				entityType: 'SeparationRecord',
 				entityId: 'sep-new'
-			})
+			}),
+			// AVIPA #5: the audit write shares the create's transaction.
+			tx
 		)
 	})
 })

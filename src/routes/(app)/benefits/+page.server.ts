@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listBenefitPlans(user.organizationId),
 		listAllEnrollments(user.organizationId),
 		db.employee.findMany({
-			where: { user: { organizationId: user.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: user.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: { lastName: 'asc' }
 		})

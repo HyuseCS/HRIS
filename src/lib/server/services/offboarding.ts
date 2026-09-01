@@ -208,16 +208,24 @@ export async function reorderItems(
 	const owned = new Set(items.map((i) => i.id))
 	if (orderedIds.length !== owned.size || !orderedIds.every((id) => owned.has(id)))
 		error(400, 'Invalid reorder payload')
-	await db.$transaction(
-		orderedIds.map((id, i) =>
-			db.offboardingChecklistItem.update({ where: { id }, data: { order: i } })
+	// One transaction: a failed audit write must not leave a reordering standing unrecorded.
+	// Sequential updates rather than the batched array form, which has no `tx` to hand the
+	// audit — the list is one org's checklist, so the count is small.
+	await db.$transaction(async (tx) => {
+		for (const [i, id] of orderedIds.entries()) {
+			await tx.offboardingChecklistItem.update({ where: { id }, data: { order: i } })
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'OffboardingChecklistItem',
+				entityId: 'reorder',
+				newValue: { order: orderedIds }
+			},
+			tx
 		)
-	)
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'OffboardingChecklistItem',
-		entityId: 'reorder',
-		newValue: { order: orderedIds }
 	})
 }
 

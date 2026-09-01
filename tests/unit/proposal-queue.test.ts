@@ -45,6 +45,34 @@ vi.mock('$lib/server/services/notifications', () => ({
 	notifyMany: vi.fn().mockResolvedValue(undefined)
 }))
 
+// #5: the confirm and reject paths write through a transaction client. Making `tx` a DIFFERENT
+// object from `db` is what gives the class-D assertion below its teeth — the reveal audits a read
+// and must keep taking `db`, and only a distinct `tx` can catch someone later wrapping it in the
+// transaction.
+//
+// `actionProposal` also gets its own delegate spies, so the *mutation* client is checkable and not
+// only the audit's: every `actionProposal` write the services make (`updateMany`, and the
+// read-back `findUniqueOrThrow`) happens inside `db.$transaction`, while `findMany`
+// (`listActionableProposals`) and `findFirst` (`requirePending`) run on `db` outside it. Those two
+// sets are asserted on the client that actually receives them, and `.not.toHaveBeenCalled()` is
+// asserted on BOTH clients — "never updated" means neither one updated.
+//
+// The other six delegates stay aliased to `dbMock`: nothing they do is client-sensitive here.
+const tx = {
+	actionProposal: {
+		findMany: vi.fn(),
+		findFirst: vi.fn(),
+		findUniqueOrThrow: vi.fn(),
+		updateMany: vi.fn()
+	},
+	employee: dbMock.employee,
+	employeeCompensation: dbMock.employeeCompensation,
+	employeeEmploymentType: dbMock.employeeEmploymentType,
+	payrollRun: dbMock.payrollRun,
+	position: dbMock.position,
+	user: dbMock.user
+}
+
 const { writeAuditLog } = await import('$lib/server/audit')
 const { load, actions } = await import('../../src/routes/(app)/requests/proposals/+page.server')
 
@@ -92,9 +120,14 @@ const event = (user: { id: string; roles: Role[] }, body: Record<string, string>
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(dbMock))
+	dbMock.$transaction.mockImplementation(async (fn: (client: typeof tx) => unknown) => fn(tx))
 	dbMock.actionProposal.findMany.mockResolvedValue([])
 	dbMock.actionProposal.findFirst.mockResolvedValue(onBehalf)
+	// The claim and the read-back run inside the transaction, so `tx` is the delegate the services
+	// actually call. `dbMock`'s copies are primed too: a regression to the shared client then fails on
+	// the client assertion below rather than crashing on an undefined claim count.
+	tx.actionProposal.updateMany.mockResolvedValue({ count: 1 })
+	tx.actionProposal.findUniqueOrThrow.mockResolvedValue({ id: 'p1', status: 'APPLIED' })
 	dbMock.actionProposal.updateMany.mockResolvedValue({ count: 1 })
 	dbMock.actionProposal.findUniqueOrThrow.mockResolvedValue({ id: 'p1', status: 'APPLIED' })
 	// `assertMayDecide` resolves the target's user id through findUnique; getEmployee uses findFirst.
@@ -207,6 +240,7 @@ describe('?/confirm', () => {
 			data: { error: 'You are not authorized to confirm this proposal.' }
 		})
 		expect(dbMock.actionProposal.updateMany).not.toHaveBeenCalled()
+		expect(tx.actionProposal.updateMany).not.toHaveBeenCalled()
 	})
 
 	it('refuses the person who filed it', async () => {
@@ -239,6 +273,22 @@ describe('?/confirm', () => {
 		expect(dbMock.employeeCompensation.create).toHaveBeenCalledWith({
 			data: expect.objectContaining({ employeeId: CREW_EMP, basicMonthlySalary: 45000 })
 		})
+	})
+
+	/**
+	 * #5, the mutation half. The claim is what moves the proposal PENDING → APPLIED, and it has to
+	 * roll back with the apply it guards — so it must run on the transaction client, never on the
+	 * shared one. The audit's client is asserted separately (class D, in ?/revealAmount); a claim
+	 * that quietly moved back to `db` would leave an APPLIED row behind a rolled-back change with
+	 * nothing here to notice.
+	 */
+	it('claims the proposal on the transaction client, not the shared one', async () => {
+		await actions.confirm!(event({ id: HR, roles: ['HR_ADMIN'] }, { proposalId: 'p1' }))
+		expect(tx.actionProposal.updateMany).toHaveBeenCalledWith({
+			where: { id: 'p1', organizationId: 'org1', status: 'PENDING' },
+			data: expect.objectContaining({ status: 'APPLIED', decidedById: HR })
+		})
+		expect(dbMock.actionProposal.updateMany).not.toHaveBeenCalled()
 	})
 
 	/**
@@ -282,6 +332,7 @@ describe('?/confirm', () => {
 		const res = await actions.confirm!(event({ id: HR, roles: ['HR_ADMIN'] }))
 		expect(res).toMatchObject({ status: 400, data: { error: 'Missing proposal id.' } })
 		expect(dbMock.actionProposal.findFirst).not.toHaveBeenCalled()
+		expect(tx.actionProposal.findFirst).not.toHaveBeenCalled()
 	})
 })
 
@@ -298,6 +349,7 @@ describe('?/reject', () => {
 			data: { error: 'A reason is required to reject a proposal.' }
 		})
 		expect(dbMock.actionProposal.findFirst).not.toHaveBeenCalled()
+		expect(tx.actionProposal.findFirst).not.toHaveBeenCalled()
 	})
 
 	it('applies the same authority as confirming', async () => {
@@ -312,6 +364,7 @@ describe('?/reject', () => {
 			data: { error: 'You are not authorized to confirm this proposal.' }
 		})
 		expect(dbMock.actionProposal.updateMany).not.toHaveBeenCalled()
+		expect(tx.actionProposal.updateMany).not.toHaveBeenCalled()
 	})
 
 	it('stores the reason on the row', async () => {
@@ -322,13 +375,15 @@ describe('?/reject', () => {
 			)
 		)
 		expect(res).toEqual({ success: 'Proposal rejected and the initiator notified.' })
-		expect(dbMock.actionProposal.updateMany).toHaveBeenCalledWith({
+		// The claim runs inside `db.$transaction` with its audit, so `tx` is the client under test.
+		expect(tx.actionProposal.updateMany).toHaveBeenCalledWith({
 			where: { id: 'p1', organizationId: 'org1', status: 'PENDING' },
 			data: expect.objectContaining({
 				status: 'REJECTED',
 				decisionNote: 'not budgeted this quarter'
 			})
 		})
+		expect(dbMock.actionProposal.updateMany).not.toHaveBeenCalled()
 	})
 })
 
@@ -357,7 +412,10 @@ describe('?/revealAmount', () => {
 				entityType: 'Employee',
 				entityId: CREW_EMP,
 				newValue: { fields: expect.arrayContaining(['basicMonthlySalary']) }
-			})
+			}),
+			// #5: class D — this audits a READ, so it takes `db`, never a transaction client.
+			// Wrapping it would let an unrelated rollback erase the record of a PII access.
+			dbMock
 		)
 	})
 

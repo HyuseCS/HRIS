@@ -19,6 +19,9 @@ const { dbMock } = vi.hoisted(() => ({
 			findFirst: vi.fn(),
 			findMany: vi.fn(),
 			findUnique: vi.fn(),
+			// #324: updateTimesheetEntries re-reads its before-image inside the transaction rather
+			// than carrying one down from the guard read above it.
+			findUniqueOrThrow: vi.fn(),
 			create: vi.fn(),
 			delete: vi.fn(),
 			update: vi.fn()
@@ -61,6 +64,10 @@ const ctx = (actorRole: Role, actorId = 'user1') => ({
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof dbMock) => unknown) => fn(dbMock))
+	dbMock.timesheet.findUniqueOrThrow.mockResolvedValue({
+		totalHours: 8,
+		_count: { entries: 1 }
+	})
 	dbMock.timesheet.update.mockResolvedValue({ entries: [] })
 	dbMock.timesheet.delete.mockResolvedValue({})
 	dbMock.timesheetEntry.deleteMany.mockResolvedValue({})
@@ -149,6 +156,11 @@ describe('updateTimesheetEntries — owner sync path', () => {
 		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
 		await updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))
 		expect(dbMock.$transaction).toHaveBeenCalledTimes(1)
+		// #324: the before-image is read inside that transaction, not from the guard read above it.
+		expect(dbMock.timesheet.findUniqueOrThrow).toHaveBeenCalledWith({
+			where: { id: 'ts1' },
+			select: { totalHours: true, _count: { select: { entries: true } } }
+		})
 	})
 
 	it('blocks the owner from editing a SUBMITTED timesheet', async () => {

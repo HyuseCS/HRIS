@@ -26,7 +26,12 @@ import type { Role } from '@prisma/client'
 const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	dbMock: {
-		employee: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+		employee: {
+			findFirst: vi.fn(),
+			findUnique: vi.fn(),
+			findUniqueOrThrow: vi.fn(),
+			update: vi.fn()
+		},
 		employeeCompensation: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
 		employeeEmploymentType: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
 		payrollRun: { findFirst: vi.fn() },
@@ -96,11 +101,16 @@ const writtenData = () => dbMock.employee.update.mock.calls[0]?.[0]?.data
  * on this route: `govIdSchema` (#191) transforms an absent government ID into `null`, so
  * `parsed.data` always carries four gov-ID keys and `updateEmployee` always runs. That is
  * pre-existing and independent of #263 — what #263 changes is whether `reportsToId` is among the
- * keys it hands over. `$transaction` is the companion assertion: promoteEmployee's own write opens
- * one, so an untouched `$transaction` proves the routed writer wrote nothing at all.
+ * keys it hands over.
+ *
+ * #5: `expect(dbMock.$transaction).not.toHaveBeenCalled()` used to be the companion assertion,
+ * because only promoteEmployee's own write opened a transaction. updateEmployee now opens one for
+ * every accepted edit, so an untouched `$transaction` no longer means anything here. The loop below
+ * is the whole check instead, and it stays complete because the transaction client IS `dbMock` —
+ * a routed write would land in `employee.update.mock.calls` either way. The one case where a write
+ * really does happen alongside a routed field pins that directly, with `writtenData().contactPhone`.
  */
 function expectReportingLineNotWritten() {
-	expect(dbMock.$transaction).not.toHaveBeenCalled()
 	for (const call of dbMock.employee.update.mock.calls) {
 		expect(call[0].data).not.toHaveProperty('reportsToId')
 	}
@@ -111,6 +121,8 @@ beforeEach(() => {
 	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof dbMock) => unknown) => fn(dbMock))
 	dbMock.employee.findFirst.mockResolvedValue(EMP)
 	dbMock.employee.update.mockResolvedValue(EMP)
+	// #5: updateEmployee reads its `before` snapshot inside the transaction.
+	dbMock.employee.findUniqueOrThrow.mockResolvedValue(EMP)
 	// `canTouchEmployee` for a bare MANAGER: their own record, and a reporting line holding the target.
 	dbMock.employee.findUnique.mockResolvedValue({ id: ACTOR_EMP })
 	listReportIdsFor.mockResolvedValue([TARGET])

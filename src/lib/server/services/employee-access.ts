@@ -63,7 +63,7 @@ export async function canTouchEmployee(
 	// point across tenants, so this stays as the fail-closed backstop: an employee outside the
 	// actor's org is unreachable however they relate.
 	const target = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId: user.organizationId } },
+		where: { id: employeeId, organizationId: user.organizationId },
 		select: { branchId: true }
 	})
 	if (!target) return false
@@ -102,7 +102,7 @@ export async function listVisibleEmployeeIds(user: EmployeeAccessActor): Promise
 		const staff = await db.employee.findMany({
 			where: {
 				branchId: { in: managedBranches.map((b) => b.id) },
-				user: { organizationId: user.organizationId }
+				organizationId: user.organizationId
 			},
 			select: { id: true }
 		})
@@ -111,7 +111,7 @@ export async function listVisibleEmployeeIds(user: EmployeeAccessActor): Promise
 	// Org-scoped: a report row written before #235 can still point across tenants, and the roster
 	// must not surface an employee from another organization.
 	const inOrg = await db.employee.findMany({
-		where: { id: { in: [...visible] }, user: { organizationId: user.organizationId } },
+		where: { id: { in: [...visible] }, organizationId: user.organizationId },
 		select: { id: true }
 	})
 	return inOrg.map((e) => e.id)
@@ -142,7 +142,7 @@ export function assertNotSelf(actorUserId: string, target: { userId: string }): 
  */
 export async function requireEmployee(employeeId: string, organizationId: string) {
 	const e = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, userId: true }
 	})
 	if (!e) error(404, 'Employee not found')

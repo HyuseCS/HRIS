@@ -56,7 +56,7 @@ export async function setAdditionalSupervisors(
 	ctx: AuditContext
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, reportsToId: true }
 	})
 	if (!employee) error(404, 'Employee not found')
@@ -65,28 +65,33 @@ export async function setAdditionalSupervisors(
 
 	if (clean.length) {
 		const valid = await db.employee.findMany({
-			where: { id: { in: clean }, user: { organizationId } },
+			where: { id: { in: clean }, organizationId },
 			select: { id: true }
 		})
 		if (valid.length !== clean.length)
 			error(400, 'A selected supervisor is not in this organization')
 	}
 
-	await db.$transaction([
-		db.employeeSupervisor.deleteMany({ where: { employeeId } }),
-		...(clean.length
-			? [
-					db.employeeSupervisor.createMany({
-						data: clean.map((supervisorId) => ({ employeeId, supervisorId }))
-					})
-				]
-			: [])
-	])
+	// One transaction: a failed audit write must not leave a changed supervisor set standing
+	// unrecorded.
+	await db.$transaction(async (tx) => {
+		await tx.employeeSupervisor.deleteMany({ where: { employeeId } })
+		// An empty selection clears the list, so the deleteMany above is the whole change.
+		if (clean.length) {
+			await tx.employeeSupervisor.createMany({
+				data: clean.map((supervisorId) => ({ employeeId, supervisorId }))
+			})
+		}
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Employee',
-		entityId: employeeId,
-		newValue: { additionalSupervisors: clean }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Employee',
+				entityId: employeeId,
+				newValue: { additionalSupervisors: clean }
+			},
+			tx
+		)
 	})
 }

@@ -221,7 +221,7 @@ describe('?/reveal — reaching a payload is itself audited (#242)', () => {
 		await actions.reveal(revealEvent(['SUPER_ADMIN']))
 
 		expect(writeAuditLog).toHaveBeenCalledTimes(1)
-		const [ctx, payload] = writeAuditLog.mock.calls[0]
+		const [ctx, payload, client] = writeAuditLog.mock.calls[0]
 		expect(ctx).toMatchObject({
 			organizationId: ORG_A,
 			actorId: ACTOR,
@@ -233,6 +233,9 @@ describe('?/reveal — reaching a payload is itself audited (#242)', () => {
 			entityType: 'AuditLog',
 			entityId: 'log1'
 		})
+		// #5: class D — this audits a READ, so it takes `db`, never a transaction client. Wrapping
+		// it would let an unrelated rollback erase the record of a payload already returned.
+		expect(client).toBe(dbMock)
 	})
 
 	// No self-reveal exemption — see the header note. A CEO reading a row they themselves wrote

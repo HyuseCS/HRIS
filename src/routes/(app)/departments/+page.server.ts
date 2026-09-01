@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listDepartments(locals.user!.organizationId),
 		// For the per-department Members panel (#71): current members + assignable others.
 		db.employee.findMany({
-			where: { user: { organizationId: locals.user!.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: locals.user!.organizationId, employmentStatus: 'ACTIVE' },
 			select: {
 				id: true,
 				firstName: true,

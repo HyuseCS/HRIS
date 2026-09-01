@@ -92,7 +92,11 @@ const other = { ...own, id: 'emp-other', userId: 'user-other', jobTitle: 'Crew' 
 /** A transaction client standing in for the one `confirmProposal` hands to `apply`. */
 const txMock = () => ({
 	employee: { update: vi.fn() },
-	employeeCompensation: { create: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
+	employeeCompensation: {
+		create: vi.fn(),
+		findFirst: vi.fn().mockResolvedValue(null),
+		findMany: vi.fn().mockResolvedValue([])
+	},
 	employeeEmploymentType: { create: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) }
 })
 

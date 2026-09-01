@@ -218,12 +218,12 @@ export async function importBacklogCsv(
 	if (maxDate.getTime() - minDate.getTime() > MAX_SPAN_DAYS * DAY_MS)
 		error(400, 'Range exceeds the 2-month limit.')
 
-	// One employee query. Org-scoped through the `user` relation, matching every other org-scoped
-	// employee read in this service — without it, an employee number from another tenant resolves.
+	// One employee query. Org-scoped on the Employee's own `organizationId` column — without
+	// that filter, an employee number from another tenant resolves.
 	const employees = await db.employee.findMany({
 		where: {
 			employeeNumber: { in: [...new Set(rows.map((r) => r.employeeNumber))] },
-			user: { organizationId },
+			organizationId,
 			employmentStatus: 'ACTIVE'
 		},
 		select: { id: true, employeeNumber: true }

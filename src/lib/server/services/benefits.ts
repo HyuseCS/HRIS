@@ -35,27 +35,34 @@ export async function createBenefitPlan(
 	},
 	ctx: AuditContext
 ) {
-	const plan = await db.benefitPlan.create({
-		data: {
-			organizationId,
-			name: data.name,
-			type: data.type,
-			provider: data.provider,
-			description: data.description,
-			employeeCost: data.employeeCost,
-			employerCost: data.employerCost,
-			isActive: data.isActive ?? true
-		}
-	})
+	// One transaction (#5): a failed audit write must not leave a new plan standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const plan = await tx.benefitPlan.create({
+			data: {
+				organizationId,
+				name: data.name,
+				type: data.type,
+				provider: data.provider,
+				description: data.description,
+				employeeCost: data.employeeCost,
+				employerCost: data.employerCost,
+				isActive: data.isActive ?? true
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'BenefitPlan',
-		entityId: plan.id,
-		newValue: { name: plan.name, type: plan.type, provider: plan.provider }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'BenefitPlan',
+				entityId: plan.id,
+				newValue: { name: plan.name, type: plan.type, provider: plan.provider }
+			},
+			tx
+		)
 
-	return plan
+		return plan
+	})
 }
 
 export async function updateBenefitPlan(
@@ -75,27 +82,34 @@ export async function updateBenefitPlan(
 	const existing = await db.benefitPlan.findFirst({ where: { id, organizationId } })
 	if (!existing) error(404, 'Benefit plan not found')
 
-	const plan = await db.benefitPlan.update({
-		where: { id },
-		data: {
-			...(data.name !== undefined && { name: data.name }),
-			...(data.type !== undefined && { type: data.type }),
-			...(data.provider !== undefined && { provider: data.provider }),
-			...(data.description !== undefined && { description: data.description }),
-			...(data.employeeCost !== undefined && { employeeCost: data.employeeCost }),
-			...(data.employerCost !== undefined && { employerCost: data.employerCost }),
-			...(data.isActive !== undefined && { isActive: data.isActive })
-		}
-	})
+	// One transaction (#5): a failed audit write must not leave a plan change standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const plan = await tx.benefitPlan.update({
+			where: { id },
+			data: {
+				...(data.name !== undefined && { name: data.name }),
+				...(data.type !== undefined && { type: data.type }),
+				...(data.provider !== undefined && { provider: data.provider }),
+				...(data.description !== undefined && { description: data.description }),
+				...(data.employeeCost !== undefined && { employeeCost: data.employeeCost }),
+				...(data.employerCost !== undefined && { employerCost: data.employerCost }),
+				...(data.isActive !== undefined && { isActive: data.isActive })
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'BenefitPlan',
-		entityId: plan.id,
-		newValue: { name: plan.name, type: plan.type, isActive: plan.isActive }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'BenefitPlan',
+				entityId: plan.id,
+				newValue: { name: plan.name, type: plan.type, isActive: plan.isActive }
+			},
+			tx
+		)
 
-	return plan
+		return plan
+	})
 }
 
 export async function listAllEnrollments(organizationId: string) {
@@ -146,24 +160,32 @@ export async function enrollEmployee(
 	if (!plan) error(404, 'Benefit plan not found')
 
 	try {
-		const enrollment = await db.benefitEnrollment.create({
-			data: {
-				employeeId,
-				benefitPlanId,
-				coverageLevel: data.coverageLevel,
-				effectiveDate: data.effectiveDate,
-				status: data.status ?? 'ACTIVE'
-			}
-		})
+		// One transaction (#5): a failed audit write must not leave an enrollment standing
+		// unrecorded. A lost race on the unique index still surfaces as P2002 below.
+		return await db.$transaction(async (tx) => {
+			const enrollment = await tx.benefitEnrollment.create({
+				data: {
+					employeeId,
+					benefitPlanId,
+					coverageLevel: data.coverageLevel,
+					effectiveDate: data.effectiveDate,
+					status: data.status ?? 'ACTIVE'
+				}
+			})
 
-		await writeAuditLog(ctx, {
-			action: 'CREATE',
-			entityType: 'BenefitEnrollment',
-			entityId: enrollment.id,
-			newValue: { employeeId, benefitPlanId, status: enrollment.status }
-		})
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'CREATE',
+					entityType: 'BenefitEnrollment',
+					entityId: enrollment.id,
+					newValue: { employeeId, benefitPlanId, status: enrollment.status }
+				},
+				tx
+			)
 
-		return enrollment
+			return enrollment
+		})
 	} catch (e) {
 		if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
 			error(409, 'Employee is already enrolled in this benefit plan')
@@ -183,20 +205,27 @@ export async function updateEnrollmentStatus(
 	})
 	if (!existing) error(404, 'Benefit enrollment not found')
 
-	const enrollment = await db.benefitEnrollment.update({
-		where: { id },
-		data: {
-			status,
-			...(status === 'TERMINATED' && { endedAt: new Date() })
-		}
-	})
+	// One transaction (#5): a failed audit write must not leave a status change standing unrecorded.
+	return await db.$transaction(async (tx) => {
+		const enrollment = await tx.benefitEnrollment.update({
+			where: { id },
+			data: {
+				status,
+				...(status === 'TERMINATED' && { endedAt: new Date() })
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'BenefitEnrollment',
-		entityId: enrollment.id,
-		newValue: { status: enrollment.status }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'BenefitEnrollment',
+				entityId: enrollment.id,
+				newValue: { status: enrollment.status }
+			},
+			tx
+		)
 
-	return enrollment
+		return enrollment
+	})
 }

@@ -14,11 +14,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
-		request: { findFirst: vi.fn(), update: vi.fn() }
+		request: { findFirst: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
-vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const writeAuditLog = vi.fn().mockResolvedValue(undefined)
+vi.mock('$lib/server/audit', () => ({
+	writeAuditLog: (...args: unknown[]) => writeAuditLog(...args)
+}))
+
+// #5: the status flip and its audit entry now share a transaction, so the mutation runs on `tx`.
+const tx = { request: { update: vi.fn() } }
 
 // Owning the module cancelRequest calls into is the only way to gate a call. The alias resolves to
 // the same module the caller imports relatively as './documents'.
@@ -38,7 +45,8 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	// cancelRequest calls `.catch()` on the result, so this must be a promise, not undefined.
 	evictMock.mockResolvedValue(undefined)
-	dbMock.request.update.mockResolvedValue({ id: 'req1', status: 'CANCELLED' })
+	tx.request.update.mockResolvedValue({ id: 'req1', status: 'CANCELLED' })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('cancelRequest — the CANCELLED terminal eviction (#299/D-6a)', () => {
@@ -49,10 +57,12 @@ describe('cancelRequest — the CANCELLED terminal eviction (#299/D-6a)', () => 
 
 		await cancelRequest('req1', 'emp-owner', CTX)
 
-		expect(dbMock.request.update).toHaveBeenCalledWith({
+		expect(tx.request.update).toHaveBeenCalledWith({
 			where: { id: 'req1' },
 			data: { status: 'CANCELLED' }
 		})
+		// #5: the audit write shares the transaction that commits the cancellation.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 		expect(evictMock).toHaveBeenCalledTimes(1)
 		expect(evictMock).toHaveBeenCalledWith('req1', 0)
 	})
@@ -72,7 +82,7 @@ describe('cancelRequest — the CANCELLED terminal eviction (#299/D-6a)', () => 
 
 		await expect(cancelRequest('req1', 'emp-owner', CTX)).rejects.toMatchObject({ status: 400 })
 
-		expect(dbMock.request.update).not.toHaveBeenCalled()
+		expect(tx.request.update).not.toHaveBeenCalled()
 		expect(evictMock).not.toHaveBeenCalled()
 	})
 })

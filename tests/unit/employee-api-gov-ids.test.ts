@@ -13,7 +13,8 @@ import type { Role } from '@prisma/client'
 const { dbMock, txMock } = vi.hoisted(() => {
 	const txMock = {
 		employeeCompensation: { create: vi.fn(), findFirst: vi.fn() },
-		employee: { update: vi.fn() }
+		// #5: updateEmployee now reads its `before` snapshot and writes the row on the tx client.
+		employee: { update: vi.fn(), findUniqueOrThrow: vi.fn() }
 	}
 	return {
 		txMock,
@@ -74,7 +75,8 @@ const patch = (body: unknown, user = HR_USER) =>
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.employee.findFirst.mockResolvedValue(EMP)
-	dbMock.employee.update.mockResolvedValue(EMP)
+	txMock.employee.findUniqueOrThrow.mockResolvedValue(EMP)
+	txMock.employee.update.mockResolvedValue(EMP)
 	dbMock.employeeCompensation.findMany.mockResolvedValue([]) // no history → getEmployee heal is a no-op
 	dbMock.employeeEmploymentType.findMany.mockResolvedValue([])
 	dbMock.payrollRun.findFirst.mockResolvedValue(null) // no frozen run in the way
@@ -86,8 +88,8 @@ describe('PATCH /api/v1/employees/[id] — a partial update must not wipe govern
 		const res = await patch({ firstName: 'Ana' })
 
 		expect(res.status).toBe(200)
-		expect(dbMock.employee.update).toHaveBeenCalledTimes(1)
-		const { data } = dbMock.employee.update.mock.calls[0][0]
+		expect(txMock.employee.update).toHaveBeenCalledTimes(1)
+		const { data } = txMock.employee.update.mock.calls[0][0]
 		expect(data).toHaveProperty('firstName', 'Ana')
 		for (const key of GOV_ID_KEYS) expect(data).not.toHaveProperty(key)
 	})
@@ -96,15 +98,15 @@ describe('PATCH /api/v1/employees/[id] — a partial update must not wipe govern
 		const res = await patch({})
 
 		expect(res.status).toBe(200)
-		expect(dbMock.employee.update).not.toHaveBeenCalled()
+		expect(txMock.employee.update).not.toHaveBeenCalled()
 	})
 
 	it('an explicitly sent ID is still written, canonically', async () => {
 		const res = await patch({ sssNumber: '3412345678' })
 
 		expect(res.status).toBe(200)
-		expect(dbMock.employee.update).toHaveBeenCalledTimes(1)
-		const { data } = dbMock.employee.update.mock.calls[0][0]
+		expect(txMock.employee.update).toHaveBeenCalledTimes(1)
+		const { data } = txMock.employee.update.mock.calls[0][0]
 		expect(data.sssNumber).toBe('34-1234567-8')
 		for (const key of GOV_ID_KEYS.filter((k) => k !== 'sssNumber')) {
 			expect(data).not.toHaveProperty(key)
@@ -117,8 +119,8 @@ describe('PATCH /api/v1/employees/[id] — a partial update must not wipe govern
 		const res = await patch({ sssNumber: '' })
 
 		expect(res.status).toBe(200)
-		expect(dbMock.employee.update).toHaveBeenCalledTimes(1)
-		const { data } = dbMock.employee.update.mock.calls[0][0]
+		expect(txMock.employee.update).toHaveBeenCalledTimes(1)
+		const { data } = txMock.employee.update.mock.calls[0][0]
 		expect(data.sssNumber).toBeNull()
 		// Clearing one ID must not clear the other three: pre-fix, all four arrived as null.
 		for (const key of GOV_ID_KEYS.filter((k) => k !== 'sssNumber')) {
@@ -130,6 +132,6 @@ describe('PATCH /api/v1/employees/[id] — a partial update must not wipe govern
 		const res = await patch({ sssNumber: '1234' })
 
 		expect(res.status).toBe(400)
-		expect(dbMock.employee.update).not.toHaveBeenCalled()
+		expect(txMock.employee.update).not.toHaveBeenCalled()
 	})
 })

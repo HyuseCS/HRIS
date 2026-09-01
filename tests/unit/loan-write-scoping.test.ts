@@ -21,18 +21,28 @@ import { CAPABILITIES } from '$lib/rbac'
  * carries either role, so nothing else in the repo would notice.
  */
 
-const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
+const { dbMock, tx, listReportIdsFor } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
+	// #324: the four writers now open a transaction and run the mutation on the client it hands
+	// them, so the mutation mocks live on `tx`, not `dbMock`. The guard reads stay on `dbMock` —
+	// they run before the transaction opens.
+	tx: {
+		loan: { create: vi.fn(), update: vi.fn() },
+		cashAdvance: { create: vi.fn(), update: vi.fn() }
+	},
 	dbMock: {
+		$transaction: vi.fn(),
 		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
 		branch: { findMany: vi.fn() },
-		loan: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-		cashAdvance: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() }
+		loan: { findFirst: vi.fn() },
+		cashAdvance: { findFirst: vi.fn() }
 	}
 }))
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+
+const { writeAuditLog } = await import('$lib/server/audit')
 vi.mock('$lib/server/services/supervisors', () => ({ listReportIdsFor }))
 
 const { createLoan, updateLoan, createCashAdvance, updateCashAdvance } =
@@ -71,8 +81,9 @@ beforeEach(() => {
 	dbMock.loan.findFirst.mockResolvedValue({ id: 'loan1', employeeId: STRANGER.id })
 	dbMock.cashAdvance.findFirst.mockResolvedValue({ id: 'ca1', employeeId: STRANGER.id })
 	// The creates dereference the new row for the audit entry.
-	dbMock.loan.create.mockResolvedValue({ id: 'loan-new' })
-	dbMock.cashAdvance.create.mockResolvedValue({ id: 'ca-new' })
+	tx.loan.create.mockResolvedValue({ id: 'loan-new' })
+	tx.cashAdvance.create.mockResolvedValue({ id: 'ca-new' })
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('the capability containment the loan guard depends on', () => {
@@ -99,7 +110,7 @@ describe('updateLoan — the door that was open', () => {
 			status: 403,
 			body: { message: DENIED }
 		})
-		expect(dbMock.loan.update).not.toHaveBeenCalled()
+		expect(tx.loan.update).not.toHaveBeenCalled()
 	})
 
 	it('refuses an actor editing their OWN loan, with the separation-of-duties reason', async () => {
@@ -111,14 +122,14 @@ describe('updateLoan — the door that was open', () => {
 			status: 403,
 			body: { message: SELF_ACTION_DENIED }
 		})
-		expect(dbMock.loan.update).not.toHaveBeenCalled()
+		expect(tx.loan.update).not.toHaveBeenCalled()
 	})
 
 	it("lets a MANAGER edit their own report's loan", async () => {
 		dbMock.loan.findFirst.mockResolvedValue({ id: 'loan1', employeeId: REPORT.id })
 		targeting(REPORT)
 		await updateLoan('loan1', ORG, { installment: 999 }, ctx('MANAGER'))
-		expect(dbMock.loan.update).toHaveBeenCalled()
+		expect(tx.loan.update).toHaveBeenCalled()
 	})
 
 	it('still 404s on a loan outside the actor org, before any scope check', async () => {
@@ -139,7 +150,7 @@ describe('the org-wide pay roles keep full reach', () => {
 		it(`${role} may edit the loan of an employee who does not report to them`, async () => {
 			targeting(STRANGER)
 			await updateLoan('loan1', ORG, { installment: 999 }, ctx(role))
-			expect(dbMock.loan.update).toHaveBeenCalled()
+			expect(tx.loan.update).toHaveBeenCalled()
 		})
 	}
 
@@ -155,7 +166,7 @@ describe('the org-wide pay roles keep full reach', () => {
 	it('reads the full role set, not just the primary role (#133)', async () => {
 		targeting(STRANGER)
 		await updateLoan('loan1', ORG, { installment: 999 }, ctx('MANAGER', ['MANAGER', 'FINANCE']))
-		expect(dbMock.loan.update).toHaveBeenCalled()
+		expect(tx.loan.update).toHaveBeenCalled()
 	})
 })
 
@@ -165,7 +176,7 @@ describe('updateCashAdvance carries the same guard', () => {
 		await expect(
 			updateCashAdvance('ca1', ORG, { installment: 999 }, ctx('MANAGER'))
 		).rejects.toMatchObject({ status: 403, body: { message: DENIED } })
-		expect(dbMock.cashAdvance.update).not.toHaveBeenCalled()
+		expect(tx.cashAdvance.update).not.toHaveBeenCalled()
 	})
 
 	it('refuses an actor editing their own cash advance', async () => {
@@ -180,7 +191,7 @@ describe('updateCashAdvance carries the same guard', () => {
 		dbMock.cashAdvance.findFirst.mockResolvedValue({ id: 'ca1', employeeId: REPORT.id })
 		targeting(REPORT)
 		await updateCashAdvance('ca1', ORG, { installment: 999 }, ctx('MANAGER'))
-		expect(dbMock.cashAdvance.update).toHaveBeenCalled()
+		expect(tx.cashAdvance.update).toHaveBeenCalled()
 	})
 })
 
@@ -193,7 +204,7 @@ describe('the creates gained the scope arm they never had', () => {
 			status: 403,
 			body: { message: DENIED }
 		})
-		expect(dbMock.loan.create).not.toHaveBeenCalled()
+		expect(tx.loan.create).not.toHaveBeenCalled()
 	})
 
 	it('refuses a MANAGER creating a cash advance for a non-report', async () => {
@@ -201,13 +212,16 @@ describe('the creates gained the scope arm they never had', () => {
 		await expect(
 			createCashAdvance(STRANGER.id, ORG, CA_DATA, ctx('MANAGER'))
 		).rejects.toMatchObject({ status: 403, body: { message: DENIED } })
-		expect(dbMock.cashAdvance.create).not.toHaveBeenCalled()
+		expect(tx.cashAdvance.create).not.toHaveBeenCalled()
 	})
 
 	it('lets a MANAGER create a loan for a report', async () => {
 		targeting(REPORT)
 		await createLoan(REPORT.id, ORG, LOAN_DATA, ctx('MANAGER'))
-		expect(dbMock.loan.create).toHaveBeenCalled()
+		expect(tx.loan.create).toHaveBeenCalled()
+		// #324: the audit write shares the transaction. A loan create has no unique key, so a
+		// committed loan with a failed audit row is unrecoverable.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('rejects a non-positive installment only AFTER the scope check', async () => {

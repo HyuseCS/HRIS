@@ -31,13 +31,20 @@ import { answerDraft, serialiseAnswers } from '../../src/lib/components/performa
  * `.trim()`, a JSON re-encode or a number coercion anywhere on that path would eat exactly those.
  */
 
-const { dbMock, writeAuditLog } = vi.hoisted(() => ({
-	dbMock: {
-		performanceReview: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-		employee: { findUnique: vi.fn() }
-	},
-	writeAuditLog: vi.fn()
-}))
+const { dbMock, txMock, writeAuditLog } = vi.hoisted(() => {
+	// #324: `submitScores` now writes the update and its audit row in one transaction, so the
+	// update the assertions read is the one made on the tx client.
+	const txMock = { performanceReview: { update: vi.fn() } }
+	return {
+		txMock,
+		dbMock: {
+			performanceReview: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+			employee: { findUnique: vi.fn() },
+			$transaction: vi.fn(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
+		},
+		writeAuditLog: vi.fn()
+	}
+})
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog }))
 
@@ -125,7 +132,7 @@ const event = (answers: string) =>
 
 /** Runs the real action and returns the exact `answers` object handed to Prisma. */
 async function submit(answersField: string) {
-	dbMock.performanceReview.update.mockImplementation(({ data }: { data: unknown }) => ({
+	txMock.performanceReview.update.mockImplementation(({ data }: { data: unknown }) => ({
 		...(data as object),
 		id: REVIEW_ID
 	}))
@@ -134,11 +141,12 @@ async function submit(answersField: string) {
 	expect(result, `the action rejected the submission: ${JSON.stringify(result)}`).toEqual({
 		success: true
 	})
-	return dbMock.performanceReview.update.mock.calls[0][0].data.answers
+	return txMock.performanceReview.update.mock.calls[0][0].data.answers
 }
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
 	dbMock.employee.findUnique.mockResolvedValue({ id: REVIEWER })
 	dbMock.performanceReview.findFirst.mockResolvedValue({
 		id: REVIEW_ID,
@@ -216,6 +224,17 @@ describe('what the evaluator typed is what is stored (AC4)', () => {
 		expect(stored.criteria).not.toHaveProperty(untouched.id)
 	})
 
+	it('writes the scores and their audit row in ONE transaction (#324)', async () => {
+		await submit(serialiseAnswers(typedDraft()))
+
+		// The mutation ran on the tx client, never on the shared `db`.
+		expect(txMock.performanceReview.update).toHaveBeenCalledTimes(1)
+		expect(dbMock.performanceReview.update).not.toHaveBeenCalled()
+		// And the audit write shares that transaction: a failed audit rolls the scores back
+		// instead of leaving them standing unrecorded behind a 500.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), txMock)
+	})
+
 	it('leaves awkward text exactly as typed — no trim, no re-encode', async () => {
 		const stored = await submit(serialiseAnswers(typedDraft()))
 		const remarks = typedCriteria.map((c) => stored.criteria[c.id].remark)
@@ -287,6 +306,9 @@ describe('what is stored is what is rendered back, read after read (AC4)', () =>
 		let stored = first
 		for (let pass = 0; pass < 3; pass++) {
 			vi.clearAllMocks()
+			dbMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => unknown) =>
+				fn(txMock)
+			)
 			dbMock.employee.findUnique.mockResolvedValue({ id: REVIEWER })
 			dbMock.performanceReview.findFirst.mockResolvedValue({
 				id: REVIEW_ID,
