@@ -260,8 +260,14 @@ export async function updateStatutoryRateConfig(
 	organizationId: string,
 	data: StatutoryRateInput,
 	ctx: AuditContext,
-	meta?: { proposalId?: string; proposedById?: string },
-	client: Prisma.TransactionClient = db
+	// Not optional any more: a required parameter cannot follow an optional one, and `client` below
+	// is now required. Callers with no proposal provenance pass `undefined`.
+	meta: { proposalId?: string; proposedById?: string } | undefined,
+	// #5 / D12: NO `= db` default. This function is on the do-not-wrap list — "Prisma has no nested
+	// interactive transactions" — so it must keep taking its client from the caller. The default made
+	// the route caller's tax-table upsert and its audit row two separate commits while the site still
+	// read as already-correct, because a client WAS being passed on to `writeAuditLog`.
+	client: Prisma.TransactionClient
 ) {
 	const persist = {
 		philhealthRate: data.philhealthRate,
@@ -331,22 +337,29 @@ export async function proposeStatutoryRates(
 	data: StatutoryRateInput,
 	ctx: AuditContext
 ) {
-	const proposal = await db.statutoryRateProposal.create({
-		data: {
-			organizationId,
-			proposedById: ctx.actorId,
-			payload: data as unknown as Prisma.InputJsonValue
-		}
-	})
+	// #5: the audit row commits with the proposal it records.
+	return await db.$transaction(async (tx) => {
+		const proposal = await tx.statutoryRateProposal.create({
+			data: {
+				organizationId,
+				proposedById: ctx.actorId,
+				payload: data as unknown as Prisma.InputJsonValue
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'StatutoryRateProposal',
-		entityId: proposal.id,
-		newValue: { proposedById: ctx.actorId, payload: data }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'StatutoryRateProposal',
+				entityId: proposal.id,
+				newValue: { proposedById: ctx.actorId, payload: data }
+			},
+			tx
+		)
 
-	return proposal
+		return proposal
+	})
 }
 
 export async function confirmProposal(
@@ -407,18 +420,25 @@ export async function rejectProposal(
 	})
 	if (!proposal) error(404, 'Pending proposal not found')
 
-	const updated = await db.statutoryRateProposal.update({
-		where: { id: proposalId },
-		data: { status: 'REJECTED', decidedById: ctx.actorId, decidedAt: new Date() }
-	})
+	// #5: the rejection and its audit row commit together.
+	return await db.$transaction(async (tx) => {
+		const updated = await tx.statutoryRateProposal.update({
+			where: { id: proposalId },
+			data: { status: 'REJECTED', decidedById: ctx.actorId, decidedAt: new Date() }
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'StatutoryRateProposal',
-		entityId: proposalId,
-		oldValue: { status: 'PENDING', proposedById: proposal.proposedById },
-		newValue: { status: 'REJECTED', decidedById: ctx.actorId }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'StatutoryRateProposal',
+				entityId: proposalId,
+				oldValue: { status: 'PENDING', proposedById: proposal.proposedById },
+				newValue: { status: 'REJECTED', decidedById: ctx.actorId }
+			},
+			tx
+		)
 
-	return updated
+		return updated
+	})
 }

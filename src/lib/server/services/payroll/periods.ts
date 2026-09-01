@@ -100,15 +100,21 @@ export async function openPeriod(
 				periodEnd: input.endDate
 			}
 		})
+		// #5: the audit row commits with the period it records.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'PayrollPeriod',
+				entityId: p.id,
+				newValue: { name: input.name, startDate: input.startDate, endDate: input.endDate }
+			},
+			tx
+		)
+
 		return p
 	})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'PayrollPeriod',
-		entityId: period.id,
-		newValue: { name: input.name, startDate: input.startDate, endDate: input.endDate }
-	})
 	return period
 }
 
@@ -121,14 +127,22 @@ export async function importAttendance(id: string, organizationId: string, ctx: 
 	await deriveRange(organizationId, range, ctx)
 	await lockRange(organizationId, range, ctx)
 
-	const updated = await db.payrollPeriod.update({ where: { id }, data: { status: 'IMPORTED' } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'IMPORTED' }
+	// #5: the status flip and its audit row commit together. `deriveRange`/`lockRange` stay outside
+	// — they are long-running and already audited in their own right.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const updated = await tx.payrollPeriod.update({ where: { id }, data: { status: 'IMPORTED' } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: { status: 'IMPORTED' }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 export async function generate(id: string, organizationId: string, ctx: AuditContext) {
@@ -145,14 +159,22 @@ export async function generate(id: string, organizationId: string, ctx: AuditCon
 	}
 	await computePayroll(run.id, organizationId, ctx)
 
-	const updated = await db.payrollPeriod.update({ where: { id }, data: { status: 'GENERATED' } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'GENERATED' }
+	// #5: the status flip and its audit row commit together. `computePayroll` stays outside — it is
+	// the long-running engine pass and writes its own audit row.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const updated = await tx.payrollPeriod.update({ where: { id }, data: { status: 'GENERATED' } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: { status: 'GENERATED' }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 export async function lock(
@@ -289,19 +311,26 @@ export async function lock(
 				data: { hasOverride: true, overrideNote }
 			})
 		}
+
+		// #5: the audit row joins the same transaction as the claim and the balance decrements. A
+		// lock that moved money but is not findable is exactly what this trail exists to prevent.
+		await writeAuditLog(
+			ctx,
+			{
+				action: overrideNote ? 'PAYROLL_OVERRIDE' : 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				// #298: `lockedById` is a plain FACT key, always present — a lock is not an override.
+				newValue: {
+					status: 'LOCKED',
+					lockedById: ctx.actorId,
+					...(overrideNote ? { overrideNote } : {})
+				}
+			},
+			tx
+		)
 	})
 
-	await writeAuditLog(ctx, {
-		action: overrideNote ? 'PAYROLL_OVERRIDE' : 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		// #298: `lockedById` is a plain FACT key, always present — a lock is not an override.
-		newValue: {
-			status: 'LOCKED',
-			lockedById: ctx.actorId,
-			...(overrideNote ? { overrideNote } : {})
-		}
-	})
 	return db.payrollPeriod.findUnique({ where: { id } })
 }
 
@@ -312,21 +341,30 @@ export async function release(id: string, organizationId: string, ctx: AuditCont
 
 	// Claim the release the same way `lock()` claims the lock. Two concurrent releases would
 	// otherwise both succeed, and the loser's `releasedAt` would overwrite the winner's — which
-	// since #298 is the date printed on every payslip in the period (PAYDATE).
-	const claimed = await db.payrollPeriod.updateMany({
-		where: { id, status: 'LOCKED' },
-		data: { status: 'RELEASED', releasedAt: new Date(), releasedById: ctx.actorId }
-	})
-	if (claimed.count === 0) error(409, 'The period was already released or changed — nothing done')
-	const updated = await db.payrollPeriod.findUniqueOrThrow({ where: { id } })
-	await writeAuditLog(ctx, {
-		// #298: `releasedById` is a plain FACT key, always present — a release is not an override,
-		// so this is never a marker. It is the copy a reveal can read back if the row is later
-		// edited by hand.
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'RELEASED', releasedById: ctx.actorId }
+	// since #298 is the date printed on every payslip in the period (PAYDATE). #5: the claim, its
+	// read-back and the audit row now share one transaction — a failed audit write must not leave
+	// the release standing unrecorded.
+	const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const claimed = await tx.payrollPeriod.updateMany({
+			where: { id, status: 'LOCKED' },
+			data: { status: 'RELEASED', releasedAt: new Date(), releasedById: ctx.actorId }
+		})
+		if (claimed.count === 0) error(409, 'The period was already released or changed — nothing done')
+		const row = await tx.payrollPeriod.findUniqueOrThrow({ where: { id } })
+		await writeAuditLog(
+			ctx,
+			{
+				// #298: `releasedById` is a plain FACT key, always present — a release is not an override,
+				// so this is never a marker. It is the copy a reveal can read back if the row is later
+				// edited by hand.
+				action: 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: { status: 'RELEASED', releasedById: ctx.actorId }
+			},
+			tx
+		)
+		return row
 	})
 
 	// Notify every employee with a payslip in this period that it's now available (#169).

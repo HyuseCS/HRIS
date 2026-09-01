@@ -189,7 +189,17 @@ export const actions: Actions = {
 				error: `Invalid statutory rates: ${parsed.error.issues[0]?.message ?? 'validation failed'}`
 			})
 
-		await updateStatutoryRateConfig(user.organizationId, parsed.data, ctxOf(user, getClientAddress))
+		// #5 / D12: `updateStatutoryRateConfig` no longer defaults its client to `db`, so this caller
+		// opens the transaction — the tax-table upsert and its audit row now commit or roll back together.
+		await db.$transaction((tx) =>
+			updateStatutoryRateConfig(
+				user.organizationId,
+				parsed.data,
+				ctxOf(user, getClientAddress),
+				undefined,
+				tx
+			)
+		)
 		return { success: 'Statutory rates saved.' }
 	},
 
