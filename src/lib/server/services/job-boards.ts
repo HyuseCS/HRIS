@@ -210,45 +210,54 @@ export async function setChannel(
 	if (!board) error(404, 'Job board not found')
 
 	const cleanUrl = input.url?.trim() || null
-	const existing = await db.jobPostingChannel.findUnique({
-		where: { jobPostingId_jobBoardId: { jobPostingId, jobBoardId } },
-		select: { id: true, status: true }
-	})
 
-	if (input.posted) {
-		await db.jobPostingChannel.upsert({
+	// One transaction: a failed audit write must not leave the channel change standing unrecorded.
+	// The existing-row read sits inside it too — both branches decide what to write from it.
+	await db.$transaction(async (tx) => {
+		const existing = await tx.jobPostingChannel.findUnique({
 			where: { jobPostingId_jobBoardId: { jobPostingId, jobBoardId } },
-			create: {
-				jobPostingId,
-				jobBoardId,
-				status: 'POSTED',
-				url: cleanUrl,
-				postedAt: new Date(),
-				postedById: ctx.actorId
-			},
-			update: {
-				status: 'POSTED',
-				url: cleanUrl,
-				takenDownAt: null,
-				postedById: ctx.actorId,
-				// Keep the original posted date when it was already live (a mere URL edit);
-				// stamp a fresh one when (re)posting a new or taken-down board.
-				...(existing?.status === 'POSTED' ? {} : { postedAt: new Date() })
-			}
+			select: { id: true, status: true }
 		})
-	} else {
-		// Nothing to take down if it was never posted.
-		if (!existing) return
-		await db.jobPostingChannel.update({
-			where: { id: existing.id },
-			data: { status: 'TAKEN_DOWN', takenDownAt: new Date() }
-		})
-	}
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'JobPostingChannel',
-		entityId: `${jobPostingId}:${jobBoardId}`,
-		newValue: { posted: input.posted, url: cleanUrl }
+		if (input.posted) {
+			await tx.jobPostingChannel.upsert({
+				where: { jobPostingId_jobBoardId: { jobPostingId, jobBoardId } },
+				create: {
+					jobPostingId,
+					jobBoardId,
+					status: 'POSTED',
+					url: cleanUrl,
+					postedAt: new Date(),
+					postedById: ctx.actorId
+				},
+				update: {
+					status: 'POSTED',
+					url: cleanUrl,
+					takenDownAt: null,
+					postedById: ctx.actorId,
+					// Keep the original posted date when it was already live (a mere URL edit);
+					// stamp a fresh one when (re)posting a new or taken-down board.
+					...(existing?.status === 'POSTED' ? {} : { postedAt: new Date() })
+				}
+			})
+		} else {
+			// Nothing to take down if it was never posted.
+			if (!existing) return
+			await tx.jobPostingChannel.update({
+				where: { id: existing.id },
+				data: { status: 'TAKEN_DOWN', takenDownAt: new Date() }
+			})
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'JobPostingChannel',
+				entityId: `${jobPostingId}:${jobBoardId}`,
+				newValue: { posted: input.posted, url: cleanUrl }
+			},
+			tx
+		)
 	})
 }

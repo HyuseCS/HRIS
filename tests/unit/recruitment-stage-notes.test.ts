@@ -67,12 +67,17 @@ describe('advanceApplicant — stage-move notes', () => {
 	it('writes an audit entry for the stage move', async () => {
 		await advanceApplicant('app1', 'org1', 'REJECTED', 'Did not pass screening', CTX)
 
-		expect(writeAuditLog).toHaveBeenCalledWith(CTX, {
-			action: 'UPDATE',
-			entityType: 'Applicant',
-			entityId: 'app1',
-			newValue: { stage: 'REJECTED' }
-		})
+		// #5: the audit write shares the transaction that commits the stage move.
+		expect(writeAuditLog).toHaveBeenCalledWith(
+			CTX,
+			{
+				action: 'UPDATE',
+				entityType: 'Applicant',
+				entityId: 'app1',
+				newValue: { stage: 'REJECTED' }
+			},
+			txMock
+		)
 	})
 
 	it('404s for an applicant outside the organization', async () => {
