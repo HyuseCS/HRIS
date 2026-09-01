@@ -9,7 +9,10 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	const user = locals.user!
 	requireAnyCapability(user.roles, 'VIEW_TEAM')
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
 	const isAdmin = canAny(user.roles, 'ADMINISTER_HR_RECORDS')
 
 	// Date range from URL params, default to current week (Mon-Sun)
@@ -32,8 +35,11 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	// Get team members. A manager's team is everyone who reports to them as primary OR
 	// additional supervisor (#176); HR/Super Admin see the whole org.
 	let memberScope: { id?: { in: string[] } } = {}
-	if (!isAdmin && myEmployee) {
-		memberScope = { id: { in: await listReportIdsFor(myEmployee.id) } }
+	// #6: `{}` here means "no filter", which returns the whole org. A non-admin with no employee
+	// row in the ACTIVE org has no reports, so the answer is the empty list — never the
+	// unfiltered one. Same `[]`-not-`undefined` discipline as leave/+page.server.ts:38.
+	if (!isAdmin) {
+		memberScope = { id: { in: myEmployee ? await listReportIdsFor(myEmployee.id) : [] } }
 	}
 	const members = await db.employee.findMany({
 		where: {
