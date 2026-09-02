@@ -84,6 +84,42 @@ describe('custom same-month range — statutory proration', () => {
 		)
 	})
 
+	/**
+	 * AC13 — the ACCEPT path, and the only proration coverage the new math has on it.
+	 *
+	 * Every other case in this file is either same-month (#163's arithmetic, unchanged) or over the
+	 * cap and falling back to a flat 0.5. Without this one, nothing anywhere asserts that a SUMMED
+	 * cross-month fraction actually reaches statutory proration: `summedMonthShare` is unit-tested
+	 * in isolation and `periodShareOf` is unit-tested in isolation, but the hand-off into
+	 * `computeEmployeeResult` is exactly where a share could be recomputed, rounded or replaced by
+	 * the semi-monthly 0.5 without a single existing test noticing.
+	 *
+	 * 20 May → 5 Jun 2026 on an all-EVEN org: 12/31 + 5/30 = 0.55376, which is deliberately CLOSE
+	 * to 0.5 — a wrong 0.5 fallback would still look plausible in a spot check but fails these
+	 * assertions on every contribution.
+	 */
+	it('an accepted cross-month range prorates by the SUMMED fraction, not by 0.5', () => {
+		const crossShare = periodShareOf(d('2026-05-20'), d('2026-06-05'))
+		expect(crossShare).toBe(12 / 31 + 5 / 30)
+		// It is an accepted range — the cap is what makes this case reachable at all.
+		expect(customRangeError(d('2026-05-20'), d('2026-06-05'))).toBeNull()
+
+		const r = computeEmployeeResult(
+			comp,
+			att({ regularHours: 96 }),
+			{},
+			cfg({ periodShare: crossShare, periodKind: null })
+		)
+		expect(r.statutory.sssEe).toBeCloseTo(MONTHLY.sssEe * crossShare, 2)
+		expect(r.statutory.philhealthEe).toBeCloseTo(MONTHLY.philhealthEe * crossShare, 2)
+		expect(r.statutory.pagibigEe).toBeCloseTo(MONTHLY.pagibigEe * crossShare, 2)
+		expect(r.statutory.withholdingTax).toBeCloseTo(MONTHLY.withholdingTax * crossShare, 2)
+
+		// And it is NOT the semi-monthly half. 0.55376 vs 0.5 is a 7.5% difference on every
+		// contribution — small enough to pass a careless eyeball, large enough to be real money.
+		expect(r.statutory.sssEe).not.toBeCloseTo(MONTHLY.sssEe * 0.5, 2)
+	})
+
 	// A 45-day range cannot reach the engine at all. #3 lets a range cross a month boundary, but
 	// the SIZE cap still refuses this one — 31/31 + 14/30 = 1.4667 — rather than letting a >100%
 	// share exist. The mechanism changed; the intent did not.
