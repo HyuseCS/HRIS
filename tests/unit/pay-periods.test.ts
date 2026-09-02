@@ -4,7 +4,7 @@ import {
 	describePeriod,
 	isValidStandardPeriod,
 	periodShareOf,
-	isSameMonthRange,
+	monthsTouched,
 	summedMonthShare,
 	customRangeError,
 	monthYearLabel,
@@ -88,8 +88,9 @@ describe('isValidStandardPeriod', () => {
 		}
 	})
 	// #163: these ranges are no longer *rejected* — a custom same-month range is now a legal
-	// period. `isValidStandardPeriod` keeps its old answer because it only ever CLASSIFIES the
-	// three standard shapes; the accept/reject decision moved to `isSameMonthRange`.
+	// period, and #3 made a cross-month one legal too. `isValidStandardPeriod` keeps its old
+	// answer because it only ever CLASSIFIES the three standard shapes; the accept/reject
+	// decision lives in `customRangeError`.
 	it('classifies arbitrary / off-cycle ranges as non-standard', () => {
 		expect(isValidStandardPeriod(utc(2026, 5, 13), utc(2026, 5, 21))).toBe(false) // mid-month week
 		expect(isValidStandardPeriod(utc(2026, 5, 1), utc(2026, 5, 14))).toBe(false) // 1–14
@@ -102,27 +103,39 @@ describe('isValidStandardPeriod', () => {
 	})
 })
 
-describe('isSameMonthRange (#163 custom-period sanity gate)', () => {
-	it('accepts a same-month range', () => {
-		expect(isSameMonthRange(utc(2026, 5, 13), utc(2026, 5, 21))).toBe(true)
+/**
+ * #3 deleted `isSameMonthRange`, and this describe is where two of its cases moved. They were
+ * never really about the same-month RULE — they were about calendar reasoning that the walker
+ * replacing it has to get right too.
+ *
+ * The one that matters is same month NUMBER, different YEAR. `isSameMonthRange` compared the year
+ * as well as the month, and got it right. A walker that steps months while comparing only `month0`
+ * would stop at the first May and report one month, or never terminate. Nothing else in this file
+ * would notice: the share would come out at 1/31 instead of 12.03, i.e. an accept instead of a
+ * refusal, on a range twelve months long.
+ */
+describe('monthsTouched', () => {
+	it('walks a single day as exactly one month', () => {
+		expect(monthsTouched(utc(2026, 5, 13), utc(2026, 5, 13))).toEqual([{ year: 2026, month0: 4 }])
 	})
-	it('accepts a single day', () => {
-		expect(isSameMonthRange(utc(2026, 5, 13), utc(2026, 5, 13))).toBe(true)
+
+	it('walks a two-month range as both months, in order', () => {
+		expect(monthsTouched(utc(2026, 5, 1), utc(2026, 6, 15))).toEqual([
+			{ year: 2026, month0: 4 },
+			{ year: 2026, month0: 5 }
+		])
 	})
-	it('rejects a reversed range', () => {
-		expect(isSameMonthRange(utc(2026, 5, 21), utc(2026, 5, 13))).toBe(false)
+
+	// The re-homed trap: 1 May 2026 → 1 May 2027 is the SAME month number a year apart.
+	it('crosses a year boundary rather than stopping at the matching month number', () => {
+		const months = monthsTouched(utc(2026, 5, 1), utc(2027, 5, 1))
+		expect(months).toHaveLength(13)
+		expect(months[0]).toEqual({ year: 2026, month0: 4 })
+		expect(months[12]).toEqual({ year: 2027, month0: 4 })
 	})
-	it('rejects a cross-month range', () => {
-		expect(isSameMonthRange(utc(2026, 5, 1), utc(2026, 6, 15))).toBe(false)
-	})
-	it('rejects the same day-of-month in a different year', () => {
-		expect(isSameMonthRange(utc(2026, 5, 1), utc(2027, 5, 1))).toBe(false)
-	})
-	it('accepts the three standard shapes', () => {
-		for (const kind of ['FIRST_HALF', 'SECOND_HALF', 'WHOLE_MONTH'] as const) {
-			const { periodStart, periodEnd } = periodOf(kind, 2026, 4)
-			expect(isSameMonthRange(periodStart, periodEnd)).toBe(true)
-		}
+
+	it('is empty for a reversed range', () => {
+		expect(monthsTouched(utc(2026, 5, 21), utc(2026, 5, 13))).toEqual([])
 	})
 })
 
@@ -368,6 +381,10 @@ describe('customRangeError', () => {
 		}
 		expect(customRangeError(utc(2026, 5, 20), utc(2026, 6, 5))).toBeNull()
 		expect(customRangeError(utc(2026, 12, 26), utc(2027, 1, 25))).toBeNull() // exactly the cap
+		// Re-homed from the deleted `isSameMonthRange` describe: a custom same-month range and a
+		// single day are both still legal, and the accept decision now lives here.
+		expect(customRangeError(utc(2026, 5, 13), utc(2026, 5, 21))).toBeNull()
+		expect(customRangeError(utc(2026, 5, 13), utc(2026, 5, 13))).toBeNull()
 	})
 
 	// The reversed check runs FIRST: a reversed range has a share of 0 and would otherwise fall
@@ -383,6 +400,11 @@ describe('customRangeError', () => {
 		expect(customRangeError(utc(2026, 2, 1), utc(2026, 3, 3))).toBe(CAP_MESSAGE_110)
 		expect(customRangeError(utc(2026, 1, 31), utc(2026, 3, 1))).toBe(
 			'A custom period cannot cover more than one month of pay. This range covers 106% of a month. Shorten it.'
+		)
+		// Re-homed: `isSameMonthRange` refused 1 May 2026 → 1 May 2027 for being a different YEAR.
+		// It is still refused, now for being twelve months of pay.
+		expect(customRangeError(utc(2026, 5, 1), utc(2027, 5, 1))).toBe(
+			'A custom period cannot cover more than one month of pay. This range covers 1203% of a month. Shorten it.'
 		)
 	})
 })

@@ -119,23 +119,6 @@ export function isValidStandardPeriod(start: Date, end: Date): boolean {
 }
 
 /**
- * True when (start, end) is a usable custom period (#163): the end is on or after the start,
- * and both fall in the same calendar month. Cross-month ranges are out of scope for v1 —
- * statutory contributions are monthly, so a range spanning two months has no single basis.
- * This is the single sanity gate shared by createPayrollRun, openPeriod, createTimesheet and
- * the PeriodPicker's inline validation, so the client and server rules can never diverge.
- */
-export function isSameMonthRange(start: Date, end: Date): boolean {
-	const s = utcMidnight(start)
-	const e = utcMidnight(end)
-	return (
-		e.getTime() >= s.getTime() &&
-		e.getUTCFullYear() === s.getUTCFullYear() &&
-		e.getUTCMonth() === s.getUTCMonth()
-	)
-}
-
-/**
  * Every calendar month the inclusive range touches, in order. Empty for a reversed range.
  * One walker, two consumers (`summedMonthShare` and the cutoff guard) — month arithmetic
  * written twice is month arithmetic that drifts once.

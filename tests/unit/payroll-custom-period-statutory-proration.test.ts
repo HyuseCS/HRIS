@@ -8,7 +8,7 @@ import {
 	type EmployeeComp,
 	type AttendanceInput
 } from '$lib/server/services/payroll/types'
-import { periodShareOf, isSameMonthRange } from '$lib/utils/pay-periods'
+import { periodShareOf, customRangeError } from '$lib/utils/pay-periods'
 
 /**
  * #163 criteria 5 and 6 — a custom range takes its DAY-COUNT slice of the monthly statutory
@@ -84,10 +84,15 @@ describe('custom same-month range — statutory proration', () => {
 		)
 	})
 
-	// A 45-day range cannot reach the engine at all: statutory is monthly, so the sanity gate
-	// refuses anything spanning two months rather than letting a >100% share exist.
-	it('a 45-day range is refused by the same-month gate, never prorated', () => {
-		expect(isSameMonthRange(d('2026-05-01'), d('2026-06-14'))).toBe(false)
+	// A 45-day range cannot reach the engine at all. #3 lets a range cross a month boundary, but
+	// the SIZE cap still refuses this one — 31/31 + 14/30 = 1.4667 — rather than letting a >100%
+	// share exist. The mechanism changed; the intent did not.
+	it('a 45-day range is refused by the size cap, never prorated', () => {
+		expect(customRangeError(d('2026-05-01'), d('2026-06-14'))).toBe(
+			'A custom period cannot cover more than one month of pay. This range covers 147% of a month. Shorten it.'
+		)
+		// And if such a row somehow already exists, `periodShareOf` keeps its historical flat half
+		// (D6) rather than being clamped up to a full month's pay.
 		expect(periodShareOf(d('2026-05-01'), d('2026-06-14'))).toBe(0.5)
 	})
 })
