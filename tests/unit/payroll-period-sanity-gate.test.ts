@@ -56,7 +56,6 @@ const ctx = { organizationId: ORG, actorId: 'u1', actorRoles: ['SUPER_ADMIN'] as
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`)
 
 const REVERSED = 'End date must be on or after the start date.'
-const CROSS_MONTH = 'A custom period must start and end in the same month.'
 // #3: the whole string, so a copy drift fails here rather than in a browser. 1 Feb → 3 Mar 2026 is
 // 28/28 + 3/31 = 1.0968, which rounds to 110%.
 const OVER_CAP_110 =
@@ -185,7 +184,7 @@ describe('openPeriod — size-cap sanity gate', () => {
 	})
 })
 
-describe('createTimesheet — same-month sanity gate', () => {
+describe('createTimesheet — size-cap sanity gate', () => {
 	it('refuses a reversed range with the exact copy, before any write', async () => {
 		await expect(timesheet('2026-05-21', '2026-05-13')).rejects.toMatchObject({
 			status: 400,
@@ -193,10 +192,20 @@ describe('createTimesheet — same-month sanity gate', () => {
 		})
 		expect(dbMock.timesheet.create).not.toHaveBeenCalled()
 	})
-	it('refuses a cross-month range with the exact copy, before any write', async () => {
-		await expect(timesheet('2026-05-20', '2026-06-05')).rejects.toMatchObject({
+	it('accepts a cross-month range under the cap (20 May → 5 Jun 2026, 12/31 + 5/30)', async () => {
+		await timesheet('2026-05-20', '2026-06-05')
+		expect(dbMock.timesheet.create).toHaveBeenCalledTimes(1)
+	})
+	it('accepts a cross-month range summing to exactly 1 (26 Dec 2025 → 25 Jan 2026)', async () => {
+		await timesheet('2025-12-26', '2026-01-25')
+		expect(dbMock.timesheet.create).toHaveBeenCalledTimes(1)
+	})
+	it('refuses an over-cap range with the exact size-cap copy, before any write', async () => {
+		// 1 Feb → 3 Mar 2026 is only 31 days long but sums to 28/28 + 3/31 = 1.0968 — the cap is on
+		// the fraction, not on a day count.
+		await expect(timesheet('2026-02-01', '2026-03-03')).rejects.toMatchObject({
 			status: 400,
-			body: { message: CROSS_MONTH }
+			body: { message: OVER_CAP_110 }
 		})
 		expect(dbMock.timesheet.create).not.toHaveBeenCalled()
 	})

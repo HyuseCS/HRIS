@@ -182,21 +182,44 @@ describe('updateTimesheetEntries — owner sync path', () => {
 	})
 })
 
-// #163 replaced the standard-shape gate (#129) with a same-month sanity gate: a mid-month week
-// is now a legal custom period, and only a cross-month or reversed range is refused.
-describe('createTimesheet — same-month period gate (#163)', () => {
+// #163 replaced the standard-shape gate (#129) with a same-month sanity gate; #3 then replaced the
+// same-month rule with a SIZE cap. A mid-month week and a cross-month range are both legal custom
+// periods now, and only a reversed range or one covering more than a month of pay is refused.
+describe('createTimesheet — size-cap period gate (#3)', () => {
 	const may = periodOf('FIRST_HALF', 2026, 4) // 2026-05-01 … 2026-05-15
 
-	it('rejects a cross-month period before touching the DB', async () => {
+	it('creates a cross-month period under the cap (19/31 + 2/30 = 0.6796)', async () => {
+		dbMock.timesheet.findMany.mockResolvedValue([])
+		dbMock.timesheet.findUnique.mockResolvedValue(null)
+		dbMock.timesheet.create.mockResolvedValue({ id: 'ts-cross', entries: [] })
+		await createTimesheet(
+			'emp-owner',
+			new Date('2026-05-13'),
+			new Date('2026-06-02'),
+			[],
+			ctx('HR_ADMIN')
+		)
+		expect(dbMock.timesheet.create).toHaveBeenCalledTimes(1)
+	})
+
+	it('rejects an over-cap period before touching the DB', async () => {
+		// The no-DB-call rail the cross-month case used to carry: the refusal is at the service
+		// entry point, ahead of the transaction, so nothing is read and nothing is written.
 		await expect(
 			createTimesheet(
 				'emp-owner',
-				new Date('2026-05-13'),
-				new Date('2026-06-02'),
+				new Date('2026-02-01'),
+				new Date('2026-03-03'),
 				[],
 				ctx('HR_ADMIN')
 			)
-		).rejects.toMatchObject({ status: 400 })
+		).rejects.toMatchObject({
+			status: 400,
+			body: {
+				message:
+					'A custom period cannot cover more than one month of pay. This range covers 110% of a month. Shorten it.'
+			}
+		})
 		expect(dbMock.timesheet.findMany).not.toHaveBeenCalled()
 		expect(dbMock.timesheet.findUnique).not.toHaveBeenCalled()
 		expect(dbMock.timesheet.create).not.toHaveBeenCalled()

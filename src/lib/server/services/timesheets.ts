@@ -3,7 +3,7 @@ import { db } from '$lib/server/db'
 import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import {
-	isSameMonthRange,
+	customRangeError,
 	isValidStandardPeriod,
 	rangesOverlapInManila,
 	utcMidnight
@@ -152,13 +152,12 @@ export async function createTimesheet(
 	entries: TimesheetEntryInput[],
 	ctx: AuditContext
 ) {
-	// #163: any same-month range is a legal timesheet period; the shape gate is gone.
-	if (utcMidnight(periodEnd) < utcMidnight(periodStart)) {
-		error(400, 'End date must be on or after the start date.')
-	}
-	if (!isSameMonthRange(periodStart, periodEnd)) {
-		error(400, 'A custom period must start and end in the same month.')
-	}
+	// #3: a timesheet period may now cross a calendar-month boundary; the same-month rule is
+	// replaced by a SIZE cap. The overlap guard below is Manila-day based and month-agnostic, so it
+	// needs no change. `createTimesheetFromAttendance` has no gate of its own and inherits this one.
+	// See createPayrollRun.
+	const invalid = customRangeError(periodStart, periodEnd)
+	if (invalid) error(400, invalid)
 
 	// #163: payroll sums an employee's timesheets by containment, so two overlapping sheets
 	// double-count the shared days' hours. Scoped to the employee, not the org. Fires only when at
