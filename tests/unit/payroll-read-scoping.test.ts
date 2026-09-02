@@ -26,7 +26,7 @@ const { dbMock, listReportIdsFor, listLoans, listCashAdvances, previewPayroll } 
 		listCashAdvances: vi.fn(),
 		previewPayroll: vi.fn(),
 		dbMock: {
-			employee: { findUnique: vi.fn(), findMany: vi.fn() },
+			employee: { findFirst: vi.fn(), findMany: vi.fn() },
 			branch: { findMany: vi.fn() },
 			payrollConfig: { findUnique: vi.fn() },
 			employeeEarning: { groupBy: vi.fn() }
@@ -102,7 +102,7 @@ const PREVIEW = { grossPay: 30000, netPay: 25000 }
 beforeEach(() => {
 	vi.clearAllMocks()
 	// The actor's own record, plus a reporting line that does NOT contain the stranger.
-	dbMock.employee.findUnique.mockResolvedValue({ id: SELF })
+	dbMock.employee.findFirst.mockResolvedValue({ id: SELF })
 	listReportIdsFor.mockResolvedValue([REPORT])
 	dbMock.branch.findMany.mockResolvedValue([])
 	// Two different reads land on `employee.findMany`: `listVisibleEmployeeIds` closes with an
@@ -162,7 +162,7 @@ describe('GET /api/v1/payroll/loans', () => {
 	// The role that exists to administer pay has no reporting line at all — scoping it would deny
 	// every employee.
 	it('leaves a PAYROLL_OFFICER with no employee record unrestricted', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		const res = await loansRoute(getEvent(['PAYROLL_OFFICER'], STRANGER))
 		expect(res.status).toBe(200)
 		expect(listLoans).toHaveBeenCalledWith(STRANGER, ORG)
@@ -173,7 +173,7 @@ describe('GET /api/v1/payroll/loans', () => {
 	it('refuses FINANCE alone at the guard, before any scoping', async () => {
 		const res = await loansRoute(getEvent(['FINANCE'], STRANGER))
 		expect(res.status).toBe(403)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 		expect(listLoans).not.toHaveBeenCalled()
 	})
 
@@ -187,7 +187,7 @@ describe('GET /api/v1/payroll/loans', () => {
 	it('still 400s a missing employeeId without resolving the allow-list', async () => {
 		const res = await loansRoute(getEvent(['MANAGER']))
 		expect(res.status).toBe(400)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 })
 
@@ -217,7 +217,7 @@ describe('GET /api/v1/payroll/cash-advances', () => {
 	})
 
 	it('leaves a PAYROLL_OFFICER with no employee record unrestricted', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		const res = await cashAdvancesRoute(getEvent(['PAYROLL_OFFICER'], STRANGER))
 		expect(res.status).toBe(200)
 		expect(listCashAdvances).toHaveBeenCalledWith(STRANGER, ORG)
@@ -226,7 +226,7 @@ describe('GET /api/v1/payroll/cash-advances', () => {
 	it('refuses FINANCE alone at the guard, before any scoping', async () => {
 		const res = await cashAdvancesRoute(getEvent(['FINANCE'], STRANGER))
 		expect(res.status).toBe(403)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 		expect(listCashAdvances).not.toHaveBeenCalled()
 	})
 
@@ -239,7 +239,7 @@ describe('GET /api/v1/payroll/cash-advances', () => {
 	it('still 400s a missing employeeId without resolving the allow-list', async () => {
 		const res = await cashAdvancesRoute(getEvent(['MANAGER']))
 		expect(res.status).toBe(400)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 })
 
@@ -272,7 +272,7 @@ describe('POST /api/v1/payroll/calculator', () => {
 	})
 
 	it('leaves a PAYROLL_OFFICER with no employee record unrestricted', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		const res = await calculatorRoute(postEvent(['PAYROLL_OFFICER'], body(STRANGER)))
 		expect(res.status).toBe(200)
 		expect(previewPayroll.mock.calls[0][0]).toBe(STRANGER)
@@ -281,7 +281,7 @@ describe('POST /api/v1/payroll/calculator', () => {
 	it('refuses FINANCE alone at the guard, before any scoping', async () => {
 		const res = await calculatorRoute(postEvent(['FINANCE'], body(STRANGER)))
 		expect(res.status).toBe(403)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 		expect(previewPayroll).not.toHaveBeenCalled()
 	})
 
@@ -294,7 +294,7 @@ describe('POST /api/v1/payroll/calculator', () => {
 	it('still 400s an invalid body without resolving the allow-list', async () => {
 		const res = await calculatorRoute(postEvent(['MANAGER'], { employeeId: '' }))
 		expect(res.status).toBe(400)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 })
 

@@ -33,7 +33,7 @@ const { dbMock, txMock, notify, applyApprovedRequest } = vi.hoisted(() => {
 		dbMock: {
 			request: { findFirst: vi.fn() },
 			timesheet: { findFirst: vi.fn() },
-			employee: { findUnique: vi.fn() },
+			employee: { findFirst: vi.fn() },
 			$transaction: vi.fn(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
 		}
 	}
@@ -72,7 +72,7 @@ const chain = (openStage: 'VERIFY' | 'APPROVE') => [
 beforeEach(() => {
 	vi.clearAllMocks()
 	// The actor is somebody other than the owner, so separation of duties never decides these.
-	dbMock.employee.findUnique.mockResolvedValue({ id: ACTOR_EMP })
+	dbMock.employee.findFirst.mockResolvedValue({ id: ACTOR_EMP })
 	dbMock.timesheet.findFirst.mockResolvedValue({
 		id: 'ts1',
 		employeeId: OWNER_EMP,

@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
-		employee: { findUnique: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		performanceReview: { findMany: vi.fn() }
 	}
 }))
@@ -87,7 +87,7 @@ function callGet() {
 describe('GET /api/v1/performance/reviews redaction (#178 AC8)', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp1' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp1' })
 		dbMock.performanceReview.findMany.mockImplementation(
 			async ({ where }: { where: { employeeId?: string; reviewerId?: string } }) =>
 				where.employeeId ? [SUBJECT_REVIEW] : [REVIEWER_REVIEW]
@@ -131,7 +131,7 @@ describe('GET /api/v1/performance/reviews redaction (#178 AC8)', () => {
 	})
 
 	it('returns empty arms when the user has no employee record', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		const body = await (await callGet()).json()
 		expect(body).toEqual({ asSubject: [], asReviewer: [] })
 	})

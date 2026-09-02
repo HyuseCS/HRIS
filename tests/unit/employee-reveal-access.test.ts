@@ -18,19 +18,15 @@ import type { Role } from '@prisma/client'
  * whole historical salary trail", which is why the wrapper gets a test now.
  */
 
-const {
-	employeeFindUnique,
-	assertCanTouchEmployee,
-	revealEmployeeSensitive,
-	getEmploymentHistory
-} = vi.hoisted(() => ({
-	employeeFindUnique: vi.fn(),
-	assertCanTouchEmployee: vi.fn(),
-	revealEmployeeSensitive: vi.fn(),
-	getEmploymentHistory: vi.fn()
-}))
+const { employeeFindFirst, assertCanTouchEmployee, revealEmployeeSensitive, getEmploymentHistory } =
+	vi.hoisted(() => ({
+		employeeFindFirst: vi.fn(),
+		assertCanTouchEmployee: vi.fn(),
+		revealEmployeeSensitive: vi.fn(),
+		getEmploymentHistory: vi.fn()
+	}))
 
-vi.mock('$lib/server/db', () => ({ db: { employee: { findUnique: employeeFindUnique } } }))
+vi.mock('$lib/server/db', () => ({ db: { employee: { findFirst: employeeFindFirst } } }))
 vi.mock('$lib/server/services/employee-access', () => ({ assertCanTouchEmployee }))
 vi.mock('$lib/server/services/employees', () => ({
 	revealEmployeeSensitive,
@@ -58,7 +54,9 @@ const revealEvent = (roles: Role[], employeeId: string) =>
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	employeeFindUnique.mockResolvedValue({ id: 'emp-self' })
+	// #6 made the self lookup at the top of `reveal` a `findFirst` keyed by `userId`; there is
+	// no other `employee.findFirst` call on this route, so a plain resolved value covers it.
+	employeeFindFirst.mockResolvedValue({ id: 'emp-self' })
 	assertCanTouchEmployee.mockResolvedValue(undefined)
 	revealEmployeeSensitive.mockResolvedValue({ basicMonthlySalary: 25000 })
 	getEmploymentHistory.mockResolvedValue([])

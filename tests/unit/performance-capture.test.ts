@@ -39,7 +39,7 @@ const { dbMock, txMock, writeAuditLog } = vi.hoisted(() => {
 		txMock,
 		dbMock: {
 			performanceReview: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-			employee: { findUnique: vi.fn() },
+			employee: { findFirst: vi.fn() },
 			$transaction: vi.fn(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
 		},
 		writeAuditLog: vi.fn()
@@ -147,7 +147,7 @@ async function submit(answersField: string) {
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
-	dbMock.employee.findUnique.mockResolvedValue({ id: REVIEWER })
+	dbMock.employee.findFirst.mockResolvedValue({ id: REVIEWER })
 	dbMock.performanceReview.findFirst.mockResolvedValue({
 		id: REVIEW_ID,
 		status: 'PENDING',
@@ -309,7 +309,7 @@ describe('what is stored is what is rendered back, read after read (AC4)', () =>
 			dbMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => unknown) =>
 				fn(txMock)
 			)
-			dbMock.employee.findUnique.mockResolvedValue({ id: REVIEWER })
+			dbMock.employee.findFirst.mockResolvedValue({ id: REVIEWER })
 			dbMock.performanceReview.findFirst.mockResolvedValue({
 				id: REVIEW_ID,
 				status: 'SCORED',

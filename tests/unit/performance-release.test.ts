@@ -20,14 +20,13 @@ import type { Role } from '@prisma/client'
 const { dbMock, txMock, writeAuditLog, notify } = vi.hoisted(() => {
 	const txMock = {
 		performanceReview: { findFirst: vi.fn(), update: vi.fn() },
-		employee: { findUnique: vi.fn() }
+		employee: { findFirst: vi.fn() }
 	}
 	return {
 		txMock,
 		writeAuditLog: vi.fn().mockResolvedValue(undefined),
 		notify: vi.fn().mockResolvedValue(undefined),
 		dbMock: {
-			employee: { findUnique: vi.fn() },
 			performanceReview: { findFirst: vi.fn(), update: vi.fn() },
 			$transaction: vi.fn(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
 		}
@@ -68,7 +67,7 @@ const UNRELEASED = {
 beforeEach(() => {
 	vi.clearAllMocks()
 	txMock.performanceReview.findFirst.mockResolvedValue(UNRELEASED)
-	txMock.employee.findUnique.mockResolvedValue({ id: HR_EMPLOYEE })
+	txMock.employee.findFirst.mockResolvedValue({ id: HR_EMPLOYEE })
 	txMock.performanceReview.update.mockImplementation(
 		async ({ data }: { data: { releasedAt: Date; releasedByEmployeeId: string | null } }) => ({
 			...UNRELEASED,
@@ -145,7 +144,7 @@ describe('releaseReview writes the release and its attribution', () => {
 	it('releases even when the HR actor has no employee record, leaving attribution null', async () => {
 		// The FK is ON DELETE SET NULL, so absent attribution is a state the schema allows. The
 		// audit row still names the actor. Refusing the release instead would strand the employee.
-		txMock.employee.findUnique.mockResolvedValue(null)
+		txMock.employee.findFirst.mockResolvedValue(null)
 		await release(['HR_ADMIN'])
 		expect(txMock.performanceReview.update.mock.calls[0][0].data.releasedByEmployeeId).toBeNull()
 	})
