@@ -5,9 +5,9 @@ date: 01-09-26
 issue: 6
 branch: fix/self-lookup-org-scoping-6
 complexity: MEDIUM
-status: EXECUTE COMPLETE except the live gate — C1-C6 (source) and C7-C9 (tests) are all built and
-  committed. Unit suite green at 188 files / 2126 tests. The Playwright org-switch gate is the ONLY
-  outstanding item; it needs the database and dev server running, which the owner starts.
+status: EXECUTE COMPLETE — C1-C6 (source), C7-C9 (tests) and the live Playwright gate are all done.
+  All four CI gates pass locally: format:check, lint (0 errors), check (0 errors), test (190 files /
+  2136 tests). The live gate passed with a negative control. Ready to push and merge.
 ---
 
 # PLAN — HRIS #6: scope employee self-lookups to the active org
@@ -383,6 +383,35 @@ self branch is never reached. Dead stub removed, reason recorded in the file.
 test. Now driven by a real set.
 
 ### The manual gate
+
+**RUN AND PASSED, live, 02-09-26**, driven through Playwright against the dev server as
+`ceo@veent.ph`. Result below; the steps it followed are unchanged and kept underneath.
+
+| Step | Org | Result |
+|---|---|---|
+| `/profile` | Veent | `EMP-900` — positive control established |
+| `/payslips` | Veent | 1 approved payslip, gross ₱75,000.00, net ₱55,823.38 |
+| `/payslips` | JoJo Potato | "No payslips yet", 0 rows, **no `₱` anywhere on the page** |
+| `/team` | JoJo Potato | "No team members found", 0 rows — none of JoJo's 6 employees |
+| `/payslips` + `/profile` | back on Veent | ₱75,000.00 and `EMP-900` again — control still holds |
+
+**The negative control is what makes this worth anything.** Reverting `/team` to the pre-#6 shape
+live and reloading showed the CEO **all six** JoJo employees by name — Head of Operations, Vera
+Verifier, Arno Approver, Carla Server, Dino Cashier, Benjie Fryer. The entire tenant roster, to a
+non-admin with no record in it. Restoring the fix returned it to zero. So the empty roster is the
+fix working, not an empty database.
+
+**Two preconditions the plan assumed and got wrong.**
+
+1. **The CEO is NOT an admin on `/team`.** `ADMINISTER_HR_RECORDS` is `['HR_ADMIN', 'SUPER_ADMIN']`
+   only. That makes the CEO exactly the non-admin `VIEW_TEAM` holder this defect targets — better
+   for the test than assumed, but it also means `/team` on **Veent** is legitimately empty, because
+   `EMP-900` has zero direct reports and zero additional supervisees. So Veent is **not** a usable
+   positive control for `/team`; an empty JoJo roster would have looked identical to an empty Veent
+   one and proved nothing. The all-six negative control replaces it.
+2. `/payslips` needed no such help — the CEO has real payroll entries in Veent, so the
+   before/after/after-again cycle on that page is self-controlling.
+
 
 `tests/e2e/tenancy-switch.spec.ts` already drives the CEO's org switch and `USERS.ceo` is seeded.
 The precondition #6 needs is exactly the CEO plus `EMP-900`.
