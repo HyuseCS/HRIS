@@ -19,8 +19,8 @@ import { emptyAttendance, round2, type ComputeSegment, type EmployeeComp } from 
 import { buildAttendanceInput, buildSegmentAttendance } from '../attendance/input'
 import { computeWorkingDays, manilaDayKey } from '$lib/utils/dates'
 import {
+	customRangeError,
 	describePeriod,
-	isSameMonthRange,
 	isValidStandardPeriod,
 	monthYearLabel,
 	monthsTouched,
@@ -247,15 +247,15 @@ export async function createPayrollRun(
 	periodEnd: Date,
 	ctx: AuditContext
 ) {
-	// #163: any same-month range is a legal period; the shape gate is gone. These two checks are
-	// what stops a reversed range (a negative day count would produce negative deductions) and a
-	// cross-month one (statutory is monthly, so a two-month span has no single basis).
-	if (utcMidnight(periodEnd) < utcMidnight(periodStart)) {
-		error(400, 'End date must be on or after the start date.')
-	}
-	if (!isSameMonthRange(periodStart, periodEnd)) {
-		error(400, 'A custom period must start and end in the same month.')
-	}
+	// #3: a range may now cross a calendar-month boundary; the same-month rule is replaced by a
+	// SIZE cap. `customRangeError` stops a reversed range (a negative day count would produce
+	// negative deductions) and a range whose summed month slices exceed one month of pay (nothing
+	// downstream clamps `periodShare` — `earnings.ts` multiplies basic pay by it raw). It is a
+	// positive restriction: only a range it accepts proceeds. It runs before the transaction, so a
+	// refusal writes nothing at all — not even an audit row. The same function backs the
+	// PeriodPicker's inline message, so the browser copy and this 400 body cannot drift apart.
+	const invalid = customRangeError(periodStart, periodEnd)
+	if (invalid) error(400, invalid)
 
 	// One transaction, under the org-month advisory lock: check-then-act is otherwise exactly what
 	// this is. Two concurrent requests for DIFFERENT but overlapping custom ranges both read an

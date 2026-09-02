@@ -57,6 +57,10 @@ const d = (iso: string) => new Date(`${iso}T00:00:00Z`)
 
 const REVERSED = 'End date must be on or after the start date.'
 const CROSS_MONTH = 'A custom period must start and end in the same month.'
+// #3: the whole string, so a copy drift fails here rather than in a browser. 1 Feb → 3 Mar 2026 is
+// 28/28 + 3/31 = 1.0968, which rounds to 110%.
+const OVER_CAP_110 =
+	'A custom period cannot cover more than one month of pay. This range covers 110% of a month. Shorten it.'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -103,7 +107,7 @@ const period = (start: string, end: string) =>
 	openPeriod(ORG, { name: 'P', startDate: d(start), endDate: d(end) }, ctx)
 const timesheet = (start: string, end: string) => createTimesheet('emp1', d(start), d(end), [], ctx)
 
-describe('createPayrollRun — same-month sanity gate', () => {
+describe('createPayrollRun — size-cap sanity gate', () => {
 	it('refuses a reversed range with the exact copy, before any write', async () => {
 		await expect(run('2026-05-21', '2026-05-13')).rejects.toMatchObject({
 			status: 400,
@@ -111,10 +115,20 @@ describe('createPayrollRun — same-month sanity gate', () => {
 		})
 		expect(dbMock.payrollRun.create).not.toHaveBeenCalled()
 	})
-	it('refuses a cross-month range with the exact copy, before any write', async () => {
-		await expect(run('2026-05-20', '2026-06-05')).rejects.toMatchObject({
+	it('accepts a cross-month range under the cap (20 May → 5 Jun 2026, 12/31 + 5/30)', async () => {
+		await run('2026-05-20', '2026-06-05')
+		expect(dbMock.payrollRun.create).toHaveBeenCalledTimes(1)
+	})
+	it('accepts a cross-month range summing to exactly 1 (26 Dec 2025 → 25 Jan 2026)', async () => {
+		await run('2025-12-26', '2026-01-25')
+		expect(dbMock.payrollRun.create).toHaveBeenCalledTimes(1)
+	})
+	it('refuses an over-cap range with the exact size-cap copy, before any write', async () => {
+		// 1 Feb → 3 Mar 2026 is only 31 days long but sums to 28/28 + 3/31 = 1.0968 — which is why
+		// the cap is on the fraction and not on a day count.
+		await expect(run('2026-02-01', '2026-03-03')).rejects.toMatchObject({
 			status: 400,
-			body: { message: CROSS_MONTH }
+			body: { message: OVER_CAP_110 }
 		})
 		expect(dbMock.payrollRun.create).not.toHaveBeenCalled()
 	})
