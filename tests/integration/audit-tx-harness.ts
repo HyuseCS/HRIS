@@ -113,6 +113,10 @@ export async function createOrgFixture() {
  * `Department`, and `Department` references `Organization` — all without cascade — so the
  * attendance fixtures unwind innermost-first, and Employee must go before User.
  *
+ * `PayrollRun` also references `Organization` without cascade, and `PayrollEntry` and
+ * `ApprovalStep` reference `PayrollRun`. Added for the run-serialisation suite: without this the
+ * org delete throws and every fixture from that file accumulates silently.
+ *
  * Sweeping by MARKER (not by the ids of this run) also clears rows stranded by a crashed
  * earlier run, so the database is left as it was found.
  */
@@ -133,6 +137,17 @@ export async function cleanupFixtures() {
 		await verifyDb.attendanceDay.deleteMany({ where: { employeeId } })
 		await verifyDb.timeLog.deleteMany({ where: { employeeId } })
 		await verifyDb.employee.deleteMany({ where: { id: employeeId } })
+	}
+
+	const runs = await verifyDb.payrollRun.findMany({
+		where: { organizationId },
+		select: { id: true }
+	})
+	if (runs.length > 0) {
+		const payrollRunId = { in: runs.map((r) => r.id) }
+		await verifyDb.approvalStep.deleteMany({ where: { payrollRunId } })
+		await verifyDb.payrollEntry.deleteMany({ where: { payrollRunId } })
+		await verifyDb.payrollRun.deleteMany({ where: { id: payrollRunId } })
 	}
 
 	await verifyDb.auditLog.deleteMany({ where: { organizationId } })

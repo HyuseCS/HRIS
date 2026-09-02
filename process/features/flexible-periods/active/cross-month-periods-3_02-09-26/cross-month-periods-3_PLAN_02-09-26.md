@@ -1009,6 +1009,13 @@ Verbatim from the SPEC, in order. Item 1 first, because it is a measurement nobo
       `git checkout <file>`** — it silently reverts every uncommitted change in that file.
    e. Re-run `pnpm test:integration` and confirm GREEN again.
    f. Record in the phase report: green → red → green, with the exact failure message from step c.
+   g. **Coverage boundary, read before signing this off.** The committed test races
+      `createPayrollRun` only, so steps a–f prove `payrollRunLockKey` and nothing else. C7 changed
+      **both** keys, and `timesheetLockKey` has no automated proof that it serialises anything —
+      the unit tier asserts its string and its arity, and `$executeRaw` is mocked everywhere it is
+      called. Racing two overlapping timesheets needs an Employee fixture the audit-tx harness does
+      not build for this file. Treat the timesheet lock as UNPROVEN at this gate and decide with the
+      owner whether to add the fixture now or carry it as a named residual.
 
 The user starts the servers and the DB container — never launch `./start.sh`, vite or
 `veent-db-5434` unasked. Driving an already-running app is fine.
