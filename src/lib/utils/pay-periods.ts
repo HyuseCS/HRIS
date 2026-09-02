@@ -136,29 +136,104 @@ export function isSameMonthRange(start: Date, end: Date): boolean {
 }
 
 /**
- * Fraction of a monthly figure that accrues in this period, for statutory proration (#129/#163).
+ * Every calendar month the inclusive range touches, in order. Empty for a reversed range.
+ * One walker, two consumers (`summedMonthShare` and the cutoff guard) — month arithmetic
+ * written twice is month arithmetic that drifts once.
+ */
+export function monthsTouched(start: Date, end: Date): { year: number; month0: number }[] {
+	const s = utcMidnight(start)
+	const e = utcMidnight(end)
+	if (e.getTime() < s.getTime()) return []
+	const last = firstDayOfMonth(e).getTime()
+	const out: { year: number; month0: number }[] = []
+	let cursor = firstDayOfMonth(s)
+	while (cursor.getTime() <= last) {
+		out.push({ year: cursor.getUTCFullYear(), month0: cursor.getUTCMonth() })
+		cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))
+	}
+	return out
+}
+
+/**
+ * Sum, over every month the range touches, of that month's slice as a fraction of the month:
+ * inclusive days inside the month ÷ days in the month. `1 Feb → 3 Mar 2026` is 28/28 + 3/31.
+ *
+ * NON-THROWING by contract, and `0` for a reversed range — the picker calls it for display and
+ * `scripts/legacy-nonstandard-runs.ts` calls it for a read-only scan of stored rows.
+ *
+ * For a same-month range this is arithmetically identical to `periodDays ÷ daysInMonth`: one term,
+ * same numerator, same divisor. That identity is what keeps the #163 peso goldens still.
+ */
+export function summedMonthShare(start: Date, end: Date): number {
+	const s = utcMidnight(start)
+	const e = utcMidnight(end)
+	let acc = 0
+	for (const { year, month0 } of monthsTouched(s, e)) {
+		const eom = daysInMonth(year, month0)
+		const sliceStart = Math.max(s.getTime(), Date.UTC(year, month0, 1))
+		const sliceEnd = Math.min(e.getTime(), Date.UTC(year, month0, eom))
+		acc += periodDays(new Date(sliceStart), new Date(sliceEnd)) / eom
+	}
+	return acc
+}
+
+/**
+ * Fraction of a monthly figure that accrues in this period, for statutory proration (#129/#163/#3).
  *
  * The three standard shapes are FROZEN and must never move: WHOLE_MONTH carries the full month
  * (exactly 1) and FIRST_HALF / SECOND_HALF carry exactly 0.5, for every month length. There is no
  * single-formula simplification — May 1–15 is 15/31 = 0.4839 by day count, but the client's
- * semi-monthly cadence pays it as half a month.
+ * semi-monthly cadence pays it as half a month. Those three short-circuits stay physically ABOVE
+ * the day counting; do not reorder them and do not fold them into the sum.
  *
- * A custom same-month range (#163) prorates by inclusive day count ÷ days in the month.
+ * Anything else prorates by `summedMonthShare` — the summed month slices — so a custom range that
+ * crosses a calendar-month boundary (#3) carries the fraction it actually covers, not a flat half.
  *
- * Anything else is a legacy stored pair. `computePayroll` gates on status only, never on period
- * shape, so a legacy cross-month or reversed row still reaches this function on Recompute — day
- * counting one would yield >100% of a month, or a negative share. Those keep the historical flat
- * 0.5, and the day-count branch is clamped to (0, 1].
+ * The one-month CAP DOES NOT LIVE HERE. It lives at the three service gates (`createPayrollRun`,
+ * `openPeriod`, `createTimesheet`) via `customRangeError`, so an over-cap range is refused before
+ * anything is written. A NEW range therefore cannot reach this function above the cap.
+ *
+ * What can is a legacy stored pair: `computePayroll` gates on run status only, never on period
+ * shape, so a legacy cross-month or reversed row still arrives here on Recompute. Those keep the
+ * historical flat 0.5 — a reversed or zero share, and an over-cap one too. Over-cap rows are NOT
+ * clamped to 1: clamping would silently turn a stored 92-day row into a full month's pay, and
+ * `earnings.ts` multiplies basic pay by this share with no second clamp downstream. The result is
+ * therefore always in (0, 1], with no tolerance — see the exhaustive sweep in the unit tests.
  */
 export function periodShareOf(start: Date, end: Date): number {
 	const kind = describePeriod(start, end).kind
 	if (kind === 'WHOLE_MONTH') return 1
 	if (kind === 'FIRST_HALF' || kind === 'SECOND_HALF') return 0.5
-	if (!isSameMonthRange(start, end)) return 0.5
-	const s = utcMidnight(start)
-	const share = periodDays(s, end) / daysInMonth(s.getUTCFullYear(), s.getUTCMonth())
-	if (!(share > 0)) return 0.5
-	return Math.min(1, share)
+	const share = summedMonthShare(start, end)
+	if (!(share > 0)) return 0.5 // reversed / NaN — legacy rows only
+	if (share > 1) return 0.5 // an over-cap LEGACY row keeps its historical flat half-month
+	return share
+}
+
+/** e.g. "June 2026" — the month the cutoff refusal must name once two months are in play. */
+export function monthYearLabel(year: number, month0: number): string {
+	return `${MONTH_NAMES[month0]} ${year}`
+}
+
+/**
+ * The refusal for a custom range, or null when it is acceptable. NON-THROWING by contract: the
+ * PeriodPicker calls it for its inline message and cannot call SvelteKit's `error()`. The three
+ * service gates wrap it in `error(400, …)`. One function, so the browser copy and the 400 body are
+ * the same string by construction — before this, both strings were duplicated verbatim across four
+ * files with nothing checking they agreed.
+ *
+ * The cap is one month of pay and the comparison is the bare `share > 1` — no constant, no epsilon.
+ * A tolerance would only be needed if a legitimate range summed to exactly 1 in exact arithmetic but
+ * landed above 1 in IEEE-754. No such range exists: the slice-tuple space is finite and was
+ * enumerated exhaustively (69,876 tuples, 116 of them summing to exactly 1, all landing on float 1).
+ * That property is held by a test, not by this comment — see 'the cap needs no tolerance'.
+ */
+export function customRangeError(start: Date, end: Date): string | null {
+	if (utcMidnight(end) < utcMidnight(start)) return 'End date must be on or after the start date.'
+	const share = summedMonthShare(start, end)
+	if (share > 1)
+		return `A custom period cannot cover more than one month of pay. This range covers ${Math.round(share * 100)}% of a month. Shorten it.`
+	return null
 }
 
 /**
