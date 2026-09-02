@@ -14,7 +14,7 @@ import type { Role } from '@prisma/client'
 const { dbMock, listTeamDay, listAttendanceDays } = vi.hoisted(() => ({
 	listTeamDay: vi.fn(),
 	listAttendanceDays: vi.fn(),
-	dbMock: { employee: { findUnique: vi.fn(), findFirst: vi.fn() } }
+	dbMock: { employee: { findFirst: vi.fn() } }
 }))
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
@@ -70,8 +70,10 @@ beforeEach(() => {
 		dayRow,
 		{ ...dayRow, amTimeIn: null, amTimeOut: null, pmTimeIn: null, pmTimeOut: null }
 	])
+	// Every request here is HR_ADMIN, so `canManage` is always true and the route's self-lookup
+	// branch (line ~83) is never reached — only the target lookup below fires. No `where`-shape
+	// collision to guard against in this file; the mock stays a plain `mockResolvedValue`.
 	dbMock.employee.findFirst.mockResolvedValue({ employeeNumber: 'JJ-0001' })
-	dbMock.employee.findUnique.mockResolvedValue({ id: 'e1' })
 })
 
 describe('#162 — attendance CSV export columns (E2)', () => {

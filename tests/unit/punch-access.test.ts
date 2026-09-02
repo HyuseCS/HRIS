@@ -18,7 +18,7 @@ const { dbMock, listReportIdsFor, listPunches } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	listPunches: vi.fn(),
 	dbMock: {
-		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		branch: { findMany: vi.fn() }
 	}
 }))
@@ -46,23 +46,32 @@ const event = (roles: Role[], employeeId: string) =>
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	}) as any
 
+/** The actor's own employee row, or `null` for "no record in the active org". */
+let selfRow: { id: string } | null
+/** Which employee ids resolve at all when looked up by `id` and scoped to the org. */
+let targetsInOrg: Set<string>
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	listPunches.mockResolvedValue([])
 	listReportIdsFor.mockResolvedValue([])
 	dbMock.branch.findMany.mockResolvedValue([])
-	dbMock.employee.findUnique.mockResolvedValue({ id: SELF })
-	// Two different findFirst calls share one mock: the route resolves the target (`select: { id }`)
-	// and `canTouchEmployee` re-resolves it for the branch arm (`select: { branchId }`). Both now
-	// scope on the same `organizationId` column, so discriminate on the `select` — never on the
-	// where-shape, which is the thing under test — and not on call order.
-	dbMock.employee.findFirst.mockImplementation(({ where, select }) =>
-		Promise.resolve(
-			select?.branchId
-				? { branchId: branchOf[where.id] ?? null }
-				: { id: where.id, userId: `user-${where.id}`, reportsToId: null }
+	selfRow = { id: SELF }
+	targetsInOrg = new Set([SELF, REPORT, CREW, STRANGER])
+	// THREE calls share one mock now: the route's own target lookup (`where.id`, `select: { id }`),
+	// `canTouchEmployee`'s self lookup (`where.userId` — #6 made this a `findFirst` too, previously
+	// it discriminated on `select.branchId` alone, which left the self lookup falling into the
+	// `select.branchId`-absent branch keyed by `where.id` — undefined for a userId-keyed call, so
+	// `self.id` came back `undefined` and every fail-closed case went green for the wrong reason),
+	// and `canTouchEmployee`'s target lookup (`where.id`, `select: { branchId }`). Discriminate on
+	// `where.userId` first, then on `select.branchId` — never on call order.
+	dbMock.employee.findFirst.mockImplementation(({ where, select }) => {
+		if (where.userId) return Promise.resolve(selfRow)
+		if (!targetsInOrg.has(where.id)) return Promise.resolve(null)
+		return Promise.resolve(
+			select?.branchId ? { branchId: branchOf[where.id] ?? null } : { id: where.id }
 		)
-	)
+	})
 })
 
 describe('punch access is object-scoped, not rank-scoped (#282 §3-A)', () => {
@@ -96,14 +105,14 @@ describe('punch access is object-scoped, not rank-scoped (#282 §3-A)', () => {
 		const res = await GET(event(['HR_ADMIN'], STRANGER))
 		expect(res.status).toBe(200)
 		// Guards against the classic slip of swapping `canTouchEmployee` for a truthiness test on
-		// `listVisibleEmployeeIds`, whose `null` ("unrestricted") is falsy and would deny HR.
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		// `listVisibleEmployeeIds`, whose `null` ("unrestricted") is falsy and would deny HR. Only the
+		// route's own target lookup should fire — `canTouchEmployee` short-circuits on
+		// ADMINISTER_HR_ORGWIDE and never reaches its self lookup.
+		expect(dbMock.employee.findFirst).toHaveBeenCalledTimes(1)
 	})
 
 	it('still 404s an employee outside the caller’s organization', async () => {
-		dbMock.employee.findFirst.mockImplementation(({ where }) =>
-			Promise.resolve(where.user ? null : null)
-		)
+		targetsInOrg = new Set()
 		const res = await GET(event(['HR_ADMIN'], STRANGER))
 		expect(res.status).toBe(404)
 	})

@@ -31,7 +31,7 @@ const { dbMock, tx, listReportIdsFor } = vi.hoisted(() => ({
 	},
 	dbMock: {
 		$transaction: vi.fn(),
-		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		branch: { findMany: vi.fn() },
 		loan: { findFirst: vi.fn() },
 		cashAdvance: { findFirst: vi.fn() }
@@ -78,11 +78,15 @@ const PATCH_BODY = { installment: 999 }
 beforeEach(() => {
 	vi.clearAllMocks()
 	// The actor's own record, plus a reporting line that does NOT contain the target.
-	dbMock.employee.findUnique.mockResolvedValue({ id: SELF.id })
 	listReportIdsFor.mockResolvedValue([REPORT.id])
 	dbMock.branch.findMany.mockResolvedValue([])
-	// `requireEmployee` and `canTouchEmployee`'s closing org lookup both land here.
-	dbMock.employee.findFirst.mockResolvedValue(STRANGER)
+	// `requireEmployee` and `canTouchEmployee`'s closing org lookup both land on `where.id`; the
+	// self lookup (#6 made it a `findFirst` too) lands on `where.userId`. A plain `mockResolvedValue`
+	// would hand STRANGER to the self lookup, letting `self.id === employeeId` match by accident and
+	// admit a manager who was never on the actor's team.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? SELF : STRANGER)
+	)
 	dbMock.loan.findFirst.mockResolvedValue({ id: 'loan1', employeeId: STRANGER.id })
 	dbMock.cashAdvance.findFirst.mockResolvedValue({ id: 'ca1', employeeId: STRANGER.id })
 	tx.loan.create.mockResolvedValue({ id: 'loan-new' })

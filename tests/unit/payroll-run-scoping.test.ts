@@ -24,7 +24,7 @@ const { dbMock, tx, listReportIdsFor, writeAuditLog } = vi.hoisted(() => ({
 	},
 	dbMock: {
 		$transaction: vi.fn(),
-		employee: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+		employee: { findFirst: vi.fn(), findMany: vi.fn() },
 		branch: { findMany: vi.fn() },
 		payrollEntry: { findFirst: vi.fn(), update: vi.fn() },
 		payrollRun: { findFirst: vi.fn(), update: vi.fn() }
@@ -56,15 +56,27 @@ const ctxOf = (role: Role, roles?: Role[]) => ({
 	ipAddress: '127.0.0.1'
 })
 
+/** The actor's own employee row, or `null` for "no record in the active org". */
+let selfRow: { id: string } | null
+/** The closing target lookup's result, or `null` for "not in your org". */
+let targetRow: { branchId: string | null } | null
+
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue(SELF)
+	selfRow = SELF
+	targetRow = { branchId: null }
+	// #6 made `canTouchEmployee`'s self lookup a `findFirst` too, so ONE `vi.fn()` now serves both
+	// calls: the self lookup keyed by `userId` and the closing target lookup keyed by `id`. A plain
+	// `mockResolvedValue` would hand the target's row to the self lookup, leaving `self.id` undefined
+	// and turning every fail-closed case green for the wrong reason.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? selfRow : targetRow)
+	)
 	listReportIdsFor.mockResolvedValue([])
 	dbMock.branch.findMany.mockResolvedValue([])
 	dbMock.employee.findMany.mockImplementation(({ where }) =>
 		Promise.resolve((where.id?.in ?? []).map((id: string) => ({ id })))
 	)
-	dbMock.employee.findFirst.mockResolvedValue({ branchId: null })
 	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
@@ -86,7 +98,7 @@ describe('listVisiblePayEmployeeIds', () => {
 	 * emptying every run and report for them.
 	 */
 	it('never delegates to the roster helper for a PAYROLL_OFFICER', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		selfRow = null
 		expect(await listVisiblePayEmployeeIds(actor('PAYROLL_OFFICER'))).toBeNull()
 		expect(listReportIdsFor).not.toHaveBeenCalled()
 	})
@@ -142,7 +154,7 @@ describe('overridePayrollEntry — the write path', () => {
 	// The counterweight: the payroll specialists must keep working. A PAYROLL_OFFICER has no
 	// employee record, so a reporting-line-only guard would deny them every override.
 	it('leaves a PAYROLL_OFFICER unrestricted', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		selfRow = null
 		dbMock.payrollEntry.findFirst.mockResolvedValue(entryFor(STRANGER_EMP))
 		await overridePayrollEntry('entry1', 'org1', { netPay: 1 }, 'note', ctxOf('PAYROLL_OFFICER'))
 		expect(tx.payrollEntry.update).toHaveBeenCalled()
