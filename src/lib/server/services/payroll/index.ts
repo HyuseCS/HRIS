@@ -81,34 +81,38 @@ export async function buildComputeSegments(
 }
 
 /**
- * #163: the advisory-lock key serializing every writer of payroll runs for one org-month. Both
+ * #163: the advisory-lock key serializing every writer of payroll runs for one ORGANISATION. Both
  * `createPayrollRun` and `openPeriod` take it as the first statement of their transaction, so the
  * two paths serialize against each other as well as against themselves.
  *
- * The month, not the exact range: the check the lock protects is "does this range intersect any
- * other range", which two concurrent requests for DIFFERENT but overlapping ranges both pass
- * otherwise — and `@@unique([organizationId, periodStart, periodEnd])` does not cover that, because
- * the bounds differ. A run never spans two months (`isSameMonthRange`), so the month is the
- * smallest key that covers every range the check can read.
+ * A key, not the exact range: the check the lock protects is "does this range intersect any other
+ * range", which two concurrent requests for DIFFERENT but overlapping ranges both pass otherwise —
+ * and `@@unique([organizationId, periodStart, periodEnd])` does not cover that, because the bounds
+ * differ. The key therefore has to cover every range the check can read.
  *
- * The month of the REQUESTED period start on the MANILA calendar, never a bound derived from the
- * overlap query's widened window — that window starts a day early, so two overlapping ranges either
- * side of a month boundary would take two different locks and serialize against nothing.
+ * #163 keyed it on the org AND the Manila month, which was correct then and is unsafe now. It
+ * rested on a run never spanning two months (`isSameMonthRange`); #3 removed that rule. A
+ * `20 May → 5 Jun` run and an overlapping `1 Jun → 10 Jun` run derive different months, take
+ * different locks, and serialize against nothing — the exact race the lock exists to stop, back
+ * again by a different route. The month is not repairable here either: with two months in play
+ * there is no single month to key on, and locking both would add an ordering rule and a deadlock
+ * to reason about.
+ *
+ * Per-org is the smallest key with no such degree of freedom (D3). It costs nothing: payroll runs
+ * are rare and deliberate, so serialising an organisation's run creation is not contention anyone
+ * can feel. The in-repo precedent is `backupLockKey` (`server/backup/plan.ts`), a one-argument
+ * per-org key written after the same class of bug.
  */
-export function payrollRunLockKey(organizationId: string, periodStart: Date): string {
-	return `payroll-run:${organizationId}:${manilaDayKey(periodStart).slice(0, 7)}`
+export function payrollRunLockKey(organizationId: string): string {
+	return `payroll-run:${organizationId}`
 }
 
 /**
- * Take the org-month lock inside `tx`. Transaction-scoped: Postgres releases it on commit OR
- * rollback, so there is nothing to unlock and no way to leak one.
+ * Take the per-org payroll-run lock inside `tx`. Transaction-scoped: Postgres releases it on commit
+ * OR rollback, so there is nothing to unlock and no way to leak one.
  */
-export async function lockPayrollMonth(
-	tx: Prisma.TransactionClient,
-	organizationId: string,
-	periodStart: Date
-) {
-	const key = payrollRunLockKey(organizationId, periodStart)
+export async function lockPayrollRuns(tx: Prisma.TransactionClient, organizationId: string) {
+	const key = payrollRunLockKey(organizationId)
 	await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`
 }
 
@@ -257,12 +261,12 @@ export async function createPayrollRun(
 	const invalid = customRangeError(periodStart, periodEnd)
 	if (invalid) error(400, invalid)
 
-	// One transaction, under the org-month advisory lock: check-then-act is otherwise exactly what
+	// One transaction, under the per-org advisory lock: check-then-act is otherwise exactly what
 	// this is. Two concurrent requests for DIFFERENT but overlapping custom ranges both read an
 	// empty conflict set and both insert, and the unique constraint cannot catch it because their
 	// bounds differ. The lock is taken FIRST so both reads below are serialized with the insert.
 	const run = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-		await lockPayrollMonth(tx, organizationId, periodStart)
+		await lockPayrollRuns(tx, organizationId)
 
 		// Kept ahead of the overlap guard on purpose (S1). `voidRun` only flips status, so the row and
 		// its @@unique([organizationId, periodStart, periodEnd]) survive; the overlap guard excludes
