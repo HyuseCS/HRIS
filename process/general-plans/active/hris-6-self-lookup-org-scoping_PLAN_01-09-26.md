@@ -5,7 +5,10 @@ date: 01-09-26
 issue: 6
 branch: fix/self-lookup-org-scoping-6
 complexity: MEDIUM
-status: VALIDATED (CONDITIONAL, no FAILs) — all four validate concerns folded in. Awaiting owner go-ahead for EXECUTE.
+status: EXECUTE IN PROGRESS — the source half (C1-C6) is done and committed, 43 sites scoped, 0 left.
+  The test tier (C7-C9) and the live Playwright gate are OUTSTANDING, so `pnpm test` is RED by
+  design and no gate below has been signed off. VALIDATE passed CONDITIONAL with no FAILs before
+  EXECUTE started; that is a plan-quality verdict and says nothing about the code.
 ---
 
 # PLAN — HRIS #6: scope employee self-lookups to the active org
@@ -354,6 +357,14 @@ new self-lookup — which C9 *does* catch, at the lookup. Revisit if a fifth eve
 | Sweep | included in unit | 0 unscoped sites, allow-list empty. |
 | Red-first | manual, per new guard | Each C8 assertion observed failing before the fix, restored by `cp`. |
 | E2E manual gate | Playwright, driven by the orchestrator | Below. |
+
+**Where the gates actually stand (measured 02-09-26).** Only `pnpm check` has been met. The unit
+gate is **RED and outstanding**: 14 files / 91 tests failing, 2028 passing, 2119 total. That is C7
+work, not a regression — the mocks stub with `mockResolvedValue`, which discards the `where`, so
+scoping the self lookup collides the self and target `findFirst` doubles. `employee-access` is the
+first file converted (27 green, both new #6 assertions driven red against a mutated source first);
+20 files remain, of which 13 fail and 7 are green-but-blind. Nothing below may be signed off until
+that reaches zero and the manual gate has been run.
 
 ### The manual gate
 
