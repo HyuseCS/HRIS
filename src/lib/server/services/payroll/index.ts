@@ -22,6 +22,8 @@ import {
 	describePeriod,
 	isSameMonthRange,
 	isValidStandardPeriod,
+	monthYearLabel,
+	monthsTouched,
 	periodOf,
 	periodShareOf,
 	rangesOverlapInManila,
@@ -166,21 +168,33 @@ export async function assertNoOverlappingRun(
 }
 
 /**
- * #163 (review round 2): refuse a CUSTOM range that overlaps a cutoff window some employee's
- * statutory allocation designates.
+ * #163 (review round 2), widened by #3: refuse a CUSTOM range that overlaps a cutoff window some
+ * employee's statutory allocation designates, in ANY month the range touches.
  *
  * A FIRST/SECOND allocation loads the WHOLE month's employee SSS/PhilHealth/Pag-IBIG share onto one
  * standard run — the 1–15 run for FIRST, the 16–EOM run for SECOND — and every other run in that
- * month takes ZERO. That is only safe while the designated run can still be created. The overlap
- * guard above refuses it once a custom run covers those days, and the month would then collect
- * either nothing (no cutoff run) or, if the cutoff run is created first and the custom one is
- * merely adjacent, an outcome that depends on creation order.
+ * month takes ZERO (`resolveEE`, `calculator.ts:158-169`). That is only safe while the designated
+ * run can still be created. The overlap guard above refuses it once a custom run covers those days,
+ * and the month would then collect either nothing (no cutoff run) or, if the cutoff run is created
+ * first and the custom one is merely adjacent, an outcome that depends on creation order.
  *
  * Rather than track that ambiguity through the engine, make it impossible: a custom range may not
  * touch a designated cutoff window at all, so the cutoff run is always creatable and `resolveEE`'s
- * ZERO on a custom range is always correct. STANDARD periods are unrestricted — they are the
- * cutoff runs. An org where every employee is EVEN (the default, no config row) has no designated
- * window and is unaffected.
+ * ZERO on a custom range is always correct.
+ *
+ * The guard walks EVERY month `monthsTouched` reports, not just the start month. Deriving the month
+ * from the start alone was a live hole (#3 / research F5), not merely a strictness question: a
+ * FIRST-only org could create `20 May → 5 Jun`, which misses May 1–15 and was therefore allowed,
+ * and which then swallows June's whole 1–15 window while every employee takes the custom range's
+ * ZERO — so June collects nothing. Because a cross-month range always covers month one's 16–EOM
+ * window and month two's 1–15 window, an org with ANY active FIRST or SECOND allocation is now
+ * refused EVERY cross-month range. That totality is what `resolveEE`'s ZERO depends on.
+ *
+ * This is a positive restriction — accept only if no touched month's designated window is
+ * overlapped — so a shape nobody enumerated is refused rather than allowed.
+ *
+ * STANDARD periods are unrestricted — they are the cutoff runs. An org where every employee is EVEN
+ * (the default, no config row) has no designated window and is unaffected.
  */
 export async function assertCustomRangeClearOfCutoff(
 	organizationId: string,
@@ -202,22 +216,28 @@ export async function assertCustomRangeClearOfCutoff(
 	})
 	if (allocations.length === 0) return
 
-	// The requested range's MANILA month — the same calendar the overlap comparison uses.
-	const key = manilaDayKey(periodStart)
-	const year = Number(key.slice(0, 4))
-	const month0 = Number(key.slice(5, 7)) - 1
+	// Every MANILA month the range touches — the same calendar the overlap comparison uses. A
+	// `YYYY-MM-DD` key parses to UTC midnight, which is the convention `monthsTouched` works in.
+	const months = monthsTouched(
+		new Date(manilaDayKey(periodStart)),
+		new Date(manilaDayKey(periodEnd))
+	)
 
-	for (const { allocation } of allocations) {
-		const kind = allocation === 'FIRST' ? 'FIRST_HALF' : 'SECOND_HALF'
-		const window = periodOf(kind, year, month0)
-		if (!rangesOverlapInManila(periodStart, periodEnd, window.periodStart, window.periodEnd))
-			continue
-		const label = allocation === 'FIRST' ? '1–15' : `16–${window.periodEnd.getUTCDate()}`
-		const standard = allocation === 'FIRST' ? 'First half' : 'Second half'
-		error(
-			400,
-			`A custom period cannot overlap the ${label} cutoff, because that run collects the whole month's employee statutory share for some employees. Use a range outside it, or run the standard ${standard} period.`
-		)
+	for (const { year, month0 } of months) {
+		for (const { allocation } of allocations) {
+			const kind = allocation === 'FIRST' ? 'FIRST_HALF' : 'SECOND_HALF'
+			const window = periodOf(kind, year, month0)
+			if (!rangesOverlapInManila(periodStart, periodEnd, window.periodStart, window.periodEnd))
+				continue
+			const label = allocation === 'FIRST' ? '1–15' : `16–${window.periodEnd.getUTCDate()}`
+			const standard = allocation === 'FIRST' ? 'First half' : 'Second half'
+			// The month named is the CLASHING window's own month, never the range start — with two
+			// months in play that is the only way to tell which one blocked the range.
+			error(
+				400,
+				`A custom period cannot overlap the ${label} cutoff of ${monthYearLabel(year, month0)}, because that run collects the whole month's employee statutory share for some employees. Use a range outside it, or run the standard ${standard} period.`
+			)
+		}
 	}
 }
 
