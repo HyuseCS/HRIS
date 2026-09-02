@@ -83,11 +83,7 @@ beforeEach(() => {
 	// `organizationId` from the service and SL-009 starts resolving for JoJo — which is
 	// precisely what B7 asserts cannot happen.
 	dbMock.employee.findMany.mockImplementation(
-		({
-			where
-		}: {
-			where: { employeeNumber: { in: string[] }; organizationId?: string }
-		}) =>
+		({ where }: { where: { employeeNumber: { in: string[] }; organizationId?: string } }) =>
 			Promise.resolve(
 				where.employeeNumber.in
 					.filter(

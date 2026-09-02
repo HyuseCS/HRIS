@@ -30,9 +30,8 @@ vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 const { writeAuditLog } = await import('$lib/server/audit')
 
-const { createEmployeeEarning, endEmployeeEarning } = await import(
-	'$lib/server/services/payroll/employee-earnings'
-)
+const { createEmployeeEarning, endEmployeeEarning } =
+	await import('$lib/server/services/payroll/employee-earnings')
 const { SELF_ACTION_DENIED } = await import('$lib/server/services/employee-access')
 
 const ORG = 'org1'

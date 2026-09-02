@@ -20,9 +20,8 @@ vi.mock('$lib/server/services/notifications', () => ({ notifyMany: vi.fn() }))
 
 const { writeAuditLog } = await import('$lib/server/audit')
 const { notifyMany } = await import('$lib/server/services/notifications')
-const { announcementAuthorName, createAnnouncement } = await import(
-	'$lib/server/services/announcements'
-)
+const { announcementAuthorName, createAnnouncement } =
+	await import('$lib/server/services/announcements')
 
 describe('announcementAuthorName', () => {
 	it('uses the employee’s full name', () => {

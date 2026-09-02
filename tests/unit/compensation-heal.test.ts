@@ -138,7 +138,6 @@ describe('recordCompensationChange — future effective date (#170 Stage 1.5)', 
 	})
 })
 
-
 describe('recordCompensationChange — the audit\'s "before" is read inside the transaction (#5)', () => {
 	// The pre-transaction read is for validation only. If the audit reuses it, two concurrent changes
 	// to the same employee both log the same prior pay — one of them a figure it never replaced.
