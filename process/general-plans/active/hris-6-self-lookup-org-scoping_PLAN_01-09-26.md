@@ -5,10 +5,9 @@ date: 01-09-26
 issue: 6
 branch: fix/self-lookup-org-scoping-6
 complexity: MEDIUM
-status: EXECUTE IN PROGRESS — the source half (C1-C6) is done and committed, 43 sites scoped, 0 left.
-  The test tier (C7-C9) and the live Playwright gate are OUTSTANDING, so `pnpm test` is RED by
-  design and no gate below has been signed off. VALIDATE passed CONDITIONAL with no FAILs before
-  EXECUTE started; that is a plan-quality verdict and says nothing about the code.
+status: EXECUTE COMPLETE except the live gate — C1-C6 (source) and C7-C9 (tests) are all built and
+  committed. Unit suite green at 188 files / 2126 tests. The Playwright org-switch gate is the ONLY
+  outstanding item; it needs the database and dev server running, which the owner starts.
 ---
 
 # PLAN — HRIS #6: scope employee self-lookups to the active org
@@ -358,13 +357,30 @@ new self-lookup — which C9 *does* catch, at the lookup. Revisit if a fifth eve
 | Red-first | manual, per new guard | Each C8 assertion observed failing before the fix, restored by `cp`. |
 | E2E manual gate | Playwright, driven by the orchestrator | Below. |
 
-**Where the gates actually stand (measured 02-09-26).** Only `pnpm check` has been met. The unit
-gate is **RED and outstanding**: 14 files / 91 tests failing, 2028 passing, 2119 total. That is C7
-work, not a regression — the mocks stub with `mockResolvedValue`, which discards the `where`, so
-scoping the self lookup collides the self and target `findFirst` doubles. `employee-access` is the
-first file converted (27 green, both new #6 assertions driven red against a mutated source first);
-20 files remain, of which 13 fail and 7 are green-but-blind. Nothing below may be signed off until
-that reaches zero and the manual gate has been run.
+**Where the gates stand (measured 02-09-26).** The unit gate is **MET**: 188 files / 2126 tests,
+zero failures, up from a 186 / 2117 baseline. C7 cleared all 91 failures across 20 files; C8 and C9
+added the 5 new files. Every new assertion was observed failing against a deliberately mutated
+source and restored by `cp`. The **live Playwright gate is the only one still outstanding.**
+
+**Two plan statements the execution corrected.**
+
+1. **C9's expected count was wrong.** The plan said 50 sites; the sweep finds **41** self-lookups
+   out of 72 employee lookups, 0 unscoped, 0 unparsed. 50 was the pre-fix total of 43 unscoped plus
+   7 already-scoped, which is not the same set the sweep measures.
+2. **C7a did not need the `where`-discriminating stub, and the plan's own HARD definition is why.**
+   "The mock has no `findFirst` at all" means those nine files never reached `canTouchEmployee`'s
+   target lookup, which was already a `findFirst` before #6. One call shape, nothing to
+   discriminate, so a rename is correct there. Those nine stay `where`-blind; C9 covers that
+   property at all 41 sites at once, which is cheaper and total. The eleven COLLISION/SILENT files
+   in C7b genuinely do merge two shapes and got the full treatment.
+
+**And one severity the plan got wrong in the other direction.** `attendance-export-am-pm` is listed
+as COLLISION. It has no collision: every case is HR_ADMIN, so `canManage` short-circuits and the
+self branch is never reached. Dead stub removed, reason recorded in the file.
+
+**A test that was passing for the wrong reason, found on the way.** `punch-access`'s 404 case had a
+`where.user` typo that returned `null` whatever the input, so it passed regardless of the code under
+test. Now driven by a real set.
 
 ### The manual gate
 
