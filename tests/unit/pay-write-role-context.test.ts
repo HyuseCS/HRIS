@@ -34,7 +34,7 @@ const { dbMock, txMock, listReportIdsFor } = vi.hoisted(() => {
 		txMock,
 		listReportIdsFor: vi.fn(),
 		dbMock: {
-			employee: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+			employee: { findFirst: vi.fn(), update: vi.fn() },
 			employeeCompensation: { findMany: vi.fn(), findFirst: vi.fn() },
 			employeeEmploymentType: { findMany: vi.fn(), findFirst: vi.fn() },
 			payrollRun: { findFirst: vi.fn() },
@@ -116,11 +116,16 @@ const changeCompensation = (roles: Role[]) => {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findFirst.mockResolvedValue(EMP)
 	dbMock.employee.update.mockResolvedValue(EMP)
-	// `canTouchEmployee`: the actor's own record, and a reporting line that contains the target.
-	dbMock.employee.findUnique.mockResolvedValue({ id: ACTOR_EMP })
 	listReportIdsFor.mockResolvedValue([TARGET])
+	// #6 made `canTouchEmployee`'s self lookup a `findFirst` too, so ONE `vi.fn()` now serves the
+	// self lookup (`where.userId` — the actor's own record) and every target-keyed lookup
+	// (`where.id` — getEmployee, canTouchEmployee's closing check). A plain `mockResolvedValue` would
+	// hand EMP to the self lookup too; harmless today since the target is a report, but it would
+	// silently mask a self-lookup regression on this file's own account.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? { id: ACTOR_EMP } : EMP)
+	)
 	dbMock.branch.findMany.mockResolvedValue([])
 	// getEmployee's heal-on-read has no history to reconcile.
 	dbMock.employeeCompensation.findMany.mockResolvedValue([])

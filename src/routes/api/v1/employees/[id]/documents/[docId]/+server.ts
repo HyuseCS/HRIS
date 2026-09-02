@@ -16,7 +16,12 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	const isHr = canAny(user.roles, 'ADMINISTER_HR_RECORDS')
 	if (!isHr) {
-		const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+		// #6: the ACTIVE org, not the home tenant. `me?.id !== doc.employeeId` below already
+		// fails closed when this resolves to null.
+		const me = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
+			select: { id: true }
+		})
 		if (me?.id !== doc.employeeId) error(403, 'Insufficient permissions')
 	}
 

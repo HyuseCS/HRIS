@@ -24,7 +24,7 @@ const { dbMock, listReportIdsFor, listRequests, countRequests, getLeaveBalances 
 		countRequests: vi.fn(),
 		getLeaveBalances: vi.fn(),
 		dbMock: {
-			employee: { findUnique: vi.fn(), findMany: vi.fn() },
+			employee: { findFirst: vi.fn(), findMany: vi.fn() },
 			branch: { findMany: vi.fn() },
 			leaveType: { findMany: vi.fn() }
 		}
@@ -62,7 +62,7 @@ const params = () => listRequests.mock.calls[0][0]
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue({ id: SELF })
+	dbMock.employee.findFirst.mockResolvedValue({ id: SELF })
 	listReportIdsFor.mockResolvedValue([REPORT])
 	dbMock.branch.findMany.mockResolvedValue([])
 	dbMock.employee.findMany.mockImplementation(({ where }) =>
@@ -141,13 +141,13 @@ describe('GET /api/v1/requests', () => {
 
 	// The second leak: no employee record must mean no rows, not every row.
 	it('returns nothing for a non-manager with no employee record', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		await GET(event(['EMPLOYEE']))
 		expect(params().employeeIds).toEqual([])
 	})
 
 	it('returns nothing for a MANAGER with no employee record', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		await GET(event(['MANAGER']))
 		expect(params().employeeIds).toEqual([])
 	})
@@ -226,7 +226,7 @@ describe('/leave page load', () => {
 
 	// The second leak: `[]`, never `undefined` — an undefined filter is dropped and leaks the org.
 	it('gives a MANAGER with no employee record an empty allow-list, not undefined', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		await load(loadEvent(['MANAGER']))
 		expect(pageParams().employeeIds).toEqual([])
 		expect(pageParams().employeeIds).not.toBeUndefined()
@@ -239,7 +239,7 @@ describe('/leave page load', () => {
 
 	// #64 and the existing short-circuit must keep working.
 	it('still returns no rows for a non-manager with no employee record', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		dbMock.employee.findFirst.mockResolvedValue(null)
 		const result = await load(loadEvent(['EMPLOYEE']))
 		expect(listRequests).not.toHaveBeenCalled()
 		expect(countRequests).not.toHaveBeenCalled()

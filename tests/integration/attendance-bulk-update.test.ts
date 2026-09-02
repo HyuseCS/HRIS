@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import type { Role } from '@prisma/client'
-import { MARKER, createOrgFixture, cleanupFixtures, disconnectAll, verifyDb } from './audit-tx-harness'
+import {
+	MARKER,
+	createOrgFixture,
+	cleanupFixtures,
+	disconnectAll,
+	verifyDb
+} from './audit-tx-harness'
 
 // Same module substitution as audit-transaction.test.ts: a REAL PrismaClient against real
 // Postgres. Failure injection is left OFF for this file — the whole point here is that the

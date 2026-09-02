@@ -44,9 +44,7 @@ const tx = {
 
 /** Rows carried by the single bulk UPDATE, if it was issued. */
 const bulkRows = (): Record<string, unknown>[] =>
-	tx.$executeRaw.mock.calls.length
-		? JSON.parse(tx.$executeRaw.mock.calls[0][2] as string)
-		: []
+	tx.$executeRaw.mock.calls.length ? JSON.parse(tx.$executeRaw.mock.calls[0][2] as string) : []
 
 const { deriveRange, autoDeriveFromPunches } = await import('$lib/server/services/attendance')
 
@@ -80,8 +78,7 @@ const writeCount = () =>
 	(tx.attendanceDay.createMany.mock.calls[0]?.[0].data.length ?? 0) + bulkRows().length
 
 /** The single row that landed, whether it went in as an insert or as an update. */
-const written = () =>
-	tx.attendanceDay.createMany.mock.calls[0]?.[0].data[0] ?? bulkRows()[0]
+const written = () => tx.attendanceDay.createMany.mock.calls[0]?.[0].data[0] ?? bulkRows()[0]
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -95,8 +92,8 @@ beforeEach(() => {
 	tx.attendanceDay.createMany.mockResolvedValue({ count: 1 })
 	tx.$executeRaw.mockResolvedValue(0)
 	// Nothing locked between the batch snapshot and the write.
-	tx.attendanceDay.findMany.mockImplementation(
-		async (args: { where: { id: { in: string[] } } }) => args.where.id.in.map((id) => ({ id }))
+	tx.attendanceDay.findMany.mockImplementation(async (args: { where: { id: { in: string[] } } }) =>
+		args.where.id.in.map((id) => ({ id }))
 	)
 	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })

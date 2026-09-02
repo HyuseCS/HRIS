@@ -27,7 +27,7 @@ const { dbMock } = vi.hoisted(() => ({
 			update: vi.fn()
 		},
 		timesheetEntry: { deleteMany: vi.fn() },
-		employee: { findUnique: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		attendanceDay: { findMany: vi.fn() },
 		$transaction: vi.fn(),
 		// #163: createTimesheet takes an advisory lock as the first statement of its transaction.
@@ -76,21 +76,21 @@ beforeEach(() => {
 describe('deleteTimesheet — owner vs manager authorization', () => {
 	it('lets the owner delete their own DRAFT', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' }) // actor is the owner
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' }) // actor is the owner
 		await deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
 
 	it('lets the owner delete their own REJECTED', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'REJECTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
 
 	it('blocks the owner from deleting a SUBMITTED timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await expect(deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 400
 		})
@@ -99,7 +99,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 
 	it('blocks the owner from deleting an APPROVED timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'APPROVED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await expect(deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 400
 		})
@@ -108,7 +108,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 
 	it("blocks a non-owner employee from deleting someone else's timesheet", async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-other' }) // not the owner
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-other' }) // not the owner
 		await expect(deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 403
 		})
@@ -117,7 +117,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 
 	it('lets a manager delete a direct report’s timesheet (any status)', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'mgr-emp' }) // actor manages the owner
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'mgr-emp' }) // actor manages the owner
 		await deleteTimesheet('ts1', ORG, ctx('MANAGER'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
@@ -126,7 +126,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 	// authority, so it is no longer narrowed to direct reports. Both cases below used to 403.
 	it('lets a manager act on an employee who is not their direct report', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'someone-else' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'someone-else' })
 		await deleteTimesheet('ts1', ORG, ctx('MANAGER'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
@@ -137,14 +137,14 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(
 			makeTs({ employee: { id: 'emp-owner', firstName: 'A', lastName: 'B', reportsToId: null } })
 		)
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'mgr-emp' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'mgr-emp' })
 		await deleteTimesheet('ts1', ORG, ctx('MANAGER'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
 
 	it('still rejects a non-management role acting on someone else’s timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-other' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-other' })
 		await expect(deleteTimesheet('ts1', ORG, ctx('FINANCE'))).rejects.toMatchObject({ status: 403 })
 		expect(dbMock.timesheet.delete).not.toHaveBeenCalled()
 	})
@@ -153,7 +153,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 describe('updateTimesheetEntries — owner sync path', () => {
 	it('lets the owner replace entries on their own DRAFT', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))
 		expect(dbMock.$transaction).toHaveBeenCalledTimes(1)
 		// #324: the before-image is read inside that transaction, not from the guard read above it.
@@ -165,7 +165,7 @@ describe('updateTimesheetEntries — owner sync path', () => {
 
 	it('blocks the owner from editing a SUBMITTED timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await expect(updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 400
 		})
@@ -174,7 +174,7 @@ describe('updateTimesheetEntries — owner sync path', () => {
 
 	it('blocks a non-owner employee from editing entries', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-other' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-other' })
 		await expect(updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 403
 		})

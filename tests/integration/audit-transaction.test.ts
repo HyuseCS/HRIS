@@ -11,9 +11,7 @@ import {
 // Module substitution with a REAL extended Prisma client. See audit-tx-harness.ts for why
 // `db.$extends()` in the test body cannot work. The dynamic import is required because
 // `vi.mock` is hoisted above the imports above.
-vi.mock('$lib/server/db', () =>
-	import('./audit-tx-harness').then((m) => m.makeInjectedDb())
-)
+vi.mock('$lib/server/db', () => import('./audit-tx-harness').then((m) => m.makeInjectedDb()))
 
 const { updateBackupConfig } = await import('$lib/server/services/settings/backup')
 
@@ -69,9 +67,9 @@ describe('audit row commits or rolls back with its mutation (real Postgres)', ()
 	it('rolls the mutation back when the audit write fails', async () => {
 		setAuditFailure(true)
 
-		await expect(
-			updateBackupConfig(fixture.organizationId, INPUT, fixture.ctx)
-		).rejects.toThrow('audit down')
+		await expect(updateBackupConfig(fixture.organizationId, INPUT, fixture.ctx)).rejects.toThrow(
+			'audit down'
+		)
 
 		// the injected callback really fired — the rejection is ours, not something upstream
 		expect(injectedCallCount()).toBe(1)

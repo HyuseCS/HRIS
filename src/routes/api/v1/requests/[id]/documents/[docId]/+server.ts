@@ -15,7 +15,12 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 	if (doc.requestId !== params.id) error(404, 'Document not found')
 
 	if (!canAny(user.roles, 'APPROVE_REQUESTS')) {
-		const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+		// #6: scoped to the ACTIVE org, so a cross-org account no longer resolves its home-tenant
+		// profile here.
+		const me = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
+			select: { id: true }
+		})
 		if (me?.id !== doc.request.employeeId) error(403, 'Insufficient permissions')
 	}
 

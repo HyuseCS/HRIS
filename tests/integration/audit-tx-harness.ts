@@ -124,7 +124,10 @@ export async function cleanupFixtures() {
 	if (orgs.length === 0) return
 	const organizationId = { in: orgs.map((o) => o.id) }
 
-	const employees = await verifyDb.employee.findMany({ where: { organizationId }, select: { id: true } })
+	const employees = await verifyDb.employee.findMany({
+		where: { organizationId },
+		select: { id: true }
+	})
 	if (employees.length > 0) {
 		const employeeId = { in: employees.map((e) => e.id) }
 		await verifyDb.attendanceDay.deleteMany({ where: { employeeId } })

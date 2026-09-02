@@ -32,7 +32,7 @@ const { dbMock, uploadsFromForm, saveRequestDocuments, leaveHelpers } = vi.hoist
 		meetsLeaveTenure: vi.fn().mockReturnValue(true)
 	},
 	dbMock: {
-		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		request: { findFirst: vi.fn() },
 		$transaction: vi.fn()
 	}
@@ -102,14 +102,24 @@ const writtenChain = () => {
 	return { currentStage: data.currentStage, make: data.steps.create[0] }
 }
 
+/**
+ * `createRequest`'s employee lookup (keyed on `id`) and `deleteRequest`'s non-privileged self
+ * lookup (keyed on `userId`) both land on `employee.findFirst`. A plain `mockResolvedValue` happens
+ * to work today only because both fixtures share `SELF_EMP` as their id — the two calls are never
+ * discriminated by shape, so a future test giving them different ids would silently break.
+ */
+let targetRow = {
+	id: SELF_EMP,
+	reportsToId: null as string | null,
+	startDate: new Date('2020-01-01')
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue({ id: SELF_EMP })
-	dbMock.employee.findFirst.mockResolvedValue({
-		id: SELF_EMP,
-		reportsToId: null,
-		startDate: new Date('2020-01-01')
-	})
+	targetRow = { id: SELF_EMP, reportsToId: null, startDate: new Date('2020-01-01') }
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? { id: SELF_EMP } : targetRow)
+	)
 	tx.request.create.mockResolvedValue({ id: 'req-new', steps: [] })
 	// Someone else's pending leave request — deletable only by an HR-capable caller.
 	dbMock.request.findFirst.mockResolvedValue({

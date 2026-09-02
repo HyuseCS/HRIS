@@ -28,7 +28,6 @@ const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
 	dbMock: {
 		employee: {
 			findFirst: vi.fn(),
-			findUnique: vi.fn(),
 			findUniqueOrThrow: vi.fn(),
 			update: vi.fn()
 		},
@@ -119,13 +118,19 @@ function expectReportingLineNotWritten() {
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof dbMock) => unknown) => fn(dbMock))
-	dbMock.employee.findFirst.mockResolvedValue(EMP)
 	dbMock.employee.update.mockResolvedValue(EMP)
 	// #5: updateEmployee reads its `before` snapshot inside the transaction.
 	dbMock.employee.findUniqueOrThrow.mockResolvedValue(EMP)
-	// `canTouchEmployee` for a bare MANAGER: their own record, and a reporting line holding the target.
-	dbMock.employee.findUnique.mockResolvedValue({ id: ACTOR_EMP })
 	listReportIdsFor.mockResolvedValue([TARGET])
+	// #6 made `canTouchEmployee`'s self lookup a `findFirst` too, so ONE `vi.fn()` now serves the
+	// self lookup (`where.userId`, a bare MANAGER's own record) and every target-keyed lookup
+	// (`where.id` — getEmployee, assertManagerInOrg, canTouchEmployee's closing check). A plain
+	// `mockResolvedValue` would hand the target row to the self lookup, letting
+	// `self.id === employeeId` match by accident and admit a manager who was never on the actor's
+	// team.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? { id: ACTOR_EMP } : EMP)
+	)
 	dbMock.branch.findMany.mockResolvedValue([])
 	// getEmployee's heal-on-read has no history to reconcile.
 	dbMock.employeeCompensation.findMany.mockResolvedValue([])

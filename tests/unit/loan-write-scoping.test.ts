@@ -32,7 +32,7 @@ const { dbMock, tx, listReportIdsFor } = vi.hoisted(() => ({
 	},
 	dbMock: {
 		$transaction: vi.fn(),
-		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		branch: { findMany: vi.fn() },
 		loan: { findFirst: vi.fn() },
 		cashAdvance: { findFirst: vi.fn() }
@@ -64,10 +64,13 @@ const ctx = (role: Role, roles?: Role[]): AuditContext => ({
 })
 
 /**
- * `requireEmployee` (selects id/userId) and `canTouchEmployee`'s closing org-scoped lookup (selects
- * branchId) both land on `employee.findFirst`, so the fixture carries every field either reads.
+ * `requireEmployee` and `canTouchEmployee`'s closing org-scoped lookup (both keyed on `id`) share
+ * this fixture with the self lookup (keyed on `userId`) below — see the `mockImplementation` note.
  */
-const targeting = (emp: typeof SELF) => dbMock.employee.findFirst.mockResolvedValue(emp)
+let targetRow: typeof SELF = STRANGER
+const targeting = (emp: typeof SELF) => {
+	targetRow = emp
+}
 
 const DENIED = 'You can only manage your own team or a branch you manage.'
 const LOAN_DATA = { principal: 50000, installment: 5000 }
@@ -75,7 +78,6 @@ const CA_DATA = { amount: 10000, installment: 2000 }
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue({ id: SELF.id })
 	listReportIdsFor.mockResolvedValue([REPORT.id])
 	dbMock.branch.findMany.mockResolvedValue([])
 	dbMock.loan.findFirst.mockResolvedValue({ id: 'loan1', employeeId: STRANGER.id })
@@ -84,6 +86,15 @@ beforeEach(() => {
 	tx.loan.create.mockResolvedValue({ id: 'loan-new' })
 	tx.cashAdvance.create.mockResolvedValue({ id: 'ca-new' })
 	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
+	targetRow = STRANGER
+	// #6 made canTouchEmployee's self lookup a `findFirst` too, so ONE `vi.fn()` now serves the self
+	// lookup (`where.userId`), `requireEmployee`, and canTouchEmployee's closing target lookup (the
+	// latter two both `where.id`). Discriminate on the where-shape: a plain `mockResolvedValue` would
+	// hand the target's row to the self lookup, letting `self.id === employeeId` match by accident
+	// and admit a stranger who was never on the actor's team.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? SELF : targetRow)
+	)
 })
 
 describe('the capability containment the loan guard depends on', () => {

@@ -120,7 +120,10 @@ describe('writeAuditLog call sites', () => {
 	it('passes a transaction client everywhere except the allow-list', () => {
 		const allowed = new Set(ALLOWED.map((a) => a.file))
 		const bad = dbSites.filter((s) => !allowed.has(s.file)).map((s) => `${s.file}:${s.line}`)
-		expect(bad, `these pass the shared \`db\`, not a transaction client:\n${bad.join('\n')}`).toEqual([])
+		expect(
+			bad,
+			`these pass the shared \`db\`, not a transaction client:\n${bad.join('\n')}`
+		).toEqual([])
 	})
 
 	it.each(ALLOWED)('allow-list entry $file is still live ($reason)', ({ file, count }) => {

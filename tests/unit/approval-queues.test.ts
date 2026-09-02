@@ -24,7 +24,7 @@ const { dbMock } = vi.hoisted(() => ({
 		request: { findMany: vi.fn() },
 		timesheet: { findMany: vi.fn() },
 		payrollRun: { findMany: vi.fn() },
-		employee: { findUnique: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		actionProposal: { findMany: vi.fn() }
 	}
 }))
@@ -124,7 +124,7 @@ const requestAt = (id: string, verifiedBy: string) => ({
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-viewer' })
+	dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-viewer' })
 	dbMock.actionProposal.findMany.mockResolvedValue([])
 	dbMock.timesheet.findMany.mockResolvedValue([])
 	dbMock.payrollRun.findMany.mockResolvedValue([])

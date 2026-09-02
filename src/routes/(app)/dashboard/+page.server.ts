@@ -81,7 +81,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listTodaysBirthdays(orgId),
 		// The viewer's own standing for the status card (#167) — employment, leave left,
 		// what's waiting on them, and their work setup. All their own data, so ungated.
-		getMyStatus(user.id),
+		getMyStatus(user.id, orgId),
 		// Recent employee awards, announced in the feed (#180).
 		listRecentAwards(orgId),
 		// Side panel. Employment matters (probation reviews, contract ends, other people's
@@ -104,8 +104,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Job postings awaiting this user's approval (#195) — the departments they're the
 	// approver for, plus HR-fallback postings. Needs the viewer's employee id.
 	const roles = user.roles
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: orgId },
 		select: { id: true }
 	})
 	const postingsToApprove = await listPostingsAwaitingApprover(
@@ -179,8 +179,8 @@ export const actions: Actions = {
 		const note = (data.get('note') as string) || undefined
 		if (!id) return fail(400, { error: 'Missing posting id' })
 
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
+		const myEmployee = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
 			select: { id: true }
 		})
 		try {

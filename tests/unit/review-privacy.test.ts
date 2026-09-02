@@ -19,7 +19,7 @@ const { dbMock, listReportIdsFor, getReview, redactForSubject } = vi.hoisted(() 
 	getReview: vi.fn(),
 	redactForSubject: vi.fn(),
 	dbMock: {
-		employee: { findUnique: vi.fn(), findFirst: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		branch: { findMany: vi.fn() },
 		// #178 item 143 — the load also reads the sign-off relations. Not what this file guards,
 		// so it resolves to nothing: no snapshot, no slots, no signature block.
@@ -56,6 +56,18 @@ const ME = 'me-emp'
 const SUBJECT = 'subject-emp'
 const REVIEWER = 'reviewer-emp'
 
+/**
+ * #6 collapsed the route's own "who am I" lookup, `canTouchEmployee`'s self lookup, and its closing
+ * target lookup onto ONE `findFirst` mock — the first two share the exact where-shape
+ * (`where: { userId, organizationId }`), and the third is keyed by `id` instead. `selfRow` answers
+ * both userId-keyed calls (they resolve the same actor, so they must agree), `targetRow` answers the
+ * id-keyed one. A plain `mockResolvedValue` would hand the target's `{ branchId }` row to a
+ * userId-keyed call, leaving `.id` undefined and turning every fail-closed case green for the wrong
+ * reason.
+ */
+let selfRow: { id: string } | null
+let targetRow: { branchId: string | null } | null
+
 const event = (roles: Role[]) =>
 	({
 		locals: { user: { id: 'user-actor', organizationId: ORG, roles } },
@@ -83,9 +95,11 @@ beforeEach(() => {
 		releasedAt: null
 	})
 	dbMock.performanceReview.findMany.mockResolvedValue([])
-	// The route's "who am I" lookup and `canTouchEmployee`'s both go through findUnique.
-	dbMock.employee.findUnique.mockResolvedValue({ id: ME })
-	dbMock.employee.findFirst.mockResolvedValue({ branchId: null })
+	selfRow = { id: ME }
+	targetRow = { branchId: null }
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? selfRow : targetRow)
+	)
 	dbMock.branch.findMany.mockResolvedValue([])
 	dbMock.performanceReview.findFirst.mockResolvedValue(null)
 	listReportIdsFor.mockResolvedValue([])
@@ -121,7 +135,7 @@ describe('review privacy is object-scoped, not rank-scoped (#282 §3-B)', () => 
 	})
 
 	it('still lets the subject read their own review, redacted (#179)', async () => {
-		dbMock.employee.findUnique.mockResolvedValue({ id: SUBJECT })
+		selfRow = { id: SUBJECT }
 		const res = await loadData(['EMPLOYEE'])
 		expect(res.isSubject).toBe(true)
 		// Pins that the fix did not over-narrow: a participant never reaches the object check.
@@ -135,7 +149,7 @@ describe('review privacy is object-scoped, not rank-scoped (#282 §3-B)', () => 
 	})
 
 	it('still lets the reviewer read it unredacted', async () => {
-		dbMock.employee.findUnique.mockResolvedValue({ id: REVIEWER })
+		selfRow = { id: REVIEWER }
 		const res = await loadData(['EMPLOYEE'])
 		expect(res.isReviewer).toBe(true)
 		expect(redactForSubject).not.toHaveBeenCalled()
@@ -175,7 +189,7 @@ describe('the same privacy rule at the API layer (#178 item 156, AC8)', () => {
 	const callGet = () => GET({ locals: { user: { id: 'user-actor' } } } as never)
 
 	beforeEach(() => {
-		dbMock.employee.findUnique.mockResolvedValue({ id: SUBJECT })
+		selfRow = { id: SUBJECT }
 	})
 
 	it('withholds the evaluation from its subject while it is unreleased', async () => {

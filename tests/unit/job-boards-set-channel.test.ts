@@ -65,11 +65,11 @@ const existing = (row: { id: string; status: string } | null) =>
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.jobPosting.findFirst.mockImplementation(
-		async (args: { select?: Record<string, true> }) => project({ id: POSTING }, args)
+	dbMock.jobPosting.findFirst.mockImplementation(async (args: { select?: Record<string, true> }) =>
+		project({ id: POSTING }, args)
 	)
-	dbMock.jobBoard.findFirst.mockImplementation(
-		async (args: { select?: Record<string, true> }) => project({ id: BOARD }, args)
+	dbMock.jobBoard.findFirst.mockImplementation(async (args: { select?: Record<string, true> }) =>
+		project({ id: BOARD }, args)
 	)
 	existing(null)
 	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))

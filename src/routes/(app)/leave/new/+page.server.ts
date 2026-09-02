@@ -9,7 +9,9 @@ import type { Actions, PageServerLoad } from './$types'
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
 
-	const employee = await db.employee.findUnique({ where: { userId: user.id } })
+	const employee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId }
+	})
 	if (!employee) redirect(303, '/leave')
 
 	const [leaveTypes, balances] = await Promise.all([
@@ -46,8 +48,8 @@ export const actions: Actions = {
 	create: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
 
-		const employee = await db.employee.findUnique({
-			where: { userId: user.id },
+		const employee = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
 			select: { id: true }
 		})
 		if (!employee) return fail(400, { error: 'No employee profile found.' })

@@ -19,11 +19,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	// Owner, or any approver (managers/HR/super-admin plus payroll officers) who can see
 	// others' requests — the same set allowed in the approvals queue, so a reviewer can open
 	// the detail of a request they're able to act on.
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
-		select: { id: true }
-	})
-	const isOwner = myEmployee?.id === req.employeeId
+	const isOwner = (await myEmployeeId(user)) === req.employeeId
 	const canReview = canAny(user.roles, 'APPROVE_REQUESTS')
 	if (!isOwner && !canReview) error(403, 'Insufficient permissions')
 
@@ -109,8 +105,17 @@ function ctxOf(locals: App.Locals, ip: string) {
 	}
 }
 
-async function myEmployeeId(userId: string) {
-	const me = await db.employee.findUnique({ where: { userId }, select: { id: true } })
+/**
+ * #6 — the caller's OWN employee id, scoped to the ACTIVE org. Takes the user rather than a
+ * bare `userId` because the org is not derivable from the id alone: without it a cross-org
+ * account's home-tenant profile resolves here whichever org the session is in. Matches
+ * `findSelfEmployee(user)` at punch/+page.server.ts.
+ */
+async function myEmployeeId(user: { id: string; organizationId: string }) {
+	const me = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
 	return me?.id ?? null
 }
 
@@ -119,7 +124,7 @@ export const actions: Actions = {
 	// (e.g. a request was returned with "please attach the receipt").
 	uploadDocs: async ({ request, locals, params, getClientAddress }) => {
 		const user = locals.user!
-		const employeeId = await myEmployeeId(user.id)
+		const employeeId = await myEmployeeId(user)
 		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 
 		const data = await request.formData()
@@ -143,7 +148,7 @@ export const actions: Actions = {
 
 	deleteDoc: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const employeeId = await myEmployeeId(user.id)
+		const employeeId = await myEmployeeId(user)
 		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 
 		const docId = (await request.formData()).get('docId') as string

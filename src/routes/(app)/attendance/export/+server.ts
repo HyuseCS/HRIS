@@ -80,7 +80,10 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	} else {
 		let employeeId = canManage ? url.searchParams.get('employeeId') : null
 		if (!canManage) {
-			const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+			const me = await db.employee.findFirst({
+				where: { userId: user.id, organizationId: user.organizationId },
+				select: { id: true }
+			})
 			employeeId = me?.id ?? null
 		}
 		if (!employeeId) error(400, 'No employee selected')

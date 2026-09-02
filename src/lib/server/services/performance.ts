@@ -278,7 +278,10 @@ export async function releaseReview(
 
 		if (review.releasedAt) return { review, released: false as const }
 
-		const releaser = await tx.employee.findUnique({ where: { userId }, select: { id: true } })
+		const releaser = await tx.employee.findFirst({
+			where: { userId, organizationId },
+			select: { id: true }
+		})
 		const updated = await tx.performanceReview.update({
 			where: { id },
 			data: { releasedAt: new Date(), releasedByEmployeeId: releaser?.id ?? null }

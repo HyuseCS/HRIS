@@ -38,8 +38,8 @@ export async function canTouchEmployee(
 ): Promise<boolean> {
 	if (canAny(user.roles, 'ADMINISTER_HR_ORGWIDE')) return true
 
-	const self = await db.employee.findUnique({
-		where: { userId: user.id },
+	const self = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
 	// A user with HR-ish rank but no employee record of their own has no team and no branch, so
@@ -83,8 +83,8 @@ export async function canTouchEmployee(
 export async function listVisibleEmployeeIds(user: EmployeeAccessActor): Promise<string[] | null> {
 	if (canAny(user.roles, 'ADMINISTER_HR_ORGWIDE')) return null
 
-	const self = await db.employee.findUnique({
-		where: { userId: user.id },
+	const self = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
 	if (!self) return []

@@ -19,7 +19,7 @@ import { CAPABILITIES } from '$lib/rbac'
 const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	dbMock: {
-		employee: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+		employee: { findFirst: vi.fn(), findMany: vi.fn() },
 		branch: { findMany: vi.fn() }
 	}
 }))
@@ -41,14 +41,26 @@ const actor = (role: Role, roles?: Role[]) => ({
 	organizationId: 'org1'
 })
 
+/** The actor's own employee row, or `null` for "no record in the active org". */
+let selfRow: { id: string } | null
+/** The closing target lookup's result, or `null` for "not in your org". */
+let targetRow: { branchId: string | null } | null
+
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue(SELF)
-	listReportIdsFor.mockResolvedValue([])
-	dbMock.branch.findMany.mockResolvedValue([])
+	selfRow = SELF
 	// `canTouchEmployee` closes with an org-scoped lookup of the target; a null result means "not in
 	// your org" and denies. In-org and on no branch is the default here.
-	dbMock.employee.findFirst.mockResolvedValue({ branchId: null })
+	targetRow = { branchId: null }
+	// #6 made `canTouchEmployee`'s self lookup a `findFirst` too, so ONE `vi.fn()` now serves both
+	// calls: the self lookup keyed by `userId` and the target lookup keyed by `id`. A plain
+	// `mockResolvedValue` would hand the target's row to the self lookup, leaving `self.id`
+	// undefined and turning every fail-closed case green for the wrong reason.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? selfRow : targetRow)
+	)
+	listReportIdsFor.mockResolvedValue([])
+	dbMock.branch.findMany.mockResolvedValue([])
 })
 
 describe('the capability containment canReadPayslip depends on', () => {
@@ -98,7 +110,7 @@ describe('canReadPayslip', () => {
 		 * closed on its "no self record" branch and deny them every payslip in the system.
 		 */
 		it('a PAYROLL_OFFICER with no employee record of their own still reads any payslip', async () => {
-			dbMock.employee.findUnique.mockResolvedValue(null)
+			selfRow = null
 			expect(await canReadPayslip(actor('PAYROLL_OFFICER'), STRANGER)).toBe(true)
 			// Never delegated: the org-wide arm answered first.
 			expect(listReportIdsFor).not.toHaveBeenCalled()
@@ -113,7 +125,7 @@ describe('canReadPayslip', () => {
 
 		it('reads a payslip of someone in a branch they manage', async () => {
 			dbMock.branch.findMany.mockResolvedValue([{ id: 'branch1' }])
-			dbMock.employee.findFirst.mockResolvedValue({ branchId: 'branch1' })
+			targetRow = { branchId: 'branch1' }
 			expect(await canReadPayslip(actor('MANAGER'), STRANGER)).toBe(true)
 		})
 

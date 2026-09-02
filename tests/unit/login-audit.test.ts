@@ -34,7 +34,13 @@ vi.mock('bcrypt', () => ({ default: { compare } }))
 const { actions } = await import('../../src/routes/(auth)/login/+page.server')
 
 const ORG = 'org-1'
-const USER = { id: 'user-1', organizationId: ORG, roles: ['CEO'], isActive: true, passwordHash: 'h' }
+const USER = {
+	id: 'user-1',
+	organizationId: ORG,
+	roles: ['CEO'],
+	isActive: true,
+	passwordHash: 'h'
+}
 
 const event = () => {
 	const body = new FormData()

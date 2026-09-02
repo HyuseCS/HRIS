@@ -21,8 +21,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const roles = user.roles
 	if (!canReviewTimesheets(roles)) redirect(303, '/requests')
 
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
+	// #6: scoped to the ACTIVE org, so a cross-org account no longer resolves its home-tenant
+	// profile here.
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
 
@@ -31,6 +33,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const submitted = await db.timesheet.findMany({
 		where: {
 			status: 'SUBMITTED',
+			// #6: after the org scoping above this self-exclusion drops for a cross-org actor, and
+			// that is safe. Dropping a NEGATIVE self-exclusion re-admits exactly one person's rows —
+			// the actor's own — which the independent org filter on the next line has already
+			// excluded. Dropping a POSITIVE restriction is what widens a query; this is not that.
 			...(myEmployee ? { employeeId: { not: myEmployee.id } } : {}),
 			employee: { organizationId: user.organizationId }
 		},

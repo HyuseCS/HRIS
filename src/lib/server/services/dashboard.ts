@@ -107,9 +107,9 @@ function weekdaysLabel(weekdays: number[]): string {
  *
  * All of it is the viewer's own data, so nothing here is capability-gated.
  */
-export async function getMyStatus(userId: string, asOf: Date = new Date()) {
-	const employee = await db.employee.findUnique({
-		where: { userId },
+export async function getMyStatus(userId: string, organizationId: string, asOf: Date = new Date()) {
+	const employee = await db.employee.findFirst({
+		where: { userId, organizationId },
 		select: {
 			id: true,
 			organizationId: true,
@@ -197,7 +197,7 @@ export async function getMyStatus(userId: string, asOf: Date = new Date()) {
 
 export async function getEmployeeMetrics(userId: string, organizationId: string) {
 	const employee = await db.employee.findFirst({
-		where: { userId }
+		where: { userId, organizationId }
 	})
 
 	if (!employee) {
@@ -252,7 +252,7 @@ export async function getEmployeeMetrics(userId: string, organizationId: string)
 
 export async function getManagerMetrics(userId: string, organizationId: string) {
 	const employee = await db.employee.findFirst({
-		where: { userId }
+		where: { userId, organizationId }
 	})
 
 	if (!employee) {
@@ -456,8 +456,8 @@ export async function listUpcomingEvents(
 	const from = new Date(`${todayKey}T00:00:00.000Z`)
 	const to = new Date(`${endKey}T23:59:59.999Z`)
 
-	const me = await db.employee.findUnique({
-		where: { userId: viewer.userId },
+	const me = await db.employee.findFirst({
+		where: { userId: viewer.userId, organizationId },
 		select: { id: true }
 	})
 

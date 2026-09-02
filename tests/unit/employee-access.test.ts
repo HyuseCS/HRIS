@@ -14,7 +14,7 @@ import { CAPABILITIES } from '$lib/rbac'
 const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	dbMock: {
-		employee: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+		employee: { findFirst: vi.fn(), findMany: vi.fn() },
 		branch: { findMany: vi.fn() }
 	}
 }))
@@ -38,15 +38,27 @@ const SELF = { id: 'mgr-emp' }
 let branchStaff: { id: string }[] = []
 /** Ids the org filter rejects, standing in for a record in another tenant. */
 let foreignIds: string[] = []
+/** The actor's own employee row, or `null` for "no record in the ACTIVE org". */
+let selfRow: { id: string } | null = null
+/** What the closing target lookup returns, or `null` for "that row is in another tenant". */
+let targetRow: { branchId: string | null } | null = null
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue(SELF)
 	listReportIdsFor.mockResolvedValue([])
 	dbMock.branch.findMany.mockResolvedValue([])
-	dbMock.employee.findFirst.mockResolvedValue({ branchId: null })
 	branchStaff = []
 	foreignIds = []
+	selfRow = SELF
+	targetRow = { branchId: null }
+	// #6 made the self lookup a `findFirst` too, so ONE `vi.fn()` now serves both calls: the self
+	// lookup keyed by `userId` and the closing target lookup keyed by `id`. Discriminate on the
+	// where-shape, as `findMany` below already does. A plain `mockResolvedValue` would hand the
+	// target's row to the self lookup, leaving `self.id` undefined — which turns every fail-closed
+	// case green for the wrong reason instead of failing.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? selfRow : targetRow)
+	)
 	// Two different findMany calls: "who is in my branches" (keyed by branchId) and the closing
 	// org filter (keyed by id). Discriminate on the where-shape rather than call order, so a
 	// manager with no branches — who skips the first call entirely — still resolves correctly.
@@ -86,7 +98,7 @@ describe('the capability split this fix depends on (#228)', () => {
 describe('canTouchEmployee (#228)', () => {
 	it('lets HR_ADMIN reach anyone without even looking up a team', async () => {
 		expect(await canTouchEmployee(actor('HR_ADMIN'), 'stranger')).toBe(true)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 
 	it('lets CEO and SUPER_ADMIN reach anyone', async () => {
@@ -109,7 +121,7 @@ describe('canTouchEmployee (#228)', () => {
 
 	it('allows a MANAGER on someone in a branch they manage', async () => {
 		dbMock.branch.findMany.mockResolvedValue([{ id: 'br1' }])
-		dbMock.employee.findFirst.mockResolvedValue({ branchId: 'br1' })
+		targetRow = { branchId: 'br1' }
 		expect(await canTouchEmployee(actor('MANAGER'), 'crew1')).toBe(true)
 	})
 
@@ -117,19 +129,30 @@ describe('canTouchEmployee (#228)', () => {
 		// Rows written before #235 can still point across tenants (every writer validates now).
 		// The relationship must not survive the org filter.
 		listReportIdsFor.mockResolvedValue(['report1'])
-		dbMock.employee.findFirst.mockResolvedValue(null)
+		targetRow = null
 		expect(await canTouchEmployee(actor('MANAGER'), 'report1')).toBe(false)
 	})
 
 	it('refuses a MANAGER on someone in a branch they do NOT manage', async () => {
 		dbMock.branch.findMany.mockResolvedValue([{ id: 'br1' }])
-		dbMock.employee.findFirst.mockResolvedValue({ branchId: 'br2' })
+		targetRow = { branchId: 'br2' }
 		expect(await canTouchEmployee(actor('MANAGER'), 'crew2')).toBe(false)
 	})
 
 	it('fails closed when the actor has no employee record of their own', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		selfRow = null
 		expect(await canTouchEmployee(actor('MANAGER'), 'anyone')).toBe(false)
+	})
+
+	// #6 — the self lookup was an unscoped `findUnique`, so a multi-org actor got their HOME-org
+	// row whichever tenant the session was in. Asserted on the query, not the result: a fixture can
+	// only show which row came back, and every row here belongs to org1, so no result-shaped
+	// assertion can see a missing filter.
+	it('scopes the self lookup to the active organization (#6)', async () => {
+		await canTouchEmployee(actor('MANAGER'), 'stranger')
+		expect(dbMock.employee.findFirst).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { userId: 'user1', organizationId: 'org1' } })
+		)
 	})
 })
 
@@ -143,7 +166,7 @@ describe('listVisibleEmployeeIds (#234)', () => {
 		for (const role of ['HR_ADMIN', 'CEO', 'SUPER_ADMIN'] as const) {
 			expect(await listVisibleEmployeeIds(actor(role))).toBeNull()
 		}
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 
 	it('shows a MANAGER with no team only themselves', async () => {
@@ -177,8 +200,15 @@ describe('listVisibleEmployeeIds (#234)', () => {
 		expect(await listVisibleEmployeeIds(actor('MANAGER'))).not.toContain('foreign1')
 	})
 
+	it('scopes the self lookup to the active organization (#6)', async () => {
+		await listVisibleEmployeeIds(actor('MANAGER'))
+		expect(dbMock.employee.findFirst).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { userId: 'user1', organizationId: 'org1' } })
+		)
+	})
+
 	it('returns nobody — not everybody — when the actor has no employee record', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		selfRow = null
 		// The dangerous failure would be `null`, which the callers read as "unrestricted".
 		expect(await listVisibleEmployeeIds(actor('MANAGER'))).toEqual([])
 	})
@@ -192,7 +222,7 @@ describe('listVisibleEmployeeIds (#234)', () => {
 		const visible = (await listVisibleEmployeeIds(actor('MANAGER')))!
 
 		for (const id of visible) {
-			dbMock.employee.findFirst.mockResolvedValue({ branchId: id === 'crew1' ? 'br1' : null })
+			targetRow = { branchId: id === 'crew1' ? 'br1' : null }
 			expect(await canTouchEmployee(actor('MANAGER'), id)).toBe(true)
 		}
 	})
@@ -229,7 +259,7 @@ describe('the full role set decides, not the primary role (#247)', () => {
 		// Admitted BY THE CAPABILITY, not by accident of the fixtures: the org-wide arm returns
 		// before any team is looked up. Asserted first, on untouched mocks — without it, a mutation
 		// returning true unconditionally would also pass.
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 
 		expect(await canTouchEmployee(actor('MANAGER', ['MANAGER']), 'stranger')).toBe(false)
 	})

@@ -132,7 +132,12 @@ beforeEach(() => {
 	dbMock.actionProposal.findUniqueOrThrow.mockResolvedValue({ id: 'p1', status: 'APPLIED' })
 	// `assertMayDecide` resolves the target's user id through findUnique; getEmployee uses findFirst.
 	dbMock.employee.findUnique.mockResolvedValue({ userId: crew.userId })
-	dbMock.employee.findFirst.mockResolvedValue(crew)
+	// `getEmployee` and `revealEmployeeSensitive` both read this by `{ id, organizationId }`. A plain
+	// `mockResolvedValue` returns `crew` no matter what org or id was asked for, so it cannot fail on
+	// a missing or wrong `organizationId` filter — discriminate on both instead.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.id === crew.id && where.organizationId === 'org1' ? crew : null)
+	)
 	dbMock.employee.findMany.mockResolvedValue([])
 	dbMock.employeeCompensation.findMany.mockResolvedValue([])
 	dbMock.employeeCompensation.findFirst.mockResolvedValue(null)
