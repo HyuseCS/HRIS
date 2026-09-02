@@ -25,13 +25,21 @@ describe('classifyLegacyRun — rows whose numbers will move', () => {
 		expect(v.moves).toBe(true)
 		expect(v).toMatchObject({ oldShare: 0.5, newShare: 15 / 31 })
 	})
+
+	it('a cross-month range at or under the cap now day-counts and moves', () => {
+		expect(classifyLegacyRun(d('2026-05-20'), d('2026-06-05'))).toEqual({
+			moves: true,
+			oldShare: 0.5,
+			newShare: 12 / 31 + 5 / 30
+		})
+	})
 })
 
 describe('classifyLegacyRun — rows that are unaffected', () => {
-	it('a cross-month range keeps the flat 0.5', () => {
-		expect(classifyLegacyRun(d('2026-05-20'), d('2026-06-05'))).toEqual({
+	it('a cross-month range over the one-month cap keeps the flat 0.5', () => {
+		expect(classifyLegacyRun(d('2026-05-01'), d('2026-06-14'))).toEqual({
 			moves: false,
-			reason: 'crosses two months — keeps the historical flat 0.5'
+			reason: 'over the one-month cap — keeps the historical flat 0.5'
 		})
 	})
 

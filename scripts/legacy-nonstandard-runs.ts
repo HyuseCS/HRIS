@@ -1,11 +1,13 @@
-// #163 pre-flight (throwaway, READ-ONLY). Lists every DRAFT/COMPUTED PayrollRun whose
+// #3/#163 pre-flight (throwaway, READ-ONLY). Lists every DRAFT/COMPUTED PayrollRun whose
 // (periodStart, periodEnd) is not one of the three standard shapes, and says — per row — whether
-// #163 will actually MOVE its numbers on the next recompute.
+// the current rules will actually MOVE its numbers on the next recompute.
 //
 // Not every non-standard row moves. `periodShareOf` keeps the historical flat 0.5 for a reversed
-// or cross-month pair, so those recompute to exactly what they hold today. Only a SAME-MONTH
-// non-standard range switches to a day-count share, and even then only when that share is not
-// itself 0.5. LOCKED/RELEASED/VOIDED runs never recompute at all, so they are not listed.
+// range or a cross-month range whose summed month-slice fraction is OVER the one-month cap (D6) —
+// those recompute to exactly what they hold today, never clamped to 1. Any other non-standard
+// range — same-month, or cross-month AT OR UNDER the cap — switches to a day-count share, and
+// even then only when that share is not itself 0.5. LOCKED/RELEASED/VOIDED runs never recompute
+// at all, so they are not listed.
 //
 //   pnpm dotenv -e .env.dev -- tsx scripts/legacy-nonstandard-runs.ts
 //
@@ -16,7 +18,7 @@ import { PrismaClient } from '@prisma/client'
 import { pathToFileURL } from 'node:url'
 import {
 	isValidStandardPeriod,
-	isSameMonthRange,
+	summedMonthShare,
 	describePeriod,
 	periodShareOf,
 	utcMidnight
@@ -42,8 +44,8 @@ export function classifyLegacyRun(periodStart: Date, periodEnd: Date): RunClassi
 	if (utcMidnight(periodEnd) < utcMidnight(periodStart)) {
 		return { moves: false, reason: 'reversed range — keeps the historical flat 0.5' }
 	}
-	if (!isSameMonthRange(periodStart, periodEnd)) {
-		return { moves: false, reason: 'crosses two months — keeps the historical flat 0.5' }
+	if (summedMonthShare(periodStart, periodEnd) > 1) {
+		return { moves: false, reason: 'over the one-month cap — keeps the historical flat 0.5' }
 	}
 	const newShare = periodShareOf(periodStart, periodEnd)
 	if (newShare === LEGACY_SHARE) {
