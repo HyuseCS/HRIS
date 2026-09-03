@@ -124,9 +124,10 @@ async function loadMatrix(
 		dates,
 		attendanceMap,
 		startDate: startISO,
-		endDate: endISO,
-		// Food-service tenants label this roster "Branches" (#182), so the heading follows suit.
-		isFoodService: isFoodServiceOrg(user.organizationId)
+		endDate: endISO
+		// `isFoodService` was returned only to swap this matrix's heading to "Branch Attendance"
+		// (#182). The owner's 03-09-26 ruling makes the roster "Team" for every tenant, so the flag
+		// has no remaining reader here.
 	}
 }
 

@@ -17,7 +17,6 @@
 			attendanceMap: Record<string, Record<string, string>>
 			startDate: string
 			endDate: string
-			isFoodService: boolean
 		}
 	} = $props()
 
@@ -69,9 +68,10 @@
 
 {#snippet toolbar()}
 	<div class="relative flex items-center gap-2">
-		<h2 class="text-base font-semibold">
-			{matrix.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
-		</h2>
+		<!-- Owner ruling 03-09-26 (#182): a physical location is a "Store" on every surface, and the
+		     people roster is "Team" for every tenant. The old food-service branch, which called the
+		     roster "Branches" and the store registry "Stores", is the inversion being killed. -->
+		<h2 class="text-base font-semibold">Team Attendance</h2>
 		<HelpTip label="About team attendance">
 			Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across
 			a date range.

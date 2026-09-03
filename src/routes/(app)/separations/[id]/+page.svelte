@@ -54,7 +54,9 @@
 </script>
 
 <svelte:head>
-	<title>Separation — {s.employee.lastName}, {s.employee.firstName}</title>
+	<!-- R2: a separation is itself the adverse fact, so no name in the tab, the history list or a
+	     shared screen. The page body still names the person. -->
+	<title>Separation — Veent HRIS</title>
 </svelte:head>
 
 <div class="space-y-6">

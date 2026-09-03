@@ -121,7 +121,7 @@ export async function openComplaint(input: OpenComplaintInput, ctx: AuditContext
 	await notify(
 		employee.user.id,
 		`HR opened an inquiry: ${input.subject}`,
-		`/complaints/${complaint.id}`
+		`/inquiries/${complaint.id}`
 	)
 	return complaint
 }
@@ -173,13 +173,13 @@ export async function postComplaintMessage(
 		await notify(
 			complaint.openedBy.id,
 			`${complaint.employee.firstName} ${complaint.employee.lastName} responded to: ${complaint.subject}`,
-			`/complaints/${complaintId}`
+			`/inquiries/${complaintId}`
 		)
 	} else {
 		await notify(
 			complaint.employee.user.id,
 			`HR replied to inquiry: ${complaint.subject}`,
-			`/complaints/${complaintId}`
+			`/inquiries/${complaintId}`
 		)
 	}
 	return { status }
@@ -223,7 +223,7 @@ export async function resolveComplaint(complaintId: string, ctx: AuditContext) {
 	await notify(
 		complaint.employee.user.id,
 		`Your HR inquiry was marked resolved: ${complaint.subject}`,
-		`/complaints/${complaintId}`
+		`/inquiries/${complaintId}`
 	)
 	return updated
 }

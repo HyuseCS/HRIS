@@ -23,7 +23,8 @@ test.describe('Branches', () => {
 
 	test('JoJo HR sees the stores and can filter by status', async ({ page }) => {
 		await login(page, USERS.jojoManager, 'JoJo Potato')
-		// The store registry reads "Stores"; the roster tab is the one now labelled "Branches".
+		// "Stores" everywhere for a physical location, per the owner's 03-09-26 #182 ruling; the
+		// roster tab is "Team" for every tenant now, not "Branches".
 		await expect(page.getByRole('link', { name: 'Stores' })).toBeVisible()
 
 		await page.goto('/branches', { waitUntil: 'domcontentloaded' })
@@ -62,11 +63,11 @@ test.describe('Branches', () => {
 		await page.goto('/branches', { waitUntil: 'domcontentloaded' })
 		await page.waitForLoadState('networkidle')
 
-		await page.getByText('Add a branch').click()
+		await page.getByText('Add a store').click()
 		await page.locator('#a-name').fill('E2E Test Branch')
 		// Naming a manager must also assign them — that is the manager/roster invariant.
 		await page.locator('#a-manager').selectOption({ index: 1 })
-		await page.getByRole('button', { name: 'Add branch' }).click()
+		await page.getByRole('button', { name: 'Add store' }).click()
 
 		const added = row(page, 'E2E Test Branch')
 		await expect(added).toBeVisible()

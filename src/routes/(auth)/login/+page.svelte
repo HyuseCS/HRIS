@@ -1,24 +1,26 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
-	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte' // TEMP DEV — remove before merge
+	// DEV ONLY — dev-gated (dev && !navigator.webdriver), never ships enabled; remove after the
+	// program's owner test pass
+	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte'
 	import type { ActionData, PageData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let loading = $state(false)
 
-	// Two-step Avipa login (#135): pick a tenant, then enter credentials. The chosen
+	// Two-step Veent HRIS login (#135): pick a tenant, then enter credentials. The chosen
 	// org is posted as `selectedOrg`; the server scopes the credential to it.
 	let selectedOrg = $state<{ id: string; name: string } | null>(null)
 </script>
 
 <svelte:head>
-	<title>Sign In — Avipa</title>
+	<title>Sign In — Veent HRIS</title>
 </svelte:head>
 
 <div class="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-	<!-- Avipa brand -->
+	<!-- Veent HRIS brand -->
 	<div class="mb-8 flex flex-col items-center gap-3">
-		<img src="/avipa-logo.png" alt="Avipa" class="h-16 w-auto" />
+		<img src="/veent-logo.png" alt="Veent" class="h-16 w-auto" />
 		<p class="text-sm text-muted-foreground">Log in to your company</p>
 	</div>
 
@@ -124,8 +126,9 @@
 		{/if}
 	</div>
 
-	<p class="mt-6 text-xs text-muted-foreground">Avipa · {new Date().getFullYear()}</p>
+	<p class="mt-6 text-xs text-muted-foreground">Veent HRIS · {new Date().getFullYear()}</p>
 </div>
 
 <DevLoginSwitcher />
-<!-- TEMP DEV — remove before merge -->
+<!-- DEV ONLY — dev-gated (dev && !navigator.webdriver), never ships enabled; remove after the
+     program's owner test pass -->
