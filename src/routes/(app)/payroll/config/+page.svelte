@@ -82,7 +82,17 @@
 	</p>
 
 	{#if form?.success}
-		<Banner kind="success" message="Payroll configuration saved successfully." />
+		<!-- Name what was saved: this page has two forms and one banner, so a multipliers save used
+		     to report "Payroll configuration saved" — true but not the thing the person just did.
+		     The generic sentence stays as the fallback for a result with no action name. -->
+		<Banner
+			kind="success"
+			message={form.action === 'update'
+				? 'Payroll frequency and cutoffs saved.'
+				: form.action === 'updateRates'
+					? 'DOLE multipliers saved.'
+					: 'Payroll configuration saved successfully.'}
+		/>
 	{/if}
 
 	{#if form?.error}

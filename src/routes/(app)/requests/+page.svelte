@@ -298,18 +298,30 @@
 				</div>
 			{:else if selectedType === 'INFO_UPDATE'}
 				<div class="grid gap-1.5">
-					<label for="field" class="text-sm font-medium">Field {@render req()}</label>
-					<input
+					<label for="field" class="text-sm font-medium">What to change {@render req()}</label>
+					<!--
+						The option values are the exact keys `resolveInfoUpdateColumn` accepts
+						(src/lib/server/services/requests/apply.ts) — this is a presentation swap, so the
+						server action and its Zod schema are unchanged. Only two: anything else is dropped
+						at apply time, which would approve the request and write nothing. Personal email,
+						emergency contact, bank details, civil status and surname are deliberately not
+						self-service; they land with T164 and stay HR-only.
+					-->
+					<select
 						id="field"
 						name="field"
-						type="text"
 						required
-						placeholder="e.g. contactAddress"
-						value={submitted?.field ?? ''}
 						aria-invalid={invalid('field')}
 						aria-describedby={describedBy('field')}
 						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					/>
+					>
+						<option value="contactAddress" selected={submitted?.field === 'contactAddress'}
+							>Home address</option
+						>
+						<option value="contactPhone" selected={submitted?.field === 'contactPhone'}
+							>Mobile number</option
+						>
+					</select>
 					{@render fieldError('field')}
 				</div>
 				<div class="grid gap-1.5">

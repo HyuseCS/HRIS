@@ -47,7 +47,8 @@ export const actions: Actions = {
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = createSchema.safeParse(raw)
-		if (!parsed.success) return fail(400, { error: 'Invalid input' })
+		if (!parsed.success)
+			return fail(400, { error: 'Fill in the posting title, department and status.' })
 
 		try {
 			await createJobPosting(user.organizationId, parsed.data, {

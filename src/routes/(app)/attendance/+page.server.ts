@@ -183,7 +183,7 @@ export const actions: Actions = {
 	derive: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid range' })
+		if (!parsed.success) return fail(400, { error: 'Choose a start date and an end date.' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
 			return fail(400, { error: 'Range exceeds the 2-month limit.' })
 		try {
@@ -200,7 +200,8 @@ export const actions: Actions = {
 	correct: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = correctSchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid correction' })
+		if (!parsed.success)
+			return fail(400, { error: 'Enter a valid time in and time out for this correction.' })
 		const { id, date, timeIn, timeOut, ...rest } = parsed.data
 		const data: Parameters<typeof correctDay>[2] = { ...rest }
 		// Rebuild PHT timestamps from the day key + HH:MM (only when a date was sent).
@@ -219,7 +220,10 @@ export const actions: Actions = {
 	resetDay: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const id = (await event.request.formData()).get('id') as string
-		if (!id) return fail(400, { error: 'Missing day id' })
+		if (!id)
+			return fail(400, {
+				error: 'That attendance row is no longer on screen. Reload the page and try again.'
+			})
 		try {
 			await resetDayToDerived(id, event.locals.user!.organizationId, ctxOf(event))
 		} catch (e) {
@@ -232,7 +236,7 @@ export const actions: Actions = {
 	lock: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid range' })
+		if (!parsed.success) return fail(400, { error: 'Choose a start date and an end date.' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
 			return fail(400, { error: 'Range exceeds the 2-month limit.' })
 		try {
@@ -251,7 +255,7 @@ export const actions: Actions = {
 	unlock: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'OVERRIDE_FINALIZED')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid range' })
+		if (!parsed.success) return fail(400, { error: 'Choose a start date and an end date.' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
 			return fail(400, { error: 'Range exceeds the 2-month limit.' })
 		try {
@@ -269,7 +273,7 @@ export const actions: Actions = {
 	unlockTeam: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'OVERRIDE_FINALIZED')
 		const parsed = teamDaySchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid date' })
+		if (!parsed.success) return fail(400, { error: 'Choose a date.' })
 		try {
 			await unlockRange(
 				event.locals.user!.organizationId,
@@ -286,7 +290,7 @@ export const actions: Actions = {
 	saveTimesheet: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid range' })
+		if (!parsed.success) return fail(400, { error: 'Choose a start date and an end date.' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
 			return fail(400, { error: 'Range exceeds the 2-month limit.' })
 		try {
@@ -309,7 +313,7 @@ export const actions: Actions = {
 	deriveTeam: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = teamDaySchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid date' })
+		if (!parsed.success) return fail(400, { error: 'Choose a date.' })
 		try {
 			await deriveRange(
 				event.locals.user!.organizationId,
@@ -352,7 +356,7 @@ export const actions: Actions = {
 	lockTeam: async (event) => {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = teamDaySchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid date' })
+		if (!parsed.success) return fail(400, { error: 'Choose a date.' })
 		try {
 			await lockRange(
 				event.locals.user!.organizationId,

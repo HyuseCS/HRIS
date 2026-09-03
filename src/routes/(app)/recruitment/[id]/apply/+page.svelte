@@ -98,7 +98,8 @@
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 					<p class="mt-1 text-xs text-muted-foreground">
-						Link to your resume (Google Drive, Dropbox, etc.)
+						<!-- HR fills this form in on the applicant's behalf, so the copy is third person. -->
+						Link to the applicant's resume (Google Drive, Dropbox, etc.)
 					</p>
 				</div>
 				<div>

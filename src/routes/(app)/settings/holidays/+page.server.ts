@@ -56,7 +56,9 @@ export const actions: Actions = {
 		const id = raw.id as string
 
 		if (!id) {
-			return fail(400, { error: 'Holiday ID is required' })
+			return fail(400, {
+				error: 'That holiday is no longer on screen. Reload the page and try again.'
+			})
 		}
 
 		const parsed = holidaySchema.safeParse(raw)
@@ -96,7 +98,9 @@ export const actions: Actions = {
 		const id = data.get('id') as string
 
 		if (!id) {
-			return fail(400, { error: 'Holiday ID is required' })
+			return fail(400, {
+				error: 'That holiday is no longer on screen. Reload the page and try again.'
+			})
 		}
 
 		// Verify the holiday belongs to this organization

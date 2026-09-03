@@ -183,7 +183,11 @@ export const actions: Actions = {
 		const id = data.get('id') as string
 		const approve = data.get('action') === 'approve'
 		const note = (data.get('note') as string) || undefined
-		if (!id) return fail(400, { action: 'decidePosting', error: 'Missing posting id' })
+		if (!id)
+			return fail(400, {
+				action: 'decidePosting',
+				error: 'That job posting is no longer on screen. Reload the page and try again.'
+			})
 
 		const myEmployee = await db.employee.findFirst({
 			where: { userId: user.id, organizationId: user.organizationId },
