@@ -138,7 +138,7 @@
 		@apply bg-border rounded-full;
 	}
 	::-webkit-scrollbar-thumb:hover {
-		background: hsl(0 0% 28%);
+		@apply bg-muted-foreground/50;
 	}
 }
 
@@ -156,20 +156,25 @@
 		@apply h-1.5 w-1.5 shrink-0 rounded-full bg-current;
 		content: '';
 	}
+	/* Every variant is theme-paired: the `text-*-400` step alone sits under 4.5:1 on the white
+	   light-mode card, so each rule names a darker light step and keeps `-400` for dark. The
+	   badge is 12px `font-medium`, which is not WCAG "large text", so the 3:1 allowance never
+	   applies here — every pair must clear 4.5:1 over the composited (tinted) card background.
+	   `badge` stays FIRST in each rule: it carries the pill layout and the leading dot. */
 	.badge-green {
-		@apply badge bg-green-500/15 text-green-400;
+		@apply badge bg-green-500/15 text-green-800 dark:text-green-400;
 	}
 	.badge-red {
-		@apply badge bg-red-500/15 text-red-400;
+		@apply badge bg-red-500/15 text-red-700 dark:text-red-400;
 	}
 	.badge-yellow {
-		@apply badge bg-yellow-500/15 text-yellow-400;
+		@apply badge bg-yellow-500/20 text-yellow-800 dark:text-yellow-400;
 	}
 	.badge-blue {
-		@apply badge bg-blue-500/15 text-blue-400;
+		@apply badge bg-blue-500/15 text-blue-700 dark:text-blue-400;
 	}
 	.badge-gray {
-		@apply badge bg-white/10 text-white/50;
+		@apply badge bg-muted text-foreground/70;
 	}
 
 	/* Input base style */
