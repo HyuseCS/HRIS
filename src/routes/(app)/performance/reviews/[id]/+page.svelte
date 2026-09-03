@@ -7,6 +7,7 @@
 	import { answerDraft, serialiseAnswers } from '$lib/components/performance/answer-draft'
 	import { addToast } from '$lib/stores/toast.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { formatDate } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -63,13 +64,9 @@
 		await update()
 		if (result.type === 'success') addToast('Signature recorded.', { kind: 'success' })
 	})
-	// #108: a double-click must not fire a second release. The service is idempotent anyway, so the
-	// worst case was already harmless — this is the affordance, not the guarantee.
-	const release = createSubmitGuard(() => async ({ result, update }) => {
-		await update()
-		if (result.type === 'success')
-			addToast('Evaluation released to the employee.', { kind: 'success' })
-	})
+	// #108: a double-click must not fire a second release. ConfirmButton's own busy state is now
+	// that guard — the release runs inside it, so no separate `createSubmitGuard` is needed here.
+	// The service is idempotent anyway, so the worst case was already harmless.
 	const submitScores = createSubmitGuard(() => async ({ result, update }) => {
 		// `reset: false` — the inputs are bound to `draft`, and a native form reset would blank the
 		// DOM without telling Svelte, leaving what is shown and what would be posted disagreeing.
@@ -151,13 +148,16 @@
 						{r.releasedBy.lastName}{/if} on {formatDate(r.releasedAt)}
 				</p>
 			{:else if data.canRelease}
-				<form method="POST" action="?/release" use:enhance={release.enhance}>
-					<button
-						disabled={release.busy}
-						class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-						>{release.busy ? 'Releasing…' : 'Release to employee'}</button
-					>
-				</form>
+				<ConfirmButton
+					action="?/release"
+					title="Release this review to the employee?"
+					message="{r.employee.firstName} {r.employee
+						.lastName} will be able to read every rating, comment and recommendation on this evaluation. There is no un-release — once they can see it, they have seen it."
+					confirmText="Release to employee"
+					triggerLabel="Release to employee"
+					triggerClass="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+					successMessage="Evaluation released to the employee."
+				/>
 			{/if}
 		</div>
 

@@ -4,6 +4,7 @@
 	import { tick } from 'svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { ROLE_DESCRIPTIONS, ROLE_GROUPS, ROLE_LABELS, canAny } from '$lib/rbac'
 	import Check from 'lucide-svelte/icons/check'
@@ -188,17 +189,34 @@
 									tone={u.isActive ? 'green' : 'gray'}
 								/>
 								{#if canManageActive}
-									<form method="POST" action="?/setActive" use:enhance={setActive.enhance}>
-										<input type="hidden" name="userId" value={u.id} />
-										<input type="hidden" name="isActive" value={u.isActive ? 'false' : 'true'} />
-										<button
-											type="submit"
-											disabled={setActive.busy}
-											class="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+									{#if u.isActive}
+										<!-- Deactivating locks a person out, so it confirms first; re-activating is
+										     neither destructive nor irreversible and deliberately stays one click.
+										     #108: ConfirmButton's busy state is this form's single-submit guard. -->
+										<ConfirmButton
+											action="?/setActive"
+											title="Deactivate this login?"
+											message="{u.email} is signed out and cannot sign in again until someone re-activates them. Their employee record, payroll history and documents are untouched."
+											confirmText="Deactivate"
+											triggerLabel="Deactivate"
+											triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 										>
-											{setActive.busy ? 'Saving…' : u.isActive ? 'Deactivate' : 'Activate'}
-										</button>
-									</form>
+											<input type="hidden" name="userId" value={u.id} />
+											<input type="hidden" name="isActive" value="false" />
+										</ConfirmButton>
+									{:else}
+										<form method="POST" action="?/setActive" use:enhance={setActive.enhance}>
+											<input type="hidden" name="userId" value={u.id} />
+											<input type="hidden" name="isActive" value="true" />
+											<button
+												type="submit"
+												disabled={setActive.busy}
+												class="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+											>
+												{setActive.busy ? 'Saving…' : 'Activate'}
+											</button>
+										</form>
+									{/if}
 								{/if}
 							</div>
 						</td>

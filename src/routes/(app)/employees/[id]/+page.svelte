@@ -15,6 +15,7 @@
 	import { isValidGovId, govIdError, type GovIdField } from '$lib/utils/gov-ids'
 	import { LOAN_TYPES } from '$lib/utils/loan-types'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import MaskedField from '$lib/components/ui/MaskedField.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -138,6 +139,16 @@
 		PAGIBIG: 'Pag-IBIG'
 	}
 	const uploadDocument = submitFeedback()
+
+	// Offboarding disables a person's employment record and their login, so it confirms first. The
+	// form keeps its own `use:enhance` and busy gating: the Last Day field is typed by the user and
+	// cannot move into ConfirmButton's own form. `reportValidity()` runs before the dialog opens so
+	// a missing Last Day is refused where the user is looking, not after they confirm.
+	let offboardFormEl = $state<HTMLFormElement>()
+	let offboardConfirm = $state(false)
+	function openOffboardConfirm() {
+		if (offboardFormEl?.reportValidity()) offboardConfirm = true
+	}
 </script>
 
 {#snippet actionError(names: string[])}
@@ -1771,6 +1782,7 @@
 		{/if}
 		{#if canManage && employee.employmentStatus === 'ACTIVE'}
 			<form
+				bind:this={offboardFormEl}
 				method="POST"
 				action="?/offboard"
 				use:enhance={offboard.enhance}
@@ -1789,8 +1801,9 @@
 						/>
 					</div>
 					<button
-						type="submit"
+						type="button"
 						disabled={offboard.busy}
+						onclick={openOffboardConfirm}
 						class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50"
 						>{offboard.busy ? 'Offboarding…' : 'Offboard'}</button
 					>
@@ -1799,3 +1812,11 @@
 		{/if}
 	</div>
 </div>
+
+<ConfirmDialog
+	bind:open={offboardConfirm}
+	title="Offboard this employee?"
+	message="{employee.firstName} {employee.lastName} is marked OFFBOARDED as of the last day you entered, their login is disabled, and they stop appearing in active-employee lists and payroll runs. Reversing this needs a Super Admin."
+	confirmText="Offboard"
+	onconfirm={() => offboardFormEl?.requestSubmit()}
+/>
