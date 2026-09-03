@@ -196,19 +196,6 @@
 <div class="space-y-8">
 	<PageHeader title="Timesheets" />
 
-	<!-- The create action sits above the lists it adds to, not on the title row. It cannot go on
-	     a section heading: `canCreate` is independent of which of the two sections render. -->
-	{#if data.canCreate}
-		<div class="flex justify-end">
-			<button
-				onclick={() => (showCreate = true)}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-			>
-				New Timesheet
-			</button>
-		</div>
-	{/if}
-
 	<!-- 14 server `fail()` sites are reachable with the modal CLOSED, and the modal owns the only
 	     other error slot on this page — so with it shut the failure rendered nowhere. Gated on
 	     `openTs` so an open modal still shows the message once, in place. -->
@@ -216,12 +203,42 @@
 		<Banner kind="error" message={form.error} />
 	{/if}
 
+	<!-- Both banners stay OUTSIDE the creation section below: they report the result of ANY action
+	     on this page (submit, delete, modal edit), so gating them on `canCreate` would hide a
+	     result from a user who can act but cannot create. -->
 	{#if form?.saved}
 		<Banner kind="success" message={form.saved} />
 	{/if}
 
-	{#if data.isHrAdmin}
-		<AggregatePanel employees={data.employees} />
+	<!-- Phase 6 / T5: the two creation doors sit under ONE heading that names the period shape each
+	     one takes, and points at the third door on /attendance. They were unlabelled siblings. -->
+	{#if data.canCreate || data.isHrAdmin}
+		<section class="space-y-3">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div class="min-w-0 flex-1 space-y-1">
+					<h2 class="text-lg font-semibold">Create a timesheet</h2>
+					<p class="max-w-2xl text-sm text-muted-foreground">
+						Pay period (1–15, 16–end, or whole month) — use New Timesheet. One week of Discord
+						punches — use Aggregate from time logs. A custom same-month range — correct it on
+						<a href="/attendance" class="underline underline-offset-2 hover:text-foreground"
+							>Attendance</a
+						> and use Save as timesheet there.
+					</p>
+				</div>
+				{#if data.canCreate}
+					<button
+						onclick={() => (showCreate = true)}
+						class="ml-auto shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+					>
+						New Timesheet
+					</button>
+				{/if}
+			</div>
+
+			{#if data.isHrAdmin}
+				<AggregatePanel employees={data.employees} />
+			{/if}
+		</section>
 	{/if}
 
 	{#if data.myEmployeeId}

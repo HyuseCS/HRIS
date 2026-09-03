@@ -370,13 +370,20 @@
 				<input type="hidden" name="from" value={data.from} />
 				<input type="hidden" name="to" value={data.to} />
 				<button
-					title="Persist this range as a Timesheet record"
 					disabled={saveTimesheet.busy}
 					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 					>{@render icon(IC.document)}Save as timesheet</button
 				>
 			</form>
 		</div>
+		<!-- Phase 6 / T5: this is the third timesheet-creation door. What it takes was only in a
+		     hover `title`, which no touch user and no screen reader user ever saw. -->
+		<p class="text-xs text-muted-foreground">
+			Saves the selected range (must be within one month) as a timesheet.
+			<a href="/timesheets" class="underline underline-offset-2 hover:text-foreground"
+				>All timesheets</a
+			>
+		</p>
 	{:else if data.canManage && data.view === 'team'}
 		<div class="flex flex-wrap gap-2">
 			<form method="POST" action="?/deriveTeam" use:enhance={deriveTeam.enhance}>
