@@ -156,7 +156,7 @@ test.describe('Government ID validation', () => {
 		// Typed three different ways; all three should land normalised.
 		await page.getByLabel('SSS Number').fill('34 1234567 8')
 		await page.getByLabel('PhilHealth Number').fill('123456789012')
-		await page.getByLabel('TIN').fill('123-456-789')
+		await page.getByLabel('TIN Number').fill('123-456-789')
 		await page.getByRole('button', { name: 'Create Employee' }).click()
 		await page.waitForURL(/\/employees\/c[a-z0-9]{10,}$/)
 
