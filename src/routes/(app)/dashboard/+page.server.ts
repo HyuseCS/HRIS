@@ -141,6 +141,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			pendingRequests: pending.requests,
 			pendingTimesheets: pending.timesheets,
 			pendingPayrollRuns: pending.payrollRuns,
+			pendingProposals: pending.proposals,
 			// Withhold payroll figures from clients that may not view them.
 			lastPayrollRun: canViewPayroll ? lastPayrollRun : null,
 			attendance
