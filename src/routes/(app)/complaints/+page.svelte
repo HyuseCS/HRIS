@@ -232,6 +232,9 @@
 
 		{#if data.isHr && data.pagination}
 			<Pagination meta={data.pagination} />
+		{:else if !data.isHr && data.myPagination}
+			<!-- Own key and `myPage` param so the two branches' pagers cannot read each other's page. -->
+			<Pagination meta={data.myPagination} />
 		{/if}
 	{:else}
 		<div class="rounded-md border border-dashed">

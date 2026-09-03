@@ -8,6 +8,7 @@
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import { INVENTORY_STATUS_LABELS } from '$lib/labels'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -334,6 +335,7 @@
 					</tbody>
 				</table>
 			</div>
+			<Pagination meta={data.pagination} />
 			<p class="text-xs text-muted-foreground">
 				Edit a row's fields and press <span class="font-medium">Save</span>. Setting status to
 				<span class="font-medium">Assigned</span> requires choosing an employee.

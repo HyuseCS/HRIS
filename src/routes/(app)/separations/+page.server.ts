@@ -3,14 +3,15 @@ import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { createSeparation, listSeparations } from '$lib/server/services/separation'
 import { setFlash } from '$lib/server/flash'
+import { paginate } from '$lib/server/pagination'
 import { z } from 'zod'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	requireAnyCapability(user.roles, 'MANAGE_HR')
 
-	const [separations, employees] = await Promise.all([
+	const [allSeparations, employees] = await Promise.all([
 		listSeparations(user.organizationId),
 		db.employee.findMany({
 			where: {
@@ -22,7 +23,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		})
 	])
 
-	return { separations, employees }
+	// Sliced here, not in the query: `listSeparations` is a shared service and giving it
+	// skip/take is out of this phase's bounds. This caps what the page RENDERS, not what the
+	// load fetches — the query cost is tracked as a backlog item.
+	const pagination = paginate(url, allSeparations.length, { pageSize: 20 })
+	const separations = allSeparations.slice(pagination.skip, pagination.skip + pagination.take)
+
+	return { separations, employees, pagination }
 }
 
 const createSchema = z.object({
