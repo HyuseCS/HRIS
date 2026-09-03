@@ -1,13 +1,13 @@
 ---
 name: note:login-email-first-tenant-privacy
-description: "Owner ruled 2026-09-03 that login step 1 becomes email-first (option C) — a definite future build in a new auth-flow plan, NOT part of the UI/UX overhaul program."
+description: "Owner ruled 2026-09-03 that login step 1 becomes email-first (option C) — built as phase 09 of the UI/UX overhaul program."
 date: 03-09-26
 feature: ui-ux-overhaul
 ---
 
 # Login step 1 stops listing every tenant — email-first
 
-**Status:** NEW PLAN REQUIRED. Owner decision taken 2026-09-03. Not built in phase 08.
+**Status:** BUILT as phase 09 (PR #18).
 
 ## What is wrong today
 
@@ -53,3 +53,19 @@ phase 08's AC5/AC20 assert that absence.
   existing audit trail.
 - Open question for that plan: what a person sees when their email belongs to no org — it must be
   indistinguishable from a wrong password.
+
+## Follow-on: option D
+
+The owner declined option D — a rate limit on the org-resolution step — on 2026-09-03, and phase 09
+shipped without it (binding ruling 4).
+
+What that leaves open. Step 1 (`?/resolve`) adds **one `user.findUnique` per submitted email** on an
+anonymous, unauthenticated, un-rate-limited, un-audited endpoint. The *response* is provably
+identical for every email — one shape, `{ email, orgs }`, with `orgs` populated only for a 2+-org
+account, pinned by `tests/unit/login-resolution.test.ts` U1 — so no oracle exists in what the caller
+reads back. The cost of probing is what changed: before phase 09, testing whether an email exists
+meant posting a password, which burned a rate-limit slot and (for a real account) wrote a
+`LOGIN_FAILED` audit row. Now it does neither.
+
+**Option D is the named next hardening step.** Pair it with D1 and D4 in
+`login-timing-parity_NOTE_03-09-26.md` — those three are one auth-hardening pass, not three.

@@ -342,7 +342,8 @@ order, because CI runs format first and skips the rest on failure.
 
 # PROGRAM CLOSE — `ui-ux-overhaul`
 
-**All 8 phases are CODE DONE.** No phase is `VERIFIED`. Nothing is pushed and no PR is open.
+**All 9 phases are CODE DONE.** No phase is `VERIFIED`. Phase 09 (`login-email-first`) was added on
+04-09-26 by owner ruling and closes OWNER-DECISION-1.
 
 ## Phase status
 
@@ -356,6 +357,7 @@ order, because CI runs format first and skips the rest on failure.
 | 06 `surface-consolidation` | CODE DONE | `phase-06-surface-consolidation_REPORT_03-09-26.md` |
 | 07 `page-splits` | CODE DONE | `…-s1-s4`, `…-s5`, `…-s6-s7_REPORT_03-09-26.md` |
 | 08 `copy-a11y` | CODE DONE | `…-s1-s3`, `…-s4-s6_REPORT_03-09-26.md` (this file) |
+| 09 `login-email-first` | CODE DONE | `phase-09-login-email-first_REPORT_03-09-26.md` |
 
 ## Consolidated owner test pass
 
@@ -395,11 +397,27 @@ spot-check, the `impeccable` audit.
    selection after submit; a failed submit on each of the five long pages scrolls the error into view;
    the onboarding tick target is comfortable at 24px; the schedules pills read as switches.
 
+**Phase 09 (`login-email-first`, added 04-09-26)** — four browser checks, plus the whole e2e tier
+and the `impeccable` pass, all unrun. The manual four, verbatim from the phase 09 plan:
+
+| # | Check | Expect |
+|---|---|---|
+| **M-1** | **Multi-org login as the CEO.** Open `/login`, type `ceo@veent.ph`, press Continue. | Three companies listed as radio choices — Veent, JoJo Potato, Sweetleaf — and nothing else. Pick JoJo Potato, sign in. The app opens **in JoJo Potato**, not Veent |
+| **M-2** | **No-JavaScript login.** Turn JavaScript off in the browser, open `/login`, sign in as `admin@veent.ph`. | Both steps work as normal page loads. You reach the dashboard |
+| **M-3** | **Bookmarked `/login`.** Bookmark `/login`, close the tab, open the bookmark. Then sign in, and open the bookmark again while signed in. | Fresh visit shows step 1 (email) with no company list. While signed in it redirects to `/dashboard` |
+| **M-4** | **Unknown email look-and-feel.** Type an email that belongs to nobody (e.g. `nobody@example.com`) and press Continue. | It asks for a password exactly like a real email does — no "no such account", no different wording, no different timing you can see. Then any password gives `Invalid email or password` |
+
+In M-1 the pre-selected company is **JoJo Potato**, not Veent — the list is name-sorted on purpose
+and sorting the primary org first would disclose which org is primary. Pick before signing in.
+
+Phase 09 also owes the full `pnpm test:e2e` run (no pre-phase baseline was captured), the R2
+rate-limit lockout check on a running app, and the `impeccable` audit.
+
 ## Open owner decisions
 
 | # | Decision | State |
 |---|---|---|
-| OWNER-DECISION-1 | Login step 1 enumerates every tenant | **OPEN.** Options A/B/C/D in the phase 08 plan; recommended default **C** (email-first). Comment-only change shipped. |
+| OWNER-DECISION-1 | Login step 1 enumerates every tenant | **CLOSED.** Owner ruled option C (email-first) on 2026-09-03; built as phase 09, PR #18. See `phase-09-login-email-first_REPORT_03-09-26.md`. |
 | OWNER-DECISION-2 | `DevLoginSwitcher` removal | **OPEN.** Option **A applied as the interim** (comments reworded). Owner picks B (remove now) or C (remove after the live gate). Recommended **C**. |
 
 ## Open backlog notes
@@ -410,7 +428,7 @@ All in `process/features/ui-ux-overhaul/backlog/`:
 `component-test-dom-environment` · `dashboard-pending-approvals-wrong-target` ·
 `drawer-focus-trap-duplicates-dialog` *(new, this session)* ·
 `e2e-flakiness-blocks-feedback-regression` · `feedback-contract-remaining-adoption` ·
-`login-email-first-tenant-privacy` · `manager-admin-nav-gate-alignment` ·
+`login-email-first-tenant-privacy` *(BUILT as phase 09)* · `login-timing-parity` *(new, phase 09)* · `manager-admin-nav-gate-alignment` ·
 `org-switcher-offline-path-unproven` · `phase-03-residual-dark-only-colours` ·
 `phase-03-responsive-sweep` · `query-level-pagination-unbounded-lists` ·
 `raw-enum-sweep-remaining-enums`
