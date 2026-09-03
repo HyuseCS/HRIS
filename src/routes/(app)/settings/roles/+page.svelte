@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
-	import { fade, scale } from 'svelte/transition'
+	import { tick } from 'svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { ROLE_DESCRIPTIONS, ROLE_GROUPS, ROLE_LABELS, canAny } from '$lib/rbac'
 	import Check from 'lucide-svelte/icons/check'
@@ -25,6 +26,8 @@
 	const setActiveGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
 	const setActiveGuard = (id: string) => (setActiveGuards[id] ??= createSubmitGuard())
 	const setRoleGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
+	// The refusal message, focused after a rejected save — see the guard below.
+	let errorEl = $state<HTMLElement>()
 	// #283: a rejected save keeps the dialog OPEN, with the attempted selection intact and the
 	// server's reason inline beside it.
 	//
@@ -46,11 +49,13 @@
 				const d = result.data as
 					{ error?: string; fieldErrors?: Record<string, string[] | undefined> } | undefined
 				saveError = d?.fieldErrors?.roles?.[0] ?? d?.error ?? 'Those roles could not be saved.'
-				// Pull focus back into the dialog. Save is `disabled` while the submit is in flight,
-				// and disabling the focused element hands focus to <body> — so by the time the refusal
+				// Pull focus back into the dialog, onto the refusal itself. Save is `disabled` while
+				// the submit is in flight, and disabling the focused element hands focus to <body> — so by the time the refusal
 				// arrives the keyboard is OUTSIDE the modal: Escape no longer closes it and Tab walks
 				// the table underneath. Caught by the batched inspection round on the 409 path.
-				panelEl?.focus()
+				// `tick()` waits for the message element to exist before it can take focus.
+				await tick()
+				errorEl?.focus()
 				return
 			}
 			await update()
@@ -103,13 +108,11 @@
 	let editingId = $state<string | null>(null)
 	const editing = $derived(data.users.find((u) => u.id === editingId) ?? null)
 	let saveError = $state('')
-	let panelEl = $state<HTMLElement>()
-	// The control that opened the dialog, so focus can go back to exactly where it left.
-	let triggerEl: HTMLElement | null = null
 
-	function openEditor(id: string, trigger: HTMLElement) {
+	// Focusing the panel on open and handing focus back to the trigger on close both live in
+	// Dialog now — this page's trap was the one the primitive was lifted from.
+	function openEditor(id: string) {
 		editingId = id
-		triggerEl = trigger
 		saveError = ''
 	}
 	function closeEditor() {
@@ -118,13 +121,7 @@
 		if (editingId) delete draft[editingId]
 		editingId = null
 		saveError = ''
-		triggerEl?.focus()
-		triggerEl = null
 	}
-
-	$effect(() => {
-		if (editingId) panelEl?.focus()
-	})
 
 	// The advisory note, computed from CAPABILITY membership rather than from role names, so it
 	// still fires the day some other role is granted APPROVE_SIGNOFF.
@@ -133,31 +130,6 @@
 		const sel = rolesOf(editing) as Role[]
 		return canAny(sel, 'VERIFY_REQUESTS') && canAny(sel, 'APPROVE_SIGNOFF')
 	})
-
-	const FOCUSABLE =
-		'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
-
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			e.stopPropagation()
-			closeEditor()
-			return
-		}
-		if (e.key !== 'Tab' || !panelEl) return
-		// Keep Tab inside the dialog. Neither ConfirmDialog nor ReasonDialog does this; a modal
-		// that lets Tab walk into the table underneath is only visually modal.
-		const items = [...panelEl.querySelectorAll<HTMLElement>(FOCUSABLE)]
-		if (items.length === 0) return
-		const first = items[0]
-		const last = items[items.length - 1]
-		if (e.shiftKey && (document.activeElement === first || document.activeElement === panelEl)) {
-			e.preventDefault()
-			last.focus()
-		} else if (!e.shiftKey && document.activeElement === last) {
-			e.preventDefault()
-			first.focus()
-		}
-	}
 
 	// How many role pills the read display shows before collapsing the rest.
 	const PILL_CAP = 3
@@ -247,7 +219,7 @@
 								{#if editable && u.roles.length > PILL_CAP}
 									<button
 										type="button"
-										onclick={(e) => openEditor(u.id, e.currentTarget)}
+										onclick={() => openEditor(u.id)}
 										class="{PILL} cursor-pointer transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
 									>
 										+{u.roles.length - PILL_CAP} more
@@ -259,7 +231,7 @@
 							{#if editable}
 								<button
 									type="button"
-									onclick={(e) => openEditor(u.id, e.currentTarget)}
+									onclick={() => openEditor(u.id)}
 									class="btn-row min-h-11 gap-1.5 sm:min-h-0"
 								>
 									<Pencil class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -282,136 +254,126 @@
 	{@const eu = editing}
 	{@const setRole = setRoleGuard(eu.id)}
 	{@const chosen = rolesOf(eu)}
-	<div
-		class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-		onclick={closeEditor}
-		role="presentation"
-		transition:fade={{ duration: 100 }}
+	<Dialog
+		open
+		onclose={closeEditor}
+		labelledBy="role-editor-title"
+		size="wide"
+		padding="none"
+		scroll
+		zIndex={70}
 	>
-		<div
-			bind:this={panelEl}
-			class="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border bg-card shadow-2xl focus:outline-none sm:max-w-2xl lg:max-w-4xl"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={onKeydown}
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="role-editor-title"
-			tabindex="-1"
-			transition:scale={{ duration: 120, start: 0.96 }}
+		<div class="border-b px-6 py-5">
+			<h2 id="role-editor-title" class="text-lg font-semibold">Edit roles</h2>
+			<p class="mt-1 text-sm text-muted-foreground">
+				{eu.employeeName ? `${eu.employeeName} · ${eu.email}` : eu.email}
+			</p>
+		</div>
+
+		<form
+			method="POST"
+			action="?/setRole"
+			use:enhance={setRole.enhance}
+			class="flex min-h-0 flex-1 flex-col"
 		>
-			<div class="border-b px-6 py-5">
-				<h2 id="role-editor-title" class="text-lg font-semibold">Edit roles</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					{eu.employeeName ? `${eu.employeeName} · ${eu.email}` : eu.email}
-				</p>
+			<input type="hidden" name="userId" value={eu.id} />
+
+			<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+				{#each ROLE_GROUPS as group (group.label)}
+					<fieldset>
+						<legend class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+							{group.label}
+						</legend>
+						<div class="grid gap-2 sm:grid-cols-2">
+							{#each group.roles as r (r)}
+								{@const on = chosen.includes(r)}
+								<label
+									class="flex min-h-11 cursor-pointer select-none items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors {on
+										? 'border-primary/50'
+										: 'border-border hover:border-foreground/30'} focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background"
+								>
+									<input
+										type="checkbox"
+										name="roles"
+										value={r}
+										checked={eu.roles.includes(r)}
+										onchange={() => toggle(eu, r)}
+										class="sr-only"
+									/>
+									<span
+										class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border {on
+											? 'border-primary bg-primary text-primary-foreground'
+											: 'border-border'}"
+									>
+										{#if on}
+											<Check class="h-3 w-3" aria-hidden="true" />
+										{/if}
+									</span>
+									<span class="min-w-0">
+										<span class="block text-sm font-medium">{ROLE_LABELS[r]}</span>
+										<span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground"
+											>{ROLE_DESCRIPTIONS[r]}</span
+										>
+									</span>
+								</label>
+							{/each}
+						</div>
+					</fieldset>
+				{/each}
 			</div>
 
-			<form
-				method="POST"
-				action="?/setRole"
-				use:enhance={setRole.enhance}
-				class="flex min-h-0 flex-1 flex-col"
-			>
-				<input type="hidden" name="userId" value={eu.id} />
-
-				<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-					{#each ROLE_GROUPS as group (group.label)}
-						<fieldset>
-							<legend
-								class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-							>
-								{group.label}
-							</legend>
-							<div class="grid gap-2 sm:grid-cols-2">
-								{#each group.roles as r (r)}
-									{@const on = chosen.includes(r)}
-									<label
-										class="flex min-h-11 cursor-pointer select-none items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors {on
-											? 'border-primary/50'
-											: 'border-border hover:border-foreground/30'} focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background"
-									>
-										<input
-											type="checkbox"
-											name="roles"
-											value={r}
-											checked={eu.roles.includes(r)}
-											onchange={() => toggle(eu, r)}
-											class="sr-only"
-										/>
-										<span
-											class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border {on
-												? 'border-primary bg-primary text-primary-foreground'
-												: 'border-border'}"
-										>
-											{#if on}
-												<Check class="h-3 w-3" aria-hidden="true" />
-											{/if}
-										</span>
-										<span class="min-w-0">
-											<span class="block text-sm font-medium">{ROLE_LABELS[r]}</span>
-											<span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground"
-												>{ROLE_DESCRIPTIONS[r]}</span
-											>
-										</span>
-									</label>
-								{/each}
-							</div>
-						</fieldset>
-					{/each}
-				</div>
-
-				<div class="space-y-3 border-t px-6 py-4">
-					{#if saveError}
-						<div
-							role="alert"
-							class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{saveError}
-						</div>
-					{/if}
-					<!-- ADVISORY ONLY. Holding both hats is legal and this note never blocks the save —
+			<div class="space-y-3 border-t px-6 py-4">
+				{#if saveError}
+					<div
+						bind:this={errorEl}
+						role="alert"
+						tabindex="-1"
+						class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive focus:outline-none"
+					>
+						{saveError}
+					</div>
+				{/if}
+				<!-- ADVISORY ONLY. Holding both hats is legal and this note never blocks the save —
 					     what is barred is one person acting twice on the SAME request, and that is
 					     enforced server-side by `canActOnStage` in services/approvals.ts, at the moment
 					     of the decision. Do not wire this to `disabled`: role assignment is not where the
 					     rule lives, and making it refuse here would forbid a set the system allows. -->
-					{#if sodOverlap}
-						<p
-							class="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+				{#if sodOverlap}
+					<p
+						class="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+					>
+						<Info class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+						<span>
+							This user won't be able to verify and approve the same request — the system blocks
+							that automatically.
+						</span>
+					</p>
+				{/if}
+				<div class="flex items-center justify-between gap-3">
+					<p class="text-xs {chosen.length === 0 ? 'text-destructive' : 'text-muted-foreground'}">
+						{#if chosen.length === 0}
+							Pick at least one role.
+						{:else}
+							{chosen.length}
+							{chosen.length === 1 ? 'role' : 'roles'}{isDirty(eu) ? ' · unsaved' : ''}
+						{/if}
+					</p>
+					<div class="flex shrink-0 gap-2">
+						<button
+							type="button"
+							onclick={closeEditor}
+							class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">Cancel</button
 						>
-							<Info class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-							<span>
-								This user won't be able to verify and approve the same request — the system blocks
-								that automatically.
-							</span>
-						</p>
-					{/if}
-					<div class="flex items-center justify-between gap-3">
-						<p class="text-xs {chosen.length === 0 ? 'text-destructive' : 'text-muted-foreground'}">
-							{#if chosen.length === 0}
-								Pick at least one role.
-							{:else}
-								{chosen.length}
-								{chosen.length === 1 ? 'role' : 'roles'}{isDirty(eu) ? ' · unsaved' : ''}
-							{/if}
-						</p>
-						<div class="flex shrink-0 gap-2">
-							<button
-								type="button"
-								onclick={closeEditor}
-								class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-								>Cancel</button
-							>
-							<button
-								type="submit"
-								disabled={setRole.busy || !isDirty(eu) || chosen.length === 0}
-								class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-							>
-								{setRole.busy ? 'Saving…' : 'Save roles'}
-							</button>
-						</div>
+						<button
+							type="submit"
+							disabled={setRole.busy || !isDirty(eu) || chosen.length === 0}
+							class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+						>
+							{setRole.busy ? 'Saving…' : 'Save roles'}
+						</button>
 					</div>
 				</div>
-			</form>
-		</div>
-	</div>
+			</div>
+		</form>
+	</Dialog>
 {/if}
