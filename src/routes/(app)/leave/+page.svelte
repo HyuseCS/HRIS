@@ -4,6 +4,7 @@
 	import { slide } from 'svelte/transition'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -37,14 +38,6 @@
 			busy = false
 			if (result.type === 'success') selected = []
 		}
-	}
-
-	function statusClass(s: string) {
-		if (s === 'APPROVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'REJECTED') return 'bg-red-500/15 text-red-400'
-		if (s === 'RETURNED') return 'bg-orange-500/15 text-orange-400'
-		if (s === 'CANCELLED') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
 	}
 </script>
 
@@ -187,9 +180,7 @@
 							{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
 						</td>
 						<td class="px-4 py-3">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(req.status)}"
-								>{req.status}</span
-							>
+							<Badge status={req.status} domain="request" />
 						</td>
 						<td class="px-4 py-3 text-right text-muted-foreground"
 							>{formatShortDate(req.createdAt)}</td

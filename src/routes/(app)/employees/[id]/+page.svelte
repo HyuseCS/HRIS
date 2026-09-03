@@ -16,6 +16,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import MaskedField from '$lib/components/ui/MaskedField.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -177,13 +178,7 @@
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold">{employee.lastName}, {employee.firstName}</h1>
-			<span
-				class="rounded-full px-2.5 py-1 text-xs font-medium {employee.employmentStatus === 'ACTIVE'
-					? 'bg-green-500/15 text-green-400'
-					: 'bg-gray-500/15 text-gray-400'}"
-			>
-				{employee.employmentStatus}
-			</span>
+			<Badge status={employee.employmentStatus} domain="employment" />
 		</div>
 		<div
 			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
@@ -327,12 +322,12 @@
 						{#if band}
 							{#if band.status === 'within'}
 								<span
-									class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-400"
+									class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-700 dark:text-green-400"
 									title="Within the {band.name} band">✓ {grade?.name}</span
 								>
 							{:else}
 								<span
-									class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-400"
+									class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-700 dark:text-amber-400"
 									title="{band.name}: {formatCurrency(band.min)}–{formatCurrency(band.max)}"
 								>
 									⚠ {band.status === 'below' ? 'Below' : 'Above'}
@@ -882,14 +877,7 @@
 										{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}
 									</td>
 									<td class="px-3 py-2">
-										<span
-											class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {b.status ===
-											'ACTIVE'
-												? 'bg-green-500/15 text-green-400'
-												: b.status === 'WAIVED'
-													? 'bg-yellow-500/15 text-yellow-400'
-													: 'bg-gray-500/15 text-gray-400'}">{b.status}</span
-										>
+										<Badge status={b.status} domain="benefitEnrollment" />
 									</td>
 								</tr>
 							{/each}
@@ -1027,15 +1015,7 @@
 													>/ {formatCurrency(Number(l.installment))}·pd</span
 												></td
 											>
-											<td class="py-1.5 text-right"
-												><span
-													class="rounded-full px-2 py-0.5 text-xs {l.status === 'PAID'
-														? 'bg-green-500/15 text-green-400'
-														: l.status === 'CANCELLED'
-															? 'bg-gray-500/15 text-gray-400'
-															: 'bg-blue-500/15 text-blue-400'}">{l.status}</span
-												></td
-											>
+											<td class="py-1.5 text-right"><Badge status={l.status} domain="loan" /></td>
 										</tr>
 									{/each}
 								</tbody>
@@ -1099,15 +1079,7 @@
 													>/ {formatCurrency(Number(a.installment))}·pd</span
 												></td
 											>
-											<td class="py-1.5 text-right"
-												><span
-													class="rounded-full px-2 py-0.5 text-xs {a.status === 'PAID'
-														? 'bg-green-500/15 text-green-400'
-														: a.status === 'CANCELLED'
-															? 'bg-gray-500/15 text-gray-400'
-															: 'bg-blue-500/15 text-blue-400'}">{a.status}</span
-												></td
-											>
+											<td class="py-1.5 text-right"><Badge status={a.status} domain="loan" /></td>
 										</tr>
 									{/each}
 								</tbody>
@@ -1183,9 +1155,7 @@
 												>
 											</form>
 										{:else}
-											<span class="rounded-full bg-gray-500/15 px-2 py-0.5 text-xs text-gray-400"
-												>ENDED</span
-											>
+											<Badge status="ENDED" tone="gray" />
 										{/if}
 									</td>
 								</tr>
@@ -1375,9 +1345,7 @@
 												>
 											</form>
 										{:else}
-											<span class="rounded-full bg-gray-500/15 px-2 py-0.5 text-xs text-gray-400"
-												>ENDED</span
-											>
+											<Badge status="ENDED" tone="gray" />
 										{/if}
 									</td>
 								</tr>

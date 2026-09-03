@@ -6,6 +6,7 @@
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	// Fields the modal reads. Both the /timesheets list rows and the /requests/timesheets
 	// approvals-load rows satisfy this shape. Decimal columns are typed loosely (they arrive
@@ -267,12 +268,6 @@
 	}
 
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
-	const statusClass: Record<string, string> = {
-		APPROVED: 'badge-green',
-		REJECTED: 'badge-red',
-		SUBMITTED: 'badge-blue',
-		DRAFT: 'badge-gray'
-	}
 	const inputClass =
 		'h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 	const btnGhost =
@@ -306,7 +301,7 @@
 						<h2 class="truncate text-lg font-bold tracking-tight">
 							{ts.employee.lastName}, {ts.employee.firstName}
 						</h2>
-						<span class={statusClass[ts.status] ?? 'badge-gray'}>{ts.status}</span>
+						<Badge status={ts.status} domain="timesheet" />
 					</div>
 					<p class="mt-0.5 text-sm text-muted-foreground">
 						{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}

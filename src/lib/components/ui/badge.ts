@@ -13,6 +13,8 @@
 import {
 	APPLICANT_STAGE_LABELS,
 	APPROVAL_DECISION_LABELS,
+	ATTENDANCE_STATUS_LABELS,
+	BENEFIT_ENROLLMENT_STATUS_LABELS,
 	BRANCH_STATUS_LABELS,
 	CLEARANCE_STATUS_LABELS,
 	COMPLAINT_CATEGORY_LABELS,
@@ -21,6 +23,7 @@ import {
 	EMPLOYMENT_TYPE_LABELS,
 	INVENTORY_STATUS_LABELS,
 	LEAVE_REQUEST_STATUS_LABELS,
+	LOAN_STATUS_LABELS,
 	PAYROLL_PERIOD_STATUS_LABELS,
 	PAYROLL_RUN_STATUS_LABELS,
 	REQUEST_STATUS_LABELS,
@@ -56,6 +59,9 @@ export type BadgeDomain =
 	| 'branch'
 	| 'employment'
 	| 'employmentType'
+	| 'attendance'
+	| 'benefitEnrollment'
+	| 'loan'
 
 export const DOMAIN_LABELS: Record<BadgeDomain, Record<string, string>> = {
 	timesheet: TIMESHEET_STATUS_LABELS,
@@ -76,7 +82,10 @@ export const DOMAIN_LABELS: Record<BadgeDomain, Record<string, string>> = {
 	inventory: INVENTORY_STATUS_LABELS,
 	branch: BRANCH_STATUS_LABELS,
 	employment: EMPLOYMENT_STATUS_LABELS,
-	employmentType: EMPLOYMENT_TYPE_LABELS
+	employmentType: EMPLOYMENT_TYPE_LABELS,
+	attendance: ATTENDANCE_STATUS_LABELS,
+	benefitEnrollment: BENEFIT_ENROLLMENT_STATUS_LABELS,
+	loan: LOAN_STATUS_LABELS
 }
 
 /**
@@ -95,15 +104,22 @@ const BASE_TONES: Record<string, BadgeTone> = {
 	HIRED: 'green',
 	IN_STOCK: 'green',
 	ACTIVE: 'green',
+	PRESENT: 'green',
+	PAID: 'green',
 	// terminal-bad
 	REJECTED: 'red',
 	VOIDED: 'red',
+	ABSENT: 'red',
 	// waiting on someone
 	PENDING: 'yellow',
 	OPEN: 'yellow',
 	LOCKED: 'yellow',
 	ON_LEAVE: 'yellow',
 	SCREENING: 'yellow',
+	LATE: 'yellow',
+	WAIVED: 'yellow',
+	// was orange before this phase
+	INCOMPLETE: 'yellow',
 	// was orange before this phase; orange has no badge token
 	RETURNED: 'yellow',
 	OFFER: 'yellow',
@@ -115,6 +131,7 @@ const BASE_TONES: Record<string, BadgeTone> = {
 	RESPONDED: 'blue',
 	ASSIGNED: 'blue',
 	APPLIED: 'blue',
+	HOLIDAY: 'blue',
 	// was purple before this phase; purple has no badge token
 	SELF_ASSESSMENT: 'blue',
 	SCORED: 'blue',
@@ -126,7 +143,9 @@ const BASE_TONES: Record<string, BadgeTone> = {
 	FINALIZED: 'gray',
 	CLOSED: 'gray',
 	RETIRED: 'gray',
-	OFFBOARDED: 'gray'
+	OFFBOARDED: 'gray',
+	REST_DAY: 'gray',
+	TERMINATED: 'gray'
 }
 
 /**
@@ -138,6 +157,11 @@ const BASE_TONES: Record<string, BadgeTone> = {
  */
 const DOMAIN_TONES: Partial<Record<BadgeDomain, Record<string, BadgeTone>>> = {
 	branch: { OPEN: 'green' },
+	// On an attendance row, ON_LEAVE is a day type sitting beside LATE — keeping the base yellow
+	// would make the two indistinguishable in the column they share.
+	attendance: { ON_LEAVE: 'blue' },
+	// An active loan is money still being collected — in progress, not a good outcome.
+	loan: { ACTIVE: 'blue' },
 	payrollPeriod: { OPEN: 'gray' }
 }
 

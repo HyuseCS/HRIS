@@ -9,6 +9,7 @@
 	import NewTimesheetDialog from '$lib/components/timesheets/NewTimesheetDialog.svelte'
 	import AggregatePanel from '$lib/components/timesheets/AggregatePanel.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -55,12 +56,6 @@
 	}
 
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
-	const statusClass: Record<string, string> = {
-		APPROVED: 'badge-green',
-		REJECTED: 'badge-red',
-		SUBMITTED: 'badge-blue',
-		DRAFT: 'badge-gray'
-	}
 	const btnPrimary =
 		'rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
 </script>
@@ -178,9 +173,7 @@
 								>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</td
 							>
 							<td class="px-4 py-3">{Number(ts.totalHours).toFixed(2)} hrs</td>
-							<td class="px-4 py-3"
-								><span class={statusClass[ts.status] ?? 'badge-gray'}>{ts.status}</span></td
-							>
+							<td class="px-4 py-3"><Badge status={ts.status} domain="timesheet" /></td>
 						</tr>
 					{:else}
 						<tr>
