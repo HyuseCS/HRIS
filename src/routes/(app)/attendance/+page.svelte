@@ -7,6 +7,7 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import type { PageData, ActionData } from './$types'
@@ -18,12 +19,6 @@
 		() =>
 		async ({ update }) =>
 			update({ reset: false })
-
-	// Reset discards the manual correction and re-derives from punches — confirm first.
-	const confirmReset: SubmitFunction = ({ cancel }) => {
-		if (!confirm('Discard the manual edit for this day and re-derive it from punches?')) cancel()
-		return async ({ update }) => update({ reset: false })
-	}
 
 	// #108: these bulk actions rewrite whole ranges/days — a double-click re-runs the derive or
 	// re-locks mid-flight. One guard per singleton form.
@@ -669,7 +664,6 @@
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
 									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
-									{@const reset = rowGuard(`resetDay:${d.id}`, confirmReset)}
 									<div class="flex items-center gap-1">
 										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
 											<input type="hidden" name="id" value={d.id} />
@@ -681,16 +675,21 @@
 											>
 										</form>
 										{#if d.manuallyEdited}
-											<form method="POST" action="?/resetDay" use:enhance={reset.enhance}>
+											<!-- #108: ConfirmButton's own per-instance busy state replaces this row's
+											     `rowGuard`, and the dialog now gates the submit. `keepValues` still
+											     rides through `submit` so untouched Reg/OT/time cells do not blank. -->
+											<ConfirmButton
+												action="?/resetDay"
+												title="Discard this manual edit?"
+												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
+												confirmText="Discard and re-derive"
+												triggerLabel="Reset"
+												triggerTitle="Discard manual edit and re-derive from punches"
+												triggerClass="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+												submit={keepValues}
+											>
 												<input type="hidden" name="id" value={d.id} />
-												<button
-													type="submit"
-													title="Discard manual edit and re-derive from punches"
-													disabled={reset.busy}
-													class="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-													>{reset.busy ? 'Resetting…' : 'Reset'}</button
-												>
-											</form>
+											</ConfirmButton>
 										{/if}
 									</div>
 								{:else if d?.isLocked}
@@ -838,7 +837,6 @@
 										>
 									{:else}
 										{@const save = rowGuard(`correct:${d.id}`, keepValues)}
-										{@const reset = rowGuard(`resetDay:${d.id}`, confirmReset)}
 										<div class="flex items-center gap-1">
 											<form
 												id="c-{d.id}"
@@ -855,16 +853,21 @@
 												>
 											</form>
 											{#if d.manuallyEdited}
-												<form method="POST" action="?/resetDay" use:enhance={reset.enhance}>
+												<!-- #108: ConfirmButton's own per-instance busy state replaces this row's
+												     `rowGuard`, and the dialog now gates the submit. `keepValues` still
+												     rides through `submit` so untouched Reg/OT/time cells do not blank. -->
+												<ConfirmButton
+													action="?/resetDay"
+													title="Discard this manual edit?"
+													message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
+													confirmText="Discard and re-derive"
+													triggerLabel="Reset"
+													triggerTitle="Discard manual edit and re-derive from punches"
+													triggerClass="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+													submit={keepValues}
+												>
 													<input type="hidden" name="id" value={d.id} />
-													<button
-														type="submit"
-														title="Discard manual edit and re-derive from punches"
-														disabled={reset.busy}
-														class="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-														>{reset.busy ? 'Resetting…' : 'Reset'}</button
-													>
-												</form>
+												</ConfirmButton>
 											{/if}
 										</div>
 									{/if}
