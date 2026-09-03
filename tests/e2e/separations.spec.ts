@@ -175,17 +175,17 @@ test.beforeAll(async () => {
 })
 test.afterAll(cleanup)
 
-/** Both destructive controls sit behind a `confirm()`; Playwright dismisses dialogs by default. */
-async function acceptConfirms(page: import('@playwright/test').Page) {
-	page.on('dialog', (d) => d.accept())
+/** Both destructive controls open the kit ConfirmDialog (phase 05); accept it by clicking its confirm button. */
+async function confirmKitDialog(page: import('@playwright/test').Page, confirmText: string) {
+	await page.getByRole('alertdialog').getByRole('button', { name: confirmText }).click()
 }
 
 test.describe('Separation finalize -> undo (#304)', () => {
 	test('finalizing writes off both loans, offboards, and disables the login', async ({ page }) => {
 		await login(page, USERS.admin)
-		acceptConfirms(page)
 		await page.goto(`/separations/${separationId}`, { waitUntil: 'domcontentloaded' })
 		await page.getByRole('button', { name: 'Finalize & offboard' }).click()
+		await confirmKitDialog(page, 'Finalize')
 		await expect(page.getByText('Separation finalized.')).toBeVisible()
 
 		const db = new PrismaClient()
@@ -248,9 +248,9 @@ test.describe('Separation finalize -> undo (#304)', () => {
 
 	test('a super admin undo restores the money, the status and the login', async ({ page }) => {
 		await login(page, USERS.admin)
-		acceptConfirms(page)
 		await page.goto(`/separations/${separationId}`, { waitUntil: 'domcontentloaded' })
 		await page.getByRole('button', { name: 'Undo finalization' }).click()
+		await confirmKitDialog(page, 'Undo finalization')
 		await expect(page.getByText('Finalization undone.')).toBeVisible()
 
 		const db = new PrismaClient()
@@ -290,11 +290,10 @@ test.describe('Separation finalize -> undo (#304)', () => {
 
 	test('a balance that moved since finalize is refused, and nothing sticks', async ({ page }) => {
 		await login(page, USERS.admin)
-		acceptConfirms(page)
-
 		// Re-finalize so there is something to undo again.
 		await page.goto(`/separations/${separationId}`, { waitUntil: 'domcontentloaded' })
 		await page.getByRole('button', { name: 'Finalize & offboard' }).click()
+		await confirmKitDialog(page, 'Finalize')
 		await expect(page.getByText('Separation finalized.')).toBeVisible()
 
 		const db = new PrismaClient()
@@ -314,6 +313,7 @@ test.describe('Separation finalize -> undo (#304)', () => {
 		const beforeUndo = new Date()
 		await page.goto(`/separations/${separationId}`, { waitUntil: 'domcontentloaded' })
 		await page.getByRole('button', { name: 'Undo finalization' }).click()
+		await confirmKitDialog(page, 'Undo finalization')
 		await expect(page.getByText(/balance changed since finalizing/)).toBeVisible()
 
 		const db2 = new PrismaClient()
