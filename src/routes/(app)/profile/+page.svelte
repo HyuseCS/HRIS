@@ -233,7 +233,8 @@
 			<span class="text-xs text-muted-foreground">Last {data.punchWindowDays} days</span>
 		</div>
 		{#if data.punches.length}
-			<div class="overflow-x-auto rounded-md border">
+			<!-- Punches are already windowed to 14 days by the loader, so this is a ceiling only. -->
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -271,7 +272,8 @@
 			My Documents
 		</h2>
 		{#if data.documents.length}
-			<div class="overflow-x-auto rounded-md border">
+			<!-- Ceiling only; a person's own documents are few but not bounded. -->
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -314,7 +316,8 @@
 			My Benefits
 		</h2>
 		{#if data.benefits.length}
-			<div class="overflow-x-auto rounded-md border">
+			<!-- Ceiling only; enrolments are config-scale. -->
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>

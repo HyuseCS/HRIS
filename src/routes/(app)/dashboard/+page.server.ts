@@ -86,7 +86,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listRecentAwards(orgId),
 		// Side panel. Employment matters (probation reviews, contract ends, other people's
 		// leave) go only to the HR ladder; everyone still sees their own.
-		listUpcomingEvents(orgId, { userId: user.id, canSeeSensitive: canPost })
+		// 10: a fortnight's worth of the events a person actually acts on. The card shares a grid
+		// row, so a list that grows with the roster pushes the column past the one beside it. The
+		// full set is unreachable by design — there is no /events page and this phase does not
+		// build one — which is why this card carries no "view all" link.
+		listUpcomingEvents(orgId, { userId: user.id, canSeeSensitive: canPost }, new Date(), 10)
 	])
 
 	// HR grants awards from the dashboard — roster for the recipient picker.
@@ -99,7 +103,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		: []
 
 	// HR's advance warning of probationary staff coming up for regularization (#168).
-	const regularizations = canPost ? await listUpcomingRegularizations(orgId) : []
+	// 10: ten named people is what HR can act on in one sitting. The card is an advance warning,
+	// not the register — each row links to its own 201 file, and the list-level route out is
+	// /employees.
+	const regularizations = canPost ? await listUpcomingRegularizations(orgId, new Date(), 10) : []
 
 	// Job postings awaiting this user's approval (#195) — the departments they're the
 	// approver for, plus HR-fallback postings. Needs the viewer's employee id.
@@ -108,11 +115,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		where: { userId: user.id, organizationId: orgId },
 		select: { id: true }
 	})
+	// 10: an approval sitting. The rest stay reachable at /recruitment, which paginates — which is
+	// why this card's "view all" link is not optional: its rows carry approve and send-back forms,
+	// so a cap without a route out would hide actionable work.
 	const postingsToApprove = await listPostingsAwaitingApprover(
 		orgId,
 		myEmployee?.id ?? null,
 		roles,
-		user.id
+		user.id,
+		10
 	)
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the

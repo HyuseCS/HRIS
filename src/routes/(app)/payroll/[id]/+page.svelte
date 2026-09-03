@@ -193,7 +193,10 @@
 		</div>
 	</div>
 
-	<div class="rounded-lg border overflow-x-auto">
+	<!-- One row per employee per run, so this table grows with the roster. The ceiling goes on
+	     the wrapper that already scrolls sideways -- this is the widest money table in the app
+	     and losing the horizontal scroll would clip pay columns. -->
+	<div class="card-scroll rounded-lg border overflow-x-auto">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>

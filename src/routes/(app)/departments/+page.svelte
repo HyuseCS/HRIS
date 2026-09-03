@@ -148,7 +148,7 @@
 	{/if}
 
 	<!-- Departments table -->
-	<div class="overflow-x-auto rounded-md border">
+	<div class="card-scroll overflow-x-auto rounded-md border">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>

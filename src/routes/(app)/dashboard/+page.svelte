@@ -253,7 +253,27 @@
 				Upcoming Events
 			</p>
 			{#if data.upcomingEvents.length}
-				<ul class="divide-y divide-border/40">
+				<!-- Scrolls to the card's own height rather than to a fixed rem value: the card
+				     already declares `flex h-full flex-col`, so `min-h-0 flex-1 overflow-y-auto`
+				     makes the list fill the grid row and scroll inside it. `.card-scroll` would
+				     fight that with a second, unrelated ceiling.
+
+				     `tabindex="0"` with a region role because the rows here are text only — no
+				     link, no button, nothing focusable — and a scroll region with no focusable
+				     child cannot be reached by keyboard at all (WCAG 2.1.1). The sibling
+				     regularization and posting lists carry real links and buttons, so they need
+				     no tab stop of their own.
+
+				     The rule fires on any nonnegative tabindex on a non-interactive element, which
+				     is right in general and wrong for a scroll container — WCAG needs the tab stop
+				     precisely BECAUSE nothing inside is focusable. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<ul
+					class="min-h-0 flex-1 divide-y divide-border/40 overflow-y-auto"
+					tabindex="0"
+					role="region"
+					aria-label="Upcoming events"
+				>
 					{#each data.upcomingEvents as event (event.kind + event.date + event.title)}
 						<li class="flex items-start gap-3 py-2">
 							<div class="w-11 shrink-0 text-center">
@@ -606,30 +626,37 @@
 	<!-- Upcoming regularizations — HR's advance warning (#168) -->
 	{#if data.canPost && data.regularizations.length}
 		<div class="card space-y-3 border-amber-500/30 bg-amber-500/5">
-			<div class="flex items-center gap-2">
-				<svg
-					class="h-4 w-4 text-amber-500"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.7"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<path
-						d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-					/>
-				</svg>
-				<p class="text-xs font-semibold uppercase tracking-widest text-amber-500">
-					Upcoming Regularizations
-				</p>
+			<div class="flex items-center justify-between gap-2">
+				<div class="flex items-center gap-2">
+					<svg
+						class="h-4 w-4 text-amber-500"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.7"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path
+							d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+						/>
+					</svg>
+					<p class="text-xs font-semibold uppercase tracking-widest text-amber-500">
+						Upcoming Regularizations
+					</p>
+				</div>
+				<!-- "View all employees", not "view all regularizations": /employees is the whole
+				     roster, not a filtered probation view, so the label must not promise one. -->
+				<a href="/employees" class="btn-row shrink-0">View all employees</a>
 			</div>
 			<p class="text-xs text-muted-foreground">
 				Probationary staff becoming regular within the next three weeks — decide before the date
 				lands.
 			</p>
-			<ul class="divide-y divide-border/60">
+			<!-- Ten rows at a time; the box keeps an eleventh from pushing the postings card below
+			     the fold. Rows carry real links, so the region is keyboard-reachable already. -->
+			<ul class="card-scroll divide-y divide-border/60">
 				{#each data.regularizations as r (r.id)}
 					<li class="flex items-center justify-between gap-3 py-2">
 						<div class="min-w-0">
@@ -655,15 +682,20 @@
 	<!-- Job postings awaiting your approval (#195) -->
 	{#if data.postingsToApprove.length}
 		<div class="card space-y-3 border-blue-500/30 bg-blue-500/5">
-			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
-				Postings awaiting your approval
-			</p>
+			<div class="flex items-center justify-between gap-2">
+				<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
+					Postings awaiting your approval
+				</p>
+				<!-- Not optional. These rows carry approve and send-back forms, so a cap with no
+				     route out would hide work someone is waiting on. /recruitment paginates. -->
+				<a href="/recruitment" class="btn-row shrink-0">View all postings</a>
+			</div>
 			<!-- Scoped: with the award panel open, a posting failure used to render under
 			     "Give award", where nothing had gone wrong. -->
 			{#if form?.action === 'decidePosting' && form?.error}
 				<Banner kind="error" message={form.error} />
 			{/if}
-			<ul class="divide-y divide-border/60">
+			<ul class="card-scroll divide-y divide-border/60">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}
 					<li class="space-y-2 py-2">

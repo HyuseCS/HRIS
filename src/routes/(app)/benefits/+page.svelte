@@ -140,7 +140,8 @@
 	{/if}
 
 	<!-- Table -->
-	<div class="overflow-x-auto rounded-lg border">
+	<!-- Plans are config-scale, so this is a ceiling rather than a cap. -->
+	<div class="card-scroll overflow-x-auto rounded-lg border">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -249,7 +250,11 @@
 			>
 		</form>
 
-		<div class="overflow-x-auto rounded-lg border">
+		<!-- Enrolments grow with the roster, so the box is the ceiling. The query would in fact
+		     be take-safe (listAllEnrollments already carries an orderBy), but this phase's service
+		     lift covers three named dashboard functions and not this one, so the bound stays in the
+		     markup. That residual is in the query-level-pagination backlog note. -->
+		<div class="card-scroll overflow-x-auto rounded-lg border">
 			<table class="w-full min-w-max text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

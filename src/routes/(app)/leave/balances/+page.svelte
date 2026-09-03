@@ -55,7 +55,12 @@
 		>
 	</form>
 
-	<div class="overflow-x-auto rounded-lg border">
+	<!-- Ceiling only, and NO cap. This page IS the view-all destination for /leave, so a row
+	     dropped here is a row nobody can reach. Columns grow with the number of leave types and
+	     rows with the roster, so the box scrolls on both axes. The honest fix is query-level
+	     pagination with a count, recorded in the backlog note. No tab stop is added here: the rows
+	     carry real links already, and a11y-invariants pins this file against a nonzero tab index. -->
+	<div class="card-scroll overflow-x-auto rounded-lg border">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>

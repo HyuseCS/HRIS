@@ -32,7 +32,11 @@
 	{#if data.isAdmin && data.cycles.length}
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Review Cycles</h2>
-			<div class="overflow-x-auto rounded-lg border">
+			<!-- Ceiling only. listStalledSignoffs carries no orderBy and post-processes through a
+			     Promise.all and a filter, so a query cap there would take the wrong rows -- the same
+			     trap the regularizations card has. All four tables are hand-rolled, so the bound sits
+			     on the wrapper that already scrolls sideways. -->
+			<div class="card-scroll overflow-x-auto rounded-lg border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -78,7 +82,7 @@
 				This is not the same as a review that was never created.
 			</p>
 			{#if data.stalledSignoffs.length}
-				<div class="overflow-x-auto rounded-lg border">
+				<div class="card-scroll overflow-x-auto rounded-lg border">
 					<table class="w-full text-sm">
 						<thead class="border-b bg-muted/50">
 							<tr>
@@ -119,7 +123,7 @@
 	<!-- My Reviews -->
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold">My Reviews</h2>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="card-scroll overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -158,7 +162,7 @@
 	{#if data.reviewsToGive.length}
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Reviews to Complete</h2>
-			<div class="overflow-x-auto rounded-lg border">
+			<div class="card-scroll overflow-x-auto rounded-lg border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>

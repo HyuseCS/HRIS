@@ -235,6 +235,18 @@
 		@apply rounded-lg bg-card p-5 shadow-sm ring-1 ring-black/[0.12] dark:shadow-none dark:ring-white/10;
 	}
 
+	/* Card scroll box — the one ceiling every unbounded list in the app shares (phase 10).
+	   `min(60vh, 28rem)` is a single declaration that scales from a 390px phone to a wide
+	   desktop with no breakpoint variant: 60vh shrinks the box on a short viewport, 28rem
+	   stops it growing on a tall one. It sits between the two values already in the repo —
+	   `max-h-96` (24rem) on the dashboard activity feed and `max-h-[70vh]` on the performance
+	   template editor. Put it on a list or on an existing overflow wrapper; a wrapper that
+	   already has `overflow-x-auto` ends up scrolling both axes, which is what a wide table
+	   wants. */
+	.card-scroll {
+		@apply max-h-[min(60vh,28rem)] overflow-y-auto;
+	}
+
 	/* Data table */
 	.data-table {
 		@apply w-full text-sm;

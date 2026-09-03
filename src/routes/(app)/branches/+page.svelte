@@ -143,7 +143,7 @@
 				No stores match — add one above or adjust the filters.
 			</p>
 		{:else}
-			<div class="overflow-x-auto rounded-md border">
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>

@@ -27,6 +27,15 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	// The 201 file is a reference document behind tabs, not a summary card, so its panels render
+	// twenty-five rows rather than the dashboard's ten: a screen and a bit inside the scroll box.
+	// The SERVICE is deliberately left uncapped. The documents array is fed to
+	// `getEmployeeOnboarding` as `documents.map((d) => d.category)`, so a query cap would make the
+	// onboarding checklist claim a step is outstanding when its document exists; and employment
+	// history events are DERIVED from audit rows — a log row that changed no tracked field yields
+	// no event — so `take: 25` there would give an unpredictable number of events, not 25.
+	const LIST_RENDER_CAP = 25
+
 	// The five sections of the 201 file are URL-backed (`?tab=`), so a deep link and the browser's
 	// Back button both work. Panels are always rendered and hidden with the attribute AND the
 	// class — never `{#if}`, which would discard anything typed into an inactive tab's form.
@@ -203,6 +212,16 @@
 	}
 </script>
 
+<!-- Shown only when rows were actually dropped. A "showing first 25" note under an uncapped
+     list is noise, and worse, it makes a complete list look truncated. -->
+{#snippet truncated(total: number)}
+	{#if total > LIST_RENDER_CAP}
+		<p class="text-xs text-muted-foreground">
+			Showing the first {LIST_RENDER_CAP} of {total}.
+		</p>
+	{/if}
+{/snippet}
+
 {#snippet actionError(names: string[])}
 	{@const message = errorFor(names)}
 	{#if message}
@@ -268,7 +287,7 @@
 								style="width: {(data.onboarding.doneCount / data.onboarding.total) * 100}%"
 							></div>
 						</div>
-						<ul class="columns-1 gap-x-8 sm:columns-2">
+						<ul class="card-scroll columns-1 gap-x-8 sm:columns-2">
 							{#each data.onboarding.steps as step (step.id)}
 								<li class="mb-2.5 flex items-start gap-2 break-inside-avoid text-sm">
 									{#if step.manual}
@@ -850,7 +869,7 @@
 				</h2>
 
 				{#if data.leaveBalances.length}
-					<div class="flex flex-wrap gap-3">
+					<div class="card-scroll flex flex-wrap gap-3">
 						{#each data.leaveBalances as bal (bal.id)}
 							{@const gated =
 								bal.minMonthsOfService > 0 &&
@@ -890,7 +909,7 @@
 				{@render actionError(['addEmergencyContact', 'deleteEmergencyContact'])}
 
 				{#if employee.emergencyContacts.length || legacyEmergencyContact}
-					<div class="rounded-md border">
+					<div class="card-scroll rounded-md border">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
 								<tr>
@@ -1014,7 +1033,7 @@
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Benefits</h2>
 				{#if data.benefits.length}
-					<div class="overflow-x-auto rounded-md border">
+					<div class="card-scroll overflow-x-auto rounded-md border">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
 								<tr>
@@ -1062,22 +1081,27 @@
 						<div class="space-y-3">
 							<h3 class="text-sm font-semibold text-muted-foreground">Loans</h3>
 							{#if data.loans.length}
-								<table class="w-full text-sm">
-									<tbody class="divide-y">
-										{#each data.loans as l (l.id)}
-											<tr>
-												<td class="py-1.5">{l.type ?? 'Loan'}</td>
-												<td class="py-1.5 text-right font-mono"
-													>{formatCurrency(Number(l.balance))}<span
-														class="ml-1 text-xs text-muted-foreground"
-														>/ {formatCurrency(Number(l.installment))}·pd</span
-													></td
-												>
-												<td class="py-1.5 text-right"><Badge status={l.status} domain="loan" /></td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
+								<div class="card-scroll">
+									<table class="w-full text-sm">
+										<tbody class="divide-y">
+											{#each data.loans.slice(0, LIST_RENDER_CAP) as l (l.id)}
+												<tr>
+													<td class="py-1.5">{l.type ?? 'Loan'}</td>
+													<td class="py-1.5 text-right font-mono"
+														>{formatCurrency(Number(l.balance))}<span
+															class="ml-1 text-xs text-muted-foreground"
+															>/ {formatCurrency(Number(l.installment))}·pd</span
+														></td
+													>
+													<td class="py-1.5 text-right"
+														><Badge status={l.status} domain="loan" /></td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								{@render truncated(data.loans.length)}
 							{:else}
 								<p class="text-xs text-muted-foreground">No loans on record.</p>
 							{/if}
@@ -1126,22 +1150,27 @@
 						<div class="space-y-3">
 							<h3 class="text-sm font-semibold text-muted-foreground">Cash Advances</h3>
 							{#if data.cashAdvances.length}
-								<table class="w-full text-sm">
-									<tbody class="divide-y">
-										{#each data.cashAdvances as a (a.id)}
-											<tr>
-												<td class="py-1.5">Cash advance</td>
-												<td class="py-1.5 text-right font-mono"
-													>{formatCurrency(Number(a.balance))}<span
-														class="ml-1 text-xs text-muted-foreground"
-														>/ {formatCurrency(Number(a.installment))}·pd</span
-													></td
-												>
-												<td class="py-1.5 text-right"><Badge status={a.status} domain="loan" /></td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
+								<div class="card-scroll">
+									<table class="w-full text-sm">
+										<tbody class="divide-y">
+											{#each data.cashAdvances.slice(0, LIST_RENDER_CAP) as a (a.id)}
+												<tr>
+													<td class="py-1.5">Cash advance</td>
+													<td class="py-1.5 text-right font-mono"
+														>{formatCurrency(Number(a.balance))}<span
+															class="ml-1 text-xs text-muted-foreground"
+															>/ {formatCurrency(Number(a.installment))}·pd</span
+														></td
+													>
+													<td class="py-1.5 text-right"
+														><Badge status={a.status} domain="loan" /></td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								{@render truncated(data.cashAdvances.length)}
 							{:else}
 								<p class="text-xs text-muted-foreground">No cash advances on record.</p>
 							{/if}
@@ -1189,38 +1218,45 @@
 						Incentives lines. Ended items stop from the next payroll run.
 					</p>
 					{#if data.recurringEarnings.length}
-						<table class="w-full text-sm">
-							<tbody class="divide-y">
-								{#each data.recurringEarnings as e (e.id)}
-									<tr>
-										<td class="py-1.5">{e.label}</td>
-										<td class="py-1.5 text-muted-foreground"
-											>{e.kind === 'ALLOWANCE' ? 'Allowance' : 'Incentive'}</td
-										>
-										<td class="py-1.5 text-right font-mono"
-											>{formatCurrency(Number(e.monthlyAmount))}<span
-												class="ml-1 text-xs text-muted-foreground">/mo</span
-											></td
-										>
-										<td class="py-1.5 text-right">
-											{#if e.isActive}
-												<form method="POST" action="?/endEarning" use:enhance={endEarning.enhance}>
-													<input type="hidden" name="id" value={e.id} />
-													<button
-														type="submit"
-														disabled={endEarning.busy}
-														class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-														>{endEarning.busy ? 'Ending…' : 'End'}</button
+						<div class="card-scroll">
+							<table class="w-full text-sm">
+								<tbody class="divide-y">
+									{#each data.recurringEarnings.slice(0, LIST_RENDER_CAP) as e (e.id)}
+										<tr>
+											<td class="py-1.5">{e.label}</td>
+											<td class="py-1.5 text-muted-foreground"
+												>{e.kind === 'ALLOWANCE' ? 'Allowance' : 'Incentive'}</td
+											>
+											<td class="py-1.5 text-right font-mono"
+												>{formatCurrency(Number(e.monthlyAmount))}<span
+													class="ml-1 text-xs text-muted-foreground">/mo</span
+												></td
+											>
+											<td class="py-1.5 text-right">
+												{#if e.isActive}
+													<form
+														method="POST"
+														action="?/endEarning"
+														use:enhance={endEarning.enhance}
 													>
-												</form>
-											{:else}
-												<Badge status="ENDED" tone="gray" />
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+														<input type="hidden" name="id" value={e.id} />
+														<button
+															type="submit"
+															disabled={endEarning.busy}
+															class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+															>{endEarning.busy ? 'Ending…' : 'End'}</button
+														>
+													</form>
+												{:else}
+													<Badge status="ENDED" tone="gray" />
+												{/if}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						{@render truncated(data.recurringEarnings.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recurring allowances or incentives.</p>
 					{/if}
@@ -1387,40 +1423,43 @@
 						from the next payroll run.
 					</p>
 					{#if data.recurringDeductions.length}
-						<table class="w-full text-sm">
-							<tbody class="divide-y">
-								{#each data.recurringDeductions as d (d.id)}
-									<tr>
-										<td class="py-1.5">{d.label ?? d.deductionType.label}</td>
-										<td class="py-1.5 text-muted-foreground">{d.deductionType.code}</td>
-										<td class="py-1.5 text-right font-mono"
-											>{formatCurrency(Number(d.monthlyAmount))}<span
-												class="ml-1 text-xs text-muted-foreground">/mo</span
-											></td
-										>
-										<td class="py-1.5 text-right">
-											{#if d.isActive}
-												<form
-													method="POST"
-													action="?/endDeduction"
-													use:enhance={endDeduction.enhance}
-												>
-													<input type="hidden" name="id" value={d.id} />
-													<button
-														type="submit"
-														disabled={endDeduction.busy}
-														class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-														>{endDeduction.busy ? 'Ending…' : 'End'}</button
+						<div class="card-scroll">
+							<table class="w-full text-sm">
+								<tbody class="divide-y">
+									{#each data.recurringDeductions.slice(0, LIST_RENDER_CAP) as d (d.id)}
+										<tr>
+											<td class="py-1.5">{d.label ?? d.deductionType.label}</td>
+											<td class="py-1.5 text-muted-foreground">{d.deductionType.code}</td>
+											<td class="py-1.5 text-right font-mono"
+												>{formatCurrency(Number(d.monthlyAmount))}<span
+													class="ml-1 text-xs text-muted-foreground">/mo</span
+												></td
+											>
+											<td class="py-1.5 text-right">
+												{#if d.isActive}
+													<form
+														method="POST"
+														action="?/endDeduction"
+														use:enhance={endDeduction.enhance}
 													>
-												</form>
-											{:else}
-												<Badge status="ENDED" tone="gray" />
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+														<input type="hidden" name="id" value={d.id} />
+														<button
+															type="submit"
+															disabled={endDeduction.busy}
+															class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+															>{endDeduction.busy ? 'Ending…' : 'End'}</button
+														>
+													</form>
+												{:else}
+													<Badge status="ENDED" tone="gray" />
+												{/if}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						{@render truncated(data.recurringDeductions.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recurring deductions.</p>
 					{/if}
@@ -1739,7 +1778,7 @@
 					{@render actionError(['uploadDocument', 'deleteDocument'])}
 
 					{#if data.documents.length}
-						<div class="overflow-x-auto rounded-md border">
+						<div class="card-scroll overflow-x-auto rounded-md border">
 							<table class="w-full text-sm">
 								<thead class="border-b bg-muted/50">
 									<tr>
@@ -1751,7 +1790,7 @@
 									</tr>
 								</thead>
 								<tbody class="divide-y">
-									{#each data.documents as doc (doc.id)}
+									{#each data.documents.slice(0, LIST_RENDER_CAP) as doc (doc.id)}
 										<tr class="hover:bg-muted/30">
 											<td class="px-3 py-2">{catLabel(doc.category)}</td>
 											<td class="px-3 py-2">
@@ -1781,6 +1820,7 @@
 								</tbody>
 							</table>
 						</div>
+						{@render truncated(data.documents.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No documents uploaded yet.</p>
 					{/if}
@@ -1860,8 +1900,8 @@
 					</h2>
 
 					{#if history.length}
-						<ol class="relative space-y-5 border-l pl-6">
-							{#each history as ev (ev.id)}
+						<ol class="card-scroll relative space-y-5 border-l pl-6">
+							{#each history.slice(0, LIST_RENDER_CAP) as ev (ev.id)}
 								<li class="relative">
 									<span
 										class="absolute -left-[27px] mt-1 h-3 w-3 rounded-full border-2 border-background {ev.type ===
@@ -1898,6 +1938,7 @@
 								</li>
 							{/each}
 						</ol>
+						{@render truncated(history.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recorded changes yet.</p>
 					{/if}

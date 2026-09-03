@@ -343,3 +343,44 @@ This phase is explicitly authorised to cross phase 08's AC5/AC20 boundary — th
 - `src/` is now Avipa-free with NO exceptions — the one allowed survivor went with `loginSchema`.
 
 **Status:** DONE
+
+---
+
+## Phase 10 — `container-bounds`
+
+**Plan:** `phase-10-container-bounds_PLAN_03-09-26.md`
+**Claimed:** 04-09-26
+**Built on:** `feat/uiux-phase-9` tip `6decf06` (phase-10 branch tip at claim time)
+
+**Files claimed:**
+
+| File | What |
+|---|---|
+| `src/app.css` | new `.card-scroll` companion class beside `.card` |
+| `src/lib/server/services/dashboard.ts` | `listUpcomingEvents` + `listUpcomingRegularizations` optional `limit` (D-1 narrow lift) |
+| `src/lib/server/services/recruitment.ts` | `listPostingsAwaitingApprover` optional `limit` (D-1) |
+| `src/routes/(app)/dashboard/+page.server.ts` | three cap call sites (10 each) |
+| `src/routes/(app)/dashboard/+page.svelte` | 3 scroll boxes, 2 view-all links, 1 a11y region |
+| `src/routes/(app)/employees/[id]/+page.svelte` | render caps + scroll boxes on 8 panels |
+| `src/routes/(app)/team/+page.svelte` | vertical bound on the existing `overflow-x-auto` wrapper |
+| `src/routes/(app)/benefits/+page.svelte` | 2 bounds |
+| `src/routes/(app)/leave/balances/+page.svelte` | scroll-only bound, NO cap (D-6) |
+| `src/routes/(app)/performance/+page.svelte` | 4 bounds |
+| `src/routes/(app)/payroll/[id]/+page.svelte` | bounds on the money tables |
+| `src/routes/(app)/profile/+page.svelte` | 3 bounds |
+| `src/routes/(app)/settings/org/+page.svelte` | 2 bounds |
+| `src/routes/(app)/settings/roles/+page.svelte` | 1 bound |
+| config-scale pages (branches, departments, offboarding, posting-approvers, statutory-rates, salary-grades, schedules, pay-codes) | markup backstop only — **there is no /org-chart route**, re-derived at execution |
+| `tests/unit/container-bounds.test.ts` | **new** — G1/G1b/G2/G3/G3b |
+| `tests/unit/container-bounds-scan.test.ts` | **new** — G5/G10 |
+| `tests/e2e/container-bounds.spec.ts` | **new** — G6/G7/G8/G9, self-seeded (E3) |
+
+**NOT claimed (explicitly out of bounds):** `src/lib/components/ui/Table.svelte` (E2 dropped the
+prop — zero consumers), every picker `<select>` (T4), `team/+page.server.ts` (T3),
+`employees/[id]/+page.server.ts` (T5), the thirteen paginated route loads (T6), `/api/v1/dashboard`.
+
+**Overlap with earlier phases:** `dashboard/+page.svelte` (01, 02, 04),
+`employees/[id]/+page.svelte` (05, 07), `app.css` (03), `settings/roles/+page.svelte` (05).
+All additive wrapper/class edits; no earlier phase's markup semantics changed.
+
+**Status:** DONE
