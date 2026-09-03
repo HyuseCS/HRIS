@@ -197,8 +197,17 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 whitespace-nowrap">{log.entityType}</td>
-							<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
-								{log.entityId.slice(0, 12)}…
+							<!-- Item 39: the id was truncated with no way to read or copy the rest, which made
+							     it useless for the one job it has (matching a row against another system).
+							     `title` gives the full value on hover, `select-all` makes one click select the
+							     whole thing to copy. No clipboard dependency — the repo has no copy
+							     affordance to follow and this phase adds no package. -->
+							<td class="px-4 py-3 whitespace-nowrap">
+								<span
+									title={log.entityId}
+									class="select-all font-mono text-xs text-muted-foreground"
+									>{log.entityId.slice(0, 12)}…</span
+								>
 							</td>
 							<!--
 								#242: the payload never arrives with the list. One entry at a time, through the

@@ -13,6 +13,7 @@
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import TeamMatrix from '$lib/components/attendance/TeamMatrix.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import { manilaShortDay } from '$lib/utils/dates'
@@ -517,8 +518,11 @@
 				     Gated on `importError`, NOT on `error`: every action on this page sets `error`, so the
 				     bare check echoed a Save-as-timesheet or Derive failure under the upload heading. -->
 				{#if form?.importError}
+					<!-- Addendum §F: this card sits far past the fold, so a failed import would otherwise
+					     render its message off-screen and read as "nothing happened". -->
 					<div
 						role="alert"
+						use:scrollToError
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
 					>
 						{form.error}
