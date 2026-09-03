@@ -112,7 +112,7 @@ test('HR creates a timesheet for another employee in a period with no punches', 
 	await page.waitForURL('**/timesheets')
 	const row = page
 		.locator('tr', { hasText: 'Employee, Elena' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: '0.00 hrs' })
 	await expect(row).toHaveCount(1)
 
