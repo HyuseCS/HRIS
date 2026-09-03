@@ -158,10 +158,10 @@
 						<td class="px-4 py-3 font-medium">{plan.name}</td>
 						<td class="px-4 py-3 text-muted-foreground">{plan.type.replace('_', ' ')}</td>
 						<td class="px-4 py-3 text-muted-foreground">{plan.provider ?? '—'}</td>
-						<td class="px-4 py-3 text-right"
+						<td class="px-4 py-3 text-right tabular-nums"
 							>{plan.employeeCost != null ? formatCurrency(Number(plan.employeeCost)) : '—'}</td
 						>
-						<td class="px-4 py-3 text-right"
+						<td class="px-4 py-3 text-right tabular-nums"
 							>{plan.employerCost != null ? formatCurrency(Number(plan.employerCost)) : '—'}</td
 						>
 						<td class="px-4 py-3">
@@ -268,7 +268,7 @@
 							<td class="px-4 py-3">{en.employee.lastName}, {en.employee.firstName}</td>
 							<td class="px-4 py-3 text-muted-foreground">{en.plan.name}</td>
 							<td class="px-4 py-3 text-muted-foreground">{en.coverageLevel ?? '—'}</td>
-							<td class="px-4 py-3 text-right"
+							<td class="px-4 py-3 text-right tabular-nums"
 								>{en.plan.employeeCost != null
 									? formatCurrency(Number(en.plan.employeeCost))
 									: '—'}</td

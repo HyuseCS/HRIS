@@ -297,7 +297,7 @@
 										class="{cellInputClass} w-24 text-right"
 									/>
 									{#if item.value != null}
-										<span class="block text-[10px] text-muted-foreground"
+										<span class="block text-[10px] tabular-nums text-muted-foreground"
 											>{formatCurrency(Number(item.value))}</span
 										>
 									{/if}

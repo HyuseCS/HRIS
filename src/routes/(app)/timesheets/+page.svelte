@@ -144,7 +144,8 @@
 							<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 						{/if}
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
-						<th class="w-40 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th
+							class="w-40 px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap"
 							>Total Hours</th
 						>
 						<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
@@ -175,7 +176,9 @@
 							<td class="px-4 py-3 whitespace-nowrap"
 								>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</td
 							>
-							<td class="px-4 py-3">{Number(ts.totalHours).toFixed(2)} hrs</td>
+							<td class="px-4 py-3 text-right tabular-nums"
+								>{Number(ts.totalHours).toFixed(2)} hrs</td
+							>
 							<td class="px-4 py-3"><Badge status={ts.status} domain="timesheet" /></td>
 						</tr>
 					{:else}
