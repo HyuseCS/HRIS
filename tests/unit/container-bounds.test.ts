@@ -63,7 +63,12 @@ const project = (row: Row, select?: Row): Row => {
 	const out: Row = {}
 	for (const [key, spec] of Object.entries(select)) {
 		if (spec === true) out[key] = row[key]
-		else if (spec && typeof spec === 'object') out[key] = project(row[key] as Row, spec as Row)
+		else if (spec && typeof spec === 'object') {
+			// A relation reads `department: { select: { name: true } }` — unwrap the inner `select`
+			// before recursing, or the nested projection looks for a field literally called "select".
+			const nested = (spec as Row).select ?? spec
+			out[key] = project(row[key] as Row, nested as Row)
+		}
 	}
 	return out
 }
@@ -158,5 +163,115 @@ describe('listUpcomingEvents caps the merged sorted output (G2)', () => {
 			'2026-06-10',
 			'2026-06-11'
 		])
+	})
+})
+
+// ── G1 / G3 / G3b — listUpcomingRegularizations ──────────────────────────────
+
+const { listUpcomingRegularizations } = await import('../../src/lib/server/services/dashboard')
+
+const probationary = (id: string, startDate: string) => ({
+	id,
+	organizationId: ORG,
+	employmentType: 'PROBATIONARY',
+	employmentStatus: 'ACTIVE',
+	firstName: 'Prob',
+	lastName: id,
+	jobTitle: 'Crew',
+	startDate: new Date(`${startDate}T00:00:00.000Z`),
+	department: { name: 'Ops' }
+})
+
+/**
+ * Twenty-five people starting on 1 – 25 September, declared NEWEST FIRST — the exact opposite of
+ * the order the card must show. September has no month-end overflow (see G3b), so here start-date
+ * order and days-until order agree and the fixture isolates the cap from the straddle case.
+ */
+const REG_EMPLOYEES = Array.from({ length: 25 }, (_, i) =>
+	probationary(`p${String(25 - i).padStart(2, '0')}`, `2025-09-${String(25 - i).padStart(2, '0')}`)
+)
+const REG_ASOF = new Date('2026-03-05T00:00:00.000Z')
+
+const useRegularizationFixtures = (rows: ReturnType<typeof probationary>[]) => {
+	dbMock.employee.findMany.mockImplementation(async (args: Args) => query(rows, args))
+}
+
+describe('listUpcomingRegularizations caps at the limit (G1)', () => {
+	it('returns every row when uncapped', async () => {
+		useRegularizationFixtures(REG_EMPLOYEES)
+
+		expect(await listUpcomingRegularizations(ORG, REG_ASOF)).toHaveLength(25)
+	})
+
+	it('returns exactly ten when capped at ten', async () => {
+		useRegularizationFixtures(REG_EMPLOYEES)
+
+		expect(await listUpcomingRegularizations(ORG, REG_ASOF, 10)).toHaveLength(10)
+	})
+})
+
+describe('the capped rows are the most overdue, not the first declared (G3)', () => {
+	it('returns the ten lowest daysUntil though they are declared last', async () => {
+		useRegularizationFixtures(REG_EMPLOYEES)
+
+		const rows = await listUpcomingRegularizations(ORG, REG_ASOF, 10)
+
+		expect(rows.map((r) => r.id)).toEqual([
+			'p01',
+			'p02',
+			'p03',
+			'p04',
+			'p05',
+			'p06',
+			'p07',
+			'p08',
+			'p09',
+			'p10'
+		])
+		expect(rows.map((r) => r.daysUntil)).toEqual([-4, -3, -2, -1, 0, 1, 2, 3, 4, 5])
+	})
+})
+
+/**
+ * G3b — the negative control, and the reason the cap is NOT a query `take`.
+ *
+ * `regularizationDate` is `addUTCMonths(startDate, 6)`, and `setUTCMonth` overflows rather than
+ * clamps. Measured, not reasoned:
+ *
+ *     2025-08-30 + 6mo → 2026-03-02
+ *     2025-08-31 + 6mo → 2026-03-03
+ *     2025-09-01 + 6mo → 2026-03-01
+ *
+ * So the LATEST start date regularizes FIRST. Start-date order is not days-until order across a
+ * 31-day-month → February boundary, and the 21-day notice window can straddle exactly that. A
+ * `take` hung off `orderBy: { startDate: 'asc' }` would return rows that are not the most overdue,
+ * and the surviving JS sort would then present those wrong rows in convincingly correct order.
+ */
+describe('the month-end straddle is ordered by days-until, not start date (G3b)', () => {
+	const STRADDLE = [
+		probationary('aug30', '2025-08-30'),
+		probationary('aug31', '2025-08-31'),
+		probationary('sep01', '2025-09-01')
+	]
+	const STRADDLE_ASOF = new Date('2026-02-20T00:00:00.000Z')
+
+	it('proves the overflow: the later start date regularizes first', async () => {
+		useRegularizationFixtures(STRADDLE)
+
+		const rows = await listUpcomingRegularizations(ORG, STRADDLE_ASOF)
+
+		expect(rows.map((r) => [r.id, r.regularizationDate.toISOString().slice(0, 10)])).toEqual([
+			['sep01', '2026-03-01'],
+			['aug30', '2026-03-02'],
+			['aug31', '2026-03-03']
+		])
+	})
+
+	it('a cap of one keeps the September row, not the first by start date', async () => {
+		useRegularizationFixtures(STRADDLE)
+
+		const rows = await listUpcomingRegularizations(ORG, STRADDLE_ASOF, 1)
+
+		expect(rows.map((r) => r.id)).toEqual(['sep01'])
 	})
 })

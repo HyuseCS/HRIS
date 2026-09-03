@@ -12,7 +12,11 @@ export const REGULARIZATION_NOTICE_DAYS = 21
  * (asOf + notice window) back to a start-date bound, so Postgres does the filtering
  * instead of loading every probationary row.
  */
-export async function listUpcomingRegularizations(organizationId: string, asOf: Date = new Date()) {
+export async function listUpcomingRegularizations(
+	organizationId: string,
+	asOf: Date = new Date(),
+	limit?: number
+) {
 	const ceiling = new Date(asOf)
 	ceiling.setUTCDate(ceiling.getUTCDate() + REGULARIZATION_NOTICE_DAYS)
 	// regularization = startDate + 6mo ≤ ceiling  ⇔  startDate ≤ ceiling − 6mo.
@@ -33,10 +37,17 @@ export async function listUpcomingRegularizations(organizationId: string, asOf: 
 			jobTitle: true,
 			startDate: true,
 			department: { select: { name: true } }
-		}
+		},
+		// Query determinism only — it is NOT what puts the rows in the right order, and a `take`
+		// must never be hung off it. `regularizationDate = addUTCMonths(startDate, 6)` and
+		// `setUTCMonth` overflows rather than clamps, so 2025-08-31 lands on 2026-03-03 while
+		// 2025-09-01 lands on 2026-03-01: the later start date regularizes FIRST. Start-date order
+		// is not days-until order across any 31-day-month → February boundary, and the 21-day
+		// notice window can straddle exactly that. The cap is applied below, after the sort.
+		orderBy: { startDate: 'asc' }
 	})
 
-	return employees
+	const rows = employees
 		.map((e) => {
 			const { date, daysUntil, overdue } = regularizationStatus(e.startDate, asOf)
 			return {
@@ -51,6 +62,11 @@ export async function listUpcomingRegularizations(organizationId: string, asOf: 
 			}
 		})
 		.sort((a, b) => a.daysUntil - b.daysUntil)
+
+	// The cut goes here, on rows already ordered by days-until — the only ordering that is
+	// actually correct (see the orderBy comment above). The query stays unbounded; that residual
+	// is recorded in the query-level-pagination backlog note.
+	return limit === undefined ? rows : rows.slice(0, limit)
 }
 
 // Active employees whose birthday (month + day) is `today` in PHT (#167). Dates of birth

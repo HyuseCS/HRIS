@@ -103,7 +103,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		: []
 
 	// HR's advance warning of probationary staff coming up for regularization (#168).
-	const regularizations = canPost ? await listUpcomingRegularizations(orgId) : []
+	// 10: ten named people is what HR can act on in one sitting. The card is an advance warning,
+	// not the register — each row links to its own 201 file, and the list-level route out is
+	// /employees.
+	const regularizations = canPost ? await listUpcomingRegularizations(orgId, new Date(), 10) : []
 
 	// Job postings awaiting this user's approval (#195) — the departments they're the
 	// approver for, plus HR-fallback postings. Needs the viewer's employee id.
