@@ -1,0 +1,14 @@
+{
+  "riskClass": "auth or identity",
+  "workDescription": "Phase 09 of the Veent HRIS UI/UX overhaul \u2014 login step 1 stops listing every Organization to anonymous visitors and becomes email-first. The server resolves the account's org(s) and returns one response shape for every email; only a 2+-org email gets a picker. Two source files, seven test files, three process artifacts. No schema, service, capability, rate-limiter or dependency change.",
+  "approver": "vc-validate-agent (outer PVL, CONDITIONAL with 9 binding execute instructions E1-E9); owner rulings of 2026-09-03 binding throughout",
+  "mustStopBeforeFinalize": true,
+  "task": "ui-ux-overhaul phase 09 \u2014 login-email-first",
+  "planPath": "process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-09-login-email-first_PLAN_03-09-26.md",
+  "riskLevel": "high",
+  "riskClasses": [
+    "auth or identity"
+  ],
+  "humanApprovalRequired": true,
+  "why": "The only phase in the program that changes an authentication flow. It rewrites the login form actions, moves org resolution server-side, and changes which org a session lands in. Every authenticated surface in the app is downstream of this page, and ~40 e2e specs enter through it."
+}

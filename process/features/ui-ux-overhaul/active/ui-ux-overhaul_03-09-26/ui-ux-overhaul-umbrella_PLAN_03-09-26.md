@@ -1,6 +1,6 @@
 ---
 name: plan:ui-ux-overhaul-umbrella
-description: "Umbrella orchestration plan for the 8-phase Veent HRIS UI/UX overhaul — reorganization and convergence of nav, kit, confirms, feedback, surfaces, page structure, copy and a11y. Not a visual redesign."
+description: "Umbrella orchestration plan for the 9-phase Veent HRIS UI/UX overhaul — reorganization and convergence of nav, kit, confirms, feedback, surfaces, page structure, copy and a11y. Not a visual redesign."
 date: 03-09-26
 feature: ui-ux-overhaul
 phase: umbrella
@@ -10,12 +10,12 @@ phase: umbrella
 
 **Date**: 03-09-26
 **Status**: PLANNED
-**Complexity**: COMPLEX (phase program, 8 phases)
+**Complexity**: COMPLEX (phase program, 9 phases)
 **Feature**: ui-ux-overhaul
 
 **TL;DR** — The audit scored the system 19/40. The fix is reorganization and convergence, not a
-redesign. Eight phases, each independently shippable, in a fixed order. Phase 3 builds the shared
-primitives that phases 4 and 5 consume. Phase 8 is last. Brand, tokens, and the 10 strengths in
+redesign. Nine phases, each independently shippable, in a fixed order. Phase 3 builds the shared
+primitives that phases 4 and 5 consume. Phase 9 is last — it was added on 04-09-26 by owner ruling and is the only phase that touches an authentication flow. Brand, tokens, and the 10 strengths in
 audit §5 are untouchable.
 
 ---
@@ -81,12 +81,12 @@ Hard safety constraints (non-negotiable, per phase):
 Copy-pasteable `/goal` block for a long-running session on this program.
 
 ```text
-TARGET: Veent HRIS UI/UX overhaul — 8 phases, reorganization and convergence only, NOT a
+TARGET: Veent HRIS UI/UX overhaul — 9 phases, reorganization and convergence only, NOT a
 visual redesign. Umbrella: process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/
 ui-ux-overhaul-umbrella_PLAN_03-09-26.md. Research artifact: docs/ui-ux-audit-2026-09-03.md
 (commit 2f89ba9, score 19/40). Order: 01 p0-fixes, 02 nav-ia, 03 design-system,
 04 feedback-contract, 05 destructive-actions, 06 surface-consolidation, 07 page-splits,
-08 copy-a11y.
+08 copy-a11y, 09 login-email-first.
 
 PER-PHASE LOOP (7 steps, SKIPS SPEC — the umbrella governs every phase):
 1 RESEARCH (staleness-check the audit's file paths and line numbers against current code)
@@ -239,21 +239,24 @@ not a tradeoff.
      |
   P7 page-splits            (depends on 02 + 03)
      |
-  P8 copy-a11y              (last)
+  P8 copy-a11y              (depends on nothing; applied to the final structure)
+     |
+  P9 login-email-first      (last; must follow 08 — phase 08 pinned the login flow's
+                             absence of change as an automated check)
 ```
 
 Phase 4 comes before phase 5: the destructive-action sweep consumes phase 4's rebuilt
 `ConfirmButton` and the Dialog base, so routing actions into a still-silent primitive would mean
 touching the same call sites twice.
 
-## Phased Delivery Plan — The 8 Phases
+## Phased Delivery Plan — The 9 Phases
 
 Every phase plan is written as `phase-0N-{slug}_PLAN_03-09-26.md` in this same folder.
 Every phase report lands as `phase-0N-{slug}_REPORT_{date}.md`, FLAT, in this same folder.
 
 **Exit criteria are identical for every phase** unless the phase adds one:
 CI gate set green — `pnpm format:check` && `pnpm lint` && `pnpm check` && `pnpm test` — plus an
-impeccable audit pass (all eight phases touch UI), plus a live spot-check in the running app for
+impeccable audit pass (all nine phases touch UI), plus a live spot-check in the running app for
 every phase with visible change (all except where noted). Phase report written. Commit checkpoint
 taken.
 
@@ -457,6 +460,32 @@ the page it sits on (`employees/[id]`).
 
 ---
 
+### Phase 9 — `login-email-first`
+
+**Plan:** `phase-09-login-email-first_PLAN_03-09-26.md`
+
+Added 04-09-26 by owner ruling, after phase 08 raised the finding. Login step 1 was a public
+directory of every Veent customer: `load` read all `Organization` rows with no session and the page
+rendered one button per tenant. This phase deletes that query and asks for an email instead. The
+server resolves which org(s) the email belongs to and returns **one response shape for every email
+in the world** — unknown, malformed, inactive, zero-org and single-org are byte-identical, and only
+a 2+-org email gets a picker of that person's own orgs. Owner ruling: option C, no new rate limit,
+the generic `'Invalid email or password'` survives verbatim.
+
+It runs last because it must. Phase 08 deliberately left the flow byte-untouched and made that
+absence an automated check (AC5/AC20); running this earlier would have meant writing those pins
+twice. It is the only phase in the program that touches an authentication flow, so it carries its
+own risk class (HIGH — auth/identity) and its own evidence pack.
+
+- **Consumes:** the phase 08 login pins (title, logo, footer, `role="alert"` error box, the generic
+  credential literal) — four preserved untouched, two amended explicitly.
+- **Entry:** Phase 8 complete.
+- **Exit:** standard gate set, plus the full `pnpm test:e2e` suite compared row-for-row against a
+  pre-phase baseline (the `helpers.login()` rewrite is a ~40-spec choke point), plus every mutation
+  check M1-M7 recorded red, plus the owner's real-browser pass M-1..M-4.
+
+---
+
 ## Per-Phase Loop
 
 Every phase runs this loop. No phase skips a step.
@@ -507,9 +536,12 @@ the overlap visible and sequenced, not to prevent it.
 | 6 | surface-consolidation | PLANNED | contract written — **BLOCKED → supplement in progress** |
 | 7 | page-splits | PLANNED | contract written — **CONDITIONAL** |
 | 8 | copy-a11y | PLANNED | contract written — **CONDITIONAL** |
+| 9 | login-email-first | PLANNED | contract written — **CONDITIONAL** |
 
-All eight phase plan files exist in this folder (`phase-01-p0-fixes_PLAN_03-09-26.md` through
-`phase-08-copy-a11y_PLAN_03-09-26.md`), and **all eight now carry a written validate-contract**.
+All nine phase plan files exist in this folder (`phase-01-p0-fixes_PLAN_03-09-26.md` through
+`phase-09-login-email-first_PLAN_03-09-26.md`), and **all nine now carry a written
+validate-contract**. Phase 09 was added on 04-09-26 by owner ruling; its contract is CONDITIONAL
+with nine binding execute instructions.
 Seven gates are CONDITIONAL; phase 06 came back BLOCKED and is in a supplement cycle. Nothing has
 been executed. The blast-radius registry does not exist yet — it is created at first execution.
 
@@ -517,7 +549,7 @@ been executed. The blast-radius registry does not exist yet — it is created at
 
 ## Current Execution State
 
-- **Position:** all nine plan artifacts written (umbrella + 8 phase plans). Nothing validated,
+- **Position:** all ten plan artifacts written (umbrella + 9 phase plans). Nothing validated,
   nothing executed, no code changed.
 - **Validation:** outer PVL has run. All eight validate-contracts are written — 7 CONDITIONAL,
   phase 06 BLOCKED and in a supplement cycle.
@@ -525,12 +557,16 @@ been executed. The blast-radius registry does not exist yet — it is created at
 - **Next execution:** Phase 1, `p0-fixes`
   (`phase-01-p0-fixes_PLAN_03-09-26.md`). It has no entry dependency.
 - **Branch:** `staging`, clean at `5e5cdfe`.
+- **Phase 09 (added 04-09-26):** `login-email-first`, planned and validated (CONDITIONAL, nine
+  binding execute instructions), executed on `feat/uiux-phase-9` off `feat/uiux-phase-8`. It is the
+  last phase and the only one touching an authentication flow. See
+  `phase-09-login-email-first_REPORT_03-09-26.md`.
 
 ## Phase Loop Progress
 
 | Phase | R | I | P | PVL | E | EVL | UP |
 |---|---|---|---|---|---|---|---|
-| 1-8 | — | — | — | — | — | — | — |
+| 1-9 | — | — | — | — | — | — | — |
 
 ## Pre-PVL Conflict Resolution
 

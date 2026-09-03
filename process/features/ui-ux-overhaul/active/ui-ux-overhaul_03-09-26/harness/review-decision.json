@@ -1,0 +1,16 @@
+{
+  "task": "ui-ux-overhaul phase 09 \u2014 login-email-first",
+  "decision": "approved-with-concerns",
+  "blockingFindings": [],
+  "nonBlockingFindings": [
+    "G5 (full pnpm test:e2e) was not run by this agent and no Section 0 pre-phase baseline was captured \u2014 the orchestrator owns the e2e run. AC11, AC12 and gates E1/E3/E4/E5/E6/E7/R1 stay unconfirmed until it runs.",
+    "R2 (rate-limit lockout through the renamed action) is a hybrid check needing a running app; unrun.",
+    "A1 (impeccable audit) and M-1..M-4 (owner browser pass) are agent-probe tiers; unrun.",
+    "resolveLoginOrgs also selects the primary org's name, which the plan's helper spec did not list. Needed so the picker can name an org the user has no membership row for; documented in the phase report as a within-blast-radius deviation.",
+    "The ?/resolve enumeration channel (C4/D5) is accepted by owner ruling 4, not ruled out. No gate measures wall-clock."
+  ],
+  "notes": "SKILL-doc decision form: APPROVE, scoped to the unit and source-scan tiers only. Recorded here as approved-with-concerns because four verification tiers are unrun. The phase is CODE DONE, never VERIFIED.",
+  "reviewer": "vc-execute-agent (self-review against the approved plan and the CONDITIONAL validate-contract)",
+  "timestamp": "2026-09-04T05:30:00+08:00",
+  "decisionScopeRationale": "All nine binding execute instructions E1-E9 are implemented and each is traceable to a line of code or a test: E1 (isActive guard + the AC8b case + mutation M7 run red), E2 (G1 narrowed to the organization.findMany half only), E3 (five explicit-org e2e call sites recorded, none edited, signature unchanged), E4 (the absolute timing claim struck from the plan, D5 written into the backlog note), E5 (?/resolve does no DB read on the Zod-reject path, asserted by a test), E6 (four citations corrected), E7 (name-sorted picker with the first radio checked, the CEO default recorded as JoJo Potato), E8 (the no-JS spec written as a real Fully-Automated test, no downgrade), E9 (no branch creation). All seven mutations M1-M7 were run and each turned its named gate red, with a green-again control. The full CI gate set is green in CI order. APPROVE is scoped to what was actually verified: the unit and source-scan tiers. It does NOT cover the e2e tier, the hybrid rate-limit check, the impeccable pass or the owner's browser pass \u2014 all four are recorded SKIP in verification.json and the phase is reported CODE DONE, never VERIFIED."
+}

@@ -1,0 +1,41 @@
+{
+  "task": "ui-ux-overhaul phase 09 \u2014 login-email-first",
+  "snippets": [
+    {
+      "file": "src/routes/(auth)/login/+page.server.ts",
+      "lines": "41-68",
+      "description": "resolveLoginOrgs \u2014 the whole resolution surface. One findUnique for every email, an inactive/unknown account returns the empty answer before any union, orgs returned only when the membership set is >= 2, soleOrgId only when it is exactly 1.",
+      "content": "async function resolveLoginOrgs(email: string) { const user = await db.user.findUnique({ where: { email }, select: { id, isActive, organizationId, organization: {id,name}, memberships: { organization: {id,name} } } }); if (!user || !user.isActive) return { userId: null, orgs: [], soleOrgId: null }; const byId = new Map(); byId.set(user.organization.id, user.organization); for (const m of user.memberships) byId.set(m.organization.id, m.organization); const all = [...byId.values()].sort((a,b) => a.name.localeCompare(b.name)); return { userId: user.id, orgs: all.length >= 2 ? all : [], soleOrgId: all.length === 1 ? all[0].id : null } }"
+    },
+    {
+      "file": "src/routes/(auth)/login/+page.server.ts",
+      "lines": "122-133",
+      "description": "selectedOrg consumer 1 of 3 \u2014 the membership check. A posted selectedOrg is attacker-controlled and is still validated against the primary org or a UserOrganization row, exactly as before. When nothing is posted the org came from the server's own resolution and cannot be forged.",
+      "content": "const resolvedOrgId = selectedOrg ?? r.soleOrgId; const isMember = selectedOrg ? user.organizationId === selectedOrg || (await db.userOrganization.findUnique({ where: { userId_organizationId: { userId: user.id, organizationId: selectedOrg } } })) !== null : r.soleOrgId !== null"
+    },
+    {
+      "file": "src/routes/(auth)/login/+page.server.ts",
+      "lines": "135-152",
+      "description": "The failure gate that makes a null session org unreachable \u2014 !resolvedOrgId returns before createSession. LOGIN_FAILED is still audited against user.organizationId, never the posted org.",
+      "content": "if (!validPassword || !isMember || !resolvedOrgId) { recordFailure(rateKey); await writeAuditLog({ organizationId: user.organizationId, ... }, { action: 'LOGIN_FAILED', ... }, db); return fail(401, { error: GENERIC, email, orgs: r.orgs }) }"
+    },
+    {
+      "file": "src/routes/(auth)/login/+page.server.ts",
+      "lines": "156-176",
+      "description": "selectedOrg consumers 2 and 3 \u2014 the session attribute and the success-audit organizationId. Both now read one variable, resolvedOrgId, which the gate above proves non-null.",
+      "content": "const session = await lucia.createSession(user.id, { currentOrgId: resolvedOrgId }) ... writeAuditLog({ organizationId: resolvedOrgId, ... }, { action: 'LOGIN', ... }, db)"
+    },
+    {
+      "file": "src/routes/(auth)/login/+page.server.ts",
+      "lines": "73-82",
+      "description": "?/resolve \u2014 the new anonymous surface. Exactly one response shape, never a fail(), and no DB read at all on the Zod-reject path (contract E5).",
+      "content": "resolve: async ({ request }) => { const formData = Object.fromEntries(await request.formData()); const parsed = resolveSchema.safeParse(formData); if (!parsed.success) return { email: String(formData.email ?? ''), orgs: [] }; const r = await resolveLoginOrgs(parsed.data.email); return { email: parsed.data.email, orgs: r.orgs } }"
+    },
+    {
+      "file": "src/routes/(auth)/login/+page.svelte",
+      "lines": "76-81",
+      "description": "The step-2 heading is generic. Naming the resolved org would make a single-org email distinguishable from an unknown one. Pinned by copy-invariants G2 and mutation M2.",
+      "content": "<h1 class=\"text-base font-semibold\">Enter your password</h1>"
+    }
+  ]
+}

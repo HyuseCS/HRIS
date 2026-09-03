@@ -26,29 +26,26 @@ export const USERS = {
 export const E2E_DISCORD_ID = 'e2e-punch-elena'
 
 /**
- * Pick a tenant on the two-step Avipa login (#135) and wait for the credential form.
- * Revealing the form is client-side, so the tenant click must land after hydration —
- * retry the click until the Email field appears (same pattern as the timesheet review
- * modal below), otherwise a pre-hydration click is silently dropped.
+ * Log in through the real login form and wait for the dashboard.
+ *
+ * Email-first login (#135, phase 09): step 1 posts the email, the server resolves the
+ * account's org(s) and re-renders. Both steps are server-rendered, so there is no
+ * hydration race to retry around — the old `selectTenant` retry loop is gone with the
+ * client-side step reveal that made it necessary.
+ *
+ * `org` only matters for a multi-org account: the picker is rendered only when the email
+ * resolves to two or more orgs. Every other seed account has one membership, the picker
+ * does not exist, and the argument is inert.
  */
-export async function selectTenant(page: Page, org: string) {
-	const tenant = page.getByRole('button', { name: org, exact: true })
-	const email = page.getByLabel('Email')
-	await expect(async () => {
-		await tenant.click()
-		await expect(email).toBeVisible({ timeout: 1000 })
-	}).toPass({ timeout: 15000 })
-}
-
-/** Log in through the real login form and wait for the dashboard. */
 export async function login(page: Page, user: { email: string; password: string }, org = 'Veent') {
 	// domcontentloaded (not the default 'load') so we don't block on external font/webfont
 	// requests that may never settle in sandboxed/offline runners.
 	await page.goto('/login', { waitUntil: 'domcontentloaded' })
-	// Two-step Avipa login (#135): pick the tenant to reveal the credential form. All
-	// seed test accounts live in `Veent`, so callers rarely override `org`.
-	await selectTenant(page, org)
 	await page.getByLabel('Email').fill(user.email)
+	await page.getByRole('button', { name: 'Continue' }).click()
+	await expect(page.getByLabel('Password')).toBeVisible()
+	const picker = page.getByRole('radio', { name: org, exact: true })
+	if (await picker.count()) await picker.check()
 	await page.getByLabel('Password').fill(user.password)
 	await page.getByRole('button', { name: 'Sign In' }).click()
 	// domcontentloaded here too — waitForURL's default 'load' hangs the same way.

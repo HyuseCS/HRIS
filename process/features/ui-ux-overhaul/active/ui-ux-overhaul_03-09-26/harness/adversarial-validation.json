@@ -1,0 +1,34 @@
+{
+  "scenarios": [
+    {
+      "scenario": "Forged selectedOrg — an attacker with valid credentials posts an org id the account does not belong to, hoping to land a session in another tenant.",
+      "ruled_out": true,
+      "rationale": "A posted selectedOrg is still checked against the primary org or a UserOrganization compound-unique row before the session is created, and the failure is the generic 401 with a LOGIN_FAILED row written against user.organizationId, never the forged id. Proven by U3 in tests/unit/login-resolution.test.ts, whose userOrganization mock is keyed on the actual where clause; mutation M5 (deleting the isMember clause) turns it red."
+    },
+    {
+      "scenario": "Null currentOrgId — a multi-org user, or a tampered no-JS request, posts no selectedOrg and gets a session with no org, reaching surfaces the org switcher cannot scope.",
+      "ruled_out": true,
+      "rationale": "resolvedOrgId is selectedOrg ?? soleOrgId, and soleOrgId is null unless the membership set is exactly one. The failure gate tests !resolvedOrgId before createSession, so a null org returns the generic 401 instead. Proven by U4 (createSession called with the resolved id) and by the gate's own ordering."
+    },
+    {
+      "scenario": "Single-org vs zero-org distinguishability — a caller submits emails at step 1 to learn which ones belong to a real account.",
+      "ruled_out": true,
+      "rationale": "?/resolve has exactly one response shape, { email, orgs }, and orgs is populated only when the set has two or more entries. Unknown, malformed, inactive, zero-membership and single-org emails all return the identical object; U1 asserts the four results are toEqual except for the echoed email, and asserts none carries a status key. The step-2 heading is generic, pinned by G2 and mutation M2 — naming the resolved org would have reopened the same disclosure one level down."
+    },
+    {
+      "scenario": "Inactive-account membership disclosure — a deactivated multi-org account (today, ceo@veent.ph) has its full org list returned at ?/resolve while being unable to sign in.",
+      "ruled_out": true,
+      "rationale": "This was validate-contract concern C1, the top finding: the planned helper selected isActive and never used it. E1 added the guard before the union, so an inactive account returns the same empty answer as an unknown one. Proven by the AC8b case in U1; mutation M7 (deleting the guard) turns exactly that case red."
+    },
+    {
+      "scenario": "?/resolve as an enumeration channel — an anonymous caller sprays emails at step 1 to map the customer base by timing or by cost.",
+      "ruled_out": false,
+      "rationale": "ACCEPTED, NOT RULED OUT. ?/resolve is a new unauthenticated, un-rate-limited, un-audited per-email DB read. The response is provably identical for every email, so no oracle exists in what the caller reads back — but a hit loads memberships and a miss does not, so wall-clock differs, and the probe is cheaper than the pre-phase one (which had to post a password, burning a rate-limit slot and writing a LOGIN_FAILED row for a real account). The owner declined option D, a rate limit on the resolution step, on 2026-09-03 (binding ruling 4), and timing hardening is out of scope by ruling 6. Recorded as D3 and D5 in process/features/ui-ux-overhaul/backlog/login-timing-parity_NOTE_03-09-26.md, with option D named as the follow-on. No gate measures wall-clock; this is a named residual, not a covered behaviour."
+    },
+    {
+      "scenario": "Multi-org picker discloses membership for a known email.",
+      "ruled_out": false,
+      "rationale": "ACCEPTED BY DESIGN, not ruled out. Inherent to option C: a 2+-org email must be shown its own orgs to choose one. The owner accepted this on 2026-09-03 (binding ruling 3). The disclosure is bounded — only that account's own memberships, never the org table, proven by U2 (four orgs mocked, two memberships, exactly two returned) with mutation M6 as the tripwire."
+    }
+  ]
+}
