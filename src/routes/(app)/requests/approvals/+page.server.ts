@@ -139,6 +139,17 @@ export const actions: Actions = {
 			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
+
+		// The page renders `form?.saved`; this action used to return nothing, so a decision
+		// looked identical to a no-op. Name the decision so the two are distinguishable.
+		return {
+			saved:
+				decision === 'APPROVED'
+					? 'Request approved.'
+					: decision === 'REJECTED'
+						? 'Request rejected.'
+						: 'Request returned to the filer.'
+		}
 	},
 
 	// Reject each selected request with one shared note. Requests the approver can't currently
