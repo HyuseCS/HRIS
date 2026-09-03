@@ -31,7 +31,7 @@
 <Dialog bind:open {title} role="alertdialog" size="sm" zIndex={60}>
 	<h2 class="text-lg font-semibold">{title}</h2>
 	{#if message}
-		<p class="mt-2 text-sm text-muted-foreground">{message}</p>
+		<p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">{message}</p>
 	{/if}
 	<div class="mt-6 flex justify-end gap-2">
 		<button
