@@ -1912,34 +1912,46 @@
 				</div>
 			{/if}
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
-				<form
-					bind:this={offboardFormEl}
-					method="POST"
-					action="?/offboard"
-					use:enhance={offboard.enhance}
-					class="rounded-lg border border-destructive/50 p-6 space-y-4 lg:col-span-2"
-				>
-					<h2 class="font-semibold text-destructive">Offboard Employee</h2>
-					<div class="flex items-end gap-4">
-						<div>
-							<label for="endDate" class="text-sm font-medium">Last Day</label>
-							<input
-								id="endDate"
-								name="endDate"
-								type="date"
-								required
-								class="mt-1 flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
+				<!--
+					The Actions tab holds this one form and nothing else: reaching the only irreversible
+					thing on the 201 file should take a deliberate move, not a scroll past it. The
+					confirm dialog and its reportValidity() gate are phase 05's — left exactly as they are.
+				-->
+				<section class="rounded-lg border border-destructive p-6 space-y-4 lg:col-span-2">
+					<h2 class="font-semibold text-destructive">Danger zone</h2>
+					<p class="text-sm text-muted-foreground">
+						Offboarding ends this employment record and disables the login. Reversing it needs a
+						Super Admin.
+					</p>
+					<form
+						bind:this={offboardFormEl}
+						method="POST"
+						action="?/offboard"
+						use:enhance={offboard.enhance}
+						class="space-y-4"
+					>
+						<h3 class="font-semibold text-destructive">Offboard Employee</h3>
+						<div class="flex items-end gap-4">
+							<div>
+								<label for="endDate" class="text-sm font-medium">Last Day</label>
+								<input
+									id="endDate"
+									name="endDate"
+									type="date"
+									required
+									class="mt-1 flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</div>
+							<button
+								type="button"
+								disabled={offboard.busy}
+								onclick={openOffboardConfirm}
+								class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50"
+								>{offboard.busy ? 'Offboarding…' : 'Offboard'}</button
+							>
 						</div>
-						<button
-							type="button"
-							disabled={offboard.busy}
-							onclick={openOffboardConfirm}
-							class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50"
-							>{offboard.busy ? 'Offboarding…' : 'Offboard'}</button
-						>
-					</div>
-				</form>
+					</form>
+				</section>
 			{/if}
 		</div>
 	</div>
