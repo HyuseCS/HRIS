@@ -235,7 +235,11 @@
 							<tr>
 								{#each data.columns as col (col)}
 									<th
-										class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+										class="px-4 py-3 font-medium text-muted-foreground whitespace-nowrap {CURRENCY_COLS.has(
+											col
+										)
+											? 'text-right'
+											: 'text-left'}"
 									>
 										{col}
 									</th>
@@ -248,7 +252,7 @@
 									{#each data.columns as col (col)}
 										<td
 											class="px-4 py-3 whitespace-nowrap {CURRENCY_COLS.has(col)
-												? 'text-right font-mono'
+												? 'text-right font-mono tabular-nums'
 												: ''}"
 										>
 											{formatCell(col, row[col])}

@@ -99,7 +99,7 @@
 						<td class="px-4 py-3 text-muted-foreground">{row.department}</td>
 						{#each row.cells as cell, i (data.leaveTypes[i].id)}
 							{@const gated = locked(row.startDate, data.leaveTypes[i].minMonthsOfService)}
-							<td class="px-4 py-3 text-right">
+							<td class="px-4 py-3 text-right tabular-nums">
 								{#if !cell}
 									<span class="text-muted-foreground" title="No balance allocated for {data.year}"
 										>—</span
@@ -112,7 +112,7 @@
 								{/if}
 							</td>
 						{/each}
-						<td class="px-4 py-3 text-right font-medium">
+						<td class="px-4 py-3 text-right font-medium tabular-nums">
 							{row.cells
 								.reduce(
 									(sum, cell, i) =>

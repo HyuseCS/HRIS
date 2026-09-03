@@ -123,7 +123,7 @@
 							<td class="px-4 py-3 text-muted-foreground"
 								>{formatShortDate(p.startDate)} – {formatShortDate(p.endDate)}</td
 							>
-							<td class="px-4 py-3 text-right font-mono"
+							<td class="px-4 py-3 text-right font-mono tabular-nums"
 								>{run ? formatCurrency(Number(run.totalNet)) : '—'}</td
 							>
 							<td class="px-4 py-3">

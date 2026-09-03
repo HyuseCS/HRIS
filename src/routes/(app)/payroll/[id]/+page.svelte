@@ -176,20 +176,22 @@
 								<div class="text-xs text-yellow-600 dark:text-yellow-500">⚠ {entry.flagReason}</div>
 							{/if}
 						</td>
-						<td class="px-4 py-3 text-right font-mono">{formatCurrency(Number(entry.grossPay))}</td>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums"
+							>{formatCurrency(Number(entry.grossPay))}</td
+						>
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.sssEe))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.philhealthEe))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.pagibigEe))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.withholdingTax))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono font-medium"
+						<td class="px-4 py-3 text-right font-mono font-medium tabular-nums"
 							>{formatCurrency(Number(entry.netPay))}</td
 						>
 						<td class="px-4 py-3">
@@ -222,7 +224,7 @@
 												{#each entry.earnings as c (c.id)}
 													<tr
 														><td class="py-0.5">{c.label}{c.taxable ? '' : ' (non-taxable)'}</td><td
-															class="py-0.5 text-right font-mono"
+															class="py-0.5 text-right font-mono tabular-nums"
 															>{formatCurrency(Number(c.amount))}</td
 														></tr
 													>
@@ -241,7 +243,7 @@
 												{#each entry.deductions as c (c.id)}
 													<tr
 														><td class="py-0.5">{c.label}</td><td
-															class="py-0.5 text-right font-mono text-muted-foreground"
+															class="py-0.5 text-right font-mono tabular-nums text-muted-foreground"
 															>{formatCurrency(Number(c.amount))}</td
 														></tr
 													>

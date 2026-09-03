@@ -195,13 +195,13 @@
 								<td class="px-4 py-3"
 									>{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)}</td
 								>
-								<td class="px-4 py-3 text-right font-mono"
+								<td class="px-4 py-3 text-right font-mono tabular-nums"
 									>{formatCurrency(Number(run.totalGross))}</td
 								>
-								<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+								<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 									>{formatCurrency(Number(run.totalDeductions))}</td
 								>
-								<td class="px-4 py-3 text-right font-mono font-medium"
+								<td class="px-4 py-3 text-right font-mono font-medium tabular-nums"
 									>{formatCurrency(Number(run.totalNet))}</td
 								>
 							</tr>
