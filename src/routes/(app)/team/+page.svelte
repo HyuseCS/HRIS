@@ -114,18 +114,23 @@
 			<EmptyState title="No team members found" />
 		</div>
 	{:else}
-		<div class="overflow-x-auto rounded-md border">
+		<!-- The bound goes on the wrapper that already scrolls sideways, so the matrix scrolls on
+		     both axes inside one box: members grow down and dates grow across, and nothing may
+		     push the page. The members query is NOT capped — it is reused to build the attendance
+		     fetch and the attendance map, so dropping a person there would look like missing
+		     attendance data rather than like a cap. -->
+		<div class="card-scroll overflow-x-auto rounded-md border">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
 						<th
-							class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/50 z-10"
+							class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap sticky left-0 top-0 bg-muted/50 z-30"
 						>
 							Employee
 						</th>
 						{#each data.dates as date (date)}
 							<th
-								class="px-2 py-3 text-center font-medium text-muted-foreground whitespace-nowrap min-w-[64px]"
+								class="px-2 py-3 text-center font-medium text-muted-foreground whitespace-nowrap min-w-[64px] sticky top-0 bg-muted/50 z-20"
 							>
 								{formatShortDate(date)}
 							</th>
