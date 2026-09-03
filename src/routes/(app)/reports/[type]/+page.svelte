@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatCurrency } from '$lib/utils/format'
+	import { REPORT_COLUMN_LABELS, labelFor } from '$lib/labels'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import { navigating } from '$app/stores'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
@@ -244,7 +245,7 @@
 											? 'text-right'
 											: 'text-left'}"
 									>
-										{col}
+										{labelFor(REPORT_COLUMN_LABELS, col)}
 									</th>
 								{/each}
 							</tr>

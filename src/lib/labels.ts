@@ -101,7 +101,9 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
 	PENDING: 'Pending',
 	APPROVED: 'Approved',
 	REJECTED: 'Rejected',
-	RETURNED: 'Returned',
+	// "Returned for changes" rather than "Returned": on its own the word does not say who has to
+	// act next, and this state is the one where the filer, not the approver, holds the request.
+	RETURNED: 'Returned for changes',
 	CANCELLED: 'Cancelled'
 }
 
@@ -110,9 +112,9 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
 	OVERTIME: 'Overtime',
 	UNDERTIME: 'Undertime',
 	OFFICIAL_BUSINESS: 'Official business',
-	REST_DAY_WORK: 'Rest day work',
+	REST_DAY_WORK: 'Rest-day work',
 	HOLIDAY_WORK: 'Holiday work',
-	INFO_UPDATE: 'Info update'
+	INFO_UPDATE: 'Information update'
 }
 
 export const APPROVAL_DECISION_LABELS: Record<ApprovalDecision, string> = {
@@ -142,9 +144,14 @@ export const SEPARATION_TYPE_LABELS: Record<SeparationType, string> = {
 	TERMINATION: 'Termination'
 }
 
+/**
+ * These name the stage of the clearance, not the row's own adjective. "Open" and "Cleared" read as
+ * states of the *employee* to anyone outside HR; the case is what is open, and what is cleared is
+ * the checklist, after which HR still has to finalize.
+ */
 export const SEPARATION_STATUS_LABELS: Record<SeparationStatus, string> = {
-	OPEN: 'Open',
-	CLEARED: 'Cleared',
+	OPEN: 'Clearance in progress',
+	CLEARED: 'Ready to finalize',
 	FINALIZED: 'Finalized'
 }
 
@@ -153,13 +160,17 @@ export const CLEARANCE_STATUS_LABELS: Record<ClearanceStatus, string> = {
 	CLEARED: 'Cleared'
 }
 
+/**
+ * Each label names who is holding the review. A one-word status here ("Signing", "Scored") does not
+ * tell an employee or an evaluator whether the next move is theirs.
+ */
 export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
-	PENDING: 'Pending',
-	SELF_ASSESSMENT: 'Self assessment',
-	SCORED: 'Scored',
-	SIGNING: 'Signing',
+	PENDING: 'Not started',
+	SELF_ASSESSMENT: 'Employee self-assessment',
+	SCORED: 'Scored by evaluator',
+	SIGNING: 'Awaiting signatures',
 	COMPLETED: 'Completed',
-	ACKNOWLEDGED: 'Acknowledged'
+	ACKNOWLEDGED: 'Acknowledged by employee'
 }
 
 export const REVIEW_CYCLE_STATUS_LABELS: Record<ReviewCycleStatus, string> = {
@@ -220,6 +231,62 @@ export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
 	PROBATIONARY: 'Probationary',
 	ON_CALL: 'On call',
 	INTERN: 'Intern'
+}
+
+/**
+ * Report table column keys → human headers. These keys are not a Prisma enum — they are the
+ * `columns` string list `reports/[type]/+page.server.ts` builds per report, and they double as the
+ * CSV header and the row-object keys, so they cannot be renamed at source. Only the rendered header
+ * is translated. A key with no entry falls back to itself via `labelFor`.
+ */
+export const REPORT_COLUMN_LABELS: Record<string, string> = {
+	Applicants: 'Applicants',
+	Balance: 'Outstanding balance',
+	Clearance: 'Clearance',
+	Closed: 'Closed',
+	Contribution: 'Contribution',
+	DaysOpen: 'Days open',
+	Department: 'Department',
+	EffectiveDate: 'Effective date',
+	Employee: 'Employee',
+	EmployeeCount: 'Employees',
+	EmployeeNumber: 'Employee number',
+	EmployeeShare: 'Employee share',
+	EmployerShare: 'Employer share',
+	FinalPay: 'Final pay',
+	Gross: 'Gross pay',
+	// Both spellings exist in the report definitions; map each rather than renaming a data key.
+	HeadCount: 'Headcount',
+	Headcount: 'Headcount',
+	Hired: 'Hired',
+	Installment: 'Installment',
+	Interviewed: 'Interviewed',
+	LateDays: 'Late days',
+	LateMinutes: 'Late minutes',
+	LeaveType: 'Leave type',
+	Net: 'Net pay',
+	NightDiffHours: 'Night differential hours',
+	OtherDeductions: 'Other deductions',
+	OvertimeHours: 'Overtime hours',
+	PagIBIG: 'Pag-IBIG',
+	Period: 'Period',
+	PhilHealth: 'PhilHealth',
+	Posted: 'Posted',
+	Principal: 'Loan principal',
+	RawOvertimeHours: 'Raw overtime hours',
+	SSS: 'SSS',
+	Status: 'Status',
+	TIN: 'TIN',
+	Tax: 'Withholding tax',
+	TaxWithheld: 'Tax withheld',
+	Title: 'Title',
+	Total: 'Total',
+	TotalDaysUsed: 'Days used',
+	TotalGross: 'Total gross pay',
+	TotalHours: 'Total hours',
+	TotalNet: 'Total net pay',
+	Type: 'Type',
+	UndertimeMinutes: 'Undertime minutes'
 }
 
 /**
