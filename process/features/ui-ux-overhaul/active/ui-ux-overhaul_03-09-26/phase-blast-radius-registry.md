@@ -202,3 +202,101 @@ full CI gate set green in CI order. The live gates (G5-G8, G10-G14, the five-rol
 the `impeccable` audit and the Playwright baseline) are the owner's and are still unrun. See
 `phase-07-page-splits-s1-s4_REPORT_03-09-26.md`, `phase-07-page-splits-s5_REPORT_03-09-26.md` and
 `phase-07-page-splits-s6-s7_REPORT_03-09-26.md`.
+
+---
+
+## Phase 8 — `copy-a11y`
+
+**Plan:** `phase-08-copy-a11y_PLAN_03-09-26.md`
+**Claimed:** 03-09-26 (transcribed from the plan's Touchpoints) · **Branch:** `feat/uiux-phase-8`
+**Commits:** `f8fa640` (S1) · `c70f89c` (S2) · `0c5abd1` (S3) — sections S1-S3, first agent ·
+`9533da0` (S4) · `0c47b8c` (S5) · `3639694` (S6) — sections S4-S6, second agent
+
+**Files created**
+
+`src/routes/(app)/inquiries/**` (4 files, moved from `complaints/`) ·
+`src/routes/(app)/complaints/+page.server.ts` · `src/routes/(app)/complaints/+page.svelte` ·
+`src/routes/(app)/complaints/[id]/+page.server.ts` · `src/routes/(app)/complaints/[id]/+page.svelte`
+(four 308-redirect stubs) · `src/lib/actions/scrollToError.ts` ·
+`tests/unit/copy-invariants.test.ts` · `tests/unit/a11y-invariants.test.ts`
+
+**Files modified**
+
+`src/routes/(app)/+layout.svelte` · `src/routes/(app)/team/+page.svelte` ·
+`src/routes/(app)/team/+page.server.ts` · `src/routes/(app)/branches/+page.svelte` ·
+`src/routes/(app)/employees/+page.svelte` · `src/routes/(app)/employees/[id]/+page.svelte` ·
+`src/routes/(app)/requests/+page.svelte` · `src/routes/(app)/requests/[id]/+page.svelte` ·
+`src/routes/(app)/requests/approvals/+page.svelte` ·
+`src/routes/(app)/requests/approvals/+page.server.ts` · `src/routes/(app)/leave/+page.svelte` ·
+`src/routes/(app)/leave/balances/+page.svelte` · `src/routes/(app)/recruitment/+page.svelte` ·
+`src/routes/(app)/recruitment/+page.server.ts` ·
+`src/routes/(app)/recruitment/[id]/apply/+page.svelte` ·
+`src/routes/(app)/timesheets/+page.svelte` · `src/routes/(app)/separations/+page.svelte` ·
+`src/routes/(app)/separations/[id]/+page.svelte` · `src/routes/(app)/performance/+page.svelte` ·
+`src/routes/(app)/performance/templates/[id]/+page.svelte` ·
+`src/routes/(app)/payroll/+page.svelte` · `src/routes/(app)/payroll/+page.server.ts` ·
+`src/routes/(app)/payroll/[id]/+page.server.ts` · `src/routes/(app)/payroll/config/+page.svelte` ·
+`src/routes/(app)/payroll/config/+page.server.ts` ·
+`src/routes/(app)/payroll/calculator/+page.server.ts` ·
+`src/routes/(app)/payroll/statutory-rates/+page.svelte` ·
+`src/routes/(app)/attendance/+page.svelte` · `src/routes/(app)/attendance/+page.server.ts` ·
+`src/routes/(app)/reports/[type]/+page.svelte` ·
+`src/routes/(app)/reports/audit-log/+page.svelte` · `src/routes/(app)/settings/roles/+page.svelte` ·
+`src/routes/(app)/settings/schedules/+page.svelte` ·
+`src/routes/(app)/settings/holidays/+page.server.ts` ·
+`src/routes/(app)/settings/posting-approvers/+page.server.ts` ·
+`src/routes/(app)/departments/+page.server.ts` · `src/routes/(app)/benefits/+page.server.ts` ·
+`src/routes/(app)/dashboard/+page.server.ts` · `src/routes/(auth)/login/+page.svelte` ·
+`src/routes/(auth)/login/+page.server.ts` (comment only) · `src/lib/labels.ts` · `src/lib/nav.ts` ·
+`src/lib/server/services/complaints/index.ts` (notification link targets only — the four
+`/complaints/{id}` URL literals became `/inquiries/{id}`; no logic, no data key) ·
+`tests/unit/labels.test.ts` · `tests/unit/complaints.test.ts` ·
+`tests/unit/complaints-scoping.test.ts` · `tests/unit/nav-sections.test.ts` ·
+`tests/e2e/branches.spec.ts` · `tests/e2e/tenancy-switch.spec.ts`
+
+**Read-only (verified, not edited):** `prisma/schema.prisma`, `src/lib/rbac.ts`,
+`src/lib/components/ui/**`, `src/lib/server/services/**` (except the URL literals noted above),
+`src/routes/(app)/punch/+page.svelte` (its `role="status"`/`role="alert"` split is the model —
+`git diff` over the phase touches it zero times), `docs/ui-ux-audit-2026-09-03.md`.
+
+**Out of bounds (verified untouched — `git diff --name-only` over the whole phase):**
+`prisma/schema.prisma`, `src/lib/rbac.ts`, `package.json`, `src/app.css`, `static/*`,
+`src/lib/components/ui/**`.
+
+**Corrections issued to earlier phases' registry claims:**
+
+- **Phase 07's entry is wrong about item 34.** It states the onboarding manual-step control was
+  "already compliant — S4 replaced the 16px glyph with a real `<button>` carrying
+  `aria-label="Mark {step} complete"`". No such string exists in
+  `employees/[id]/+page.svelte`; the control was still `h-4 w-4` (16px) with
+  `aria-label="{step.done ? 'Uncheck' : 'Check'} {step.label}"`. Phase 08 built it (raised to
+  `h-6 w-6`). **Lesson for future registry entries:** an "already done" claim should cite a
+  grep-able string, and the consuming phase should grep it before skipping.
+
+**Notes for anyone after this phase:**
+
+- No `<tr>` in `src/` may carry `role="link"` — `tests/unit/a11y-invariants.test.ts` enforces it
+  repo-wide, with a self-check that the scan can still see one.
+- The org switcher in `(app)/+layout.svelte` is a native `<select>` labelled
+  **"Active organization"** (not "Organization" — phase 02's nav has a section group of that name
+  and the collision is a real ambiguity *and* a Playwright strict-mode failure). `orgMenuOpen` no
+  longer exists.
+- `src/lib/actions/scrollToError.ts` is the one error-scroll mechanism. Put it on the element that
+  renders the error; it sets `tabindex="-1"` on the node for you and skips smooth scrolling under
+  `prefers-reduced-motion`.
+- The drawer focus trap in `(app)/+layout.svelte` is a deliberate copy of `Dialog.svelte`'s —
+  see `backlog/drawer-focus-trap-duplicates-dialog_NOTE_03-09-26.md`.
+- `/complaints` is four redirect stubs; `/inquiries` is the real route. Never write `/complaints`
+  as a URL — `tests/unit/copy-invariants.test.ts` fails on it. The module path, Prisma models and
+  audit entity names still say *complaint*; those are data keys.
+
+**Status:** DONE (CODE DONE, not VERIFIED) — all six sections executed and committed 03-09-26; full
+CI gate set green in CI order; ten S4 specs green against a recorded pre-phase baseline (31/31 both
+sides); 42/42 on a 14-spec final sweep. Every Agent-Probe row (keyboard walk, 10-item screen-reader
+list, live brand check, `impeccable` audit) is the owner's and is unrun. Both OWNER-DECISION items
+remain OPEN and neither was built. See `phase-08-copy-a11y-s1-s3_REPORT_03-09-26.md` and
+`phase-08-copy-a11y-s4-s6_REPORT_03-09-26.md`.
+
+**PROGRAMME STATUS: all 8 phases CODE DONE.** The owner's test pass is the only remaining gate —
+the consolidated list is the PROGRAM CLOSE section of
+`phase-08-copy-a11y-s4-s6_REPORT_03-09-26.md`.
