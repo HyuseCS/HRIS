@@ -84,13 +84,11 @@ describe('requests/approvals ?/decideRequest success feedback', () => {
 		expect(new Set([approved, rejected, returned]).size).toBe(3)
 	})
 
-	it('still reports the failure contract when the service throws', async () => {
+	it('rethrows an unexpected service error rather than printing its raw text', async () => {
+		// The raw-message fallback was removed in phase 04: an untyped throw is a bug, not a
+		// message, so it goes to handleError and comes back as a reference the user can quote.
 		decideMock.mockRejectedValueOnce(new Error('not at your stage'))
-		const res = await decideRequest('APPROVED')
-
-		expect(res.status).toBe(400)
-		expect(res.data.error).toBe('not at your stage')
-		expect(res.data.saved).toBeUndefined()
+		await expect(decideRequest('APPROVED')).rejects.toThrow('not at your stage')
 	})
 })
 
@@ -104,12 +102,8 @@ describe('requests/timesheets ?/review success feedback', () => {
 		expect(approved.saved).not.toBe(rejected.saved)
 	})
 
-	it('still reports the failure contract when the service throws', async () => {
+	it('rethrows an unexpected service error rather than printing its raw text', async () => {
 		reviewTimesheetMock.mockRejectedValueOnce(new Error('already reviewed'))
-		const res = await review(true)
-
-		expect(res.status).toBe(400)
-		expect(res.data.error).toBe('already reviewed')
-		expect(res.data.saved).toBeUndefined()
+		await expect(review(true)).rejects.toThrow('already reviewed')
 	})
 })

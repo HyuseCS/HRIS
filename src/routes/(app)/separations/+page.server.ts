@@ -57,7 +57,6 @@ export const actions: Actions = {
 			id = record.id
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 		setFlash(cookies, { kind: 'success', message: 'Separation record created.' })
