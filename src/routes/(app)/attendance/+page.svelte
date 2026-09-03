@@ -666,7 +666,7 @@
 										<ConfirmButton
 											action="?/resetDay"
 											title="Discard the manual edit?"
-											message="This day goes back to the values derived from its punch records. The manual correction is lost."
+											message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
 											confirmText="Reset"
 											triggerLabel="Reset"
 											disabled={!d.manuallyEdited}
@@ -840,7 +840,7 @@
 											<ConfirmButton
 												action="?/resetDay"
 												title="Discard the manual edit?"
-												message="This day goes back to the values derived from its punch records. The manual correction is lost."
+												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
 												confirmText="Reset"
 												triggerLabel="Reset"
 												disabled={!d.manuallyEdited}
