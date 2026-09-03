@@ -77,6 +77,12 @@
 			label: 'Recruitment',
 			desc: 'Job postings, applicant funnel & days open',
 			payroll: false
+		},
+		{
+			href: '/reports/audit-log',
+			label: 'Audit Log',
+			desc: 'Who changed what, when',
+			payroll: false
 		}
 	]
 	const reportCards = $derived(

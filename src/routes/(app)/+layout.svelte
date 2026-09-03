@@ -324,6 +324,11 @@
 			}
 		].filter((i) => i.show)
 	)
+	// Reports has one child that is otherwise unreachable from the UI. Same MANAGE_HR gate the
+	// route itself uses (reports/audit-log/+page.server.ts) — the nav must mirror the load guard.
+	const reportsChildren = $derived(
+		[{ href: '/reports/audit-log', label: 'Audit Log', show: isAdmin }].filter((i) => i.show)
+	)
 	const inRequests = $derived(
 		$page.url.pathname === '/requests' || $page.url.pathname.startsWith('/requests/')
 	)
@@ -582,6 +587,53 @@
 								{/each}
 							</div>
 						{/if}
+					</div>
+				{:else if item.href === '/reports' && reportsChildren.length > 0}
+					<!-- Reports keeps its plain link; MANAGE_HR holders also get the otherwise
+					     unreachable Audit Log beneath it. No toggle — that IA work is phase 02. -->
+					<!-- Same `active` rule as the generic arm: for '/reports' the dashboard and
+					     performance exceptions are vacuously true, so only the startsWith remains. -->
+					{@const active = $page.url.pathname.startsWith(item.href)}
+					<a
+						href={item.href}
+						class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors
+							{active
+							? 'bg-primary/15 text-primary'
+							: 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4 shrink-0"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="1.75"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d={item.icon} />
+						</svg>
+						<span class="flex-1">{item.label}</span>
+						{#if item.badge}
+							<span
+								class="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
+								aria-label="{item.badge} waiting on you"
+							>
+								{item.badge}
+							</span>
+						{/if}
+					</a>
+					<div class="mt-0.5 space-y-0.5 border-l border-border pl-3 ml-4">
+						{#each reportsChildren as child (child.href)}
+							{@const childActive = $page.url.pathname === child.href}
+							<a
+								href={child.href}
+								class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors
+									{childActive
+									? 'bg-primary/15 font-medium text-primary'
+									: 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
+							>
+								<span class="flex-1">{child.label}</span>
+							</a>
+						{/each}
 					</div>
 				{:else}
 					{@const active =
