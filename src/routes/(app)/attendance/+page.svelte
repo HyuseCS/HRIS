@@ -416,12 +416,17 @@
 						<input type="hidden" name="from" value={data.from} />
 						<input type="hidden" name="to" value={data.to} />
 						<button
-							title="Persist this range as a Timesheet record"
 							disabled={saveTimesheet.busy}
 							class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 							>{@render icon(IC.document)}Save as timesheet</button
 						>
 					</form>
+					<p class="w-full text-xs text-muted-foreground">
+						Saves the selected range (must be within one month) as a timesheet.
+						<a href="/timesheets" class="underline underline-offset-2 hover:text-foreground"
+							>All timesheets</a
+						>
+					</p>
 				{:else if data.canManage && data.view === 'team'}
 					<form method="POST" action="?/deriveTeam" use:enhance={deriveTeam.enhance}>
 						<input type="hidden" name="date" value={data.date} />
