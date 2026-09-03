@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Banner from '$lib/components/ui/Banner.svelte'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	import AttendanceSelfView from '$lib/components/attendance/AttendanceSelfView.svelte'
 	import AttendanceHrGrid from '$lib/components/attendance/AttendanceHrGrid.svelte'
 	import { createAttendanceGuards, isException } from '$lib/components/attendance/shared'
@@ -58,7 +59,10 @@
 	/>
 
 	{#if form?.error}
+		<!-- Addendum §F: this page runs far past the fold, so a failed grid edit would otherwise
+		     render its message off-screen and read as "nothing happened". -->
 		<div
+			use:scrollToError
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}

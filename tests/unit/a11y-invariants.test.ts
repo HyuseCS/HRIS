@@ -175,5 +175,47 @@ describe('icon, tab and error affordances (S6 items 35-37)', () => {
 	it('the scroll-to-error action honours prefers-reduced-motion', () => {
 		const action = read('lib/actions/scrollToError.ts')
 		expect(action).toContain('prefers-reduced-motion')
+		// Smooth is the default; reduced motion must get the jump, not a slower smooth.
+		expect(action).toContain(`reduced ? 'auto' : 'smooth'`)
+	})
+})
+
+// ── S6 items 34, 38-40 — per-area affordances ────────────────────────────────
+describe('per-area affordances (S6 items 34, 38-40)', () => {
+	it('the onboarding manual-step control clears the 24px minimum target', () => {
+		const page = read('routes/(app)/employees/[id]/+page.svelte')
+		// h-6 = 24px. The old control was h-4 (16px).
+		expect(page).toContain("aria-label=\"{step.done ? 'Uncheck' : 'Check'} {step.label}\"")
+		expect(page).not.toContain('mt-0.5 flex h-4 w-4 flex-none')
+	})
+
+	it('the audit-log filters reflect the active URL params', () => {
+		const page = read('routes/(app)/reports/audit-log/+page.svelte')
+		// All five controls, or the active filter goes invisible after submit for the missing one.
+		expect(page).toContain(`selected={param('actor') === actor.id}`)
+		expect(page).toContain(`selected={param('entity') === et}`)
+		expect(page).toContain(`selected={param('action') === a}`)
+		expect(page).toContain(`value={param('start')}`)
+		expect(page).toContain(`value={param('end')}`)
+	})
+
+	it('the audit-log entity id can be read and copied', () => {
+		const page = read('routes/(app)/reports/audit-log/+page.svelte')
+		expect(page).toContain('title={log.entityId}')
+		expect(page).toContain('select-all')
+	})
+
+	it('the login error box is announced and readable in both themes', () => {
+		const page = read('routes/(auth)/login/+page.svelte')
+		expect(page).toContain('role="alert"')
+		// `text-red-400` alone is a dark-mode colour; on light it was pale red on near-white.
+		expect(page).toContain('text-red-600 dark:text-red-400')
+		expect(page).not.toMatch(/class="mb-4 rounded bg-destructive\/15[^"]*text-red-400"/)
+	})
+
+	it('the deliberate non-enumeration login message survives (R5 negative control)', () => {
+		// Guards the whole S6 sweep against "improving" the one error string that is vague on
+		// purpose. If this ever fails, an agent has widened scope into the auth flow.
+		expect(read('routes/(auth)/login/+page.server.ts')).toContain('Invalid email or password')
 	})
 })

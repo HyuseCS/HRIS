@@ -2,6 +2,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { tenureLabel, tenureRequirement, monthsOfService } from '$lib/utils/dates'
@@ -205,7 +206,12 @@
 {#snippet actionError(names: string[])}
 	{@const message = errorFor(names)}
 	{#if message}
-		<Banner kind="error" {message} />
+		<!-- Addendum §F. This file is the longest page in the app, so a scoped error can land
+		     several screens away from wherever the person pressed Save. The wrapper exists only to
+		     carry the action — Banner is phase 03's component and this phase does not edit it. -->
+		<div use:scrollToError>
+			<Banner kind="error" {message} />
+		</div>
 	{/if}
 {/snippet}
 
@@ -270,11 +276,19 @@
 										<form method="POST" action="?/toggleOnboardingStep" use:enhance>
 											<input type="hidden" name="itemId" value={step.id} />
 											<input type="hidden" name="done" value={(!step.done).toString()} />
+											<!-- Item 34, the plan's fallback path. The target was 16px, under the 24px
+											     minimum, so it is raised to h-6 w-6. It stays a submit <button> rather
+											     than becoming a real <input type="checkbox">: a checkbox could only
+											     submit via an onchange requestSubmit(), so it would stop working
+											     entirely with JavaScript off, which this form does not do today.
+											     aria-pressed already carries the toggle state. The app.css
+											     coarse-pointer 44px floor deliberately excludes checkboxes, so this
+											     is a desktop-size fix, not a change to that floor. -->
 											<button
 												type="submit"
 												aria-pressed={step.done}
 												aria-label="{step.done ? 'Uncheck' : 'Check'} {step.label}"
-												class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-bold transition-colors {step.done
+												class="flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold transition-colors {step.done
 													? 'bg-green-500 text-white hover:bg-green-600'
 													: 'border border-muted-foreground/40 text-transparent hover:border-primary hover:text-muted-foreground'}"
 											>
@@ -282,8 +296,10 @@
 											</button>
 										</form>
 									{:else}
+										<!-- Not interactive (a derived step), but sized to match the manual one above so
+										     the list does not become a ragged column of two different dots. -->
 										<span
-											class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-bold {step.done
+											class="flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold {step.done
 												? 'bg-green-500 text-white'
 												: 'border border-muted-foreground/40 text-transparent'}"
 										>

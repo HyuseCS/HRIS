@@ -2,9 +2,18 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
+	import { page } from '$app/stores'
 	import type { ActionData, PageData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
+
+	/**
+	 * Item 38: the filter controls never read the URL back, so submitting a filter reloaded the
+	 * page with every control reset to "All" while the *results* stayed filtered. The active
+	 * filter became invisible, which reads as a broken table rather than a narrowed one.
+	 * The query itself is untouched — the server already reads these same params.
+	 */
+	const param = (name: string) => $page.url.searchParams.get(name) ?? ''
 
 	// `fail()` contributes its own shape to the ActionData union, so narrow before reading.
 	// Without this the 400 from a reveal with no id renders as silence.
@@ -59,7 +68,7 @@
 			>
 				<option value="">All Users</option>
 				{#each data.actors as actor (actor.id)}
-					<option value={actor.id}>{actor.email}</option>
+					<option value={actor.id} selected={param('actor') === actor.id}>{actor.email}</option>
 				{/each}
 			</select>
 		</div>
@@ -74,7 +83,7 @@
 			>
 				<option value="">All Types</option>
 				{#each data.entityTypes as et (et)}
-					<option value={et}>{et}</option>
+					<option value={et} selected={param('entity') === et}>{et}</option>
 				{/each}
 			</select>
 		</div>
@@ -89,7 +98,7 @@
 			>
 				<option value="">All Actions</option>
 				{#each ACTIONS as a (a)}
-					<option value={a}>{a}</option>
+					<option value={a} selected={param('action') === a}>{a}</option>
 				{/each}
 			</select>
 		</div>
@@ -101,6 +110,7 @@
 				id="start"
 				name="start"
 				type="date"
+				value={param('start')}
 				use:advanceTo={'end'}
 				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
@@ -111,6 +121,7 @@
 				id="end"
 				name="end"
 				type="date"
+				value={param('end')}
 				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
@@ -196,8 +207,17 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 whitespace-nowrap">{log.entityType}</td>
-							<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
-								{log.entityId.slice(0, 12)}…
+							<!-- Item 39: the id was truncated with no way to read or copy the rest, which made
+							     it useless for the one job it has (matching a row against another system).
+							     `title` gives the full value on hover, `select-all` makes one click select the
+							     whole thing to copy. No clipboard dependency — the repo has no copy
+							     affordance to follow and this phase adds no package. -->
+							<td class="px-4 py-3 whitespace-nowrap">
+								<span
+									title={log.entityId}
+									class="select-all font-mono text-xs text-muted-foreground"
+									>{log.entityId.slice(0, 12)}…</span
+								>
 							</td>
 							<!--
 								#242: the payload never arrives with the list. One entry at a time, through the

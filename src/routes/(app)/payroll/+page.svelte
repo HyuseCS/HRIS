@@ -165,8 +165,14 @@
 							>
 							<td class="px-4 py-3">
 								<Badge status={run.status} domain="payrollRun" />
-								{#if run.hasOverride}<span class="ml-1 text-yellow-600 dark:text-yellow-500">*</span
-									>{/if}
+								<!-- The asterisk is colour and glyph only, which is no signal at all to a screen
+								     reader or to anyone who cannot pick out the yellow. The sr-only text is the
+								     real announcement; the title serves a sighted person who does not know what
+								     the asterisk means. -->
+								{#if run.hasOverride}<span
+										class="ml-1 text-yellow-600 dark:text-yellow-500"
+										title="This run has a manual override">*</span
+									><span class="sr-only">, has a manual override</span>{/if}
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex items-center justify-end gap-2">

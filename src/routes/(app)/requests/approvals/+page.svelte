@@ -3,6 +3,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
 	import { slide } from 'svelte/transition'
@@ -183,7 +184,11 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<!-- Addendum §F. The wrapper exists only to carry the action — Banner is phase 03's
+		     component and this phase does not edit components/ui. -->
+		<div use:scrollToError>
+			<Banner kind="error" message={form.error} />
+		</div>
 	{/if}
 
 	{#if form?.saved}
@@ -320,11 +325,28 @@
 						{#if req.liveDocuments.length}
 							{@const unverified = unverifiedCount(req.liveDocuments)}
 							<p class="text-xs">
-								<span class="text-muted-foreground"
-									>📎 {req.liveDocuments.length} document{req.liveDocuments.length === 1
-										? ''
-										: 's'}</span
-								>
+								<!-- An inline svg, not the bare paperclip emoji this used to be: a screen reader
+								     reads the emoji aloud, in the middle of the count, and it renders as a
+								     different glyph on every platform. aria-hidden because the text beside it
+								     already says everything the icon does. -->
+								<span class="inline-flex items-center gap-1 text-muted-foreground">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-3.5 w-3.5 shrink-0"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="1.75"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"
+										/>
+									</svg>
+									{req.liveDocuments.length} document{req.liveDocuments.length === 1 ? '' : 's'}
+								</span>
 								{#if unverified}
 									<span
 										class="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 font-medium text-yellow-400"

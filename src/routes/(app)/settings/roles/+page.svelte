@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	import { enhance } from '$app/forms'
 	import { tick } from 'svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -157,7 +158,9 @@
 	<!-- `?/setActive` errors only: a rejected role save renders inside the dialog, where the person
 	     who pressed Save is looking. -->
 	{#if form?.error}
+		<!-- Addendum §F — long page, error renders above the fold the person is looking at. -->
 		<div
+			use:scrollToError
 			class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
 		>
 			{form.error}

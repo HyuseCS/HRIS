@@ -60,8 +60,13 @@
 		</div>
 		<form method="POST" action="?/toggleOrgTardiness" use:enhance>
 			<input type="hidden" name="enabled" value={(!data.orgTracksTardiness).toString()} />
+			<!-- An On/Off pill IS a switch; announcing it as a plain button loses the state entirely,
+			     and "On" on its own never says what is on. -->
 			<button
 				type="submit"
+				role="switch"
+				aria-checked={data.orgTracksTardiness}
+				aria-label="Track tardiness for this organization"
 				class="rounded-full px-3 py-1 text-xs font-medium {data.orgTracksTardiness
 					? 'bg-green-500/15 text-green-700 dark:text-green-400'
 					: 'bg-muted text-muted-foreground'}">{data.orgTracksTardiness ? 'On' : 'Off'}</button
@@ -259,6 +264,9 @@
 									<input type="hidden" name="enabled" value={(!s.trackTardiness).toString()} />
 									<button
 										type="submit"
+										role="switch"
+										aria-checked={s.trackTardiness}
+										aria-label="Track tardiness for {s.name}"
 										disabled={!data.orgTracksTardiness}
 										title={data.orgTracksTardiness
 											? 'Toggle tardiness tracking for this schedule'

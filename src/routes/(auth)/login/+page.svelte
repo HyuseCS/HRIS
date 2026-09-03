@@ -71,7 +71,15 @@
 			</div>
 
 			{#if form?.error}
-				<div class="mb-4 rounded bg-destructive/15 px-3 py-2 text-sm text-red-400">
+				<!-- Item 40. Two fixes. `role="alert"` because a failed sign-in re-renders in place:
+				     without it a screen-reader user presses Sign in and hears nothing at all. And
+				     `text-red-400` is a dark-mode colour used unconditionally — on the light theme it
+				     was pale red on near-white. Now phase 03's Banner pair. Not the Banner component
+				     itself: this is the (auth) group, which does not carry the app shell. -->
+				<div
+					role="alert"
+					class="mb-4 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400"
+				>
 					{form.error}
 				</div>
 			{/if}
