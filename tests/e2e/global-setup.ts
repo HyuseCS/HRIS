@@ -29,22 +29,26 @@ async function warmRoutes(base: string) {
 		}
 	}
 
-	// The fetch loop compiles server modules, but the two-step Avipa login (#135) reveals
-	// its credential form client-side, so the first *browser* hit to /login pays the client
-	// bundle + hydration cost. Prime it here in a real browser so the first test doesn't
-	// flake waiting for the tenant button to become interactive. Best-effort.
+	// The fetch loop compiles server modules, but the first *browser* hit to /login still pays
+	// the client bundle + hydration cost. Prime it here in a real browser so the first test
+	// doesn't flake. Email-first login (#135, phase 09): the first interactive element is the
+	// Email box, and Continue is a real form post to `?/resolve`. Best-effort.
 	try {
 		const browser = await chromium.launch()
 		const page = await browser.newPage()
 		await page.goto(`${base}/login`, { waitUntil: 'load', timeout: 60_000 })
-		// Clicking the tenant button forces hydration; if it reveals the Email field the
-		// bundle is warm. Swallow failures — this is a warmup, not an assertion.
+		// Walking step 1 warms the resolution action as well as the bundle; if the Password
+		// field appears, both are warm. Swallow failures — this is a warmup, not an assertion.
 		await page
-			.getByRole('button', { name: 'Veent', exact: true })
+			.getByLabel('Email')
+			.fill('admin@veent.ph', { timeout: 30_000 })
+			.catch(() => {})
+		await page
+			.getByRole('button', { name: 'Continue' })
 			.click({ timeout: 30_000 })
 			.catch(() => {})
 		await page
-			.getByLabel('Email')
+			.getByLabel('Password')
 			.waitFor({ state: 'visible', timeout: 10_000 })
 			.catch(() => {})
 		await browser.close()

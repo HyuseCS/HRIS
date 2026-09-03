@@ -95,8 +95,9 @@ test.describe('Leave balances', () => {
 		// #287. The row is a `role="link"` <tr> whose navigation is an `onclick` -> `goto`, with no
 		// <a href> underneath — so a click that lands before hydration is silently DROPPED and the
 		// wait below then hangs for the full 120s. That is what made this spec fail only under a
-		// loaded parallel run. Retry the click until the URL actually moves; same idiom as
-		// `selectTenant` in helpers.ts.
+		// loaded parallel run. Retry the click until the URL actually moves; same idiom as the
+		// timesheet review modal, and as `login()` in helpers.ts used to need before phase 09
+		// made both login steps server-rendered.
 		// domcontentloaded, not waitForURL's default 'load': helpers.ts documents that external
 		// font requests never settle in a sandboxed runner, so 'load' times out on a navigation
 		// that already happened.
