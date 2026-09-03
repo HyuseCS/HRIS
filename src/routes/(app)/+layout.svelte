@@ -87,6 +87,18 @@
 		fetch('/api/v1/notifications/read', { method: 'POST' })
 	})
 
+	// A redirect-after-success parks its message in the flash cookie; the layout load reads and
+	// clears it. Dedupe on the nonce exactly like the notifications above: this load's payload
+	// stays cached between re-runs, so without it an invalidateAll() would re-toast a stale flash.
+	const seenFlashes = new Set<string>()
+	$effect(() => {
+		if (!browser) return
+		const flash = data.flash
+		if (!flash || seenFlashes.has(flash.id)) return
+		seenFlashes.add(flash.id)
+		addToast(flash.message, { kind: flash.kind })
+	})
+
 	// Same capability table the server enforces with ($lib/rbac) — a nav item shown to
 	// a role the server would reject is its own bug, so both read one source of truth.
 	// Nav uses the full role set (#133) so a multi-role user sees every entry they hold.
