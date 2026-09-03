@@ -8,6 +8,7 @@
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const run = $derived(data.run)
@@ -75,6 +76,45 @@
 		let g = overrideGuards.get(entryId)
 		if (!g) overrideGuards.set(entryId, (g = createSubmitGuard()))
 		return g
+	}
+
+	// Overriding a net pay rewrites what a person is paid, so it confirms first and the dialog
+	// names the delta. Only one override panel is open at a time, so one set of state and one
+	// dialog serve every row.
+	//
+	// `overrideBaseline` is $state captured once when the panel opens, NOT $derived: a $derived
+	// would follow `entry.netPay` and collapse the delta to zero the moment a save re-renders.
+	// Known limitation: PayrollEntry.netPay is overwritten in place, so there is no stored
+	// "originally computed" figure — the baseline is the value that was on screen when the panel
+	// opened, and the copy says "vs {amount}" rather than "vs computed" for exactly that reason.
+	let overrideBaseline = $state(0)
+	let overrideValue = $state<number | null>(0)
+	let overrideName = $state('')
+	let overrideConfirm = $state(false)
+	let overrideFormEl = $state<HTMLFormElement>()
+
+	function openOverride(entryId: string, netPay: number, name: string) {
+		overrideEntryId = entryId
+		overrideBaseline = netPay
+		overrideValue = netPay
+		overrideName = name
+	}
+
+	// An empty input reads as `null`; treat it as "unchanged" so a blank field behaves exactly as
+	// it did before this dialog existed rather than claiming a delta it cannot know.
+	const overrideEntered = $derived(overrideValue ?? overrideBaseline)
+	const overrideDelta = $derived(overrideEntered - overrideBaseline)
+	const overrideSignedDelta = $derived(
+		`${overrideDelta > 0 ? '+' : '−'}${formatCurrency(Math.abs(overrideDelta))}`
+	)
+	const overrideMessage = $derived(
+		`${overrideName}'s net pay for this run changes from ${formatCurrency(overrideBaseline)} to ${formatCurrency(overrideEntered)} — a difference of ${overrideSignedDelta}. The figure you type is what gets paid and what prints on the payslip; the computed amount is replaced, not adjusted. Your reason is written to the audit log.`
+	)
+
+	// A save that changes nothing has no consequence to name, so it goes straight through.
+	function submitOverride() {
+		if (overrideDelta === 0) overrideFormEl?.requestSubmit()
+		else overrideConfirm = true
 	}
 </script>
 
@@ -207,8 +247,14 @@
 									class="btn-row">{expandedEntryId === entry.id ? 'Hide' : 'Breakdown'}</button
 								>
 								{#if data.canManage && run.status !== 'APPROVED'}
-									<button onclick={() => (overrideEntryId = entry.id)} class="btn-row"
-										>Override</button
+									<button
+										onclick={() =>
+											openOverride(
+												entry.id,
+												Number(entry.netPay),
+												`${entry.employee.firstName} ${entry.employee.lastName}`
+											)}
+										class="btn-row">Override</button
 									>
 								{/if}
 							</div>
@@ -268,6 +314,7 @@
 									method="POST"
 									action="?/override"
 									use:enhance={overrideG.enhance}
+									bind:this={overrideFormEl}
 									class="flex items-end gap-3"
 								>
 									<input type="hidden" name="entryId" value={entry.id} />
@@ -275,14 +322,22 @@
 										<label for={'netPay-' + entry.id} class="text-xs font-medium"
 											>Override Net Pay</label
 										>
+										<!-- min="0" matches the server's existing z.coerce.number().finite().min(0) so the
+										     browser refuses a negative before the round-trip. The schema is not touched. -->
 										<input
 											id={'netPay-' + entry.id}
 											name="netPay"
 											type="number"
 											step="any"
-											value={Number(entry.netPay)}
+											min="0"
+											bind:value={overrideValue}
 											class="mt-1 flex h-8 w-36 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										/>
+										<p class="mt-1 text-xs text-muted-foreground">
+											{overrideDelta === 0
+												? 'No change'
+												: `${overrideSignedDelta} vs ${formatCurrency(overrideBaseline)}`}
+										</p>
 									</div>
 									<div class="flex-1">
 										<label for={'note-' + entry.id} class="text-xs font-medium"
@@ -296,7 +351,8 @@
 										/>
 									</div>
 									<button
-										type="submit"
+										type="button"
+										onclick={submitOverride}
 										disabled={overrideG.busy}
 										class="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 										>{overrideG.busy ? 'Saving…' : 'Save'}</button
@@ -461,3 +517,13 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Outside the table: the override panel is a row inside <tbody>, and a dialog overlay cannot
+     live there. Only one panel is open at a time, so one dialog serves every row. -->
+<ConfirmDialog
+	bind:open={overrideConfirm}
+	title="Override this net pay?"
+	message={overrideMessage}
+	confirmText="Override net pay"
+	onconfirm={() => overrideFormEl?.requestSubmit()}
+/>
