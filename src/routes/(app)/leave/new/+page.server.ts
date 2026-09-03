@@ -79,7 +79,6 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(422, { error: e.message })
 			throw e
 		}
 
