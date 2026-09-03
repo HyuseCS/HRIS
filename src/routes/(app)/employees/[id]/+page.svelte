@@ -46,12 +46,55 @@
 	// The schedule an unassigned employee actually falls back to, named from the org's data.
 	const orgDefaultSchedule = $derived(data.schedules?.find((s) => s.isDefault) ?? null)
 	// #111: every sensitive field (gov IDs, salary, bank/GCash) arrives masked from the load.
-	// The full values exist client-side only after the audited ?/reveal action, and any other
-	// action result (e.g. a save) drops back to the masked display.
-	const revealed = $derived(form?.revealed ?? null)
+	// The full values exist client-side only after the audited ?/reveal action.
+	//
+	// Phase 07 (owner-accepted): a reveal now HOLDS across a save instead of dropping back to
+	// masked on the next action result — HR had to re-reveal (and re-audit) after every edit.
+	// The exposure window is wider by design, and bounded: the cache lives until a reload or a
+	// navigation, and it is KEYED TO THE EMPLOYEE. That key is not cosmetic. SvelteKit reuses
+	// this component across employees/A → employees/B, so an unkeyed cache would paint A's
+	// plaintext IDs, bank number and salary into B's editable inputs — and a save on B would
+	// write A's data onto B. Never write this cache from a non-reveal payload, and never put it
+	// in sessionStorage/localStorage/$page.state (shallow-routing state lands in browser history).
+	// No second reveal call and no second audit row: this only holds what ?/reveal already returned.
+	type FormResult = NonNullable<ActionData>
+	let revealCache = $state<{
+		id: string
+		revealed: FormResult['revealed']
+		history: PageData['history']
+	} | null>(null)
+	$effect(() => {
+		const f = form as FormResult | null
+		if (f?.action === 'reveal' && f.revealed)
+			revealCache = {
+				id: data.employee.id,
+				revealed: f.revealed,
+				history: f.history ?? data.history
+			}
+	})
+	const revealed = $derived(
+		revealCache && revealCache.id === data.employee.id ? revealCache.revealed : null
+	)
 	// #290: the Employment History panel's salary figures arrive masked from the load and are
 	// released by the same ?/reveal, which returns the unmasked timeline alongside `revealed`.
-	const history = $derived(form?.history ?? data.history)
+	const history = $derived(
+		revealCache && revealCache.id === data.employee.id ? revealCache.history : data.history
+	)
+
+	// The 201 file used to carry ONE emergency contact in three columns on the employee row; the
+	// `emergencyContacts` relation replaced it. Records created before the relation still hold
+	// those columns, so they are shown read-only rather than lost — but only when all three are
+	// filled and no real contact already covers that person. Display only: no migration, no write.
+	const legacyEmergencyContact = $derived.by(() => {
+		const name = employee.emergencyContactName?.trim()
+		const relationship = employee.emergencyContactRelation?.trim()
+		const phone = employee.emergencyContactPhone?.trim()
+		if (!name || !relationship || !phone) return null
+		const covered = employee.emergencyContacts.some(
+			(c) => c.name.trim().toLowerCase() === name.toLowerCase()
+		)
+		return covered ? null : { name, relationship, phone }
+	})
 
 	const DOC_CATEGORIES = [
 		{ value: 'CONTRACT', label: 'Contract' },
@@ -436,24 +479,34 @@
 						use:enhance={setSupervisors.enhance}
 						class="space-y-2 border-t pt-3"
 					>
-						<label for="supervisorIds" class="text-xs font-medium text-muted-foreground"
-							>Additional supervisors (Ctrl/Cmd-click to select multiple)</label
-						>
-						<select
-							id="supervisorIds"
-							name="supervisorIds"
-							multiple
-							size="4"
-							class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-						>
-							{#each data.supervisorOptions as opt (opt.id)}
-								<option
-									value={opt.id}
-									selected={data.additionalSupervisors.some((s) => s.id === opt.id)}
-									>{opt.lastName}, {opt.firstName}</option
-								>
-							{/each}
-						</select>
+						<!--
+							Checkboxes, not a multi-select: a `<select multiple>` needs Ctrl/Cmd-click to
+							pick a second name and silently drops the first without it. Same field name,
+							same action — `getAll('supervisorIds')` reads both shapes identically.
+						-->
+						<fieldset class="space-y-2">
+							<legend class="text-xs font-medium text-muted-foreground">
+								Additional supervisors
+							</legend>
+							{#if data.supervisorOptions.length}
+								<div class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-input p-2">
+									{#each data.supervisorOptions as opt (opt.id)}
+										<label class="flex items-center gap-2 text-sm">
+											<input
+												type="checkbox"
+												name="supervisorIds"
+												value={opt.id}
+												checked={data.additionalSupervisors.some((s) => s.id === opt.id)}
+												class="h-4 w-4 rounded border-input"
+											/>
+											{opt.lastName}, {opt.firstName}
+										</label>
+									{/each}
+								</div>
+							{:else}
+								<p class="text-xs text-muted-foreground">No other employees to pick from.</p>
+							{/if}
+						</fieldset>
 						<button
 							type="submit"
 							disabled={setSupervisors.busy}
@@ -506,19 +559,6 @@
 					</form>
 				</div>
 			{/if}
-
-			<!-- Emergency Contact Card (visible to managers) -->
-			<div class="rounded-lg border bg-card p-6 space-y-4">
-				<h2 class="font-semibold">Emergency Contact</h2>
-				<dl class="grid grid-cols-2 gap-3 text-sm">
-					<dt class="text-muted-foreground">Name</dt>
-					<dd>{employee.emergencyContactName ?? '—'}</dd>
-					<dt class="text-muted-foreground">Relationship</dt>
-					<dd>{employee.emergencyContactRelation ?? '—'}</dd>
-					<dt class="text-muted-foreground">Phone</dt>
-					<dd>{employee.emergencyContactPhone ?? '—'}</dd>
-				</dl>
-			</div>
 
 			<!-- Edit Form (HR-only; the update/offboard actions require HR_ADMIN) -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
@@ -701,37 +741,12 @@
 								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							/>
 						</div>
-						<div class="sm:col-span-3 border-t pt-3">
-							<h3 class="text-sm font-semibold text-muted-foreground">Emergency Contact</h3>
-						</div>
-						<div>
-							<label for="emergencyContactName" class="text-sm font-medium">Contact Name</label>
-							<input
-								id="emergencyContactName"
-								name="emergencyContactName"
-								value={employee.emergencyContactName ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="emergencyContactRelation" class="text-sm font-medium">Relationship</label>
-							<input
-								id="emergencyContactRelation"
-								name="emergencyContactRelation"
-								value={employee.emergencyContactRelation ?? ''}
-								placeholder="e.g. Spouse, Parent"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="emergencyContactPhone" class="text-sm font-medium">Contact Phone</label>
-							<input
-								id="emergencyContactPhone"
-								name="emergencyContactPhone"
-								value={employee.emergencyContactPhone ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
+						<!--
+							Emergency contacts are edited in their own section (the `emergencyContacts`
+							relation), not here — three surfaces for one thing is what the audit flagged.
+							`?/update` still accepts the legacy singular fields; this form just stops
+							sending them.
+						-->
 						<div class="sm:col-span-3 border-t pt-3">
 							<h3 class="text-sm font-semibold text-muted-foreground">
 								Disbursement <span class="font-normal">(bank / GCash — sensitive)</span>
@@ -841,7 +856,7 @@
 				</h2>
 				{@render actionError(['addEmergencyContact', 'deleteEmergencyContact'])}
 
-				{#if employee.emergencyContacts.length}
+				{#if employee.emergencyContacts.length || legacyEmergencyContact}
 					<div class="rounded-md border">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
@@ -878,6 +893,20 @@
 										{/if}
 									</tr>
 								{/each}
+								{#if legacyEmergencyContact}
+									<tr class="bg-muted/20">
+										<td class="px-3 py-2 font-medium">
+											{legacyEmergencyContact.name}
+											<span class="block text-xs font-normal text-muted-foreground">
+												Legacy record — On file from the old single-contact field. Add it as a
+												contact above to make it editable.
+											</span>
+										</td>
+										<td class="px-3 py-2">{legacyEmergencyContact.relationship}</td>
+										<td class="px-3 py-2 font-mono">{legacyEmergencyContact.phone}</td>
+										{#if canManage}<td class="px-3 py-2"></td>{/if}
+									</tr>
+								{/if}
 							</tbody>
 						</table>
 					</div>
