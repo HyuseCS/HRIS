@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import ReviewFormRender from '$lib/components/performance/ReviewFormRender.svelte'
 	import { answerDraft, serialiseAnswers } from '$lib/components/performance/answer-draft'
@@ -113,12 +114,7 @@
 	</div>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-			role="alert"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<!-- Self-assessment — employee-authored, its own column, never inside `answers`. -->

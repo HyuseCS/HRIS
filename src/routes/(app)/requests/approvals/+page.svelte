@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
 	import { slide } from 'svelte/transition'
@@ -182,19 +183,11 @@
 	</div>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if data.pendingRequests.length > 0}

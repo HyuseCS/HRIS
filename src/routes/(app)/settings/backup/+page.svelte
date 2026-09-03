@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -128,13 +129,11 @@
 		</dl>
 
 		{#if neverRan}
-			<p
-				class="mt-4 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400"
-			>
+			<Banner kind="warning" class="mt-4">
 				Backups are switched on but none has run yet. They are started by a nightly job on the
 				server, not by this app — if nothing appears after tonight, ask your administrator to
 				confirm the <code class="font-mono text-xs">backup-documents</code> schedule is installed.
-			</p>
+			</Banner>
 		{/if}
 	</div>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { regularizationStatus, tenureLabel } from '$lib/utils/dates'
 	import { employmentTypeLabel, contractRenewalStatus } from '$lib/utils/employment'
@@ -326,18 +327,10 @@
 			</div>
 
 			{#if form?.posted}
-				<div
-					class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs text-green-400"
-				>
-					Announcement posted.
-				</div>
+				<Banner kind="success" message="Announcement posted." />
 			{/if}
 			{#if form?.awarded}
-				<div
-					class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
-				>
-					Award given.
-				</div>
+				<Banner kind="success" message="Award given." />
 			{/if}
 
 			{#if showAward && data.canPost}

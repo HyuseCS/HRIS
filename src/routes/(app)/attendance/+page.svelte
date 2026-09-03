@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -224,11 +225,7 @@
 		</div>
 	{/if}
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if data.canManage}

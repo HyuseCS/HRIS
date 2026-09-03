@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { manilaDateTime } from '$lib/utils/dates'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -57,11 +58,7 @@
 	</div>
 
 	{#if form?.message}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			{form.message}
-		</div>
+		<Banner kind="success" message={form.message} />
 	{/if}
 	{#if form?.error}
 		<div

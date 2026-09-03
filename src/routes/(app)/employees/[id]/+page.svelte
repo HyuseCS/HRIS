@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { tenureLabel, tenureRequirement, monthsOfService } from '$lib/utils/dates'
@@ -426,11 +427,7 @@
 			<div class="rounded-lg border bg-card p-6 space-y-4">
 				<h2 class="font-semibold">Evaluation Template</h2>
 				{#if form?.action === 'assignTemplate' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'assignTemplate' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -496,11 +493,7 @@
 					nowhere, which is the lesser harm.
 				-->
 				{#if form?.action === 'update' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'update' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1467,17 +1460,9 @@
 					>
 				</h2>
 				{#if form?.action === 'changeCompensation' && form?.notice}
-					<div
-						class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
-					>
-						{form.notice}
-					</div>
+					<Banner kind="warning" message={form.notice} />
 				{:else if form?.action === 'changeCompensation' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'changeCompensation' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1569,17 +1554,9 @@
 					>
 				</h2>
 				{#if form?.action === 'promote' && form?.notice}
-					<div
-						class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
-					>
-						{form.notice}
-					</div>
+					<Banner kind="warning" message={form.notice} />
 				{:else if form?.action === 'promote' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Promotion recorded.
-					</div>
+					<Banner kind="success" message="Promotion recorded." />
 				{:else if form?.action === 'promote' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1760,11 +1737,7 @@
 			read. Gated on form.action so it only answers the offboard form.
 		-->
 		{#if form?.action === 'offboard' && form?.saved}
-			<div
-				class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400 lg:col-span-2"
-			>
-				{form.saved}
-			</div>
+			<Banner kind="success" class="lg:col-span-2" message={form.saved} />
 		{:else if form?.action === 'offboard' && form?.error}
 			<div
 				class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400 lg:col-span-2"
