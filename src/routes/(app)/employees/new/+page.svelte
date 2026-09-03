@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import {
@@ -57,10 +58,11 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Onboard New Employee</h1>
-		<a href="/employees" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>
-	</div>
+	<PageHeader title="Onboard New Employee">
+		{#snippet back()}
+			<a href="/employees" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div

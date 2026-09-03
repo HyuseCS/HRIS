@@ -98,5 +98,12 @@ export const actions: Actions = {
 		} catch (err) {
 			return failFromError(err)
 		}
+
+		// Deactivating a login is permission-adjacent and irreversible for whoever is signed in
+		// as it; the pill flip used to be the only cue.
+		return {
+			action: 'setActive',
+			saved: parsed.data.isActive === 'true' ? 'Login activated.' : 'Login deactivated.'
+		}
 	}
 }

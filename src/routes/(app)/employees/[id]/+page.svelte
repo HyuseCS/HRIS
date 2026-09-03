@@ -1,6 +1,8 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import Banner from '$lib/components/ui/Banner.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { tenureLabel, tenureRequirement, monthsOfService } from '$lib/utils/dates'
 	import {
@@ -13,9 +15,11 @@
 	import { isValidGovId, govIdError, type GovIdField } from '$lib/utils/gov-ids'
 	import { LOAN_TYPES } from '$lib/utils/loan-types'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import MaskedField from '$lib/components/ui/MaskedField.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -103,57 +107,71 @@
 	// contacts, loans, cash advances, recurring earnings/deductions, uploaded documents, or a
 	// second offboard/reveal. One guard per form; the per-row forms share the guard for their
 	// action, which is fine because those rows submit one at a time.
-	const reveal = createSubmitGuard()
-	const update = createSubmitGuard()
-	const offboard = createSubmitGuard()
-	const setSupervisors = createSubmitGuard()
-	const deleteEmergencyContact = createSubmitGuard()
-	const addEmergencyContact = createSubmitGuard()
-	const addLoan = createSubmitGuard()
-	const addCashAdvance = createSubmitGuard()
-	const endEarning = createSubmitGuard()
-	const addEarning = createSubmitGuard()
-	const endDeduction = createSubmitGuard()
-	const addDeduction = createSubmitGuard()
-	const toggleStatutory = createSubmitGuard()
-	const toggleErExternal = createSubmitGuard()
-	const setAllocation = createSubmitGuard()
-	const changeCompensation = createSubmitGuard()
-	const promote = createSubmitGuard()
-	const assignTemplate = createSubmitGuard()
+	const reveal = submitFeedback()
+	const update = submitFeedback()
+	const offboard = submitFeedback()
+	const setSupervisors = submitFeedback()
+	const deleteEmergencyContact = submitFeedback()
+	const addEmergencyContact = submitFeedback()
+	const addLoan = submitFeedback()
+	const addCashAdvance = submitFeedback()
+	const endEarning = submitFeedback()
+	const addEarning = submitFeedback()
+	const endDeduction = submitFeedback()
+	const addDeduction = submitFeedback()
+	const toggleStatutory = submitFeedback()
+	const toggleErExternal = submitFeedback()
+	const setAllocation = submitFeedback()
+	const changeCompensation = submitFeedback()
+	const promote = submitFeedback()
+	const assignTemplate = submitFeedback()
+	// P0-7: this page has 24 actions and used to have ONE ungated error slot, itself inside a card
+	// that is hidden for an offboarded employee — so a failed document upload or loan add rendered
+	// nowhere at all. Every card now answers only for its own actions.
+	function errorFor(names: string[]): string | null {
+		const f = form as { action?: string; error?: unknown } | null
+		return f && names.includes(f.action ?? '') && typeof f.error === 'string' ? f.error : null
+	}
+
 	const STATUTORY_LABELS: Record<string, string> = {
 		SSS: 'SSS',
 		PHILHEALTH: 'PhilHealth',
 		PAGIBIG: 'Pag-IBIG'
 	}
-	const uploadDocument = createSubmitGuard()
+	const uploadDocument = submitFeedback()
+
+	// Offboarding disables a person's employment record and their login, so it confirms first. The
+	// form keeps its own `use:enhance` and busy gating: the Last Day field is typed by the user and
+	// cannot move into ConfirmButton's own form. `reportValidity()` runs before the dialog opens so
+	// a missing Last Day is refused where the user is looking, not after they confirm.
+	let offboardFormEl = $state<HTMLFormElement>()
+	let offboardConfirm = $state(false)
+	function openOffboardConfirm() {
+		if (offboardFormEl?.reportValidity()) offboardConfirm = true
+	}
 </script>
+
+{#snippet actionError(names: string[])}
+	{@const message = errorFor(names)}
+	{#if message}
+		<Banner kind="error" {message} />
+	{/if}
+{/snippet}
 
 <svelte:head>
 	<title>{employee.lastName}, {employee.firstName} — Veent HRIS</title>
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold">{employee.lastName}, {employee.firstName}</h1>
-			<span
-				class="rounded-full px-2.5 py-1 text-xs font-medium {employee.employmentStatus === 'ACTIVE'
-					? 'bg-green-500/15 text-green-400'
-					: 'bg-gray-500/15 text-gray-400'}"
-			>
-				{employee.employmentStatus}
-			</span>
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<PageHeader title="{employee.lastName}, {employee.firstName}">
+		{#snippet back()}
+			<Badge status={employee.employmentStatus} domain="employment" />
 			<BackButton
 				fallback={canManage ? '/employees' : '/team'}
 				label={canManage ? 'Employees' : 'Team'}
 			/>
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
 
 	<div class="grid gap-6 lg:grid-cols-2">
 		<!-- Onboarding checklist (HR-only, T178) -->
@@ -163,6 +181,7 @@
 					? 'border-green-500/30 bg-green-500/5'
 					: 'border-amber-500/30 bg-amber-500/5'}"
 			>
+				{@render actionError(['toggleOnboardingStep'])}
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<h2 class="font-semibold">
 						Onboarding
@@ -271,12 +290,12 @@
 						{#if band}
 							{#if band.status === 'within'}
 								<span
-									class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-400"
+									class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-700 dark:text-green-400"
 									title="Within the {band.name} band">✓ {grade?.name}</span
 								>
 							{:else}
 								<span
-									class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-400"
+									class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-700 dark:text-amber-400"
 									title="{band.name}: {formatCurrency(band.min)}–{formatCurrency(band.max)}"
 								>
 									⚠ {band.status === 'below' ? 'Below' : 'Above'}
@@ -374,6 +393,7 @@
 		<!-- Supervisors (#176): primary manager + additional superiors -->
 		<div class="rounded-lg border bg-card p-6 space-y-4">
 			<h2 class="font-semibold">Supervisors</h2>
+			{@render actionError(['setSupervisors'])}
 			<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
 				<dt class="text-muted-foreground">Primary</dt>
 				<dd>
@@ -431,11 +451,7 @@
 			<div class="rounded-lg border bg-card p-6 space-y-4">
 				<h2 class="font-semibold">Evaluation Template</h2>
 				{#if form?.action === 'assignTemplate' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'assignTemplate' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -494,13 +510,15 @@
 				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">Update Profile</h2>
-				{#if form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
-				{:else if form?.error}
+				<!--
+					Gated on form.action: this is the ONLY error slot on a page with 21 actions, so
+					an ungated block painted a failed addLoan (or document delete) into this form.
+					Phase 07 gives every form its own slot; until then an untagged action reports
+					nowhere, which is the lesser harm.
+				-->
+				{#if form?.action === 'update' && form?.success}
+					<Banner kind="success" message="Saved." />
+				{:else if form?.action === 'update' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
 					>
@@ -820,14 +838,7 @@
 										{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}
 									</td>
 									<td class="px-3 py-2">
-										<span
-											class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {b.status ===
-											'ACTIVE'
-												? 'bg-green-500/15 text-green-400'
-												: b.status === 'WAIVED'
-													? 'bg-yellow-500/15 text-yellow-400'
-													: 'bg-gray-500/15 text-gray-400'}">{b.status}</span
-										>
+										<Badge status={b.status} domain="benefitEnrollment" />
 									</td>
 								</tr>
 							{/each}
@@ -847,6 +858,7 @@
 				Emergency Contacts
 				<span class="text-xs font-normal text-muted-foreground">(name, relationship, phone)</span>
 			</h2>
+			{@render actionError(['addEmergencyContact', 'deleteEmergencyContact'])}
 
 			{#if employee.emergencyContacts.length}
 				<div class="rounded-md border">
@@ -945,6 +957,7 @@
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Loans &amp; Cash Advances</h2>
+				{@render actionError(['addLoan', 'addCashAdvance'])}
 				<p class="text-xs text-muted-foreground">
 					Active items amortize automatically each payroll period (fixed installment, capped at
 					balance).
@@ -965,15 +978,7 @@
 													>/ {formatCurrency(Number(l.installment))}·pd</span
 												></td
 											>
-											<td class="py-1.5 text-right"
-												><span
-													class="rounded-full px-2 py-0.5 text-xs {l.status === 'PAID'
-														? 'bg-green-500/15 text-green-400'
-														: l.status === 'CANCELLED'
-															? 'bg-gray-500/15 text-gray-400'
-															: 'bg-blue-500/15 text-blue-400'}">{l.status}</span
-												></td
-											>
+											<td class="py-1.5 text-right"><Badge status={l.status} domain="loan" /></td>
 										</tr>
 									{/each}
 								</tbody>
@@ -1037,15 +1042,7 @@
 													>/ {formatCurrency(Number(a.installment))}·pd</span
 												></td
 											>
-											<td class="py-1.5 text-right"
-												><span
-													class="rounded-full px-2 py-0.5 text-xs {a.status === 'PAID'
-														? 'bg-green-500/15 text-green-400'
-														: a.status === 'CANCELLED'
-															? 'bg-gray-500/15 text-gray-400'
-															: 'bg-blue-500/15 text-blue-400'}">{a.status}</span
-												></td
-											>
+											<td class="py-1.5 text-right"><Badge status={a.status} domain="loan" /></td>
 										</tr>
 									{/each}
 								</tbody>
@@ -1091,6 +1088,7 @@
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Recurring Allowances &amp; Incentives</h2>
+				{@render actionError(['addEarning', 'endEarning'])}
 				<p class="text-xs text-muted-foreground">
 					Monthly amounts, prorated to each payroll period and added to the payslip's Allowances /
 					Incentives lines. Ended items stop from the next payroll run.
@@ -1121,9 +1119,7 @@
 												>
 											</form>
 										{:else}
-											<span class="rounded-full bg-gray-500/15 px-2 py-0.5 text-xs text-gray-400"
-												>ENDED</span
-											>
+											<Badge status="ENDED" tone="gray" />
 										{/if}
 									</td>
 								</tr>
@@ -1170,6 +1166,13 @@
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Recurring Deductions</h2>
+				{@render actionError([
+					'addDeduction',
+					'endDeduction',
+					'toggleStatutoryExemption',
+					'toggleEmployerShareExternal',
+					'setStatutoryAllocation'
+				])}
 
 				<div class="space-y-2">
 					<h3 class="text-sm font-medium">Statutory contributions</h3>
@@ -1313,9 +1316,7 @@
 												>
 											</form>
 										{:else}
-											<span class="rounded-full bg-gray-500/15 px-2 py-0.5 text-xs text-gray-400"
-												>ENDED</span
-											>
+											<Badge status="ENDED" tone="gray" />
 										{/if}
 									</td>
 								</tr>
@@ -1377,6 +1378,7 @@
 						>(201 file — contracts, IDs, exit docs)</span
 					>
 				</h2>
+				{@render actionError(['uploadDocument', 'deleteDocument'])}
 
 				{#if data.documents.length}
 					<div class="overflow-x-auto rounded-md border">
@@ -1493,17 +1495,9 @@
 					>
 				</h2>
 				{#if form?.action === 'changeCompensation' && form?.notice}
-					<div
-						class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
-					>
-						{form.notice}
-					</div>
+					<Banner kind="warning" message={form.notice} />
 				{:else if form?.action === 'changeCompensation' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'changeCompensation' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1595,17 +1589,9 @@
 					>
 				</h2>
 				{#if form?.action === 'promote' && form?.notice}
-					<div
-						class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
-					>
-						{form.notice}
-					</div>
+					<Banner kind="warning" message={form.notice} />
 				{:else if form?.action === 'promote' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Promotion recorded.
-					</div>
+					<Banner kind="success" message="Promotion recorded." />
 				{:else if form?.action === 'promote' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1780,8 +1766,23 @@
 				{/if}
 			</section>
 		{/if}
+		<!--
+			OUTSIDE the ACTIVE block on purpose: a successful offboard flips employmentStatus to
+			OFFBOARDED, which unmounts the block below — a message placed inside it could never be
+			read. Gated on form.action so it only answers the offboard form.
+		-->
+		{#if form?.action === 'offboard' && form?.saved}
+			<Banner kind="success" class="lg:col-span-2" message={form.saved} />
+		{:else if form?.action === 'offboard' && form?.error}
+			<div
+				class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400 lg:col-span-2"
+			>
+				{form.error}
+			</div>
+		{/if}
 		{#if canManage && employee.employmentStatus === 'ACTIVE'}
 			<form
+				bind:this={offboardFormEl}
 				method="POST"
 				action="?/offboard"
 				use:enhance={offboard.enhance}
@@ -1800,8 +1801,9 @@
 						/>
 					</div>
 					<button
-						type="submit"
+						type="button"
 						disabled={offboard.busy}
+						onclick={openOffboardConfirm}
 						class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50"
 						>{offboard.busy ? 'Offboarding…' : 'Offboard'}</button
 					>
@@ -1810,3 +1812,11 @@
 		{/if}
 	</div>
 </div>
+
+<ConfirmDialog
+	bind:open={offboardConfirm}
+	title="Offboard this employee?"
+	message="{employee.firstName} {employee.lastName} is marked OFFBOARDED as of the last day you entered, their login is disabled, and they stop appearing in active-employee lists and payroll runs. Reversing this needs a Super Admin."
+	confirmText="Offboard"
+	onconfirm={() => offboardFormEl?.requestSubmit()}
+/>

@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
 	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
@@ -25,21 +27,18 @@
 </svelte:head>
 
 <div class="space-y-6 max-w-xl">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">New Leave Request</h1>
-		<a href="/leave" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>
-	</div>
+	<PageHeader title="New Leave Request">
+		{#snippet back()}
+			<a href="/leave" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>
+		{/snippet}
+	</PageHeader>
 
 	{#if data.balances.length > 0}
 		<BalanceSummary balances={data.balances} />
 	{/if}
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<form

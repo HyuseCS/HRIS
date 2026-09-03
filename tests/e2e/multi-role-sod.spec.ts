@@ -97,7 +97,7 @@ test('AC-17: the two-hat user verifies a request, then cannot approve it', async
 	// The request is still open, now awaiting APPROVE — not decided, not gone.
 	await twoPage.goto(`/requests/${id}`, { waitUntil: 'domcontentloaded' })
 	const detail = await twoPage.locator('body').innerText()
-	expect(detail).toMatch(/PENDING/)
+	expect(detail).toMatch(/pending/i)
 	expect(detail).toMatch(/Verified/)
 	// D12's "explain why" half on the detail page.
 	expect(detail).toContain(

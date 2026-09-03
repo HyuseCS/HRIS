@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { regularizationStatus, tenureLabel } from '$lib/utils/dates'
 	import { employmentTypeLabel, contractRenewalStatus } from '$lib/utils/employment'
@@ -7,6 +9,7 @@
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -45,8 +48,8 @@
 	let showPost = $state(false)
 
 	// Per-posting guards + a reject-note toggle for the approval card (#195).
-	const decideGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const decideGuard = (id: string) => (decideGuards[id] ??= createSubmitGuard())
+	const decideGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const decideGuard = (id: string) => (decideGuards[id] ??= submitFeedback())
 	let rejectingId = $state<string | null>(null)
 
 	// Today's birthday greeting, rendered at the top of the announcements feed (#167).
@@ -103,9 +106,7 @@
 </svelte:head>
 
 <div class="flex flex-1 flex-col gap-6">
-	<div class="page-header">
-		<h1 class="page-title">Dashboard</h1>
-	</div>
+	<PageHeader title="Dashboard" />
 
 	<!-- Attendance and the metric cards stack in the left two thirds; Upcoming Events fills the
 	     right third across both of their rows. Keeping attendance narrower than full width stops
@@ -275,7 +276,7 @@
 				     and a hairline rule between two-line rows reads as clutter where a tile edge
 				     reads as grouping. Unread rows carry the accent ring, so "new" survives without
 				     a separate dot competing with the icon. -->
-				<ul class="space-y-2">
+				<ul class="max-h-96 space-y-2 overflow-y-auto">
 					{#each data.recentActivity as n (n.id)}
 						{@const unread = !n.readAt}
 						<li>
@@ -326,18 +327,10 @@
 			</div>
 
 			{#if form?.posted}
-				<div
-					class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs text-green-400"
-				>
-					Announcement posted.
-				</div>
+				<Banner kind="success" message="Announcement posted." />
 			{/if}
 			{#if form?.awarded}
-				<div
-					class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
-				>
-					Award given.
-				</div>
+				<Banner kind="success" message="Award given." />
 			{/if}
 
 			{#if showAward && data.canPost}
@@ -347,7 +340,9 @@
 					use:enhance={giveAward.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<div class="grid gap-2 sm:grid-cols-2">
 						<select name="employeeId" required class="input h-9">
 							<option value="">Select employee…</option>
@@ -379,7 +374,9 @@
 					use:enhance={postAnnouncement.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'postAnnouncement' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<input name="title" placeholder="Title" required class="input h-9" />
 					<textarea
 						name="body"
@@ -633,6 +630,11 @@
 			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
 				Postings awaiting your approval
 			</p>
+			<!-- Scoped: with the award panel open, a posting failure used to render under
+			     "Give award", where nothing had gone wrong. -->
+			{#if form?.action === 'decidePosting' && form?.error}
+				<Banner kind="error" message={form.error} />
+			{/if}
 			<ul class="divide-y divide-border/60">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}

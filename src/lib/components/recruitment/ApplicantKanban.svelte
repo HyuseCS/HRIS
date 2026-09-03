@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
-	import { fade, scale } from 'svelte/transition'
+	import Dialog from '$lib/components/ui/Dialog.svelte'
 
 	interface Applicant {
 		id: string
@@ -173,76 +173,55 @@
 <!-- Stage-move confirmation dialog (#52): target summary + optional note -->
 {#if pending}
 	{@const target = pending}
-	<div
-		class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-		onclick={() => (pending = null)}
-		role="presentation"
-		transition:fade={{ duration: 100 }}
-	>
-		<div
-			class="w-full max-w-md rounded-xl border bg-card p-6 shadow-2xl"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => {
-				if (e.key === 'Escape') {
-					e.stopPropagation()
+	<Dialog open onclose={() => (pending = null)} title="Confirm stage move" size="md" zIndex={60}>
+		<h2 class="text-lg font-semibold">
+			{target.to === 'REJECTED' ? 'Reject applicant' : `Move to ${STAGE_LABELS[target.to]}`}
+		</h2>
+		<p class="mt-2 text-sm text-muted-foreground">
+			{target.applicant.firstName}
+			{target.applicant.lastName}: {STAGE_LABELS[target.from]} → {STAGE_LABELS[target.to]}
+		</p>
+		<form
+			method="POST"
+			action="?/advanceStage"
+			use:enhance={() =>
+				async ({ update }) => {
+					await update()
 					pending = null
-				}
-			}}
-			role="dialog"
-			aria-modal="true"
-			aria-label="Confirm stage move"
-			tabindex="-1"
-			transition:scale={{ duration: 120, start: 0.96 }}
+				}}
+			class="mt-4 space-y-4"
 		>
-			<h2 class="text-lg font-semibold">
-				{target.to === 'REJECTED' ? 'Reject applicant' : `Move to ${STAGE_LABELS[target.to]}`}
-			</h2>
-			<p class="mt-2 text-sm text-muted-foreground">
-				{target.applicant.firstName}
-				{target.applicant.lastName}: {STAGE_LABELS[target.from]} → {STAGE_LABELS[target.to]}
-			</p>
-			<form
-				method="POST"
-				action="?/advanceStage"
-				use:enhance={() =>
-					async ({ update }) => {
-						await update()
-						pending = null
-					}}
-				class="mt-4 space-y-4"
-			>
-				<input type="hidden" name="applicantId" value={target.applicant.id} />
-				<input type="hidden" name="stage" value={target.to} />
-				<div>
-					<label for="stage-move-notes" class="text-sm font-medium">
-						Note <span class="font-normal text-muted-foreground"
-							>(optional — shown in the applicant's stage history)</span
-						>
-					</label>
-					<textarea
-						id="stage-move-notes"
-						name="notes"
-						rows="3"
-						placeholder="e.g. Strong portfolio — fast-tracking"
-						class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					></textarea>
-				</div>
-				<div class="flex justify-end gap-2">
-					<button
-						type="button"
-						onclick={() => (pending = null)}
-						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">Cancel</button
+			<input type="hidden" name="applicantId" value={target.applicant.id} />
+			<input type="hidden" name="stage" value={target.to} />
+			<div>
+				<label for="stage-move-notes" class="text-sm font-medium">
+					Note <span class="font-normal text-muted-foreground"
+						>(optional — shown in the applicant's stage history)</span
 					>
-					<button
-						type="submit"
-						class="rounded-md px-4 py-2 text-sm font-medium {target.to === 'REJECTED'
-							? 'bg-red-600 text-white hover:bg-red-700'
-							: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
-					>
-						{target.to === 'REJECTED' ? 'Reject' : 'Confirm move'}
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
+				</label>
+				<textarea
+					id="stage-move-notes"
+					name="notes"
+					rows="3"
+					placeholder="e.g. Strong portfolio — fast-tracking"
+					class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				></textarea>
+			</div>
+			<div class="flex justify-end gap-2">
+				<button
+					type="button"
+					onclick={() => (pending = null)}
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">Cancel</button
+				>
+				<button
+					type="submit"
+					class="rounded-md px-4 py-2 text-sm font-medium {target.to === 'REJECTED'
+						? 'bg-red-600 text-white hover:bg-red-700'
+						: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
+				>
+					{target.to === 'REJECTED' ? 'Reject' : 'Confirm move'}
+				</button>
+			</div>
+		</form>
+	</Dialog>
 {/if}

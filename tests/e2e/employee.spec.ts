@@ -24,7 +24,7 @@ test.describe('Employee self-service', () => {
 		await page.waitForURL('**/leave')
 		const row = page.locator('tbody tr', { hasText: 'Vacation Leave' }).first()
 		await expect(row).toBeVisible()
-		await expect(row.getByText('PENDING')).toBeVisible()
+		await expect(row.getByText(/pending/i)).toBeVisible()
 	})
 
 	// #175: personal & contact details are HR-managed. An employee's profile is read-only —

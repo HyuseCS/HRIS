@@ -1,9 +1,12 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -36,8 +39,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-2">
-		<h1 class="text-2xl font-bold tracking-tight">Recruitment</h1>
+	<PageHeader title="Recruitment" />
+
+	<!-- The posting actions sit above the list they publish into, not on the title row. -->
+	<div class="flex flex-wrap items-center justify-end gap-2">
 		<div class="flex items-center gap-2">
 			{#if selectedDraftIds.length}
 				<form
@@ -214,17 +219,7 @@
 						<td class="px-4 py-3 text-muted-foreground">{jp.department.name}</td>
 						<td class="px-4 py-3">{jp._count.applicants}</td>
 						<td class="px-4 py-3">
-							<span
-								class="rounded-full px-2 py-0.5 text-xs font-medium {jp.status === 'OPEN'
-									? 'bg-green-500/15 text-green-400'
-									: jp.status === 'CLOSED'
-										? 'bg-gray-500/15 text-gray-400'
-										: jp.status === 'PENDING_APPROVAL'
-											? 'bg-blue-500/15 text-blue-400'
-											: 'bg-yellow-500/15 text-yellow-400'}"
-							>
-								{jp.status.replace('_', ' ')}
-							</span>
+							<Badge status={jp.status} domain="jobPosting" />
 						</td>
 						<td class="px-4 py-3 text-muted-foreground"
 							>{jp.postedAt ? formatShortDate(jp.postedAt) : '—'}</td
@@ -232,9 +227,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No job postings yet</td
-						>
+						<td colspan="6" class="p-0"><EmptyState title="No job postings yet" /></td>
 					</tr>
 				{/each}
 			</tbody>
