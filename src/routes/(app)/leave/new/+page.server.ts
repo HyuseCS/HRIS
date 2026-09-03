@@ -4,6 +4,7 @@ import { getLeaveBalances } from '$lib/server/services/leave'
 import { createRequest } from '$lib/server/services/requests'
 import { meetsLeaveTenure } from '$lib/server/services/requests/leave'
 import { requestSchema } from '$lib/server/schemas/requests'
+import { setFlash } from '$lib/server/flash'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -45,7 +46,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 export const actions: Actions = {
 	// Files a unified Request (type=LEAVE) — same flow as the Requests/Approvals page,
 	// so leave shows there, in /leave, and routes through the approval chain.
-	create: async ({ request, locals, getClientAddress }) => {
+	create: async ({ request, locals, getClientAddress, cookies }) => {
 		const user = locals.user!
 
 		const employee = await db.employee.findFirst({
@@ -82,6 +83,7 @@ export const actions: Actions = {
 			throw e
 		}
 
+		setFlash(cookies, { kind: 'success', message: 'Your leave request was filed.' })
 		redirect(303, '/leave')
 	}
 }

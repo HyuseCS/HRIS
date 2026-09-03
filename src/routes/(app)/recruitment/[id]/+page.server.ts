@@ -5,6 +5,7 @@ import { failFromError } from '$lib/server/form-fail'
 import { db } from '$lib/server/db'
 import { advanceApplicant, convertApplicantToEmployee } from '$lib/server/services/recruitment'
 import { getPostingBoards, liveChannels, setChannel } from '$lib/server/services/job-boards'
+import { setFlash } from '$lib/server/flash'
 import type { Actions, PageServerLoad } from './$types'
 
 // A robust http(s) check (mirrors the #109 resumeUrl approach) so the board URL field
@@ -170,7 +171,7 @@ export const actions: Actions = {
 		return { success: true }
 	},
 
-	convert: async ({ request, locals, getClientAddress }) => {
+	convert: async ({ request, locals, getClientAddress, cookies }) => {
 		const user = locals.user!
 		requireAnyCapability(user.roles, 'MANAGE_HR')
 
@@ -193,6 +194,10 @@ export const actions: Actions = {
 			throw e
 		}
 
+		setFlash(cookies, {
+			kind: 'success',
+			message: `${newEmployee.firstName} ${newEmployee.lastName} was hired and now has an employee record.`
+		})
 		return redirect(302, `/employees/${newEmployee.id}`)
 	}
 }

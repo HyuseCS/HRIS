@@ -2,6 +2,7 @@ import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { createSeparation, listSeparations } from '$lib/server/services/separation'
+import { setFlash } from '$lib/server/flash'
 import { z } from 'zod'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -32,7 +33,7 @@ const createSchema = z.object({
 })
 
 export const actions: Actions = {
-	create: async ({ request, locals, getClientAddress }) => {
+	create: async ({ request, locals, getClientAddress, cookies }) => {
 		const user = locals.user!
 		requireAnyCapability(user.roles, 'MANAGE_HR')
 
@@ -59,6 +60,7 @@ export const actions: Actions = {
 			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
+		setFlash(cookies, { kind: 'success', message: 'Separation record created.' })
 		redirect(303, `/separations/${id}`)
 	}
 }

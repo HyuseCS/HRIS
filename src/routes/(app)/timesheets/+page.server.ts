@@ -12,6 +12,7 @@ import {
 	assertCanModifyTimesheet
 } from '$lib/server/services/timesheets'
 import { paginate } from '$lib/server/pagination'
+import { setFlash } from '$lib/server/flash'
 import {
 	previewTimeLogAggregation,
 	aggregateTimeLogsToTimesheet
@@ -281,6 +282,9 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		// This action redirects to the page it was posted from, which discards `form` — so the
+		// page's own banner can never fire for it. The flash is the only way to say anything.
+		setFlash(event.cookies, { kind: 'success', message: 'Draft timesheet created.' })
 		redirect(303, '/timesheets')
 	},
 
