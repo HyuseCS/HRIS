@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { page } from '$app/stores'
@@ -44,18 +45,16 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">
-				{data.isHr ? 'HR Inquiries' : 'HR Inquiries about you'}
-			</h1>
-			<p class="mt-1 text-sm text-muted-foreground">
-				{data.isHr
-					? 'Raise a question or concern to an employee and track their response.'
-					: 'Questions HR has raised with you. Open one to reply.'}
-			</p>
-		</div>
-		{#if data.isHr}
+	<PageHeader
+		title={data.isHr ? 'HR Inquiries' : 'HR Inquiries about you'}
+		description={data.isHr
+			? 'Raise a question or concern to an employee and track their response.'
+			: 'Questions HR has raised with you. Open one to reply.'}
+	/>
+
+	<!-- The raise action sits directly above the form it opens, not on the title row. -->
+	{#if data.isHr}
+		<div class="flex justify-end">
 			<button
 				type="button"
 				onclick={() => (showForm = !showForm)}
@@ -63,8 +62,8 @@
 			>
 				{showForm ? 'Close' : 'New inquiry'}
 			</button>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	{#if form?.message}
 		<Banner kind="success" message={form.message} />

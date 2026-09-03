@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
@@ -116,7 +117,7 @@
 {/snippet}
 
 <div class="space-y-8">
-	<h1 class="text-2xl font-bold tracking-tight">Reports</h1>
+	<PageHeader title="Reports" />
 
 	{#if data.canViewHrReports}
 		<!-- Attrition summary -->

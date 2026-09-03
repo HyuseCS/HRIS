@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
@@ -113,12 +114,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Settings</h1>
-		<p class="text-sm text-muted-foreground">
-			Master data and configuration for your organization.
-		</p>
-	</div>
+	<PageHeader title="Settings" description="Master data and configuration for your organization." />
 
 	<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 		{#each visible as c (c.href)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDateRange, formatShortDate, formatDate } from '$lib/utils/format'
@@ -117,17 +118,12 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<h1 class="min-w-0 flex-1 text-2xl font-bold tracking-tight">
-			{typeLabels[req.type] ?? req.type}
-		</h1>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<PageHeader title={typeLabels[req.type] ?? req.type}>
+		{#snippet back()}
 			<BackButton fallback="/requests" label="Requests" />
 			<Badge status={req.status} domain="request" />
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
 
 	<div class="rounded-lg border bg-card p-4">
 		<dl class="grid grid-cols-3 gap-y-2 text-sm">

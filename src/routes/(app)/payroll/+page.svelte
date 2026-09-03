@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
@@ -53,8 +54,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Payroll Runs</h1>
+	<PageHeader title="Payroll Runs" />
+
+	<!-- The run actions sit above the list they add to, not on the title row. -->
+	<div class="flex items-center justify-end">
 		{#if data.canManage}
 			<div class="flex items-center gap-2">
 				<a

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { formatShortDate } from '$lib/utils/format'
@@ -13,9 +14,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Performance</h1>
-	</div>
+	<PageHeader title="Performance" />
 
 	<!-- #178 readiness note. Informational, never a gate: it disables nothing and blocks no
 	     action. The count is 0 for anyone without ADMINISTER_HR_ORGWIDE (see the load), so the

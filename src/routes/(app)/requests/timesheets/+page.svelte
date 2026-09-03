@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
@@ -59,10 +60,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Timesheet Approvals</h1>
-		<p class="text-sm text-muted-foreground">Review and approve submitted timesheets.</p>
-	</div>
+	<PageHeader title="Timesheet Approvals" description="Review and approve submitted timesheets." />
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />

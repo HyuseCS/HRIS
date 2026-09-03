@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -94,24 +95,15 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="min-w-0 flex-1 space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">
-				{r.employee.firstName}
-				{r.employee.lastName}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				{r.cycle.name} · Reviewer: {r.reviewer.firstName}
-				{r.reviewer.lastName}
-			</p>
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<PageHeader
+		title="{r.employee.firstName} {r.employee.lastName}"
+		description="{r.cycle.name} · Reviewer: {r.reviewer.firstName} {r.reviewer.lastName}"
+	>
+		{#snippet back()}
 			<BackButton fallback="/performance" label="Performance" />
 			<Badge status={r.status} domain="review" />
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />
