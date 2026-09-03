@@ -802,7 +802,301 @@ option D from `login-email-first-tenant-privacy_NOTE_03-09-26.md`."*
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: parallel-subagents (read-only fan-out), executed in-session
+Rationale: 5/7 signals — S2 (auth flow + form-action contract change), S3 (the Chosen-Mechanic
+section itself weighed four alternatives), S4 (phase program), S6 (HIGH risk class: auth/identity,
+named by the plan itself), S7 (2 source + 7 test + 3 process files). Validating one already-written
+plan needs no inter-agent talk, so independent dimension/section probes were the right shape. Cost
+guard: not triggered (12 probes).
+
+**Grade: CONDITIONAL — GO with 9 binding execute-agent instructions.** 0 FAILs. Every plan claim
+that was checkable against source was re-read at `feat/uiux-phase-9` (056f056); the six named truth
+checks came back 4 PASS / 2 PASS-with-correction, and nine concerns are recorded below.
+
+Test gates (C3 5-column table):
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC1 | `db.organization.findMany` is gone from the login server file and no tenant button renders | Fully-Automated | G1 (narrowed: `organization.findMany` absence grep only — see C2) + `pnpm test:e2e tests/e2e/auth.spec.ts` E3 | B |
+| AC2 | step 1 takes an email and advances to a password step | Fully-Automated | `pnpm test:e2e tests/e2e/auth.spec.ts` E1/E4/E5 | B |
+| AC3 | zero-org / unknown / malformed email is byte-indistinguishable from single-org at step 1 | Fully-Automated | `pnpm test` — U1 deep-equal in `tests/unit/login-resolution.test.ts`; G2 heading grep; E4 | B |
+| AC4 | `?/resolve` never returns `fail()` for any input | Fully-Automated | `pnpm test` — U1 asserts no `status` key on all branches | B |
+| AC5 | a 2+-org email gets a picker listing ONLY that person's orgs | Fully-Automated | `pnpm test` — U2 (4 orgs mocked / 2 memberships / exactly 2 returned); E6 renders; E3 scoping | B |
+| AC6 | a failed sign-in re-renders step 2 with the email retained and the error announced | Fully-Automated | `pnpm test:e2e tests/e2e/auth.spec.ts` E1 (Password field still visible) + `a11y-invariants` `role="alert"` pin | B |
+| AC7 | a forged `selectedOrg` is rejected: 401 generic, `LOGIN_FAILED` on `user.organizationId`, no session | Fully-Automated | `pnpm test` — U3 | B |
+| AC8 | a session is NEVER created with `currentOrgId` null | Fully-Automated | `pnpm test` — U4 | B |
+| AC8b (NEW, C1) | an INACTIVE multi-org account discloses no membership at `?/resolve` | Fully-Automated | `pnpm test` — new U6 case in `login-resolution.test.ts`; mutation M7 | B |
+| AC9 | `'Invalid email or password'` survives verbatim at all three failure sites | Fully-Automated | `pnpm test` — existing `copy-invariants` :265 + `a11y-invariants` :216 pins, unedited | A |
+| AC10 | every phase-08 login pin survives; the Avipa amendment tightens rather than weakens | Fully-Automated | `pnpm test` — amended `copy-invariants` :106 + mutation M4 (with a green-again negative control) | B |
+| AC11 | the ~40 specs entering through `helpers.login()` are no worse than the pre-phase baseline | Fully-Automated (flaky, #287) | full `pnpm test:e2e`, row-for-row vs the Section 0 baseline | B |
+| AC12 | the login flow works with JavaScript disabled, both steps | Fully-Automated | `pnpm test:e2e tests/e2e/auth.spec.ts` E7 — `test.use({ javaScriptEnabled: false })`. **Verified available**, see C8; the M-2 downgrade is NOT authorised | B |
+| AC13 | no schema, service, capability, rate-limiter or dependency change | Fully-Automated | `git diff --stat` bounded to the Touchpoints list + G4 | A |
+| AC14 | the full CI gate set is green in CI order | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` | A |
+| AC15 | a real person signs in on a real browser, single-org and multi-org | Agent-Probe | owner manual table M-1..M-4, filled row by row in the phase report | D |
+| R2 | rate limiting still locks out after 5 failures through the new action name | Hybrid | six wrong-password submits on one email — precondition: running app, no restart mid-check | B |
+| A1 | design-quality bar the CI gates cannot express | Agent-Probe | `impeccable` audit pass on the two changed source files | D |
+
+gap-resolution legend: A = proven now; B = gate added by this plan's checklist; C = deferred to a
+named later phase; D = backlog test-building stub (named residual, keep-active).
+
+Legacy line form:
+- login server resolution: [Fully-automated: `pnpm test` — `tests/unit/login-resolution.test.ts` U1-U4 + new U6, each with a named RED mutation M1-M7]
+- login audit writes: [Fully-automated: `pnpm test` — `tests/unit/login-audit.test.ts` re-pointed at `actions.signin`, assertions unchanged]
+- source-scan invariants: [Fully-automated: `pnpm test` — `copy-invariants` G1 (narrowed) + G2 + the three phase-08 pins]
+- e2e login flow: [Fully-automated: full `pnpm test:e2e`, baseline-compared; `auth.spec.ts` E1/E3/E4/E5/E6/E7]
+- rate-limit lockout through the renamed action: [hybrid: six wrong-password submits — precondition: running app, in-memory limiter, no restart]
+- design quality + real-browser sign-in: [agent-probe: `impeccable` pass + owner M-1..M-4]
+- `src/lib/server/rate-limit.ts` has no unit test: [known-gap: documented — `login-rate-limit-untested_NOTE_{date}.md`]
+- `/login?error=account_disabled` never renders: [known-gap: documented as NEW PLAN REQUIRED — register at UPDATE-PROCESS]
+- login timing/enumeration economics (D1-D4 + the new D5): [known-gap: documented — `login-timing-parity_NOTE_03-09-26.md`; owner declined option D]
+
+Dimension findings:
+
+- **Infra fit: PASS** — one SvelteKit app, no container, port, proxy or deploy surface. Every cited
+  edit target was re-read on disk and matches: `load` + `findMany` at `+page.server.ts:20-32`;
+  membership check `:68-72`; `createSession(..., { currentOrgId: selectedOrg })` `:95`; success-audit
+  `organizationId: selectedOrg` `:110`; tenant-button block `+page.svelte:29-56`; `let selectedOrg =
+  $state(...)` `:13`; the `role="alert"` box `:73-85`; global-setup warmup `:36-53`;
+  `leave-balances.spec.ts:99`. `node .claude/skills/vc-generate-plan/scripts/validate-plan-artifact.mjs`
+  returns 0 failures / 0 warnings. One mechanical blocker at the very first checklist item — C9.
+
+- **Test coverage: CONCERN** — the tier assignments are sound and the anti-vacuous-mock design is the
+  best this repo has produced (two DIFFERENT traps covered by two DIFFERENT fixtures — see truth
+  check 5 below). Three gaps: G1's second half is not textually expressible (C2); AC8b has no test
+  because C1's guard is missing from the spec; and M4 needs a green-again negative control, since a
+  permanently-red gate is as useless as a permanently-green one.
+
+- **Breaking changes: CONCERN** — the `default` → `?/resolve` + `?/signin` break is correctly
+  identified and its only unit consumer named. `data.orgs` has exactly ONE consumer, verified by grep:
+  `+page.svelte:37`. Session shape, audit-row shape and the rate-limit key are genuinely unchanged.
+  BUT the e2e blast radius is understated: the plan names 1 of 5 explicit-org `login()` call sites
+  (C3). All four unnamed ones are mechanically safe — proven, not assumed — but the Section 5 risk
+  statement rests on a wrong count.
+
+- **Security surface: CONCERN** — HIGH risk class (auth/identity), evidence pack REQUIRED, not
+  waived; see the evidence-pack row below. The core security property (one response shape) holds and
+  ruling 2 is not broken. Two findings: the plan's stated "inactive user gets `[]`" is contradicted by
+  its own helper spec (C1 — the top concern); and the timing section's absolute "the gap is not
+  narrowed and not widened" is not true in the enumeration-economics sense (C4). Neither reopens a
+  settled ruling.
+
+Section verdicts (Layer 2 — the plan has EIGHT sections, 0 through 7, not the seven the task brief
+assumed; all eight were probed):
+
+- Section 0 — entry checks and branch: **CONCERN**. Items 1-2 are already done and re-running item 2
+  errors (C9). Registry has no `## Phase 09` yet, which is correct — item 4 appends it.
+- Section 1 — server, email-first resolution: **CONCERN**. C1 (missing `isActive` guard) and C5
+  (item 11 does not say whether the DB read happens on a Zod reject). Highest-risk edit in the phase.
+- Section 2 — client, the email-first page: **PASS with a note**. Every carry-across target is present
+  and uniquely matchable; the `{@const}` rule is called out; `$effect` focus over `autofocus` is right.
+  Note C7 — the default-checked radio is the alphabetically-first org, not the user's home org.
+- Section 3 — unit tests: **CONCERN**. U1-U4 are non-vacuous and the `login-audit` entry-point move
+  genuinely preserves both assertions (traced end to end). Missing: the AC8b case (C1).
+- Section 4 — copy/a11y invariant amendments: **CONCERN**. Both amendments are exactly feasible
+  against the real assertions; M4 proves the gate still fails. C2 is the one defect.
+- Section 5 — e2e choke point: **CONCERN**. C3.
+- Section 6 — auth.spec rewrites: **CONCERN**. C8 — the E7 fallback must be struck, not kept as an
+  option.
+- Section 7 — backlog, verification, close: **PASS**. Add D5 to the timing note per C4.
+
+Totals: 0 FAILs / 9 CONCERNs / 3 PASSes (of 12 probes)
+→ Net Gate: **CONDITIONAL**
+
+### Concerns
+
+**C1 — HIGH, security. `resolveLoginOrgs` never applies `isActive`, contradicting the plan's own
+single-response-shape claim.** The plan states `orgs` is `[]` for "unknown email, **inactive user**,
+zero-membership user, and single-org user", but the specified helper selects `isActive` and then never
+uses it — the only thresholds given are set-size `>= 2` / `=== 1`. A deactivated multi-org account
+(today: `ceo@veent.ph` alone) would have its full membership list returned at `?/resolve` while being
+unable to sign in. Prose says one thing, the spec says another, on the exact disclosure surface this
+phase exists to close. Fix: E1 below, plus a new unit case (AC8b) and mutation M7.
+
+**C2 — HIGH, testability. G1's second half is not textually expressible and would be permanently
+red.** G1 asks `copy-invariants` to assert `+page.server.ts` contains "no `organization.findMany` and
+no `orgs` key in the `load` return". After the rewrite `?/resolve` returns `{ email, orgs }`, so any
+file-level grep for `orgs` is red forever, and a region-scoped match on the `load` body is fragile
+enough to rot on the next edit. The `organization.findMany` half IS the real invariant and IS exactly
+what M1 mutates. Fix: E2.
+
+**C3 — MEDIUM, blast radius. The plan names 1 of 5 explicit-org `login()` call sites.** Verified by
+grep: `tenancy-switch.spec.ts:15` (the plan says `:16`), `branches.spec.ts:25`, `:62`, `:84`
+(`USERS.jojoManager`, `'JoJo Potato'`), and `timesheet-punch-location.spec.ts:72` (`CREW =
+benjie@jojo.ph`, `TENANT = 'JoJo Potato'`). I traced all four unnamed ones rather than assuming:
+`backfillMemberships` (`prisma/seed-core.ts:13-22`) gives EVERY user exactly one membership mirroring
+their primary org, and the only other `userOrganization` write in `prisma/` is the CEO's three-org
+loop (`:477-483`) — so `jojoManager` and `benjie` are single-org, the picker never renders, `count()`
+is 0, the `org` argument is inert, and `soleOrgId` resolves to `org_jojo`. The session org is
+unchanged. **Mechanically safe; the plan's statement is still wrong** and Section 5's risk analysis
+rests on it. Fix: E3.
+
+**C4 — MEDIUM, security honesty. The timing-parity section overclaims.** "The gap is not narrowed and
+not widened" is false in the enumeration-economics sense. Today, probing whether an email exists costs
+a POST to `default` with a password: it burns a rate-limit slot (5 → lockout) and, for a real account,
+writes a `LOGIN_FAILED` audit row. After this phase, `?/resolve` is an unauthenticated,
+un-rate-limited, un-audited endpoint that performs one DB read per submitted email, and hit-vs-miss
+wall-clock differs (a hit loads memberships). The **response** is provably identical and gated by U1,
+so ruling 2 holds and ruling 6's scope is respected — but the **probe channel** is new and cheaper.
+This does NOT reopen ruling 4 (still no rate limit). It requires only that the plan stop asserting the
+absolute and that the backlog note say so. Fix: E4.
+
+**C5 — MEDIUM, spec ambiguity. Item 11 does not say whether the DB read happens on a Zod reject.**
+"parse; on **either** outcome return `{ email, orgs: r.orgs }`" — but on a Zod reject `r` was never
+computed. A literal reading invites `resolveLoginOrgs(undefined)`. The response stays byte-identical
+either way, so AC3/U1 hold; the ambiguity is an execute-time trap, not a design flaw. Fix: E5.
+
+**C6 — LOW, citation drift (4 wrong, 10 exact).** Wrong: `User.memberships` is `prisma/schema.prisma:415`,
+not `:312` (`:312` is inside `Organization`; `model UserOrganization` is `:351`);
+`tenancy-switch.spec.ts` is `:15` not `:16`; the email-case row cites "`:44-45` vs `:55`" inverted —
+`rateKey` (lowercased) is `:45` and the non-lowercased `findUnique` is `:55`; the `loginSchema` Avipa
+comment is `:13-16` (schema `:10-18`) not `:12-16`. Exact and confirmed: `User.email @unique` at
+`:403`; `@@unique([userId, organizationId])` at `:360`; `copy-invariants.test.ts:104-119`;
+`+page.server.ts:68-72`, `:95`, `:110`; `+page.svelte:29-56`; `global-setup.ts:36-53`;
+`leave-balances.spec.ts:99`; `seed-core.ts` CEO block ≈`:466-482` (actual 464-483). Fix: E6.
+
+**C7 — LOW, behaviour. The picker's default radio is the alphabetically-first org, not the user's
+home org.** Orgs are name-sorted and the first is `checked`, so a CEO pressing Enter without reading
+lands in **JoJo Potato**, not Veent. Not a security issue and not a ruling breach. Do NOT "fix" it by
+sorting the primary org first — that would leak which org is primary and reopen ruling 2. Keep the
+name sort; document it. Fix: E7.
+
+**C8 — LOW, resolved by measurement. The E7 no-JS fallback is not needed — strike it.** Checked on
+disk, not from memory: `javaScriptEnabled: boolean` is a member of `export interface
+PlaywrightTestOptions` at `node_modules/.pnpm/playwright@1.61.1/node_modules/playwright/types/test.d.ts`
+(interface opens :7064, field :7313). `test.use()` takes `PlaywrightTestOptions` and scopes to the
+enclosing `describe`, and `playwright.config.ts` has a single `chromium` project that sets no
+conflicting value. So `test.use({ javaScriptEnabled: false })` per-describe **is available** and AC12
+stays Fully-Automated. Fix: E8.
+
+**C9 — LOW but blocking at step 1. Section 0 items 1-2 are already done, and item 2 will error.** The
+working tree is already on `feat/uiux-phase-9` at 056f056 (the plan commit) on top of 8365a24 (the
+phase-08 tip). `git switch -c feat/uiux-phase-9` fails on an existing branch. Fix: E9.
+
+### Truth checks demanded by the owner — results
+
+1. **One response shape / does it widen D1? — PASS with C4/C5.** Residual branches traced: status is
+   always 200 (no `fail()` anywhere in `?/resolve`), the body is always `{ email, orgs }`, headers are
+   unchanged. The only residuals that differ are wall-clock (C4) and the Zod-reject no-read path (C5);
+   neither changes the response. It does **not** widen D1 — D1 is the bcrypt gap at `?/signin`, and
+   step 4 of the order of operations runs `resolveLoginOrgs` on BOTH the hit and miss branches (before
+   the user check at step 6), so the *difference* between them is unchanged. The plan reasoned this
+   correctly. What it understates is the new probe channel — C4.
+2. **The three `selectedOrg` consumers — PASS.** Confirmed on disk at `:68-72`, `:95`, `:110`; the
+   plan's table covers all three. `currentOrgId` can never be null: step 9's `|| !resolvedOrgId`
+   fires before step 10's `createSession`, and the absent-`selectedOrg` branch sets `isMember =
+   soleOrgId !== null`, so a multi-org user who posts nothing fails generically rather than getting a
+   null session.
+3. **E2E blast radius — PASS with correction (C3).** `selectTenant`'s only importer IS `auth.spec.ts`
+   (verified). The third-arg count is 5, not 1. All four unnamed callers are mechanically safe, proven
+   through the seed.
+4. **The two phase-08 amendments — PASS, exactly.** Current state confirmed: `ALLOWED_AVIPA` at
+   `copy-invariants.test.ts:104`, `expect(offenders).toEqual([ALLOWED_AVIPA])` at `:110`, the
+   characterisation test at `:113-119` (it is the only other consumer of the const, so Amendment 2
+   makes Amendment 1's deletion safe). **RED mutation named and verified:** M4 (put `Avipa` back in any
+   `src/` comment) makes `sourceFiles().filter(/avipa/i)` yield
+   `['routes/(auth)/login/+page.server.ts']` ≠ `[]` → red. The gate tightens from "zero except one" to
+   "zero". Also confirmed the `'Invalid email or password'` pin at `:265` asserts the literal **with
+   its single quotes** (`toContain("'Invalid email or password'")`) — so `const GENERIC = 'Invalid
+   email or password'` satisfies it. The plan's reasoning is right.
+5. **U2 vs a where-ignoring mock — PASS.** Two DIFFERENT traps, two DIFFERENT fixtures. U1's
+   unknown-email deep-equal kills a where-ignoring `user.findUnique` mock (a bare `mockResolvedValue`
+   returns the seeded user for every email, so the unknown branch would carry orgs and the `toEqual`
+   goes red). U2's 4-orgs-vs-2-memberships kills a read of the org table (M6). This requires
+   `db.organization.findMany` to be mocked in the NEW file purely as the tripwire — the plan says so
+   explicitly. This is the correct answer to the repo's mocks-that-ignore-the-where-clause lesson.
+6. **Prisma / seed claims — PASS with one wrong line number.** `User.email String @unique` at
+   `schema.prisma:403` — **exact**. `@@unique([userId, organizationId])` at `:360` — **exact**. "CEO is
+   the only multi-org seed account" — **verified independently**, not taken on trust: only two
+   `userOrganization` writes exist in `prisma/`, the one-per-user backfill at `seed-core.ts:13-22` and
+   the CEO's three-org loop at `:477-483`. Only the `User.memberships` line is miscited (C6).
+7. **M1-M6 non-vacuous — PASS, with two additions.** M1 ✓ (source grep for `organization.findMany`),
+   M2 ✓ (heading pattern grep), M3 ✓ (single-org gains orgs → U1's deep-equal breaks), M4 ✓ (verified
+   above), M5 ✓ (drop `isMember` → forged org + valid password succeeds → U3 red), M6 ✓ (4 ≠ 2). None
+   is a zeros-only or grep-by-name assertion; each mutates source and names one gate. Additions
+   required: **M7** (remove the C1 `isActive` guard → the AC8b case goes red) and a **green-again
+   negative control on M4** — revert the mutation and confirm the gate returns green, since a
+   permanently-red gate proves as little as a permanently-green one.
+8. **E7 `javaScriptEnabled` — DEFINITIVELY AVAILABLE.** See C8. The fallback is struck.
+
+### Binding execute-agent instructions
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | In `resolveLoginOrgs`, after the `findUnique`, add `if (!user \|\| !user.isActive) return { userId: null, orgs: [], soleOrgId: null }` BEFORE the union/de-dup. This makes the code match the plan's stated property. Add a sixth case to `tests/unit/login-resolution.test.ts` (AC8b): an INACTIVE user with 2+ memberships → `?/resolve` returns `{ email, orgs: [] }`, deep-equal to the unknown-email result. Add mutation **M7** (delete the guard → that case goes red) and record it in the phase report. | Section 1, item 10 |
+| E2 | Narrow G1 (checklist item 31) to ONE assertion: `+page.server.ts` contains no `organization.findMany`. DROP the "no `orgs` key in the `load` return" half — `?/resolve` legitimately returns an `orgs` key, so a file-level grep is permanently red and a region match is fragile. M1 already tests exactly the surviving assertion. Note the narrowing in the phase report. | Section 4, item 31 |
+| E3 | Before rewriting `helpers.ts`, correct the plan's e2e caller list in the phase report: FIVE explicit-org call sites, not one — `tenancy-switch.spec.ts:15`, `branches.spec.ts:25/:62/:84`, `timesheet-punch-location.spec.ts:72`. Do NOT edit those specs; the `org = 'Veent'` signature keeps all five byte-unchanged and every one of those accounts is single-org (one membership each per `seed-core.ts:13-22`), so the picker never renders and the arg is inert. Confirm all five specs pass by name in the Section 5 full-suite gate and record their individual results. | Section 5, item 33 |
+| E4 | Delete the sentence "The gap is not narrowed and not widened." from the plan's timing-parity section, and add **D5** to `login-timing-parity_NOTE_03-09-26.md`: "`?/resolve` is a NEW unauthenticated, un-rate-limited, un-audited per-email DB read. The response is provably identical for every email (U1), but the probe is cheaper than today's — today an enumeration attempt must POST a password, burning a rate-limit slot and (for a real account) writing a LOGIN_FAILED row. Option D remains the named follow-on; the owner declined it on 2026-09-03." Do NOT add a rate limit (ruling 4) and do NOT add timing hardening (ruling 6). | Section 7, item 47 |
+| E5 | Implement `?/resolve` explicitly as: `const p = resolveSchema.safeParse(formData); if (!p.success) return { email: String(formData.email ?? ''), orgs: [] }` — **no DB read on the reject path** — else `const r = await resolveLoginOrgs(p.data.email); return { email: p.data.email, orgs: r.orgs }`. Never `fail()`. Never return `soleOrgId`. The response object is byte-identical on both paths, so AC3/AC4/U1 hold. | Section 1, item 11 |
+| E6 | Fix four citations while editing (comment/plan text only, no behaviour): `User.memberships` is `schema.prisma:415` (model `UserOrganization` at `:351`), not `:312`; `tenancy-switch.spec.ts` is `:15`; the email-case row is `:55` (raw `findUnique`) vs `:45` (lowercased `rateKey`) — the plan has them inverted; the Avipa comment is `:13-16`. | Section 0, item 3 |
+| E7 | Keep the name-sorted picker with the FIRST radio `checked`, exactly as planned. Do NOT sort the user's primary org first — that would disclose which org is primary and reopen ruling 2. Record in the phase report and in owner check M-1 that the CEO's default selection is `JoJo Potato` (alphabetically first), not Veent, so the owner is not surprised. | Section 2, item 21 |
+| E8 | Write E7 as a real Fully-Automated spec: `test.describe('no-JS login', () => { test.use({ javaScriptEnabled: false }); ... })`. The downgrade to Agent-Probe M-2 is **NOT authorised** — `javaScriptEnabled` is confirmed present in `PlaywrightTestOptions` for the installed playwright 1.61.1 and the single `chromium` project sets no conflicting value. Keep M-2 as the owner's human confirmation, not as E7's replacement. | Section 6, item 44 |
+| E9 | Section 0 items 1-2 are ALREADY DONE. The working tree is on `feat/uiux-phase-9` at 056f056, branched off `feat/uiux-phase-8` (8365a24). Do NOT run `git switch -c feat/uiux-phase-9` — it will error on the existing branch. Confirm `git branch --show-current` = `feat/uiux-phase-9` and that the tree is clean, then go straight to item 3. | Section 0, items 1-2 |
+
+**Evidence pack (HIGH risk class — auth/identity, required, NOT waived):** before the phase can be
+reported DONE, write the five `vc-risk-evidence-pack` artifacts to
+`process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/harness/`: `risk-gate.json`
+(`riskClass: "auth or identity"`, `mustStopBeforeFinalize: true`), `context-snippets.json` (the three
+`selectedOrg` consumer sites + `resolveLoginOrgs`), `verification.json` (M1-M7 results with the M4
+green-again control), `review-decision.json`, and `adversarial-validation.json` — the last one must
+rule out, by name: forged `selectedOrg` (U3), null `currentOrgId` (U4), single-vs-zero-org
+distinguishability (U1/G2), inactive-account membership disclosure (AC8b/M7), and the `?/resolve`
+enumeration channel (C4/D5, accepted by ruling 4, not ruled out).
+
+Open gaps:
+- `src/lib/server/rate-limit.ts` has no unit test: known-gap: documented — backlog stub
+  `login-rate-limit-untested_NOTE_{date}.md` at UPDATE-PROCESS; R2 covers it as a Hybrid check for
+  this phase only.
+- `/login?error=account_disabled` (`hooks.server.ts:45`) redirects to a message the page has never
+  rendered: known-gap: documented as NEW PLAN REQUIRED — register at UPDATE-PROCESS.
+- `process/context/tests/all-tests.md` still terminates at the router ("No deeper test docs yet") —
+  the Playwright + `_dev/login-as` + `psql` harness is prose-only. Third phase to hit it (05, 08, 09).
+  known-gap: documented — raise at UPDATE-PROCESS.
+- Login-timing / enumeration economics (D1-D5): known-gap: documented —
+  `login-timing-parity_NOTE_03-09-26.md`. Owner declined option D; out of scope by ruling 6.
+- No component-render test tier exists in this repo, so AC15 has no automated tier. Residual D.
+
+What this coverage does NOT prove:
+- `pnpm test` (unit): the Prisma client is mocked, so NO unit gate proves the real Postgres query
+  shape, the real `@unique` constraint behaviour, or that `memberships` actually joins. It proves the
+  branching logic given a mock. M1-M7 prove each gate can fail; they do not make the mock real.
+- G1/G2 (source greps): prove a STRING is absent from a file. They do not prove the rendered page
+  omits the org name at runtime, nor that no other file grew an org query. G1 after E2 covers exactly
+  one symbol in one file.
+- `pnpm test:e2e` E3 (the privacy spec): proves a single-org admin sees no `JoJo Potato` or
+  `Sweetleaf` button. With only three seed orgs and the CEO in all three, it does NOT prove picker
+  scoping in general — that is U2's job, and U2 proves it only against a mock.
+- E6 (multi-org path): proves the picker RENDERS and submits for a user who belongs to all three seed
+  orgs. It proves nothing about scoping. Stated honestly in the plan; repeated here.
+- E7 (no-JS): proves both form posts complete without JS in headless chromium. It does not prove
+  behaviour in a real browser with JS disabled by a human — that is M-2.
+- R2 (rate limit): the limiter is in-memory. A pass proves lockout in ONE process that did not restart
+  mid-check. It proves nothing about lockout across a restart or across workers.
+- Full `pnpm test:e2e` vs baseline: proves no NEW red spec. The suite is known flaky (#287), so a green
+  run is weak evidence; a red one must be READ, never re-run blindly.
+- NOTHING here proves the timing/enumeration properties in C4/D5 — no gate measures wall-clock. That
+  is a named residual, not a covered behaviour.
+- NOTHING here proves the phase is safe in production: this repo has never been deployed live.
+
+Gate: CONDITIONAL (0 FAILs; 9 concerns, all with named fixes; execute-agent bound to E1-E9 + the
+evidence pack)
+Accepted by: session (outer PVL, autonomous) — accepted concerns: C1 (missing `isActive` guard →
+fixed by E1 + AC8b + M7), C2 (G1 narrowed by E2), C3 (blast-radius count corrected by E3, all five
+callers proven safe), C4 (timing overclaim corrected by E4, ruling 4 and ruling 6 untouched), C5
+(resolve-path ambiguity closed by E5), C6 (four citations corrected by E6), C7 (default-radio
+behaviour documented by E7), C8 (E7 fallback struck by E8), C9 (branch step corrected by E9). The
+owner's four settled rulings — option C email-first, no new rate limiting, the generic
+`'Invalid email or password'` literal, and the accepted multi-org membership disclosure — were treated
+as binding and are NOT reopened by any concern above; C4 records an honest description of a settled
+trade-off, it does not ask for it to be revisited.
+
+Autonomous Goal Block: not written to this phase plan — BRANCH B. The umbrella
+`ui-ux-overhaul-umbrella_PLAN_03-09-26.md` carries `## Stable Program Goal` (line 79) and governs
+this phase. Reference for latest state: that umbrella path.
 
 ## Resume and Execution Handoff
 
