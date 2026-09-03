@@ -4,11 +4,18 @@
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import { beforeNavigate, goto } from '$app/navigation'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
-	const saveGuard = createSubmitGuard()
+	// Re-seed the touched-services baseline once the save lands, so the confirm and the leave guard
+	// both stop reporting edits the user has already committed.
+	const saveGuard = createSubmitGuard(() => async ({ update, result }) => {
+		await update()
+		if (result.type === 'success') baselineStatutory = serviceState()
+	})
 	let formEl = $state<HTMLFormElement>()
 	let confirmOpen = $state(false)
 
@@ -81,6 +88,62 @@
 			}))
 		)
 	)
+
+	// All four services submit together through the hidden inputs at the bottom of the form, so a
+	// save started on one tab also commits edits made on tabs nobody is looking at. Both the confirm
+	// message and the leave guard have to name which ones actually moved.
+	const serviceState = (): Record<string, string> => ({
+		SSS: sssPayload,
+		PhilHealth: `${philhealthRate}|${philhealthFloor}|${philhealthCeiling}`,
+		'Pag-IBIG': `${pagibigRate}|${pagibigCap}`,
+		'BIR Withholding Tax': taxPayload
+	})
+	let baselineStatutory = $state(serviceState())
+	const touchedServices = $derived(
+		Object.entries(serviceState())
+			.filter(([name, value]) => value !== baselineStatutory[name])
+			.map(([name]) => name)
+	)
+	const isDirty = $derived(touchedServices.length > 0)
+
+	// Site 9: one dialog, two label sets — the manage path applies rates live, the other files a
+	// proposal. Derived so the copy tracks `touchedServices` as the user edits.
+	const confirmTitle = $derived(
+		data.canManage ? 'Apply statutory rates?' : 'Submit these rates for CEO approval?'
+	)
+	const confirmMessage = $derived(
+		data.canManage
+			? `These become the live tax and contribution tables for the whole organization and feed every payroll run computed from now on. Runs already computed are not recalculated.\n\nYou are changing: ${touchedServices.join(', ')}. Edits on tabs you are not looking at are included.`
+			: `A proposal goes to the CEO for approval. Nothing changes for payroll until it is approved.\n\nYou are submitting: ${touchedServices.join(', ')}. Edits on tabs you are not looking at are included.`
+	)
+	const confirmLabel = $derived(data.canManage ? 'Apply rates' : 'Submit for approval')
+
+	// Unsaved-changes guard, ported from performance/templates/[id]. Two exits to cover: the tab
+	// (native `beforeunload`, the only thing a browser honours) and in-app navigation (ConfirmDialog).
+	let leaving = $state(false)
+	let pendingUrl = $state<string | null>(null)
+	let confirmLeaveOpen = $state(false)
+	const leaveMessage = $derived(
+		`You have unsaved rate changes on: ${touchedServices.join(', ')}. Leaving now discards them.`
+	)
+
+	function onBeforeUnload(event: BeforeUnloadEvent) {
+		if (!isDirty || leaving) return
+		event.preventDefault()
+	}
+
+	beforeNavigate((nav) => {
+		// `leave` is the tab-close path; `onBeforeUnload` above already owns it.
+		if (nav.type === 'leave' || !isDirty || leaving) return
+		nav.cancel()
+		pendingUrl = nav.to?.url.href ?? null
+		confirmLeaveOpen = true
+	})
+
+	function discardAndLeave() {
+		leaving = true
+		if (pendingUrl) void goto(pendingUrl)
+	}
 
 	const addSssRow = () =>
 		(sssRows = [
@@ -204,23 +267,29 @@
 									{/each}
 								</ul>
 							</div>
+							<!-- #108: ConfirmButton's busy state is this form's single-submit guard. -->
 							<div class="flex shrink-0 gap-2">
-								<form method="POST" action="?/confirmProposal" use:enhance>
+								<ConfirmButton
+									action="?/confirmProposal"
+									title="Apply these statutory rates?"
+									message={`These rates become the live tax and contribution tables for the whole organization and feed every payroll run computed from now on. Runs already computed are not recalculated.\n\nApplying:\n${p.changes.join('\n')}`}
+									confirmText="Apply rates"
+									triggerLabel="Confirm"
+									triggerClass="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+								>
 									<input type="hidden" name="proposalId" value={p.id} />
-									<button
-										type="submit"
-										class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-										>Confirm</button
-									>
-								</form>
-								<form method="POST" action="?/rejectProposal" use:enhance>
+								</ConfirmButton>
+								<!-- #108: ConfirmButton's busy state is this form's single-submit guard. -->
+								<ConfirmButton
+									action="?/rejectProposal"
+									title="Reject this rate proposal?"
+									message="The proposal is discarded and the live rates stay as they are. Whoever prepared it has to enter the changes again — there is no draft to return to."
+									confirmText="Reject proposal"
+									triggerLabel="Reject"
+									triggerClass="rounded-md border px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
+								>
 									<input type="hidden" name="proposalId" value={p.id} />
-									<button
-										type="submit"
-										class="rounded-md border px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10"
-										>Reject</button
-									>
-								</form>
+								</ConfirmButton>
 							</div>
 						</div>
 					</div>
@@ -544,8 +613,9 @@
 				</button>
 			{:else}
 				<button
-					type="submit"
+					type="button"
 					disabled={saveGuard.busy}
+					onclick={() => (confirmOpen = true)}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 				>
 					{saveGuard.busy ? 'Submitting…' : 'Submit for CEO approval'}
@@ -555,12 +625,23 @@
 	</form>
 </div>
 
+<svelte:window onbeforeunload={onBeforeUnload} />
+
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Apply statutory rates?"
-	message="These rates feed the payroll tax computation for all future runs. Apply them now?"
-	confirmText="Apply"
+	title={confirmTitle}
+	message={confirmMessage}
+	confirmText={confirmLabel}
 	onconfirm={() => formEl?.requestSubmit()}
+/>
+
+<ConfirmDialog
+	bind:open={confirmLeaveOpen}
+	title="Leave without saving?"
+	message={leaveMessage}
+	confirmText="Leave without saving"
+	cancelText="Stay on this page"
+	onconfirm={discardAndLeave}
 />
 
 <style>
