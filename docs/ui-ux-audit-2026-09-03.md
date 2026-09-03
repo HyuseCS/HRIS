@@ -13,19 +13,19 @@ The functionality is genuinely good and deeply authored for this product — Phi
 
 ### Design health score (Nielsen, system-wide)
 
-| # | Heuristic | Score | Key issue |
-|---|-----------|-------|-----------|
-| 1 | Visibility of system status | 2 | Most saves succeed silently; Toaster exists, almost nothing uses it; approvals dot hides the count |
-| 2 | Match system / real world | 2 | Raw enums shown to users (`TERMINATION`, `SELF_ASSESSMENT`); employees asked to type `contactAddress` |
-| 3 | User control and freedom | 2 | Evaluator can lose ~60 typed fields on navigation; no backward move on the hiring pipeline; no sidebar collapse |
-| 4 | Consistency and standards | 1 | The dominant failure — 5+ badge systems, 4 error-banner variants, 3 row-click patterns, 4 add-form patterns |
-| 5 | Error prevention | 2 | Double-submit guards are excellent and universal, but the highest-stakes actions (offboard, void, release, net-pay override) fire unconfirmed |
-| 6 | Recognition rather than recall | 2 | 20-item flat nav forces linear scans; labels contradict routes (Inquiries→/complaints, Stores/Branches) |
-| 7 | Flexibility and efficiency | 2 | Bulk actions exist but unevenly (bulk reject without bulk approve); no shortcuts; no combined approvals view |
-| 8 | Aesthetic and minimalist design | 2 | Per-element the quiet dense style is well executed; the aggregate (everything top-level, 1,800-line pages) is not minimal |
-| 9 | Error recovery | 3 | Long-form error routing (zod path → focused field) is genuinely strong; banner styling drifts |
-| 10 | Help and documentation | 2 | Some of the best inline explanatory copy I've seen in an admin app, but coverage is uneven and there's no help surface |
-| **Total** | | **20/40** | **Acceptable (low end) — significant improvement needed, foundation is solid** |
+| #         | Heuristic                       | Score     | Key issue                                                                                                                                     |
+| --------- | ------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1         | Visibility of system status     | 2         | Most saves succeed silently; Toaster exists, almost nothing uses it; approvals dot hides the count                                            |
+| 2         | Match system / real world       | 2         | Raw enums shown to users (`TERMINATION`, `SELF_ASSESSMENT`); employees asked to type `contactAddress`                                         |
+| 3         | User control and freedom        | 2         | Evaluator can lose ~60 typed fields on navigation; no backward move on the hiring pipeline; no sidebar collapse                               |
+| 4         | Consistency and standards       | 1         | The dominant failure — 5+ badge systems, 4 error-banner variants, 3 row-click patterns, 4 add-form patterns                                   |
+| 5         | Error prevention                | 2         | Double-submit guards are excellent and universal, but the highest-stakes actions (offboard, void, release, net-pay override) fire unconfirmed |
+| 6         | Recognition rather than recall  | 2         | 20-item flat nav forces linear scans; labels contradict routes (Inquiries→/complaints, Stores/Branches)                                       |
+| 7         | Flexibility and efficiency      | 2         | Bulk actions exist but unevenly (bulk reject without bulk approve); no shortcuts; no combined approvals view                                  |
+| 8         | Aesthetic and minimalist design | 2         | Per-element the quiet dense style is well executed; the aggregate (everything top-level, 1,800-line pages) is not minimal                     |
+| 9         | Error recovery                  | 3         | Long-form error routing (zod path → focused field) is genuinely strong; banner styling drifts                                                 |
+| 10        | Help and documentation          | 2         | Some of the best inline explanatory copy I've seen in an admin app, but coverage is uneven and there's no help surface                        |
+| **Total** |                                 | **20/40** | **Acceptable (low end) — significant improvement needed, foundation is solid**                                                                |
 
 **Deterministic detector:** 1 finding across 105 files (`side-tab` on `src/lib/components/recruitment/ApplicantKanban.svelte:100` — stage-colored left border; arguably functional kanban idiom, low priority). The mess is architectural/behavioral, which the detector doesn't measure — do not read "1 finding" as "clean."
 
@@ -70,18 +70,18 @@ Dark-tuned colors hardcoded without a light variant, in at least five independen
 
 Protection is inverted: low-stakes deletes get the kit `ConfirmButton` while the most consequential actions fire on one bare click.
 
-| Action | Stakes | Current friction |
-|---|---|---|
-| Offboard employee (`employees/[id]:1783-1809`) | Disables a person's employment record | **None** |
-| Period void (`payroll/periods:196-206`) | Un-undoable, credits back amortization | **None** (run void on the next page gets a full ConfirmButton) |
-| Net-pay override (`payroll/[id]:263-271`) | Rewrites someone's pay; negative values allowed, no `min` | **None** |
-| DOLE multiplier save (`payroll/config`) | Rewrites OT pay for every future run | **None** |
-| Statutory proposal Confirm (`statutory-rates:~215-235`) | Applies org-wide tax tables | **None**, and no double-submit guard (the #108 pattern guarded everywhere else) |
-| Release review to employee (`performance/reviews/[id]:173-180`) | Irreversibly discloses evaluator's entries | **None** |
-| Deactivate user (`settings/roles`) | Locks a person out | **None** |
-| Separation finalize/undo (`separations/[id]:210-232`) | Money movement + login disable | Native browser `confirm()` |
-| Attendance reset (`attendance:18-21`) | Discards a manual edit | Native `confirm()` |
-| Inventory row delete, branch close, holiday delete | Low | Kit ConfirmButton ✓ |
+| Action                                                          | Stakes                                                    | Current friction                                                                |
+| --------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Offboard employee (`employees/[id]:1783-1809`)                  | Disables a person's employment record                     | **None**                                                                        |
+| Period void (`payroll/periods:196-206`)                         | Un-undoable, credits back amortization                    | **None** (run void on the next page gets a full ConfirmButton)                  |
+| Net-pay override (`payroll/[id]:263-271`)                       | Rewrites someone's pay; negative values allowed, no `min` | **None**                                                                        |
+| DOLE multiplier save (`payroll/config`)                         | Rewrites OT pay for every future run                      | **None**                                                                        |
+| Statutory proposal Confirm (`statutory-rates:~215-235`)         | Applies org-wide tax tables                               | **None**, and no double-submit guard (the #108 pattern guarded everywhere else) |
+| Release review to employee (`performance/reviews/[id]:173-180`) | Irreversibly discloses evaluator's entries                | **None**                                                                        |
+| Deactivate user (`settings/roles`)                              | Locks a person out                                        | **None**                                                                        |
+| Separation finalize/undo (`separations/[id]:210-232`)           | Money movement + login disable                            | Native browser `confirm()`                                                      |
+| Attendance reset (`attendance:18-21`)                           | Discards a manual edit                                    | Native `confirm()`                                                              |
+| Inventory row delete, branch close, holiday delete              | Low                                                       | Kit ConfirmButton ✓                                                             |
 
 **Fix direction:** one rule — anything irreversible or money/person-affecting goes through `ConfirmButton`/`ConfirmDialog` with a consequence-naming message. Replace both native `confirm()` calls.
 
@@ -142,7 +142,7 @@ The kit was built to end exactly this drift (PageHeader's own comment: "six diff
 - INFO_UPDATE asks employees to type internal field names ("e.g. contactAddress", `requests/+page.svelte:305-320`).
 - Apply page speaks with the applicant's voice on an HR-only form ("Link to **your** resume", `recruitment/[id]/apply:101-103`).
 - Name rendering flips between "Last, First" and "First Last" on the same page (`employees/[id]:380-382`).
-- Mixed verbs for one destination: "Review" vs "Detail"; periods' "Detail" opens a *run*.
+- Mixed verbs for one destination: "Review" vs "Detail"; periods' "Detail" opens a _run_.
 - `DevLoginSwitcher` mounted in both layout and login with "TEMP DEV — remove before merge" comments — already on staging.
 
 ---
@@ -152,23 +152,27 @@ The kit was built to end exactly this drift (PageHeader's own comment: "six diff
 Full agent reports are condensed here; evidence is `file:line`.
 
 ### Shell / dashboard / login
+
 - No way to collapse the desktop sidebar despite 20+ rows.
 - Three distinct concepts share the identical clipboard icon (My Requests, Requests group, Eval Templates — `+layout.svelte:157,184,293`); 24 inline SVG paths invite drift.
 - Footer identity block at 10px type; long emails truncate.
 
 ### People
+
 - **Reveal flow drops on any save:** after HR reveals salary to edit a gov ID, saving re-masks everything and the reveal must be re-audited to continue (`employees/[id]:36-42, 627-666`). Return `revealed` through the action result.
 - Branches: an all-cells-always-editable table with per-row Save — no read mode, accidental keystrokes invisible until the wrong Save (`branches:851-944`); departments uses explicit Edit-toggles. Same split on inventory (11 editable columns, no dirty state).
 - Onboarding manual-step checkbox is a 16px `✓` text-glyph button, sub-24px target (`employees/[id]:190-203`).
 - `EmployeeCard.svelte` is dead weight and colors non-existent status values (`PROBATIONARY`/`RESIGNED` as statuses).
 
 ### Time & attendance
+
 - Attendance Save button sits at the far right of a 12-column horizontal scroller — off-screen on laptops in AM/PM tenants (`attendance:682-714`). Sticky action column.
 - Period-selection UX diverges: raw date inputs + hand-rolled quick-picks (attendance) vs kit PeriodPicker (NewTimesheetDialog) vs bare week input (AggregatePanel).
 - Balance display duplicated with different components and typography (`/leave` inline cards vs `BalanceSummary` on `/leave/new`).
 - Timesheets "Total Hours" left-aligned while every other numeric column is right-aligned.
 
 ### Payroll
+
 - Statutory editor: all four services submit together via hidden inputs — "Save" on the SSS tab silently commits forgotten edits in unseen tabs; no unsaved-changes guard (`statutory-rates:~540-547`).
 - Cryptic inline "Override note (if flagged)" input beside Lock with no explanation (`periods:158-163`).
 - Payslip PDF iframe: fixed 720px, no loading/error fallback (`payslips/[id]:48-50`); redundant always-green Status column on the list.
@@ -176,6 +180,7 @@ Full agent reports are condensed here; evidence is `file:line`.
 - Calculator FAB overlaps table rows on small screens; drag is pointer-only.
 
 ### Requests / cases
+
 - Chat bubbles align by author role, not viewer — employees see their own messages on the left, HR's in the "mine" style (`complaints/[id]:346-351`).
 - Bulk asymmetry: timesheet queue has bulk approve+reject; request queue has bulk reject only, unexplained (`requests/approvals:223-233`).
 - Browser-tab titles leak the most on the most sensitive pages: separations put the employee's full name in `<title>`, complaints put the subject, while request detail is generic (`separations/[id]:242`).
@@ -183,6 +188,7 @@ Full agent reports are condensed here; evidence is `file:line`.
 - Separations table lacks the `overflow-x-auto` wrapper its siblings have.
 
 ### Performance / recruitment
+
 - **Evaluator's fill form (~60 inputs) has no unsaved-work protection and no draft save** — the template builder next door protects the identical work shape with dirty tracking + `beforeNavigate` + `beforeunload` (`templates/[id]:92-110` vs `reviews/[id]:30,197-221`). Port the guard.
 - The no-arithmetic rule ("You type every number") is stated only beside Submit at the bottom — evaluators meet Subtotal boxes mid-form expecting autofill (`reviews/[id]:217-219`). Move it to the top of the section.
 - The weight-sum hint — the builder's highest-value check per its own comment — renders as muted `text-xs`, indistinguishable from a hint (`templates/[id]:295-298`).
@@ -193,6 +199,7 @@ Full agent reports are condensed here; evidence is `file:line`.
 - Create-posting department select silently defaults to the first department — easy mis-filing (`recruitment:122-131`).
 
 ### Settings / reports
+
 - Audit-log filter form loses its state after submit — selects never reflect the URL params, so active filters are invisible and can't be adjusted incrementally (`audit-log:54-115`).
 - Reports year selector hardcodes 3 years — older payroll history becomes unreachable from the UI (`reports/+page.svelte:105`).
 - Report table headers are raw column keys (`TotalGross`), no sorting; currency alignment depends on a hand-maintained `CURRENCY_COLS` set (`reports/[type]:79-96, 236-241`).
@@ -245,7 +252,7 @@ Each step maps cleanly to Impeccable commands when we get there: 2 → `shape`, 
 
 ---
 
-*Method note: findings were produced by isolated per-area reviewers and cross-checked against each other in synthesis; every finding carries source evidence. Because no browser was available, purely visual issues (actual rendered contrast, spacing rhythm, responsive breakage) are inferred from code and should be spot-verified live during the overhaul — the light-mode badge findings especially will be immediately visible on first look.*
+_Method note: findings were produced by isolated per-area reviewers and cross-checked against each other in synthesis; every finding carries source evidence. Because no browser was available, purely visual issues (actual rendered contrast, spacing rhythm, responsive breakage) are inferred from code and should be spot-verified live during the overhaul — the light-mode badge findings especially will be immediately visible on first look._
 
 ---
 
@@ -253,7 +260,7 @@ Each step maps cleanly to Impeccable commands when we get there: 2 → `shape`, 
 
 **Method:** 3 additional isolated reviewers — server-side error handling, client-side error display, success feedback/toasts. Source-only, nothing changed. This section deepens and partly supersedes theme T7.
 
-**Score adjustment:** with this evidence, heuristic 9 (error recovery) drops from 3 to 2 — the error *routing* is good where it exists, but five surfaces fail silently and the biggest page shows errors in the wrong form. **Revised total: 19/40.**
+**Score adjustment:** with this evidence, heuristic 9 (error recovery) drops from 3 to 2 — the error _routing_ is good where it exists, but five surfaces fail silently and the biggest page shows errors in the wrong form. **Revised total: 19/40.**
 
 ## A. The headline numbers
 
@@ -274,12 +281,12 @@ Each step maps cleanly to Impeccable commands when we get there: 2 → `shape`, 
 
 Beyond P0-7, four pages render no error at all for real failure paths:
 
-| Surface | What fails silently | Evidence |
-|---|---|---|
-| `/leave` bulk delete | `deleteMany` fail() arrives, template renders only `form?.saved` | `leave/+page.server.ts:96` vs `+page.svelte:87` |
-| `/timesheets` list-level actions | 14 server fail() sites reachable with the modal closed; error renders only inside `TimesheetModal:356` | `timesheets/+page.svelte:211, 251` |
-| Dashboard `decidePosting` | no error slot; if the award panel is open the error appears under "Give award" | `dashboard/+page.server.ts:180,200` vs `+page.svelte:350,382,646,667` |
-| `recruitment/[id]` publish/close/convert | only `setChannel` errors render (gated `:203-204`); publishing that fails a server rule looks like a no-op | `recruitment/[id]/+page.server.ts:101,110,118,180,192` |
+| Surface                                  | What fails silently                                                                                        | Evidence                                                              |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `/leave` bulk delete                     | `deleteMany` fail() arrives, template renders only `form?.saved`                                           | `leave/+page.server.ts:96` vs `+page.svelte:87`                       |
+| `/timesheets` list-level actions         | 14 server fail() sites reachable with the modal closed; error renders only inside `TimesheetModal:356`     | `timesheets/+page.svelte:211, 251`                                    |
+| Dashboard `decidePosting`                | no error slot; if the award panel is open the error appears under "Give award"                             | `dashboard/+page.server.ts:180,200` vs `+page.svelte:350,382,646,667` |
+| `recruitment/[id]` publish/close/convert | only `setChannel` errors render (gated `:203-204`); publishing that fails a server rule looks like a no-op | `recruitment/[id]/+page.server.ts:101,110,118,180,192`                |
 
 Plus client-side swallowing: **all 4 `{#await}` blocks have no `{:catch}`** (employees, payroll, timesheets ×2 — a rejected streamed load replaces the skeleton with a blank list); `CalculatorPanel.svelte:76-85` ignores `result.type === 'error'` and keeps showing the stale result; the org switcher's fetch has `try/finally` with no `catch`, so an offline switch dies without its own "Could not switch" toast (`+layout.svelte:48-60`).
 
@@ -301,7 +308,7 @@ Plus client-side swallowing: **all 4 `{#await}` blocks have no `{:catch}`** (emp
 - **[P1] Redirect-after-success loses all context in 6 flows** — employees/new → detail (and the temp-password email is sent without telling the operator), recruitment convert/hire → employee page, leave/new → /leave, `timesheets ?/create` → same page (the self-redirect discards `form`, so its own banner system never fires), apply → board, separations create → detail. None of the destinations render a "created/hired" banner.
 - **[P2] 14+ dead success flags** — server returns them, no template renders them: benefits ×3, dashboard `postingDecided`, branches/inventory `{success:true}`, all 6 applicant-page actions, separations `toggleClearance`, recruitment `setChannel`. Wiring exists on one side only — evidence the intent was there.
 - **[P2] "Did it save?" invisible saves** — success is pixel-identical to no-op on: branches/inventory row saves, `departments ?/setHead`, posting-approvers, salary-grade assign, org assign, row updates on job-boards/leave-types/onboarding/offboarding, and `payroll/[id] ?/override` (panel stays open, looks unsaved). Create panels are split too: schedules/periods/benefits/branches/inventory stay open with blanked fields (reads as a failed submit); org/holidays/payroll/dashboard close theirs.
-- **[P2] Banners are persistent and unscoped** — form-prop banners never auto-clear and survive until the next submit; `payroll/config` shows "Payroll configuration saved" even after saving multipliers; `timesheets ?/saveEntries` renders its banner *behind the open modal* (`TimesheetModal.svelte:253`).
+- **[P2] Banners are persistent and unscoped** — form-prop banners never auto-clear and survive until the next submit; `payroll/config` shows "Payroll configuration saved" even after saving multipliers; `timesheets ?/saveEntries` renders its banner _behind the open modal_ (`TimesheetModal.svelte:253`).
 - **[P3] Toaster component gaps:** no pause-on-hover (6s hard timer, link-toasts can vanish mid-click), no stacking cap or de-dup, no dismiss-all; not mounted in `(auth)` so login can never toast.
 
 ## F. Long-page placement and ARIA (P2)
