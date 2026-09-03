@@ -128,7 +128,7 @@
 				</button>
 			</div>
 		</div>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="card-scroll overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -289,7 +289,7 @@
 				Showing {filteredEmployees.length} of {data.employees.length} employees
 			</p>
 		</div>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="card-scroll overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

@@ -167,7 +167,7 @@
 		</div>
 	{/if}
 
-	<div class="overflow-x-auto rounded-lg border">
+	<div class="card-scroll overflow-x-auto rounded-lg border">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
