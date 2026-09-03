@@ -115,11 +115,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		where: { userId: user.id, organizationId: orgId },
 		select: { id: true }
 	})
+	// 10: an approval sitting. The rest stay reachable at /recruitment, which paginates — which is
+	// why this card's "view all" link is not optional: its rows carry approve and send-back forms,
+	// so a cap without a route out would hide actionable work.
 	const postingsToApprove = await listPostingsAwaitingApprover(
 		orgId,
 		myEmployee?.id ?? null,
 		roles,
-		user.id
+		user.id,
+		10
 	)
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the

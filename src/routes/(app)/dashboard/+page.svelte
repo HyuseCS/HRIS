@@ -682,15 +682,20 @@
 	<!-- Job postings awaiting your approval (#195) -->
 	{#if data.postingsToApprove.length}
 		<div class="card space-y-3 border-blue-500/30 bg-blue-500/5">
-			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
-				Postings awaiting your approval
-			</p>
+			<div class="flex items-center justify-between gap-2">
+				<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
+					Postings awaiting your approval
+				</p>
+				<!-- Not optional. These rows carry approve and send-back forms, so a cap with no
+				     route out would hide work someone is waiting on. /recruitment paginates. -->
+				<a href="/recruitment" class="btn-row shrink-0">View all postings</a>
+			</div>
 			<!-- Scoped: with the award panel open, a posting failure used to render under
 			     "Give award", where nothing had gone wrong. -->
 			{#if form?.action === 'decidePosting' && form?.error}
 				<Banner kind="error" message={form.error} />
 			{/if}
-			<ul class="divide-y divide-border/60">
+			<ul class="card-scroll divide-y divide-border/60">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}
 					<li class="space-y-2 py-2">

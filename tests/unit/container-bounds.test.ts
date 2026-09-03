@@ -21,6 +21,8 @@ const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
 		employee: { findFirst: vi.fn(), findMany: vi.fn() },
 		publicHoliday: { findMany: vi.fn() },
+		jobPosting: { findMany: vi.fn() },
+		postingApprover: { findMany: vi.fn() },
 		payrollPeriod: { findMany: vi.fn() },
 		request: { findMany: vi.fn() }
 	}
@@ -273,5 +275,60 @@ describe('the month-end straddle is ordered by days-until, not start date (G3b)'
 		const rows = await listUpcomingRegularizations(ORG, STRADDLE_ASOF, 1)
 
 		expect(rows.map((r) => r.id)).toEqual(['sep01'])
+	})
+})
+
+// ── G1b — listPostingsAwaitingApprover caps AFTER the approver filter ────────
+
+const { listPostingsAwaitingApprover } = await import('../../src/lib/server/services/recruitment')
+
+/**
+ * Five postings this actor may NOT decide, sitting at the FRONT of the oldest-first queue, then
+ * twelve they may. The mapped department is decidable only by its designated approver; an
+ * unmapped one falls back to HR, which is what this actor is. A cap of ten must return ten
+ * approvable rows — capping the pending set before the filter would return five.
+ */
+const POSTINGS = [
+	...Array.from({ length: 5 }, (_, i) => ({
+		id: `blocked${i}`,
+		organizationId: ORG,
+		status: 'PENDING_APPROVAL',
+		title: `Blocked ${i}`,
+		departmentId: 'dMapped',
+		submittedById: 'someoneElse',
+		updatedAt: new Date(`2026-01-0${i + 1}T00:00:00.000Z`),
+		department: { name: 'Mapped' }
+	})),
+	...Array.from({ length: 12 }, (_, i) => ({
+		id: `open${String(i).padStart(2, '0')}`,
+		organizationId: ORG,
+		status: 'PENDING_APPROVAL',
+		title: `Open ${i}`,
+		departmentId: 'dUnmapped',
+		submittedById: 'someoneElse',
+		updatedAt: new Date(`2026-02-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`),
+		department: { name: 'Unmapped' }
+	}))
+]
+
+describe('listPostingsAwaitingApprover caps after the approver filter (G1b)', () => {
+	beforeEach(() => {
+		dbMock.jobPosting.findMany.mockImplementation(async (args: Args) => query(POSTINGS, args))
+		dbMock.postingApprover.findMany.mockResolvedValue([
+			{ departmentId: 'dMapped', approverId: 'notMe' }
+		])
+	})
+
+	it('returns every approvable row when uncapped', async () => {
+		const rows = await listPostingsAwaitingApprover(ORG, 'me', ['HR_ADMIN'], 'uMe')
+
+		expect(rows).toHaveLength(12)
+	})
+
+	it('returns ten APPROVABLE rows, not ten of the queue', async () => {
+		const rows = await listPostingsAwaitingApprover(ORG, 'me', ['HR_ADMIN'], 'uMe', 10)
+
+		expect(rows).toHaveLength(10)
+		expect(rows.every((r) => r.department === 'Unmapped')).toBe(true)
 	})
 })

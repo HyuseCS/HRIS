@@ -230,7 +230,8 @@ export async function listPostingsAwaitingApprover(
 	organizationId: string,
 	actorEmployeeId: string | null,
 	actorRoles: Role[],
-	actorUserId: string
+	actorUserId: string,
+	limit?: number
 ) {
 	const pending = await db.jobPosting.findMany({
 		where: { organizationId, status: 'PENDING_APPROVAL' },
@@ -245,24 +246,30 @@ export async function listPostingsAwaitingApprover(
 	})
 	const approverByDept = new Map(mappings.map((m) => [m.departmentId, m.approverId]))
 
-	return pending
-		.filter((p) => {
-			const approver = approverByDept.get(p.departmentId) ?? null
-			// The trailing `&& (approver != null || isHr)` that used to live here existed only
-			// because canApprovePosting said yes to every HR admin. With the mapping bound it can
-			// never change the result — see plan DECISION-8 for the branch-by-branch proof.
-			// The submitter filter mirrors the service guard so the card never offers a posting
-			// the action would refuse (same discipline as AC-15 for requests).
-			return (
-				canApprovePosting(approver, actorEmployeeId, actorRoles) && p.submittedById !== actorUserId
-			)
-		})
-		.map((p) => ({
-			id: p.id,
-			title: p.title,
-			department: p.department.name,
-			submittedAt: p.updatedAt
-		}))
+	const approvable = pending.filter((p) => {
+		const approver = approverByDept.get(p.departmentId) ?? null
+		// The trailing `&& (approver != null || isHr)` that used to live here existed only
+		// because canApprovePosting said yes to every HR admin. With the mapping bound it can
+		// never change the result — see plan DECISION-8 for the branch-by-branch proof.
+		// The submitter filter mirrors the service guard so the card never offers a posting
+		// the action would refuse (same discipline as AC-15 for requests).
+		return (
+			canApprovePosting(approver, actorEmployeeId, actorRoles) && p.submittedById !== actorUserId
+		)
+	})
+
+	// The cut goes on the APPROVABLE set, never as a query `take`. The filter above drops postings
+	// this actor cannot decide and postings they submitted themselves, so a take would cap the
+	// pending queue first and hand back fewer approvable rows than the cap asked for — five
+	// unapprovable rows at the front would eat half a cap of ten. The query's
+	// `orderBy: { updatedAt: 'asc' }` is already oldest-first, which is the right order to keep
+	// under a cap: the longest-waiting postings stay visible.
+	return approvable.slice(0, limit ?? approvable.length).map((p) => ({
+		id: p.id,
+		title: p.title,
+		department: p.department.name,
+		submittedAt: p.updatedAt
+	}))
 }
 
 export async function applyToPosting(
