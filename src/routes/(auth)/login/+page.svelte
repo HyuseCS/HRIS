@@ -3,14 +3,20 @@
 	// DEV ONLY — dev-gated (dev && !navigator.webdriver), never ships enabled; remove after the
 	// program's owner test pass
 	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte'
-	import type { ActionData, PageData } from './$types'
+	import type { ActionData } from './$types'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { form }: { form: ActionData } = $props()
 	let loading = $state(false)
 
-	// Two-step Veent HRIS login (#135): pick a tenant, then enter credentials. The chosen
-	// org is posted as `selectedOrg`; the server scopes the credential to it.
-	let selectedOrg = $state<{ id: string; name: string } | null>(null)
+	// Email-first Veent HRIS login (#135): step 1 posts the email to `?/resolve`, the server
+	// resolves the org(s) and re-renders. The step is derived from the server's answer alone —
+	// there is no client step state, so both steps work with JavaScript disabled.
+	let pwEl = $state<HTMLInputElement | null>(null)
+	// A server round-trip re-renders the whole card, so a keyboard or screen-reader user would
+	// otherwise land back at the top of the document. `autofocus` trips the a11y lint rule.
+	$effect(() => {
+		pwEl?.focus()
+	})
 </script>
 
 <svelte:head>
@@ -26,48 +32,60 @@
 
 	<!-- Card -->
 	<div class="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-xl">
-		{#if !selectedOrg}
-			<!-- Step 1: tenant selector -->
+		{#if !form?.email}
+			<!-- Step 1: email -->
 			<div class="mb-5">
-				<h1 class="text-base font-semibold">Choose your company</h1>
-				<p class="mt-1 text-xs text-muted-foreground">Select a workspace to continue</p>
+				<h1 class="text-base font-semibold">Sign in</h1>
+				<p class="mt-1 text-xs text-muted-foreground">Enter your work email to continue</p>
 			</div>
 
-			<div class="space-y-2">
-				{#each data.orgs as org (org.id)}
-					<button
-						type="button"
-						onclick={() => (selectedOrg = org)}
-						class="btn-row flex w-full items-center justify-between px-4 py-3 text-left"
-					>
-						<span class="text-sm font-medium">{org.name}</span>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4 text-muted-foreground"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-						</svg>
-					</button>
-				{/each}
-			</div>
+			<form
+				method="POST"
+				action="?/resolve"
+				class="space-y-4"
+				use:enhance={() => {
+					loading = true
+					return async ({ update }) => {
+						loading = false
+						update()
+					}
+				}}
+			>
+				<div class="space-y-1.5">
+					<label for="email" class="text-sm font-medium">Email</label>
+					<input
+						id="email"
+						name="email"
+						type="email"
+						autocomplete="email"
+						required
+						placeholder="you@company.com"
+						class="input"
+					/>
+				</div>
+
+				<button
+					type="submit"
+					disabled={loading}
+					class="btn-primary w-full h-10 disabled:opacity-60"
+				>
+					{loading ? 'Checking…' : 'Continue'}
+				</button>
+			</form>
 		{:else}
-			<!-- Step 2: credentials, scoped to the chosen tenant -->
+			<!-- Step 2: password. The heading is generic on purpose — naming the resolved org would
+			     make a single-org email distinguishable from an unknown one. -->
 			<div class="mb-5 flex items-start justify-between gap-2">
 				<div>
-					<h1 class="text-base font-semibold">Sign in to {selectedOrg.name}</h1>
-					<p class="mt-1 text-xs text-muted-foreground">Enter your work credentials to continue</p>
+					<h1 class="text-base font-semibold">Enter your password</h1>
+					<p class="mt-1 text-xs text-muted-foreground">{form.email}</p>
 				</div>
-				<button
-					type="button"
-					onclick={() => (selectedOrg = null)}
+				<a
+					href="/login"
 					class="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground"
 				>
 					Change
-				</button>
+				</a>
 			</div>
 
 			{#if form?.error}
@@ -86,6 +104,7 @@
 
 			<form
 				method="POST"
+				action="?/signin"
 				class="space-y-4"
 				use:enhance={() => {
 					loading = true
@@ -95,24 +114,30 @@
 					}
 				}}
 			>
-				<input type="hidden" name="selectedOrg" value={selectedOrg.id} />
+				<input type="hidden" name="email" value={form.email} />
 
-				<div class="space-y-1.5">
-					<label for="email" class="text-sm font-medium">Email</label>
-					<input
-						id="email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						required
-						placeholder="you@company.com"
-						class="input"
-					/>
-				</div>
+				{#if form.orgs && form.orgs.length > 1}
+					<fieldset class="space-y-2">
+						<legend class="text-sm font-medium">Choose your company</legend>
+						{#each form.orgs as org, i (org.id)}
+							<div class="flex items-center gap-2">
+								<input
+									type="radio"
+									name="selectedOrg"
+									value={org.id}
+									checked={i === 0}
+									id="org-{org.id}"
+								/>
+								<label for="org-{org.id}" class="text-sm">{org.name}</label>
+							</div>
+						{/each}
+					</fieldset>
+				{/if}
 
 				<div class="space-y-1.5">
 					<label for="password" class="text-sm font-medium">Password</label>
 					<input
+						bind:this={pwEl}
 						id="password"
 						name="password"
 						type="password"
