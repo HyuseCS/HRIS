@@ -62,5 +62,14 @@ Status vocabulary: *(no status)* / `BLOCKED-skipped` / `DONE` / `SUPERSEDED`.
   (§4 Payroll) and the period `?/lock` "Override note (if flagged)" copy — this phase
   deliberately leaves both alone.
 
-**Status:** in progress — sections 0-3 executed 03-09-26 (sites 2, 3, 4-verify, 5, 6).
-Sections 4-7 (sites 1, 7-16 and the `destructive-confirms` test) executed separately.
+**Additional file touched beyond the claim (authorized amendment):**
+`src/lib/components/ui/ConfirmDialog.svelte` — one line, `whitespace-pre-line` added to the
+message `<p>` so `\n` in a confirm message renders as a line break. Authorized by the
+orchestrator as a **phase 03 amendment**, committed alone as `3c7c08e`. This is the single
+exception to the "out of bounds: `src/lib/components/ui/**`" rule above; nothing else in that
+directory was touched.
+
+**Status:** DONE (CODE DONE, not ✅ VERIFIED) — sections 0-3 executed 03-09-26 (sites 2, 3,
+4-verify, 5, 6); sections 4-7 executed 03-09-26 (sites 1, 7-16 and
+`tests/unit/destructive-confirms.test.ts`). CI gate set green; the owner's live P1 matrix is the
+only gate left. See `phase-05-destructive-actions_REPORT_03-09-26.md`.
