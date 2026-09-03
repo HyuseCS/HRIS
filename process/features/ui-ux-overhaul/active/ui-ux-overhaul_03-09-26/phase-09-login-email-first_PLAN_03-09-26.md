@@ -212,7 +212,8 @@ consumer, per the no-speculative-abstraction rule) and returns:
 
 - One query: `db.user.findUnique({ where: { email }, select: { id, isActive, organizationId,
   memberships: { select: { organization: { select: { id: true, name: true } } } } } })`.
-  The relation is `User.memberships` → `UserOrganization` (`prisma/schema.prisma:312`, unique
+  The relation is `User.memberships` → `UserOrganization` (`prisma/schema.prisma:415`, model
+  `UserOrganization` at `:351`, unique
   `[userId, organizationId]`).
 - Org set = `{user.organizationId}` ∪ membership org ids, de-duplicated by id, sorted by name.
   (The seed backfills one membership per user, so for most accounts the union collapses to one row —
@@ -279,8 +280,10 @@ easiest thing to miss. It has its own AC (AC6).
 | known email, wrong password | `findUnique` → bcrypt → audit write → 401 | same, plus `resolveLoginOrgs` | unchanged in kind |
 | step 1 | no DB read at all (the org list was a `load`) | one `findUnique` per email, **same query for every email**, single response shape | new surface, no new *branch*: the response cannot differ, only the wall-clock read time can |
 
-The gap is not narrowed and not widened. Backlog note `login-timing-parity` (Section 7) records
-D1–D4 so a later hardening pass has the facts.
+Backlog note `login-timing-parity` (Section 7) records
+D1–D5 so a later hardening pass has the facts. D5 is the honest correction (contract concern C4):
+`?/resolve` is a NEW unauthenticated, un-rate-limited, un-audited per-email read, so the *probe
+channel* is cheaper than today's even though the *response* is provably identical.
 
 ---
 
@@ -301,7 +304,7 @@ amended. **State the exact amendment, do not silently let a test go red.**
 ### The two exact `copy-invariants.test.ts` amendments
 
 The surviving Avipa comment lives **inside `loginSchema`** ("The tenant chosen on the Avipa login
-(#135)…", `+page.server.ts:12-16`). `loginSchema` is deleted by this phase — it is replaced by
+(#135)…", `+page.server.ts:13-16`). `loginSchema` is deleted by this phase — it is replaced by
 `resolveSchema` and `signinSchema`, and the comment describes a flow that no longer exists. The
 comment goes with it. Phase 08's own test comment says exactly this: *"It goes with the email-first
 login plan (see the backlog note.)"*
@@ -334,7 +337,7 @@ not read the omission as an oversight, and so nobody "fixes" one mid-execution.
 
 | Defect | Evidence | Why not here |
 |---|---|---|
-| `user.findUnique({ where: { email } })` is **not** lowercased, while `rateKey` uses `email.toLowerCase()` | `+page.server.ts:44-45` vs `:55` | Changing it changes who can log in (a `User.email` stored with capitals becomes reachable by a different string). That is a behaviour change on an auth path with no owner ruling. `resolveLoginOrgs` matches the existing behaviour exactly so the two lookups agree. Backlog: fold into `login-timing-parity` as D4 |
+| `user.findUnique({ where: { email } })` is **not** lowercased, while `rateKey` uses `email.toLowerCase()` | `+page.server.ts:55` (raw `findUnique`) vs `:45` (lowercased `rateKey`) | Changing it changes who can log in (a `User.email` stored with capitals becomes reachable by a different string). That is a behaviour change on an auth path with no owner ruling. `resolveLoginOrgs` matches the existing behaviour exactly so the two lookups agree. Backlog: fold into `login-timing-parity` as D4 |
 | No `bcrypt.compare` runs for an unknown email → measurable timing difference | `:55-60` | Ruling 6, explicitly out of scope. Backlog note `login-timing-parity` |
 | `hooks.server.ts:45` redirects to `/login?error=account_disabled`; the page never renders it | `hooks.server.ts:45` | Out of scope by the task brief. The rewrite must not accidentally start rendering it either — `form?.error` is the only error source |
 | The login rate limiter has **no** unit test | `src/lib/server/rate-limit.ts`, `_resetForTests()` exists and is uncalled in `tests/` | Real gap, but writing one is not in this phase's blast radius and this phase does not change the limiter. Test Infra Improvement Notes |
@@ -473,7 +476,7 @@ its own before any spec rewrite lands.
     await page.waitForURL('**/dashboard', { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
     ```
-    Keep the signature `login(page, user, org = 'Veent')` so `tenancy-switch.spec.ts:16` is
+    Keep the signature `login(page, user, org = 'Veent')` so `tenancy-switch.spec.ts:15` is
     **byte-unchanged**. For single-org accounts the picker does not exist, the `count()` is 0, and the
     `org` argument is inert.
 34. **Delete `selectTenant`** and its docblock. Its only importer is `auth.spec.ts`, rewritten in

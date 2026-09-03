@@ -300,3 +300,46 @@ remain OPEN and neither was built. See `phase-08-copy-a11y-s1-s3_REPORT_03-09-26
 **PROGRAMME STATUS: all 8 phases CODE DONE.** The owner's test pass is the only remaining gate —
 the consolidated list is the PROGRAM CLOSE section of
 `phase-08-copy-a11y-s4-s6_REPORT_03-09-26.md`.
+
+---
+
+## Phase 9 — `login-email-first`
+
+**Plan:** `phase-09-login-email-first_PLAN_03-09-26.md`
+**Claimed:** 04-09-26
+
+**Files claimed (2 source + 7 test + 3 process):**
+
+| File | Change |
+|---|---|
+| `src/routes/(auth)/login/+page.server.ts` | `load` loses the org query; `loginSchema` → `resolveSchema` + `signinSchema`; `actions.default` → `actions.resolve` + `actions.signin`; new `resolveLoginOrgs` helper; `GENERIC` constant |
+| `src/routes/(auth)/login/+page.svelte` | tenant-button step 1 → email step 1; client `selectedOrg` state deleted; step derived from `form`; radio picker; `<a href="/login">Change</a>`; password focus effect |
+| `tests/unit/login-audit.test.ts` | entry point `actions.default` → `actions.signin`; mock shape extended |
+| `tests/unit/login-resolution.test.ts` | **new** — U1-U4 + U6 (AC8b) |
+| `tests/unit/copy-invariants.test.ts` | Avipa Amendments 1 + 2; new G1 (narrowed per E2) + G2 assertions |
+| `tests/e2e/helpers.ts` | `login()` rewritten; `selectTenant` deleted |
+| `tests/e2e/global-setup.ts` | browser warmup matches the new first interactive element |
+| `tests/e2e/auth.spec.ts` | two rewrites, one deletion, four new specs |
+| `tests/e2e/leave-balances.spec.ts` | stale `selectTenant` comment at `:99` only |
+| `backlog/login-email-first-tenant-privacy_NOTE_03-09-26.md` | Status + option-D follow-on |
+| `backlog/login-timing-parity_NOTE_03-09-26.md` | **new** — D1-D5 |
+| `ui-ux-overhaul-umbrella_PLAN_03-09-26.md` | 8 → 9 phases |
+
+**Overlap with earlier phases:** only `tests/unit/copy-invariants.test.ts` (phase 08's file, phase 08
+already CODE DONE). Phases 01-08 never touched `(auth)/login/+page.server.ts` beyond one comment.
+This phase is explicitly authorised to cross phase 08's AC5/AC20 boundary — that check pinned the
+*absence* of this change and was correct for phase 08.
+
+**Notes for anyone after this phase:**
+
+- `POST /login` with no action name no longer exists. Use `?/resolve` (email only) or `?/signin`
+  (email + password + optional `selectedOrg`).
+- `?/resolve` has exactly ONE response shape forever: `{ email, orgs }`, with `orgs` populated only
+  when the resolved membership set is ≥ 2. It never returns `fail()`. Unknown, malformed, inactive,
+  zero-org and single-org emails are byte-identical. `tests/unit/login-resolution.test.ts` U1/U6
+  pins it.
+- The step-2 heading must stay generic (`Enter your password`). Naming the resolved org would make
+  single-org distinguishable from zero-org. `copy-invariants` G2 pins it.
+- `src/` is now Avipa-free with NO exceptions — the one allowed survivor went with `loginSchema`.
+
+**Status:** DONE
