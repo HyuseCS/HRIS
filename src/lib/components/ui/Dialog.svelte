@@ -123,7 +123,7 @@
 	>
 		<div
 			bind:this={panelEl}
-			class="w-full rounded-xl border bg-card shadow-2xl focus:outline-none {SIZES[size]} {PADDINGS[
+			class="relative w-full rounded-xl border bg-card shadow-2xl focus:outline-none {SIZES[size]} {PADDINGS[
 				padding
 			]} {scroll ? 'flex max-h-[90vh] flex-col overflow-hidden' : ''}"
 			onclick={(e) => e.stopPropagation()}
