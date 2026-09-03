@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
@@ -28,15 +29,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Employees</h1>
-		<a
-			href="/employees/new"
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			Add Employee
-		</a>
-	</div>
+	<PageHeader title="Employees" />
 
 	<!-- Search -->
 	<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
@@ -61,6 +54,12 @@
 		{/if}
 		<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent">Search</button
 		>
+		<a
+			href="/employees/new"
+			class="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+		>
+			Add Employee
+		</a>
 	</form>
 
 	<!-- Active / Offboarded tabs (#184) -->

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDate, formatCurrency } from '$lib/utils/format'
@@ -32,9 +33,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="page-header">
-		<h1 class="page-title">My Profile</h1>
-	</div>
+	<PageHeader title="My Profile" />
 
 	{#if form?.success}
 		<Banner kind="success" message="Profile updated successfully." />

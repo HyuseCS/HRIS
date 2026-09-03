@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -28,15 +29,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Benefits</h1>
-		<button
-			onclick={() => (showCreate = !showCreate)}
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			Add Plan
-		</button>
-	</div>
+	<PageHeader title="Benefits" />
 
 	<!-- Top level, not inside the collapsible create form: enroll and setEnrollmentStatus
 	     are submitted from the plan list below, and their failures must surface too. -->
@@ -45,6 +38,16 @@
 			{form.error}
 		</div>
 	{/if}
+
+	<!-- The create toggle sits directly above the form it opens and the plan list it adds to. -->
+	<div class="flex justify-end">
+		<button
+			onclick={() => (showCreate = !showCreate)}
+			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+		>
+			Add Plan
+		</button>
+	</div>
 
 	<!-- Create form -->
 	{#if showCreate}

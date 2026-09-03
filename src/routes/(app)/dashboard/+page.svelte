@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
@@ -104,9 +105,7 @@
 </svelte:head>
 
 <div class="flex flex-1 flex-col gap-6">
-	<div class="page-header">
-		<h1 class="page-title">Dashboard</h1>
-	</div>
+	<PageHeader title="Dashboard" />
 
 	<!-- Attendance and the metric cards stack in the left two thirds; Upcoming Events fills the
 	     right third across both of their rows. Keeping attendance narrower than full width stops

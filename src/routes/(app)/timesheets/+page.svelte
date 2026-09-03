@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
@@ -190,17 +191,20 @@
 {/snippet}
 
 <div class="space-y-8">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Timesheets</h1>
-		{#if data.canCreate}
+	<PageHeader title="Timesheets" />
+
+	<!-- The create action sits above the lists it adds to, not on the title row. It cannot go on
+	     a section heading: `canCreate` is independent of which of the two sections render. -->
+	{#if data.canCreate}
+		<div class="flex justify-end">
 			<button
 				onclick={() => (showCreate = true)}
 				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 			>
 				New Timesheet
 			</button>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	{#if form?.saved}
 		<Banner kind="success" message={form.saved} />

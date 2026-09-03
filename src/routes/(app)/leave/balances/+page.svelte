@@ -1,4 +1,6 @@
 <script lang="ts">
+	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
 	import { monthsOfService, tenureRequirement } from '$lib/utils/dates'
 	import type { PageData } from './$types'
@@ -20,13 +22,14 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<a href="/leave" class="text-sm text-muted-foreground hover:text-foreground">← Leave</a>
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Leave Balances</h1>
-		<p class="text-sm text-muted-foreground">
-			Remaining / allocated days per active employee for {data.year}.
-		</p>
-	</div>
+	<PageHeader
+		title="Leave Balances"
+		description="Remaining / allocated days per active employee for {data.year}."
+	>
+		{#snippet back()}
+			<BackButton fallback="/leave" label="Leave" />
+		{/snippet}
+	</PageHeader>
 
 	<form method="GET" class="flex flex-wrap gap-2">
 		<input

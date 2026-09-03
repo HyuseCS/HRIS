@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -84,8 +85,18 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Departments</h1>
+	<PageHeader title="Departments" />
+
+	{#if form?.error}
+		<div
+			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
+		>
+			{form.error}
+		</div>
+	{/if}
+
+	<!-- The create toggle sits directly above the form it opens and the list it adds to. -->
+	<div class="flex justify-end">
 		<button
 			onclick={() => {
 				showCreate = !showCreate
@@ -96,14 +107,6 @@
 			{showCreate ? 'Cancel' : 'Add Department'}
 		</button>
 	</div>
-
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
-		>
-			{form.error}
-		</div>
-	{/if}
 
 	<!-- Inline create form -->
 	{#if showCreate}
