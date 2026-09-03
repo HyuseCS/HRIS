@@ -2,8 +2,7 @@
 	import {
 		periodOf,
 		periodShareOf,
-		daysInMonth,
-		isSameMonthRange,
+		customRangeError,
 		formatPeriodPreview,
 		toPeriodInputValue,
 		type PeriodKind
@@ -16,9 +15,10 @@
 	// <form> submits exactly the same field names it did with the old date inputs — the
 	// service layer still validates, this just constrains what a user can pick.
 	//
-	// #163 adds a fourth segment, `Custom range`, which reveals two native date inputs for any
-	// same-month span. It feeds the SAME two hidden inputs, so no consumer changes shape, and it
-	// is never pre-selected — the 15-day cutoff stays the path of least resistance.
+	// #163 adds a fourth segment, `Custom range`, which reveals two native date inputs. #3 lets
+	// that range cross a month boundary, capped at one month of pay. It feeds the SAME two hidden
+	// inputs, so no consumer changes shape, and it is never pre-selected — the 15-day cutoff stays
+	// the path of least resistance.
 	let {
 		startName = 'periodStart',
 		endName = 'periodEnd',
@@ -78,42 +78,41 @@
 		return { s, e }
 	})
 
-	// Same two rules the server applies (isSameMonthRange), same copy, so the inline message and
+	// Literally the same function the three service gates refuse with, so the inline message and
 	// the 400 the service would return can never disagree.
-	const customError = $derived.by(() => {
-		if (!customRange) return null
-		if (customRange.e < customRange.s) return 'End date must be on or after the start date.'
-		if (!isSameMonthRange(customRange.s, customRange.e))
-			return 'A custom period must start and end in the same month.'
-		return null
-	})
+	const customError = $derived(customRange ? customRangeError(customRange.s, customRange.e) : null)
 
 	const validCustom = $derived(customRange && !customError ? customRange : null)
 
-	// #163 follow-up: the same-month rule expressed as native `min`/`max` on the date inputs, so
-	// the browser's own calendar greys out the impossible days instead of letting a user pick one
-	// and only then reading an error. The inline message and the server gate both stay — this is
-	// the cheap first line, not the guard.
-	const startMonthEnd = $derived.by(() => {
-		if (!customStart) return undefined
-		const s = new Date(customStart)
-		if (Number.isNaN(s.getTime())) return undefined
-		return toPeriodInputValue(
-			new Date(
-				Date.UTC(
-					s.getUTCFullYear(),
-					s.getUTCMonth(),
-					daysInMonth(s.getUTCFullYear(), s.getUTCMonth())
-				)
+	// #3: the size cap expressed as native `min`/`max` on the date inputs, so the browser's own
+	// calendar greys out the unreachable days instead of letting a user pick one and only then
+	// reading an error. The inline message and the server gate both stay — this is the cheap first
+	// line, not the guard.
+	//
+	// ponytail: linear probe, ceiling ~40 iterations per keystroke. The cap is one month of pay,
+	// so no acceptable range can be longer than 31 days and the loop always breaks early. Upgrade
+	// path if it ever gets hot: a closed-form bound from daysInMonth, which would be a second
+	// expression of the cap rule and is exactly what D-B says not to write until it is needed.
+	function capBound(anchor: string, step: 1 | -1): string | undefined {
+		if (!anchor) return undefined
+		const a = new Date(anchor)
+		if (Number.isNaN(a.getTime())) return undefined
+		let best = a
+		for (let i = 1; i <= 40; i++) {
+			const candidate = new Date(
+				Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate() + step * i)
 			)
-		)
-	})
-	const startMonthStart = $derived.by(() => {
-		if (!customEnd) return undefined
-		const e = new Date(customEnd)
-		if (Number.isNaN(e.getTime())) return undefined
-		return toPeriodInputValue(new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), 1)))
-	})
+			const start = step === 1 ? a : candidate
+			const end = step === 1 ? candidate : a
+			if (customRangeError(start, end) !== null) break
+			best = candidate
+		}
+		return toPeriodInputValue(best)
+	}
+
+	/** Latest end date the cap allows for the chosen start, and the earliest start for an end. */
+	const capBoundEnd = $derived(capBound(customStart, 1))
+	const capBoundStart = $derived(capBound(customEnd, -1))
 
 	const period = $derived(periodOf(kind as PeriodKind, year as number, month0 as number))
 
@@ -130,7 +129,7 @@
 		if (!isCustom) return formatPeriodPreview(period.periodStart, period.periodEnd)
 		if (!validCustom) return 'Pick a start and end date'
 		const share = Math.round(periodShareOf(validCustom.s, validCustom.e) * 100)
-		return `${formatPeriodPreview(validCustom.s, validCustom.e)} · statutory and loans prorated to ${share}% of the month`
+		return `${formatPeriodPreview(validCustom.s, validCustom.e)} · statutory and loans prorated to ${share}% of a month`
 	})
 
 	const selectClass =
@@ -198,7 +197,7 @@
 						id="pp-custom-start"
 						type="date"
 						bind:value={customStart}
-						min={startMonthStart}
+						min={capBoundStart}
 						max={customEnd || undefined}
 						class={selectClass}
 						aria-invalid={customError ? 'true' : undefined}
@@ -212,7 +211,7 @@
 						type="date"
 						bind:value={customEnd}
 						min={customStart || undefined}
-						max={startMonthEnd}
+						max={capBoundEnd}
 						class={selectClass}
 						aria-invalid={customError ? 'true' : undefined}
 						aria-describedby={customError ? 'pp-custom-error' : undefined}

@@ -19,9 +19,11 @@ import { emptyAttendance, round2, type ComputeSegment, type EmployeeComp } from 
 import { buildAttendanceInput, buildSegmentAttendance } from '../attendance/input'
 import { computeWorkingDays, manilaDayKey } from '$lib/utils/dates'
 import {
+	customRangeError,
 	describePeriod,
-	isSameMonthRange,
 	isValidStandardPeriod,
+	monthYearLabel,
+	monthsTouched,
 	periodOf,
 	periodShareOf,
 	rangesOverlapInManila,
@@ -79,34 +81,38 @@ export async function buildComputeSegments(
 }
 
 /**
- * #163: the advisory-lock key serializing every writer of payroll runs for one org-month. Both
+ * #163: the advisory-lock key serializing every writer of payroll runs for one ORGANISATION. Both
  * `createPayrollRun` and `openPeriod` take it as the first statement of their transaction, so the
  * two paths serialize against each other as well as against themselves.
  *
- * The month, not the exact range: the check the lock protects is "does this range intersect any
- * other range", which two concurrent requests for DIFFERENT but overlapping ranges both pass
- * otherwise — and `@@unique([organizationId, periodStart, periodEnd])` does not cover that, because
- * the bounds differ. A run never spans two months (`isSameMonthRange`), so the month is the
- * smallest key that covers every range the check can read.
+ * A key, not the exact range: the check the lock protects is "does this range intersect any other
+ * range", which two concurrent requests for DIFFERENT but overlapping ranges both pass otherwise —
+ * and `@@unique([organizationId, periodStart, periodEnd])` does not cover that, because the bounds
+ * differ. The key therefore has to cover every range the check can read.
  *
- * The month of the REQUESTED period start on the MANILA calendar, never a bound derived from the
- * overlap query's widened window — that window starts a day early, so two overlapping ranges either
- * side of a month boundary would take two different locks and serialize against nothing.
+ * #163 keyed it on the org AND the Manila month, which was correct then and is unsafe now. It
+ * rested on a run never spanning two months (`isSameMonthRange`); #3 removed that rule. A
+ * `20 May → 5 Jun` run and an overlapping `1 Jun → 10 Jun` run derive different months, take
+ * different locks, and serialize against nothing — the exact race the lock exists to stop, back
+ * again by a different route. The month is not repairable here either: with two months in play
+ * there is no single month to key on, and locking both would add an ordering rule and a deadlock
+ * to reason about.
+ *
+ * Per-org is the smallest key with no such degree of freedom (D3). It costs nothing: payroll runs
+ * are rare and deliberate, so serialising an organisation's run creation is not contention anyone
+ * can feel. The in-repo precedent is `backupLockKey` (`server/backup/plan.ts`), a one-argument
+ * per-org key written after the same class of bug.
  */
-export function payrollRunLockKey(organizationId: string, periodStart: Date): string {
-	return `payroll-run:${organizationId}:${manilaDayKey(periodStart).slice(0, 7)}`
+export function payrollRunLockKey(organizationId: string): string {
+	return `payroll-run:${organizationId}`
 }
 
 /**
- * Take the org-month lock inside `tx`. Transaction-scoped: Postgres releases it on commit OR
- * rollback, so there is nothing to unlock and no way to leak one.
+ * Take the per-org payroll-run lock inside `tx`. Transaction-scoped: Postgres releases it on commit
+ * OR rollback, so there is nothing to unlock and no way to leak one.
  */
-export async function lockPayrollMonth(
-	tx: Prisma.TransactionClient,
-	organizationId: string,
-	periodStart: Date
-) {
-	const key = payrollRunLockKey(organizationId, periodStart)
+export async function lockPayrollRuns(tx: Prisma.TransactionClient, organizationId: string) {
+	const key = payrollRunLockKey(organizationId)
 	await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`
 }
 
@@ -166,21 +172,33 @@ export async function assertNoOverlappingRun(
 }
 
 /**
- * #163 (review round 2): refuse a CUSTOM range that overlaps a cutoff window some employee's
- * statutory allocation designates.
+ * #163 (review round 2), widened by #3: refuse a CUSTOM range that overlaps a cutoff window some
+ * employee's statutory allocation designates, in ANY month the range touches.
  *
  * A FIRST/SECOND allocation loads the WHOLE month's employee SSS/PhilHealth/Pag-IBIG share onto one
  * standard run — the 1–15 run for FIRST, the 16–EOM run for SECOND — and every other run in that
- * month takes ZERO. That is only safe while the designated run can still be created. The overlap
- * guard above refuses it once a custom run covers those days, and the month would then collect
- * either nothing (no cutoff run) or, if the cutoff run is created first and the custom one is
- * merely adjacent, an outcome that depends on creation order.
+ * month takes ZERO (`resolveEE`, `calculator.ts:158-169`). That is only safe while the designated
+ * run can still be created. The overlap guard above refuses it once a custom run covers those days,
+ * and the month would then collect either nothing (no cutoff run) or, if the cutoff run is created
+ * first and the custom one is merely adjacent, an outcome that depends on creation order.
  *
  * Rather than track that ambiguity through the engine, make it impossible: a custom range may not
  * touch a designated cutoff window at all, so the cutoff run is always creatable and `resolveEE`'s
- * ZERO on a custom range is always correct. STANDARD periods are unrestricted — they are the
- * cutoff runs. An org where every employee is EVEN (the default, no config row) has no designated
- * window and is unaffected.
+ * ZERO on a custom range is always correct.
+ *
+ * The guard walks EVERY month `monthsTouched` reports, not just the start month. Deriving the month
+ * from the start alone was a live hole (#3 / research F5), not merely a strictness question: a
+ * FIRST-only org could create `20 May → 5 Jun`, which misses May 1–15 and was therefore allowed,
+ * and which then swallows June's whole 1–15 window while every employee takes the custom range's
+ * ZERO — so June collects nothing. Because a cross-month range always covers month one's 16–EOM
+ * window and month two's 1–15 window, an org with ANY active FIRST or SECOND allocation is now
+ * refused EVERY cross-month range. That totality is what `resolveEE`'s ZERO depends on.
+ *
+ * This is a positive restriction — accept only if no touched month's designated window is
+ * overlapped — so a shape nobody enumerated is refused rather than allowed.
+ *
+ * STANDARD periods are unrestricted — they are the cutoff runs. An org where every employee is EVEN
+ * (the default, no config row) has no designated window and is unaffected.
  */
 export async function assertCustomRangeClearOfCutoff(
 	organizationId: string,
@@ -202,22 +220,28 @@ export async function assertCustomRangeClearOfCutoff(
 	})
 	if (allocations.length === 0) return
 
-	// The requested range's MANILA month — the same calendar the overlap comparison uses.
-	const key = manilaDayKey(periodStart)
-	const year = Number(key.slice(0, 4))
-	const month0 = Number(key.slice(5, 7)) - 1
+	// Every MANILA month the range touches — the same calendar the overlap comparison uses. A
+	// `YYYY-MM-DD` key parses to UTC midnight, which is the convention `monthsTouched` works in.
+	const months = monthsTouched(
+		new Date(manilaDayKey(periodStart)),
+		new Date(manilaDayKey(periodEnd))
+	)
 
-	for (const { allocation } of allocations) {
-		const kind = allocation === 'FIRST' ? 'FIRST_HALF' : 'SECOND_HALF'
-		const window = periodOf(kind, year, month0)
-		if (!rangesOverlapInManila(periodStart, periodEnd, window.periodStart, window.periodEnd))
-			continue
-		const label = allocation === 'FIRST' ? '1–15' : `16–${window.periodEnd.getUTCDate()}`
-		const standard = allocation === 'FIRST' ? 'First half' : 'Second half'
-		error(
-			400,
-			`A custom period cannot overlap the ${label} cutoff, because that run collects the whole month's employee statutory share for some employees. Use a range outside it, or run the standard ${standard} period.`
-		)
+	for (const { year, month0 } of months) {
+		for (const { allocation } of allocations) {
+			const kind = allocation === 'FIRST' ? 'FIRST_HALF' : 'SECOND_HALF'
+			const window = periodOf(kind, year, month0)
+			if (!rangesOverlapInManila(periodStart, periodEnd, window.periodStart, window.periodEnd))
+				continue
+			const label = allocation === 'FIRST' ? '1–15' : `16–${window.periodEnd.getUTCDate()}`
+			const standard = allocation === 'FIRST' ? 'First half' : 'Second half'
+			// The month named is the CLASHING window's own month, never the range start — with two
+			// months in play that is the only way to tell which one blocked the range.
+			error(
+				400,
+				`A custom period cannot overlap the ${label} cutoff of ${monthYearLabel(year, month0)}, because that run collects the whole month's employee statutory share for some employees. Use a range outside it, or run the standard ${standard} period.`
+			)
+		}
 	}
 }
 
@@ -227,22 +251,22 @@ export async function createPayrollRun(
 	periodEnd: Date,
 	ctx: AuditContext
 ) {
-	// #163: any same-month range is a legal period; the shape gate is gone. These two checks are
-	// what stops a reversed range (a negative day count would produce negative deductions) and a
-	// cross-month one (statutory is monthly, so a two-month span has no single basis).
-	if (utcMidnight(periodEnd) < utcMidnight(periodStart)) {
-		error(400, 'End date must be on or after the start date.')
-	}
-	if (!isSameMonthRange(periodStart, periodEnd)) {
-		error(400, 'A custom period must start and end in the same month.')
-	}
+	// #3: a range may now cross a calendar-month boundary; the same-month rule is replaced by a
+	// SIZE cap. `customRangeError` stops a reversed range (a negative day count would produce
+	// negative deductions) and a range whose summed month slices exceed one month of pay (nothing
+	// downstream clamps `periodShare` — `earnings.ts` multiplies basic pay by it raw). It is a
+	// positive restriction: only a range it accepts proceeds. It runs before the transaction, so a
+	// refusal writes nothing at all — not even an audit row. The same function backs the
+	// PeriodPicker's inline message, so the browser copy and this 400 body cannot drift apart.
+	const invalid = customRangeError(periodStart, periodEnd)
+	if (invalid) error(400, invalid)
 
-	// One transaction, under the org-month advisory lock: check-then-act is otherwise exactly what
+	// One transaction, under the per-org advisory lock: check-then-act is otherwise exactly what
 	// this is. Two concurrent requests for DIFFERENT but overlapping custom ranges both read an
 	// empty conflict set and both insert, and the unique constraint cannot catch it because their
 	// bounds differ. The lock is taken FIRST so both reads below are serialized with the insert.
 	const run = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-		await lockPayrollMonth(tx, organizationId, periodStart)
+		await lockPayrollRuns(tx, organizationId)
 
 		// Kept ahead of the overlap guard on purpose (S1). `voidRun` only flips status, so the row and
 		// its @@unique([organizationId, periodStart, periodEnd]) survive; the overlap guard excludes

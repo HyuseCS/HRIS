@@ -3,12 +3,11 @@ import { db } from '$lib/server/db'
 import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import {
-	isSameMonthRange,
+	customRangeError,
 	isValidStandardPeriod,
 	rangesOverlapInManila,
 	utcMidnight
 } from '$lib/utils/pay-periods'
-import { manilaDayKey } from '$lib/utils/dates'
 import { buildApprovalChain } from './requests/routing'
 import { canActOnStage, nextState, liveChain, timesheetSoD } from './approvals'
 import { formatShortDate } from '$lib/utils/format'
@@ -133,16 +132,22 @@ export async function assertCanModifyTimesheet(ctx: AuditContext, ts: { employee
 }
 
 /**
- * #163: the advisory-lock key serializing every writer of one employee's timesheets for one month.
+ * #163: the advisory-lock key serializing every writer of one EMPLOYEE's timesheets.
  *
- * The month of the REQUESTED period, on the Manila calendar — never a bound derived from the
- * widened `from`/`dayAfterEnd` query window. `from` is one day BEFORE the period start, so a range
- * starting Aug 1 would key on July while an overlapping range starting Aug 2 keys on August: two
- * different locks, no serialization, and exactly the race the lock exists to stop. `manilaDayKey`
- * also buckets a row stored on a PHT day boundary into the month it means.
+ * #163 keyed it on the employee AND the period's Manila month, and was careful about which month:
+ * never a bound derived from the widened `from`/`dayAfterEnd` query window, because `from` is one
+ * day BEFORE the period start, so an Aug 1 range would key on July while an overlapping Aug 2 range
+ * keys on August — two different locks, no serialization, and exactly the race the lock exists to
+ * stop. That care was right, and the month is still not safe: #3 lets a period span two months, so
+ * `13 May → 2 Jun` and an overlapping `1 Jun → 10 Jun` derive different months and hit the same
+ * failure by a different route. There is no single month to key on once two are in play.
+ *
+ * Per-employee is the smallest key with no such degree of freedom (D3). One employee's timesheets
+ * are written rarely and by few people, so serialising them costs nothing. Matches the shape of
+ * `backupLockKey` (`server/backup/plan.ts`) and of `payrollRunLockKey`.
  */
-export function timesheetLockKey(employeeId: string, periodStart: Date): string {
-	return `timesheet:${employeeId}:${manilaDayKey(periodStart).slice(0, 7)}`
+export function timesheetLockKey(employeeId: string): string {
+	return `timesheet:${employeeId}`
 }
 
 export async function createTimesheet(
@@ -152,13 +157,12 @@ export async function createTimesheet(
 	entries: TimesheetEntryInput[],
 	ctx: AuditContext
 ) {
-	// #163: any same-month range is a legal timesheet period; the shape gate is gone.
-	if (utcMidnight(periodEnd) < utcMidnight(periodStart)) {
-		error(400, 'End date must be on or after the start date.')
-	}
-	if (!isSameMonthRange(periodStart, periodEnd)) {
-		error(400, 'A custom period must start and end in the same month.')
-	}
+	// #3: a timesheet period may now cross a calendar-month boundary; the same-month rule is
+	// replaced by a SIZE cap. The overlap guard below is Manila-day based and month-agnostic, so it
+	// needs no change. `createTimesheetFromAttendance` has no gate of its own and inherits this one.
+	// See createPayrollRun.
+	const invalid = customRangeError(periodStart, periodEnd)
+	if (invalid) error(400, invalid)
 
 	// #163: payroll sums an employee's timesheets by containment, so two overlapping sheets
 	// double-count the shared days' hours. Scoped to the employee, not the org. Fires only when at
@@ -175,13 +179,13 @@ export async function createTimesheet(
 	const dayAfterEnd = new Date(utcMidnight(periodEnd).getTime() + 2 * day)
 	const totalHours = entries.reduce((sum, e) => sum + e.hoursWorked, 0)
 
-	// One transaction, under an employee-month advisory lock: on their own the two checks and the
+	// One transaction, under the per-employee advisory lock: on their own the two checks and the
 	// insert are check-then-act, so two concurrent saves of DIFFERENT but overlapping ranges both
 	// read an empty conflict set and both insert — and `@@unique([employeeId, periodStart])` cannot
 	// catch that, because their start days differ. The lock is transaction-scoped, so Postgres
 	// releases it on commit or rollback and there is nothing to unlock.
 	const ts = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-		const key = timesheetLockKey(employeeId, periodStart)
+		const key = timesheetLockKey(employeeId)
 		await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`
 
 		const candidates = await tx.timesheet.findMany({

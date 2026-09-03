@@ -6,13 +6,13 @@ import {
 	assertCustomRangeClearOfCutoff,
 	assertNoOverlappingRun,
 	computePayroll,
-	lockPayrollMonth
+	lockPayrollRuns
 } from './index'
 import { voidedOwnApproval } from './audit-markers'
 import { D, q2 } from './money'
 import { reverseAmortization } from './amortization'
 import { deriveRange, lockRange } from '../attendance'
-import { isSameMonthRange, utcMidnight } from '$lib/utils/pay-periods'
+import { customRangeError } from '$lib/utils/pay-periods'
 import { notifyMany } from '../notifications'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { formatShortDate } from '$lib/utils/format'
@@ -52,19 +52,19 @@ export async function openPeriod(
 	},
 	ctx: AuditContext
 ) {
-	// #163: any same-month range is a legal period; the shape gate is gone. See createPayrollRun.
-	if (utcMidnight(input.endDate) < utcMidnight(input.startDate)) {
-		error(400, 'End date must be on or after the start date.')
-	}
-	if (!isSameMonthRange(input.startDate, input.endDate)) {
-		error(400, 'A custom period must start and end in the same month.')
-	}
+	// #3: a range may now cross a calendar-month boundary; the same-month rule is replaced by a
+	// SIZE cap. One service, two callers — the form action and the v1 API twin both land here, so
+	// there is no second gate to keep in sync. See createPayrollRun.
+	const invalid = customRangeError(input.startDate, input.endDate)
+	if (invalid) error(400, invalid)
 
 	const period = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-		// Same org-month advisory lock `createPayrollRun` takes, keyed identically, so the two write
-		// paths serialize against each other. Both checks below now run inside it; when either
-		// throws, the transaction rolls back and NEITHER row is written.
-		await lockPayrollMonth(tx, organizationId, input.startDate)
+		// The same per-org advisory lock `createPayrollRun` takes, keyed identically, so the two
+		// write paths serialize against each other. It used to carry the period's month too; #3
+		// dropped that, because a range may now touch two months and two overlapping ranges either
+		// side of a boundary would otherwise take two different locks. Both checks below run inside
+		// it; when either throws, the transaction rolls back and NEITHER row is written.
+		await lockPayrollRuns(tx, organizationId)
 
 		// S1: kept ahead of the overlap guard — a VOIDED run keeps its row and its unique constraint,
 		// and the guard skips VOIDED, so without this the recreate would raise a raw Prisma P2002

@@ -111,6 +111,16 @@ export function compensationForPeriod(
 	const rows = sortedRows(history)
 	const compOn = (d: Date): Comp => compAt(rows, d.getTime(), fallbackComp)
 
+	// Accepted limitation (D2, cross-month-periods-3 SPEC — see
+	// process/features/flexible-periods/active/cross-month-periods-3_02-09-26/cross-month-periods-3_SPEC_02-09-26.md):
+	// for a cross-month period this still anchors the statutory bracket basis to the FIRST day of
+	// month ONE, not the period's own start. A pay change effective in month two therefore does NOT
+	// move that employee's SSS/PhilHealth/Pag-IBIG bracket for this period — only their basic pay
+	// (below) reflects the mid-period change; statutory catches up the following month. This is a
+	// deliberate owner decision, not a bug — do NOT extend the #170/#171 segment machinery to "fix"
+	// it. The `payroll-mid-period`, `compensation-resolver`, `payroll-statutory-basis`,
+	// `compensation-heal` and `employee-api-compensation` suites are the parity detector: if any of
+	// them goes red, this anchor moved and the change is wrong.
 	const statutoryBasis = compOn(firstDayOfMonth(start))
 	const periodEndComp = compOn(end)
 

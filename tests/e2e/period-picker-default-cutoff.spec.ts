@@ -44,9 +44,15 @@ test('the create-run picker still opens on First half, with Custom range unselec
 	await expect(page.locator('#pp-custom-error')).toHaveText(
 		'End date must be on or after the start date.'
 	)
+	// #3: crossing a month boundary is no longer a rule break — 11/30 + 5/31 = 0.53 of a month.
+	await page.getByLabel('End date').fill('2026-07-05')
+	await expect(page.locator('#pp-custom-error')).toHaveCount(0)
+
+	// The size cap is what refuses now. Jun 3 – Jul 5 is 28/30 + 5/31 = 1.0946 of a month.
+	await page.getByLabel('Start date').fill('2026-06-03')
 	await page.getByLabel('End date').fill('2026-07-05')
 	await expect(page.locator('#pp-custom-error')).toHaveText(
-		'A custom period must start and end in the same month.'
+		'A custom period cannot cover more than one month of pay. This range covers 109% of a month. Shorten it.'
 	)
 
 	// A valid range states the money consequence before commit: 7 of June's 30 days ≈ 23%.
@@ -54,19 +60,20 @@ test('the create-run picker still opens on First half, with Custom range unselec
 	await page.getByLabel('End date').fill('2026-06-09')
 	await expect(page.locator('#pp-custom-error')).toHaveCount(0)
 	await expect(preview).toHaveText(
-		'Jun 3 – Jun 9, 2026 (7 days) · statutory and loans prorated to 23% of the month'
+		'Jun 3 – Jun 9, 2026 (7 days) · statutory and loans prorated to 23% of a month'
 	)
 })
 
 /**
- * #163 follow-up — the browser's own calendar must refuse the impossible days rather than let a
- * user pick one and only then read an error. `min`/`max` express the two rules the inline message
- * and the server gate already enforce: the end is never before the start, and a custom period
- * never leaves the start's month.
+ * #163 follow-up, retargeted by #3 — the browser's own calendar must refuse the unreachable days
+ * rather than let a user pick one and only then read an error. `min`/`max` express the two rules
+ * the inline message and the server gate already enforce: the end is never before the start, and a
+ * custom period never covers more than one month of pay. Both bounds are walked with the SAME
+ * `customRangeError` the server refuses with, so the calendar and the 400 cannot disagree.
  *
  * Read-only: never submits.
  */
-test('the custom date inputs bound each other to one month', async ({ page }) => {
+test('the custom date inputs bound each other at the one-month cap', async ({ page }) => {
 	await login(page, USERS.admin)
 	await page.goto('/payroll', { waitUntil: 'domcontentloaded' })
 	await page.getByRole('button', { name: 'New Payroll Run' }).click()
@@ -79,18 +86,20 @@ test('the custom date inputs bound each other to one month', async ({ page }) =>
 	await expect(start).not.toHaveAttribute('max', /./)
 	await expect(end).not.toHaveAttribute('min', /./)
 
-	// A start date pins the end to that day at the earliest and that month's last day at the latest.
+	// A start date pins the end to that day at the earliest, and at the latest to the last day the
+	// cap allows: 28/30 + 2/31 = 0.99785 fits, 28/30 + 3/31 = 1.03011 does not.
 	await start.fill('2026-06-03')
 	await expect(end).toHaveAttribute('min', '2026-06-03')
-	await expect(end).toHaveAttribute('max', '2026-06-30')
+	await expect(end).toHaveAttribute('max', '2026-07-02')
 
-	// February's shorter month comes from daysInMonth, not a hard-coded 30.
+	// February's shorter month still shapes the bound — it just now reaches into March:
+	// 19/28 + 9/31 = 0.96889 fits, 19/28 + 10/31 = 1.00115 does not.
 	await start.fill('2026-02-10')
-	await expect(end).toHaveAttribute('max', '2026-02-28')
+	await expect(end).toHaveAttribute('max', '2026-03-09')
 
-	// The constraint runs both ways: an end date pins the start to the first of that month.
+	// The constraint runs both ways: 21/31 + 9/30 = 0.97742 fits, 22/31 + 9/30 = 1.00968 does not.
 	await start.fill('')
 	await end.fill('2026-06-09')
-	await expect(start).toHaveAttribute('min', '2026-06-01')
+	await expect(start).toHaveAttribute('min', '2026-05-11')
 	await expect(start).toHaveAttribute('max', '2026-06-09')
 })

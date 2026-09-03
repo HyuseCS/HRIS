@@ -5,13 +5,37 @@
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { addToast } from '$lib/stores/toast.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
 
 	// #108: a double-submit here creates a duplicate payroll run for the same period.
-	const create = createSubmitGuard()
+	//
+	// It also owns the success confirmation: a created run used to leave this panel open over a
+	// reset picker with nothing said, so the only way to know it worked was to spot the new row in
+	// the list below. Closing the panel and naming the period is the confirmation — the period
+	// matters because a custom range can now span two months, and the list shows many runs.
+	//
+	// Announced from the submit callback, NOT from an `$effect` watching `form`. `addToast` pushes
+	// onto a `$state` array, and `push` reads it as well as writing it — inside an effect that is a
+	// read-write cycle and Svelte 5 aborts the page with `effect_update_depth_exceeded`. Same trap,
+	// same fix as `settings/backup`.
+	const create = createSubmitGuard((input) => {
+		// Read before `update()`: a successful submit resets the form and blanks these.
+		const start = String(input.formData.get('periodStart') ?? '')
+		const end = String(input.formData.get('periodEnd') ?? '')
+		return async ({ update, result }) => {
+			await update()
+			if (result.type !== 'success') return
+			showCreate = false
+			addToast(
+				`Payroll run created for ${formatShortDate(new Date(start))} – ${formatShortDate(new Date(end))}.`,
+				{ kind: 'success' }
+			)
+		}
+	})
 
 	// #108: compute/approve live inside an {#each}, so each run needs its OWN guard — a single
 	// shared one would disable every row's button at once. Memoised by `${runId}:${action}`.

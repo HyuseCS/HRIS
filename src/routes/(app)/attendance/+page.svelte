@@ -485,8 +485,10 @@
 			</form>
 			<!-- M-9: `fail(400/413/415)` from this action lands in `form.error`, which renders in the
 			     page-top banner — several screens above this card. Repeat it here so the operator sees
-			     why the button did nothing. The duplicate with the top banner is deliberate. -->
-			{#if form?.error}
+			     why the button did nothing. The duplicate with the top banner is deliberate.
+			     Gated on `importError`, NOT on `error`: every action on this page sets `error`, so the
+			     bare check echoed a Save-as-timesheet or Derive failure under the upload heading. -->
+			{#if form?.importError}
 				<div
 					role="alert"
 					class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
