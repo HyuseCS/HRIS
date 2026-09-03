@@ -159,55 +159,69 @@
 	</form>
 {/if}
 
-<!-- Bulk actions -->
+<!-- Bulk actions.
+     E3: one flat row of five buttons made a re-derive read the same as a lock. They are now two
+     labelled clusters — a read-ish recalculate, and the irreversible lock/release pair — split by
+     a visible divider, with "Save as timesheet" held apart as this bar's primary action. -->
 {#if data.view === 'employee' && data.selectedEmployeeId}
-	<div class="flex flex-wrap gap-2">
-		<form method="POST" action="?/derive" use:enhance={guards.derive.enhance}>
-			<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-			<input type="hidden" name="from" value={data.from} />
-			<input type="hidden" name="to" value={data.to} />
-			<button
-				title="Re-pull from punches (updates unlocked days)"
-				disabled={guards.derive.busy}
-				class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-				><Icon d={IC.refresh} />Refresh</button
-			>
-		</form>
-		<form method="POST" action="?/lock" use:enhance={guards.lock.enhance}>
-			<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-			<input type="hidden" name="from" value={data.from} />
-			<input type="hidden" name="to" value={data.to} />
-			<button
-				disabled={guards.lock.busy}
-				class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-				>{guards.lock.busy ? 'Locking…' : 'Lock range'}</button
-			>
-		</form>
-		{#if data.canUnlock}
-			<form method="POST" action="?/unlock" use:enhance={guards.unlock.enhance}>
+	<div class="flex flex-wrap items-center gap-2">
+		<div role="group" aria-label="Recalculate" class="flex flex-wrap items-center gap-2">
+			<form method="POST" action="?/derive" use:enhance={guards.derive.enhance}>
 				<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
 				<input type="hidden" name="from" value={data.from} />
 				<input type="hidden" name="to" value={data.to} />
 				<button
-					title="Reopen locked days (super admin)"
-					disabled={guards.unlock.busy}
-					class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
-					><Icon d={IC.lockOpen} />Unlock range</button
+					title="Re-pull from punches (updates unlocked days)"
+					disabled={guards.derive.busy}
+					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					><Icon d={IC.refresh} />Refresh</button
 				>
 			</form>
-		{/if}
+		</div>
+		<div class="h-6 w-px bg-border" aria-hidden="true"></div>
+		<div role="group" aria-label="Lock & release" class="flex flex-wrap items-center gap-2">
+			<form method="POST" action="?/lock" use:enhance={guards.lock.enhance}>
+				<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+				<input type="hidden" name="from" value={data.from} />
+				<input type="hidden" name="to" value={data.to} />
+				<button
+					disabled={guards.lock.busy}
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{guards.lock.busy ? 'Locking…' : 'Lock range'}</button
+				>
+			</form>
+			{#if data.canUnlock}
+				<form method="POST" action="?/unlock" use:enhance={guards.unlock.enhance}>
+					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+					<input type="hidden" name="from" value={data.from} />
+					<input type="hidden" name="to" value={data.to} />
+					<button
+						title="Reopen locked days (super admin)"
+						disabled={guards.unlock.busy}
+						class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+						><Icon d={IC.lockOpen} />Unlock range</button
+					>
+				</form>
+			{/if}
+		</div>
+		<div class="h-6 w-px bg-border" aria-hidden="true"></div>
 		<a
 			href={exportHref}
 			class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
 			><Icon d={IC.download} />Export CSV</a
 		>
-		<form method="POST" action="?/saveTimesheet" use:enhance={guards.saveTimesheet.enhance}>
+		<form
+			method="POST"
+			action="?/saveTimesheet"
+			use:enhance={guards.saveTimesheet.enhance}
+			class="ml-auto"
+		>
 			<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
 			<input type="hidden" name="from" value={data.from} />
 			<input type="hidden" name="to" value={data.to} />
 			<button
 				disabled={guards.saveTimesheet.busy}
-				class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+				class="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 				><Icon d={IC.document} />Save as timesheet</button
 			>
 		</form>
@@ -221,35 +235,41 @@
 		>
 	</p>
 {:else if data.view === 'team'}
-	<div class="flex flex-wrap gap-2">
-		<form method="POST" action="?/deriveTeam" use:enhance={guards.deriveTeam.enhance}>
-			<input type="hidden" name="date" value={data.date} />
-			<button
-				title="Re-pull from punches (updates unlocked days)"
-				disabled={guards.deriveTeam.busy}
-				class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-				><Icon d={IC.refresh} />Refresh</button
-			>
-		</form>
-		<form method="POST" action="?/lockTeam" use:enhance={guards.lockTeam.enhance}>
-			<input type="hidden" name="date" value={data.date} />
-			<button
-				disabled={guards.lockTeam.busy}
-				class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-				>{guards.lockTeam.busy ? 'Locking…' : 'Lock day'}</button
-			>
-		</form>
-		{#if data.canUnlock}
-			<form method="POST" action="?/unlockTeam" use:enhance={guards.unlockTeam.enhance}>
+	<div class="flex flex-wrap items-center gap-2">
+		<div role="group" aria-label="Recalculate" class="flex flex-wrap items-center gap-2">
+			<form method="POST" action="?/deriveTeam" use:enhance={guards.deriveTeam.enhance}>
 				<input type="hidden" name="date" value={data.date} />
 				<button
-					title="Reopen locked days (super admin)"
-					disabled={guards.unlockTeam.busy}
-					class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
-					><Icon d={IC.lockOpen} />Unlock day</button
+					title="Re-pull from punches (updates unlocked days)"
+					disabled={guards.deriveTeam.busy}
+					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					><Icon d={IC.refresh} />Refresh</button
 				>
 			</form>
-		{/if}
+		</div>
+		<div class="h-6 w-px bg-border" aria-hidden="true"></div>
+		<div role="group" aria-label="Lock & release" class="flex flex-wrap items-center gap-2">
+			<form method="POST" action="?/lockTeam" use:enhance={guards.lockTeam.enhance}>
+				<input type="hidden" name="date" value={data.date} />
+				<button
+					disabled={guards.lockTeam.busy}
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{guards.lockTeam.busy ? 'Locking…' : 'Lock day'}</button
+				>
+			</form>
+			{#if data.canUnlock}
+				<form method="POST" action="?/unlockTeam" use:enhance={guards.unlockTeam.enhance}>
+					<input type="hidden" name="date" value={data.date} />
+					<button
+						title="Reopen locked days (super admin)"
+						disabled={guards.unlockTeam.busy}
+						class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+						><Icon d={IC.lockOpen} />Unlock day</button
+					>
+				</form>
+			{/if}
+		</div>
+		<div class="h-6 w-px bg-border" aria-hidden="true"></div>
 		<a
 			href={exportHref}
 			class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
@@ -269,108 +289,115 @@
 
 <!-- #200: CSV backlog import. Food-service tenants only; the action re-checks both gates. -->
 {#if data.showAmPm}
-	<div class="space-y-3 rounded-lg border bg-card p-4">
-		<div>
-			<p class="text-sm font-medium">Import backlog CSV</p>
-			<p class="text-xs text-muted-foreground">
-				Columns: employeeNumber, date (YYYY-MM-DD), amIn, amOut, pmIn, pmOut (HH:MM, Manila time).
-				Locked and hand-corrected days are refused.
-			</p>
-			<!-- m-4: state the caps here — the operator otherwise meets them as a 413/400 that renders
+	<!-- E4: a backlog import is a rare, deliberate task — it sat expanded above the grid HR reads
+	     every morning. Collapsed by default, but forced open whenever an import result exists: a
+	     result that renders inside a closed container is a silent failure. -->
+	<details class="rounded-lg border bg-card" open={!!(form?.importError || form?.imported)}>
+		<summary class="cursor-pointer px-4 py-3 text-sm font-medium">Import backlog CSV</summary>
+		<div class="space-y-3 border-t p-4">
+			<div>
+				<p class="text-xs text-muted-foreground">
+					Columns: employeeNumber, date (YYYY-MM-DD), amIn, amOut, pmIn, pmOut (HH:MM, Manila time).
+					Locked and hand-corrected days are refused.
+				</p>
+				<!-- m-4: state the caps here — the operator otherwise meets them as a 413/400 that renders
 			     in the page-top banner, off-screen. `load` passes the real MAX_IMPORT_BYTES and
 			     MAX_IMPORT_ROWS through, so the copy cannot drift from the caps that enforce them. -->
-			<p class="text-xs text-muted-foreground">
-				Limits: {data.maxImportBytes / 1024 / 1024} MB per file, {data.maxImportRows.toLocaleString()}
-				rows, and a {data.maxRangeDays}-day span.
-			</p>
-		</div>
-		<form
-			method="POST"
-			action="?/importBacklog"
-			enctype="multipart/form-data"
-			use:enhance={guards.importBacklog.enhance}
-			class="flex flex-wrap items-center gap-2"
-		>
-			<label for="backlog" class="sr-only">Backlog CSV file</label>
-			<input
-				id="backlog"
-				name="backlog"
-				type="file"
-				accept=".csv,text/csv"
-				required
-				class="text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium"
-			/>
-			<button
-				disabled={guards.importBacklog.busy}
-				class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-				>{guards.importBacklog.busy ? 'Importing…' : 'Import backlog CSV'}</button
+				<p class="text-xs text-muted-foreground">
+					Limits: {data.maxImportBytes / 1024 / 1024} MB per file, {data.maxImportRows.toLocaleString()}
+					rows, and a {data.maxRangeDays}-day span.
+				</p>
+			</div>
+			<form
+				method="POST"
+				action="?/importBacklog"
+				enctype="multipart/form-data"
+				use:enhance={guards.importBacklog.enhance}
+				class="flex flex-wrap items-center gap-2"
 			>
-			<!-- m-5: this action writes punches for a whole roster. The reassurance belongs beside the
+				<label for="backlog" class="sr-only">Backlog CSV file</label>
+				<input
+					id="backlog"
+					name="backlog"
+					type="file"
+					accept=".csv,text/csv"
+					required
+					class="text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium"
+				/>
+				<button
+					disabled={guards.importBacklog.busy}
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{guards.importBacklog.busy ? 'Importing…' : 'Import backlog CSV'}</button
+				>
+				<!-- m-5: this action writes punches for a whole roster. The reassurance belongs beside the
 			     button, not at the end of the column list. -->
-			<span class="text-xs text-muted-foreground">Re-uploading the same file changes nothing.</span>
-		</form>
-		<!-- M-9: `fail(400/413/415)` from this action lands in `form.error`, which renders in the
+				<span class="text-xs text-muted-foreground"
+					>Re-uploading the same file changes nothing.</span
+				>
+			</form>
+			<!-- M-9: `fail(400/413/415)` from this action lands in `form.error`, which renders in the
 		     page-top banner — several screens above this card. Repeat it here so the operator sees
 		     why the button did nothing. The duplicate with the top banner is deliberate.
 		     Gated on `importError`, NOT on `error`: every action on this page sets `error`, so the
 		     bare check echoed a Save-as-timesheet or Derive failure under the upload heading. -->
-		{#if form?.importError}
-			<div
-				role="alert"
-				class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
-			>
-				{form.error}
-			</div>
-		{/if}
-		{#if form?.imported}
-			{@const res = form.imported}
-			<!-- M-10: a totally failed import used to look exactly like a totally successful one —
+			{#if form?.importError}
+				<div
+					role="alert"
+					class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
+				>
+					{form.error}
+				</div>
+			{/if}
+			{#if form?.imported}
+				{@const res = form.imported}
+				<!-- M-10: a totally failed import used to look exactly like a totally successful one —
 			     same neutral box, four counts to parse. Colour and a lead sentence say the outcome
 			     first; `role="status"` makes it reach a screen reader at all. -->
-			<!-- A re-upload applies nothing and rejects nothing: every row was already here. That is
+				<!-- A re-upload applies nothing and rejects nothing: every row was already here. That is
 			     the card's own promise ("re-uploading changes nothing") working, so it must not
 			     read as the failure bucket. It gets neutral wording, not red. -->
-			{@const alreadyImported =
-				res.applied === 0 && res.rejected.length === 0 && res.skippedDuplicate > 0}
-			{@const nothing = res.applied === 0 && !alreadyImported}
-			{@const partial = res.applied > 0 && res.rejected.length > 0}
-			<div
-				role="status"
-				class="rounded-md border px-3 py-2 text-sm {nothing
-					? 'border-destructive/20 bg-destructive/10 text-red-400'
-					: alreadyImported
-						? 'border-border bg-background text-muted-foreground'
-						: partial
-							? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-							: 'border-green-500/20 bg-green-500/10 text-green-600'}"
-			>
-				<p class="font-medium">
-					{#if alreadyImported}Already imported — every row in this file was here already.{:else if nothing}Nothing
-						was imported — no rows were applied.{:else if partial}Partly imported — {res.applied}
-						{res.applied === 1 ? 'row' : 'rows'} applied, {res.rejected.length} rejected.{:else}Import
-						complete — {res.applied}
-						{res.applied === 1 ? 'row' : 'rows'} applied.{/if}
-				</p>
-				<p class="mt-0.5 text-xs">
-					Applied {res.applied}
-					{res.applied === 1 ? 'row' : 'rows'} ({res.punchesWritten} punches), skipped {res.skippedDuplicate}
-					duplicates, rejected {res.rejected.length}
-					{res.rejected.length === 1 ? 'row' : 'rows'}.
-				</p>
-				{#if res.rejected.length > 0}
-					<!-- Open when nothing landed: the reasons are then the only useful content. -->
-					<details class="mt-1" open={nothing}>
-						<summary class="cursor-pointer text-xs font-medium">Why rows were rejected</summary>
-						<ul class="mt-1 space-y-0.5 text-xs">
-							{#each res.rejected as r (r.line)}
-								<li>Line {r.line} ({r.employeeNumber || '—'}, {r.date || '—'}): {r.reason}</li>
-							{/each}
-						</ul>
-					</details>
-				{/if}
-			</div>
-		{/if}
-	</div>
+				{@const alreadyImported =
+					res.applied === 0 && res.rejected.length === 0 && res.skippedDuplicate > 0}
+				{@const nothing = res.applied === 0 && !alreadyImported}
+				{@const partial = res.applied > 0 && res.rejected.length > 0}
+				<div
+					role="status"
+					class="rounded-md border px-3 py-2 text-sm {nothing
+						? 'border-destructive/20 bg-destructive/10 text-red-400'
+						: alreadyImported
+							? 'border-border bg-background text-muted-foreground'
+							: partial
+								? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+								: 'border-green-500/20 bg-green-500/10 text-green-600'}"
+				>
+					<p class="font-medium">
+						{#if alreadyImported}Already imported — every row in this file was here already.{:else if nothing}Nothing
+							was imported — no rows were applied.{:else if partial}Partly imported — {res.applied}
+							{res.applied === 1 ? 'row' : 'rows'} applied, {res.rejected.length} rejected.{:else}Import
+							complete — {res.applied}
+							{res.applied === 1 ? 'row' : 'rows'} applied.{/if}
+					</p>
+					<p class="mt-0.5 text-xs">
+						Applied {res.applied}
+						{res.applied === 1 ? 'row' : 'rows'} ({res.punchesWritten} punches), skipped {res.skippedDuplicate}
+						duplicates, rejected {res.rejected.length}
+						{res.rejected.length === 1 ? 'row' : 'rows'}.
+					</p>
+					{#if res.rejected.length > 0}
+						<!-- Open when nothing landed: the reasons are then the only useful content. -->
+						<details class="mt-1" open={nothing}>
+							<summary class="cursor-pointer text-xs font-medium">Why rows were rejected</summary>
+							<ul class="mt-1 space-y-0.5 text-xs">
+								{#each res.rejected as r (r.line)}
+									<li>Line {r.line} ({r.employeeNumber || '—'}, {r.date || '—'}): {r.reason}</li>
+								{/each}
+							</ul>
+						</details>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	</details>
 {/if}
 
 <!-- Exceptions filter for the daily fail-check / incomplete-log review -->
@@ -417,7 +444,10 @@
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM In</th>
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM Out</th>
 					{/if}
-					<th class="w-[1%] whitespace-nowrap px-3 py-3"></th>
+					<!-- E5: the Save column is the whole point of this grid and it sat off the right edge
+					     of a 12-column scroller on a laptop. Pinned, with its own backdrop and a left
+					     border so it does not read as floating over the row. -->
+					<th class="sticky right-0 w-[1%] whitespace-nowrap border-l bg-card px-3 py-3"></th>
 				</tr>
 			</thead>
 			<tbody class="divide-y">
@@ -500,7 +530,7 @@
 							<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeIn ?? null)}</td>
 							<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeOut ?? null)}</td>
 						{/if}
-						<td class="w-[1%] whitespace-nowrap px-3 py-2">
+						<td class="sticky right-0 w-[1%] whitespace-nowrap border-l bg-card px-3 py-2">
 							{#if editable && d}
 								{@const save = rowGuard(`correct:${d.id}`, keepValues)}
 								<div class="flex items-center gap-1">
@@ -576,7 +606,10 @@
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM In</th>
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM Out</th>
 					{/if}
-					<th class="w-[1%] whitespace-nowrap px-3 py-3"></th>
+					<!-- E5: the Save column is the whole point of this grid and it sat off the right edge
+					     of a 12-column scroller on a laptop. Pinned, with its own backdrop and a left
+					     border so it does not read as floating over the row. -->
+					<th class="sticky right-0 w-[1%] whitespace-nowrap border-l bg-card px-3 py-3"></th>
 				</tr>
 			</thead>
 			<tbody class="divide-y">
@@ -668,7 +701,7 @@
 							<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeIn ?? null)}</td>
 							<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeOut ?? null)}</td>
 						{/if}
-						<td class="w-[1%] whitespace-nowrap px-3 py-2">
+						<td class="sticky right-0 w-[1%] whitespace-nowrap border-l bg-card px-3 py-2">
 							{#if d.isLocked}
 								<span class="inline-flex h-7 items-center text-xs text-muted-foreground"
 									>locked</span
