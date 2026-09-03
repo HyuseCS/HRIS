@@ -6,6 +6,7 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
 	import type { PageData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data }: { data: PageData } = $props()
 	let search = $state($page.url.searchParams.get('search') ?? '')
@@ -128,16 +129,7 @@
 							<td class="px-4 py-3 text-muted-foreground">{emp.employmentType.replace('_', ' ')}</td
 							>
 							<td class="px-4 py-3">
-								<span
-									class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {emp.employmentStatus ===
-									'ACTIVE'
-										? 'bg-green-500/15 text-green-400'
-										: emp.employmentStatus === 'ON_LEAVE'
-											? 'bg-yellow-500/15 text-yellow-400'
-											: 'bg-gray-500/15 text-gray-400'}"
-								>
-									{emp.employmentStatus.replace('_', ' ')}
-								</span>
+								<Badge status={emp.employmentStatus} domain="employment" />
 								{#if emp.employmentStatus === 'OFFBOARDED' && emp.endDate}
 									<div class="mt-0.5 text-xs text-muted-foreground">
 										left {formatShortDate(emp.endDate)}

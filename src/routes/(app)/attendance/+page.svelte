@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import type { PageData, ActionData } from './$types'
@@ -76,16 +77,6 @@
 		{ label: 'This month', kind: 'WHOLE_MONTH' },
 		{ label: 'Prev month', kind: 'WHOLE_MONTH', monthsBack: 1 }
 	]
-
-	const badge: Record<string, string> = {
-		PRESENT: 'bg-green-500/15 text-green-400',
-		LATE: 'bg-yellow-500/15 text-yellow-400',
-		ABSENT: 'bg-red-500/15 text-red-400',
-		INCOMPLETE: 'bg-orange-500/15 text-orange-400',
-		ON_LEAVE: 'bg-purple-500/15 text-purple-400',
-		HOLIDAY: 'bg-blue-500/15 text-blue-400',
-		REST_DAY: 'bg-gray-500/15 text-gray-400'
-	}
 
 	const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY']
 
@@ -617,10 +608,7 @@
 											>{/each}
 									</select>
 								{:else if d}
-									<span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {badge[d.status] ??
-											'bg-gray-500/15 text-gray-400'}">{d.status}</span
-									>
+									<Badge status={d.status} domain="attendance" />
 									{#if d.isLocked}<span
 											title="locked"
 											class="ml-1 inline-flex align-middle text-muted-foreground"
@@ -775,10 +763,7 @@
 											>{/each}
 									</select>
 								{:else}
-									<span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {badge[d.status] ??
-											'bg-gray-500/15 text-gray-400'}">{d.status}</span
-									>
+									<Badge status={d.status} domain="attendance" />
 								{/if}
 							</td>
 							<td class="px-3 py-2 text-muted-foreground"

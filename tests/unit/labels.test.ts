@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
 	ApplicantStage,
 	ApprovalDecision,
+	AttendanceStatus,
+	BenefitEnrollmentStatus,
 	BranchStatus,
 	ClearanceStatus,
 	ComplaintCategory,
@@ -10,6 +12,7 @@ import {
 	EmploymentType,
 	InventoryStatus,
 	LeaveRequestStatus,
+	LoanStatus,
 	PayrollPeriodStatus,
 	PayrollRunStatus,
 	RequestStatus,
@@ -23,6 +26,8 @@ import {
 import {
 	APPLICANT_STAGE_LABELS,
 	APPROVAL_DECISION_LABELS,
+	ATTENDANCE_STATUS_LABELS,
+	BENEFIT_ENROLLMENT_STATUS_LABELS,
 	BRANCH_STATUS_LABELS,
 	CLEARANCE_STATUS_LABELS,
 	COMPLAINT_CATEGORY_LABELS,
@@ -31,6 +36,7 @@ import {
 	EMPLOYMENT_TYPE_LABELS,
 	INVENTORY_STATUS_LABELS,
 	LEAVE_REQUEST_STATUS_LABELS,
+	LOAN_STATUS_LABELS,
 	PAYROLL_PERIOD_STATUS_LABELS,
 	PAYROLL_RUN_STATUS_LABELS,
 	REQUEST_STATUS_LABELS,
@@ -73,12 +79,15 @@ const CASES: [string, Record<string, string>, Record<string, string>][] = [
 	['InventoryStatus', InventoryStatus, INVENTORY_STATUS_LABELS],
 	['BranchStatus', BranchStatus, BRANCH_STATUS_LABELS],
 	['EmploymentStatus', EmploymentStatus, EMPLOYMENT_STATUS_LABELS],
-	['EmploymentType', EmploymentType, EMPLOYMENT_TYPE_LABELS]
+	['EmploymentType', EmploymentType, EMPLOYMENT_TYPE_LABELS],
+	['AttendanceStatus', AttendanceStatus, ATTENDANCE_STATUS_LABELS],
+	['BenefitEnrollmentStatus', BenefitEnrollmentStatus, BENEFIT_ENROLLMENT_STATUS_LABELS],
+	['LoanStatus', LoanStatus, LOAN_STATUS_LABELS]
 ]
 
 describe('labels.ts covers every mapped Prisma enum', () => {
-	it('maps all 19 enums the phase-03 badges render', () => {
-		expect(CASES).toHaveLength(19)
+	it('maps every enum the phase-03 badges render', () => {
+		expect(CASES).toHaveLength(22)
 	})
 
 	for (const [name, prismaEnum, labels] of CASES) {

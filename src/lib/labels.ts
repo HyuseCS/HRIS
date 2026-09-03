@@ -13,6 +13,8 @@
 import type {
 	ApplicantStage,
 	ApprovalDecision,
+	AttendanceStatus,
+	BenefitEnrollmentStatus,
 	BranchStatus,
 	ClearanceStatus,
 	ComplaintCategory,
@@ -21,6 +23,7 @@ import type {
 	EmploymentType,
 	InventoryStatus,
 	LeaveRequestStatus,
+	LoanStatus,
 	PayrollPeriodStatus,
 	PayrollRunStatus,
 	RequestStatus,
@@ -31,6 +34,28 @@ import type {
 	SeparationType,
 	TimesheetStatus
 } from '@prisma/client'
+
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
+	PRESENT: 'Present',
+	LATE: 'Late',
+	ABSENT: 'Absent',
+	INCOMPLETE: 'Incomplete',
+	ON_LEAVE: 'On leave',
+	HOLIDAY: 'Holiday',
+	REST_DAY: 'Rest day'
+}
+
+export const BENEFIT_ENROLLMENT_STATUS_LABELS: Record<BenefitEnrollmentStatus, string> = {
+	ACTIVE: 'Active',
+	WAIVED: 'Waived',
+	TERMINATED: 'Terminated'
+}
+
+export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = {
+	ACTIVE: 'Active',
+	PAID: 'Paid',
+	CANCELLED: 'Cancelled'
+}
 
 export const TIMESHEET_STATUS_LABELS: Record<TimesheetStatus, string> = {
 	DRAFT: 'Draft',
