@@ -1,0 +1,111 @@
+{
+  "task": "ui-ux-overhaul phase 09 \u2014 login-email-first",
+  "commands": [
+    "pnpm format:check",
+    "pnpm lint",
+    "pnpm check",
+    "pnpm test",
+    "pnpm exec tsc -p tsconfig.json --noEmit",
+    "pnpm exec vitest run tests/unit/login-resolution.test.ts",
+    "pnpm exec vitest run tests/unit/copy-invariants.test.ts"
+  ],
+  "manualChecks": [
+    "G5 \u2014 full pnpm test:e2e, baseline-compared",
+    "R2 \u2014 rate limiting still locks out after 5 failures through the renamed action",
+    "A1 \u2014 impeccable audit pass on the two changed source files",
+    "M-1..M-4 \u2014 owner real-browser pass"
+  ],
+  "result": "PASS-with-gaps \u2014 every automated tier green (CI gate set in CI order, 214 files / 2461 tests) and all seven mutations M1-M7 run red with a green-again control; the e2e tier, the hybrid rate-limit check, the impeccable pass and the owner browser pass are all unrun and listed in manualChecks.",
+  "steps": [
+    {
+      "step": "Baseline unit suite on the untouched branch (Section 0 item 6)",
+      "command": "pnpm test",
+      "result": "PASS",
+      "notes": "213 files / 2453 tests green before any edit."
+    },
+    {
+      "step": "Full CI gate set in CI order, final state",
+      "command": "pnpm format:check && pnpm lint && pnpm check && pnpm test",
+      "result": "PASS",
+      "notes": "format clean; lint 0 errors 1 pre-existing warning (CalculatorWindow.svelte:82); svelte-check 0 errors; 214 files / 2461 tests."
+    },
+    {
+      "step": "TypeScript program includes the e2e specs",
+      "command": "pnpm exec tsc -p tsconfig.json --noEmit --listFiles",
+      "result": "PASS",
+      "notes": "45 tests/e2e files typechecked including auth.spec.ts, so test.use({ javaScriptEnabled: false }) is accepted by the installed playwright types \u2014 contract C8/E8 confirmed by compile, not by memory."
+    },
+    {
+      "step": "M1 \u2014 re-add db.organization.findMany to load",
+      "command": "pnpm exec vitest run tests/unit/copy-invariants.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: 'the login server never reads the org table again' failed (1 failed / 43 passed). Reverted."
+    },
+    {
+      "step": "M2 \u2014 change the step-2 heading to 'Sign in to {form.orgs[0]?.name}'",
+      "command": "pnpm exec vitest run tests/unit/copy-invariants.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: 'the password step never names the resolved org' failed (1 failed / 43 passed). Reverted."
+    },
+    {
+      "step": "M3 \u2014 drop the >= 2 threshold so a single-org email carries orgs",
+      "command": "pnpm exec vitest run tests/unit/login-resolution.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: U1 deep-equal and U3 failed (2 failed / 5 passed). Reverted."
+    },
+    {
+      "step": "M4 \u2014 re-introduce the word Avipa in a comment in +page.server.ts",
+      "command": "pnpm exec vitest run tests/unit/copy-invariants.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: 'leaves no Avipa string anywhere in src/' failed (1 failed / 43 passed). Green-again negative control run immediately after revert: 44/44 passed \u2014 the gate is not permanently red."
+    },
+    {
+      "step": "M5 \u2014 delete the isMember clause from the ?/signin failure condition",
+      "command": "pnpm exec vitest run tests/unit/login-resolution.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: U3 (forged selectedOrg) failed (1 failed / 6 passed). Reverted."
+    },
+    {
+      "step": "M6 \u2014 resolve orgs from db.organization.findMany instead of memberships",
+      "command": "pnpm exec vitest run tests/unit/login-resolution.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: U1, U2, U3 and U4 failed (4 failed / 3 passed). The 4-orgs/2-memberships fixture is what makes this fail; a where-ignoring mock would not have caught it. Reverted."
+    },
+    {
+      "step": "M7 \u2014 delete the isActive guard from resolveLoginOrgs (contract E1)",
+      "command": "pnpm exec vitest run tests/unit/login-resolution.test.ts",
+      "result": "PASS",
+      "notes": "RED as required: the AC8b case inside U1 failed \u2014 an inactive multi-org account would have had its membership list disclosed at ?/resolve (1 failed / 6 passed). Reverted."
+    },
+    {
+      "step": "Green-again control after every mutation revert",
+      "command": "pnpm exec vitest run tests/unit/login-resolution.test.ts",
+      "result": "PASS",
+      "notes": "7/7 green after the last revert; copy-invariants 44/44."
+    },
+    {
+      "step": "G5 \u2014 full pnpm test:e2e, baseline-compared",
+      "command": "pnpm test:e2e",
+      "result": "SKIP",
+      "notes": "NOT RUN by this agent. The orchestrator owns the e2e run at the phase boundary and forbade it here, which also means the Section 0 pre-phase baseline was never captured. This is the phase's largest open verification item: AC11, AC12, E1, E3, E4, E5, E6, E7 and R1 are all unconfirmed until it runs."
+    },
+    {
+      "step": "R2 \u2014 rate limiting still locks out after 5 failures through the renamed action",
+      "command": "six wrong-password submits on one email against a running app",
+      "result": "SKIP",
+      "notes": "Hybrid tier, needs a running app. This agent never starts the server or the DB container. Owner/orchestrator item."
+    },
+    {
+      "step": "A1 \u2014 impeccable audit pass on the two changed source files",
+      "command": "impeccable",
+      "result": "SKIP",
+      "notes": "Agent-probe tier. Not run in this session."
+    },
+    {
+      "step": "M-1..M-4 \u2014 owner real-browser pass",
+      "command": "manual",
+      "result": "SKIP",
+      "notes": "Agent-probe tier. Listed verbatim in the phase report for PROGRAM CLOSE."
+    }
+  ]
+}
