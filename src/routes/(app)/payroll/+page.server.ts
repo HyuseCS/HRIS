@@ -43,7 +43,7 @@ export const actions: Actions = {
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = createSchema.safeParse(raw)
-		if (!parsed.success) return fail(400, { error: 'Invalid dates' })
+		if (!parsed.success) return fail(400, { error: 'Choose a period start date and end date.' })
 
 		// Service errors (e.g. "run for this period already exists") come back as
 		// HttpErrors — surface them inline instead of blowing up to an error page.
@@ -68,7 +68,10 @@ export const actions: Actions = {
 		requireAnyCapability(user.roles, 'OVERRIDE_FINALIZED')
 
 		const id = String((await request.formData()).get('id') ?? '')
-		if (!id) return fail(400, { error: 'Missing run id' })
+		if (!id)
+			return fail(400, {
+				error: 'That payroll run is no longer on screen. Reload the page and try again.'
+			})
 
 		try {
 			await voidRun(id, user.organizationId, {

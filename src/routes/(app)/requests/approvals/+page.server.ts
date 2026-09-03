@@ -112,7 +112,7 @@ export const actions: Actions = {
 		const decision = data.get('decision') as ApprovalDecision
 		const note = (data.get('note') as string) || undefined
 		if (!id || !['APPROVED', 'REJECTED', 'RETURNED'].includes(decision)) {
-			return fail(400, { error: 'Missing request id or invalid decision' })
+			return fail(400, { error: 'Choose Approve, Return or Reject.' })
 		}
 
 		if (['REJECTED', 'RETURNED'].includes(decision) && (!note || note.trim() === '')) {

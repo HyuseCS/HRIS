@@ -157,6 +157,117 @@ describe('sensitive titles leak no name or subject (S2 item 15, R2)', () => {
 	})
 })
 
+// ── S3 item 21 — the R4 message rewrite ──────────────────────────────────────
+/**
+ * R4: `{what is wrong or missing} + {what to do}`, in the person's words, one sentence, ending in a
+ * period. Never a field name, never an id, never a type name.
+ *
+ * Scoped to the ten files the phase names, NOT repo-wide. `'Invalid input'` still lives at two
+ * unlisted sites (`employees/[id]` and `recruitment/[id]`) and roughly forty other machine-voiced
+ * `fail(400)` strings survive elsewhere — a recorded known gap, listed in the phase report. A
+ * repo-wide assertion here could not pass and would be deleted by the next person who saw it red.
+ */
+const REWRITTEN: { file: string; gone: string; present: string }[] = [
+	{
+		file: 'routes/(app)/payroll/calculator/+page.server.ts',
+		gone: "'Invalid input'",
+		present: 'Enter a basic rate and a period before calculating.'
+	},
+	{
+		file: 'routes/(app)/recruitment/+page.server.ts',
+		gone: "'Invalid input'",
+		present: 'Fill in the posting title, department and status.'
+	},
+	{
+		file: 'routes/(app)/departments/+page.server.ts',
+		gone: "'Invalid input'",
+		present: 'Enter a department name.'
+	},
+	{
+		file: 'routes/(app)/attendance/+page.server.ts',
+		gone: "'Missing day id'",
+		present: 'That attendance row is no longer on screen. Reload the page and try again.'
+	},
+	{
+		file: 'routes/(app)/attendance/+page.server.ts',
+		gone: "'Invalid range'",
+		present: 'Choose a start date and an end date.'
+	},
+	{
+		file: 'routes/(app)/attendance/+page.server.ts',
+		gone: "'Invalid correction'",
+		present: 'Enter a valid time in and time out for this correction.'
+	},
+	{
+		file: 'routes/(app)/attendance/+page.server.ts',
+		gone: "'Invalid date'",
+		present: 'Choose a date.'
+	},
+	{
+		file: 'routes/(app)/payroll/+page.server.ts',
+		gone: "'Invalid dates'",
+		present: 'Choose a period start date and end date.'
+	},
+	{
+		file: 'routes/(app)/payroll/+page.server.ts',
+		gone: "'Missing run id'",
+		present: 'That payroll run is no longer on screen. Reload the page and try again.'
+	},
+	{
+		file: 'routes/(app)/payroll/[id]/+page.server.ts',
+		gone: "'Invalid decision'",
+		present: 'Choose Approve or Reject.'
+	},
+	{
+		file: 'routes/(app)/dashboard/+page.server.ts',
+		gone: "'Missing posting id'",
+		present: 'That job posting is no longer on screen. Reload the page and try again.'
+	},
+	{
+		file: 'routes/(app)/benefits/+page.server.ts',
+		gone: "'Invalid status change'",
+		present: "That status change is not allowed from the plan's current status."
+	},
+	{
+		file: 'routes/(app)/settings/posting-approvers/+page.server.ts',
+		gone: "'Missing department'",
+		present: 'Choose a department.'
+	},
+	{
+		file: 'routes/(app)/settings/holidays/+page.server.ts',
+		gone: "'Holiday ID is required'",
+		present: 'That holiday is no longer on screen. Reload the page and try again.'
+	},
+	{
+		file: 'routes/(app)/requests/approvals/+page.server.ts',
+		gone: "'Missing request id or invalid decision'",
+		present: 'Choose Approve, Return or Reject.'
+	}
+]
+
+describe('machine-voiced errors are rewritten in the person’s words (S3 item 21, R4)', () => {
+	for (const { file, gone, present } of REWRITTEN) {
+		it(`${file}: ${gone} is gone`, () => {
+			expect(read(file)).not.toContain(gone)
+		})
+
+		it(`${file}: says "${present}"`, () => {
+			expect(read(file)).toContain(present)
+		})
+	}
+
+	/**
+	 * R5 negative control. `'Invalid email or password'` is deliberate non-enumeration: the same
+	 * answer for a wrong password, an unknown email and a right password against the wrong tenant.
+	 * Making it "helpful" would turn it into an account oracle. If the R4 sweep ever reaches it,
+	 * this goes red — which is the whole point of keeping it here rather than in a comment.
+	 */
+	it('the login credential message is untouched (R5 negative control)', () => {
+		const login = read('routes/(auth)/login/+page.server.ts')
+		expect(login).toContain("'Invalid email or password'")
+	})
+})
+
 // ── S2 item 14 — the #182 noun ruling ────────────────────────────────────────
 /**
  * Owner ruling 03-09-26: a physical location is a "Store" on every surface, and `/team` — the
