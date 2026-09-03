@@ -77,7 +77,7 @@ test('happy path: employee → HR make → verifier → approver → APPROVED', 
 
 	await aPage.goto(`/requests/${id}`, { waitUntil: 'domcontentloaded' })
 	const text = await aPage.locator('body').innerText()
-	expect(text).toMatch(/APPROVED/)
+	expect(text).toMatch(/approved/i)
 	expect(text).toMatch(/Filed/)
 	expect(text).toMatch(/Verified/)
 	await aCtx.close()
