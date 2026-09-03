@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -91,25 +92,21 @@
 	{/if}
 
 	<!-- Header -->
-	<div class="flex flex-wrap items-start justify-between gap-4 rounded-lg border bg-card p-4">
-		<div class="min-w-0 flex-1">
-			<h1 class="text-xl font-bold tracking-tight">
-				{s.employee.lastName}, {s.employee.firstName}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				{s.employee.jobTitle} · {s.employee.department?.name ?? '—'} · #{s.employee.employeeNumber}
-			</p>
-			<p class="mt-2 text-sm">
-				<span class="font-medium">{s.type}</span> · effective {formatShortDate(s.effectiveDate)}
-			</p>
-			{#if s.reason}<p class="mt-1 text-sm text-muted-foreground">{s.reason}</p>{/if}
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+	<div class="space-y-2 rounded-lg border bg-card p-4">
+		<PageHeader
+			title="{s.employee.lastName}, {s.employee.firstName}"
+			description="{s.employee.jobTitle} · {s.employee.department?.name ?? '—'} · #{s.employee
+				.employeeNumber}"
 		>
-			<BackButton fallback="/separations" label="Separations" />
-			<Badge status={s.status} domain="separation" />
-		</div>
+			{#snippet back()}
+				<BackButton fallback="/separations" label="Separations" />
+				<Badge status={s.status} domain="separation" />
+			{/snippet}
+		</PageHeader>
+		<p class="text-sm">
+			<span class="font-medium">{s.type}</span> · effective {formatShortDate(s.effectiveDate)}
+		</p>
+		{#if s.reason}<p class="text-sm text-muted-foreground">{s.reason}</p>{/if}
 	</div>
 
 	<!-- Clearance checklist -->

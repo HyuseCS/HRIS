@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
@@ -170,17 +171,15 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Request Approvals</h1>
-			<p class="text-sm text-muted-foreground">Review requests awaiting your decision.</p>
-		</div>
-		{#if data.pagination.total > 0}
-			<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-				{data.pagination.total} awaiting you
-			</span>
-		{/if}
-	</div>
+	<PageHeader title="Request Approvals" description="Review requests awaiting your decision.">
+		{#snippet back()}
+			{#if data.pagination.total > 0}
+				<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+					{data.pagination.total} awaiting you
+				</span>
+			{/if}
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />

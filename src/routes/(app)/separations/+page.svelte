@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatShortDate } from '$lib/utils/format'
@@ -26,13 +27,13 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Separations</h1>
-			<p class="text-sm text-muted-foreground">
-				Record resignations and terminations, run clearance, and settle final pay.
-			</p>
-		</div>
+	<PageHeader
+		title="Separations"
+		description="Record resignations and terminations, run clearance, and settle final pay."
+	/>
+
+	<!-- The create action sits directly above the form it opens, not on the title row. -->
+	<div class="flex justify-end">
 		<button
 			onclick={() => (showForm = !showForm)}
 			class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"

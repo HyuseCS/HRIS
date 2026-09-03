@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatShortDate } from '$lib/utils/format'
@@ -37,25 +38,19 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div>
-		<a href="/complaints" class="text-sm text-muted-foreground hover:text-foreground"
-			>← Back to inquiries</a
-		>
-	</div>
-
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">{complaint.subject}</h1>
-			<p class="mt-1 text-sm text-muted-foreground">
-				{CATEGORY_LABELS[complaint.category] ?? complaint.category}
-				· For {complaint.employee.firstName}
-				{complaint.employee.lastName} ({complaint.employee.employeeNumber}) · Opened {formatShortDate(
-					complaint.createdAt
-				)}
-			</p>
-		</div>
-		<Badge status={complaint.status} domain="complaint" />
-	</div>
+	<PageHeader
+		title={complaint.subject}
+		description="{CATEGORY_LABELS[complaint.category] ?? complaint.category} · For {complaint
+			.employee.firstName} {complaint.employee.lastName} ({complaint.employee
+			.employeeNumber}) · Opened {formatShortDate(complaint.createdAt)}"
+	>
+		{#snippet back()}
+			<Badge status={complaint.status} domain="complaint" />
+			<a href="/complaints" class="text-sm text-muted-foreground hover:text-foreground"
+				>← Back to inquiries</a
+			>
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.message}
 		<Banner kind="success" message={form.message} />

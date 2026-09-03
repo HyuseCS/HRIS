@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -28,13 +29,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Stores</h1>
-		<p class="text-sm text-muted-foreground">
-			Your physical stores — address, contact, branch manager, and who works out of each. Closing a
-			branch keeps its crew on record; it just stops accepting new assignments.
-		</p>
-	</div>
+	<PageHeader
+		title="Stores"
+		description="Your physical stores — address, contact, branch manager, and who works out of each. Closing a branch keeps its crew on record; it just stops accepting new assignments."
+	/>
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />

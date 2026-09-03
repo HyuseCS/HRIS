@@ -251,12 +251,4 @@
 	.data-table tbody td {
 		@apply px-4 py-3;
 	}
-
-	/* Page header */
-	.page-header {
-		@apply flex items-center justify-between;
-	}
-	.page-title {
-		@apply text-xl font-semibold tracking-tight;
-	}
 }

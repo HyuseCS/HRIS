@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -27,13 +28,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Inventory</h1>
-		<p class="text-sm text-muted-foreground">
-			Track company assets, equipment, and supplies — quantity, location, status, and who holds each
-			item.
-		</p>
-	</div>
+	<PageHeader
+		title="Inventory"
+		description="Track company assets, equipment, and supplies — quantity, location, status, and who holds each item."
+	/>
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />

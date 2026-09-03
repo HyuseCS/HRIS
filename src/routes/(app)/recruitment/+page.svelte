@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
@@ -37,8 +38,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-2">
-		<h1 class="text-2xl font-bold tracking-tight">Recruitment</h1>
+	<PageHeader title="Recruitment" />
+
+	<!-- The posting actions sit above the list they publish into, not on the title row. -->
+	<div class="flex flex-wrap items-center justify-end gap-2">
 		<div class="flex items-center gap-2">
 			{#if selectedDraftIds.length}
 				<form

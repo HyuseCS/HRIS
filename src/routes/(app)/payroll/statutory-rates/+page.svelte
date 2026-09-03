@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -159,19 +160,19 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Statutory Rates</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
-			The SSS, PhilHealth, Pag-IBIG, and BIR withholding-tax figures the payroll engine computes
-			with. These are authoritative — changes take effect on the next payroll computation (approved
-			runs stay frozen).
-			{#if data.canManage}
-				You can edit and apply these directly.
-			{:else}
-				Your changes are submitted for CEO approval before they take effect.
-			{/if}
-		</p>
-	</div>
+	<!-- The description branches on capability, which PageHeader's string `description` cannot
+	     express, so it stays its own paragraph directly under the title. -->
+	<PageHeader title="Statutory Rates" />
+	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
+		The SSS, PhilHealth, Pag-IBIG, and BIR withholding-tax figures the payroll engine computes with.
+		These are authoritative — changes take effect on the next payroll computation (approved runs
+		stay frozen).
+		{#if data.canManage}
+			You can edit and apply these directly.
+		{:else}
+			Your changes are submitted for CEO approval before they take effect.
+		{/if}
+	</p>
 
 	{#if form?.success}
 		<Banner kind="success" message={form.success} />

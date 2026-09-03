@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import type { ActionData, PageData } from './$types'
@@ -38,7 +39,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold tracking-tight">Audit Log</h1>
+	<PageHeader title="Audit Log" />
 
 	{#if failure}
 		<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">

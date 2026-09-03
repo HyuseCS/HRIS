@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
@@ -85,20 +86,19 @@
 {/snippet}
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">My Requests</h1>
-			<p class="text-sm text-muted-foreground">File and track your requests.</p>
-		</div>
-		{#if data.hasEmployee}
+	<PageHeader title="My Requests" description="File and track your requests." />
+
+	<!-- The file action sits directly above the form it opens, not on the title row. -->
+	{#if data.hasEmployee}
+		<div class="flex justify-end">
 			<button
 				onclick={() => (showForm = !showForm)}
 				class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 			>
 				{showForm ? 'Close' : 'New Request'}
 			</button>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />

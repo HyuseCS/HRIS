@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
@@ -79,39 +80,38 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-			<!-- #163: a custom range is no longer self-evident from its dates, so the inclusive day
-			     count is spelled out — it is what statutory and loans are prorated against. -->
-			<h1 class="text-2xl font-bold">
-				{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)}
-				<span class="text-base font-normal text-muted-foreground"
-					>({periodDays(run.periodStart, run.periodEnd)} days)</span
-				>
-			</h1>
+	<!-- #163: a custom range is no longer self-evident from its dates, so the inclusive day
+	     count is spelled out — it is what statutory and loans are prorated against. -->
+	<PageHeader
+		title="{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)} ({periodDays(
+			run.periodStart,
+			run.periodEnd
+		)} days)"
+	>
+		{#snippet back()}
 			<Badge status={run.status} domain="payrollRun" />
 			{#if run.hasOverride}
 				<span class="text-xs text-yellow-600 font-medium dark:text-yellow-500">Has overrides</span>
 			{/if}
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
 			<BackButton fallback="/payroll" label="Payroll" />
-			{#if data.canManage && run.status === 'COMPUTED'}
-				<!-- Recompute rebuilds all entries from current data (e.g. after assigning
-				     recurring earnings/deductions). Managers only; disabled once approved. -->
-				<form method="POST" action="?/compute" use:enhance={compute.enhance}>
-					<button
-						type="submit"
-						disabled={compute.busy}
-						class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{compute.busy ? 'Computing…' : 'Recompute'}</button
-					>
-				</form>
-			{/if}
+		{/snippet}
+	</PageHeader>
+
+	<!-- Recompute rebuilds all entries from current data (e.g. after assigning recurring
+	     earnings/deductions). Managers only; disabled once approved. It sits above the totals
+	     and the entry table it rebuilds, not on the title row. -->
+	{#if data.canManage && run.status === 'COMPUTED'}
+		<div class="flex justify-end">
+			<form method="POST" action="?/compute" use:enhance={compute.enhance}>
+				<button
+					type="submit"
+					disabled={compute.busy}
+					class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{compute.busy ? 'Computing…' : 'Recompute'}</button
+				>
+			</form>
 		</div>
-	</div>
+	{/if}
 
 	{#if form?.error}
 		<div
