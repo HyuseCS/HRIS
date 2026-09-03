@@ -48,10 +48,10 @@
 		{#if data.showBranches}
 			<select
 				name="branch"
-				aria-label="Branch"
+				aria-label="Store"
 				class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			>
-				<option value="">All branches</option>
+				<option value="">All stores</option>
 				{#each data.branches as br (br.id)}
 					<option value={br.id} selected={data.branchFilter === br.id}>{br.name}</option>
 				{/each}
@@ -98,7 +98,7 @@
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
 						{#if data.showBranches}
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Branch</th>
+							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Store</th>
 						{/if}
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -154,7 +154,7 @@
 										? 'No offboarded employees'
 										: 'No employees found'}
 									description={filtered
-										? 'No employee matches your search or branch filter.'
+										? 'No employee matches your search or store filter.'
 										: undefined}
 								/>
 							</td>

@@ -182,7 +182,7 @@ describe('no role gains reach (N4)', () => {
 	// capability change smuggled in as an IA change.
 	const MANAGER_HREFS = [
 		'/attendance',
-		'/complaints',
+		'/inquiries',
 		'/dashboard',
 		'/departments',
 		'/employees',
@@ -260,12 +260,17 @@ describe('tenant conditionals (N8)', () => {
 		expect(itemsFor(ctx(['HR_ADMIN'])).find((i) => i.href === '/team')?.label).toBe('Team')
 	})
 
-	it('shows both and relabels the roster for a food-service org', () => {
+	// Owner ruling 03-09-26 on #182: the roster is "Team" for EVERY tenant and a physical location
+	// is a "Store". This test used to pin the opposite (roster relabelled "Branches" for a
+	// food-service org), which is the inversion phase 08 removes — so it now pins the ruling, and
+	// would go red if the tenant-conditional label came back.
+	it('shows both, and the roster stays "Team" for a food-service org', () => {
 		const c = ctx(['HR_ADMIN'], { hasBranches: true })
 		const hrefs = hrefsFor(c)
 		expect(hrefs).toContain('/punch')
 		expect(hrefs).toContain('/branches')
-		expect(itemsFor(c).find((i) => i.href === '/team')?.label).toBe('Branches')
+		expect(itemsFor(c).find((i) => i.href === '/team')?.label).toBe('Team')
+		expect(itemsFor(c).find((i) => i.href === '/branches')?.label).toBe('Stores')
 	})
 })
 
@@ -303,7 +308,7 @@ describe('badges', () => {
 			waitingInquiries: 3,
 			pendingApprovals: { timesheets: 1, requests: 2, proposals: 4, payrollRuns: 5, total: 12 }
 		})
-		expect(itemsFor(c).find((i) => i.href === '/complaints')?.badge).toBe(3)
+		expect(itemsFor(c).find((i) => i.href === '/inquiries')?.badge).toBe(3)
 		const children = itemsFor(c).find((i) => i.href === '/requests')?.children ?? []
 		expect(children.map((ch) => ch.badge)).toEqual([0, 1, 2, 4, 5])
 	})

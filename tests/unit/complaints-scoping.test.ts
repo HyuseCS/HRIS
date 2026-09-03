@@ -50,10 +50,12 @@ vi.mock('$lib/server/services/employee-access', () => ({
 
 const { listComplaintsForEmployee, listComplaintsForOrg, resolveComplaint, countWaitingInquiries } =
 	await import('$lib/server/services/complaints')
+// The route moved to /inquiries in phase 08; the service module, the Prisma models and the audit
+// entity names still say "complaint", which is why only these two paths changed.
 const { load: listLoad, actions: listActions } =
-	await import('../../src/routes/(app)/complaints/+page.server')
+	await import('../../src/routes/(app)/inquiries/+page.server')
 const { load: threadLoad, actions: threadActions } =
-	await import('../../src/routes/(app)/complaints/[id]/+page.server')
+	await import('../../src/routes/(app)/inquiries/[id]/+page.server')
 
 const ORG = 'org1'
 const ACTOR_USER = 'u-actor'

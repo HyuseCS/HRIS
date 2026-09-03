@@ -164,7 +164,9 @@
 							<Badge status={s.status} domain="separation" />
 						</td>
 						<td class="px-4 py-3 text-right">
-							<a href="/separations/{s.id}" class="btn-row">Open</a>
+							<!-- Item 17: "Review", not "Open" — this destination is where the clearance is
+							     worked and the case finalized, and "Open" also names a separation status. -->
+							<a href="/separations/{s.id}" class="btn-row">Review</a>
 						</td>
 					</tr>
 				{:else}

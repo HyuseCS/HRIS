@@ -50,12 +50,15 @@
 </script>
 
 <svelte:head>
-	<title>{data.isFoodService ? 'Branches' : 'Team'} — Veent HRIS</title>
+	<!-- Owner ruling 03-09-26 (#182): a physical location is a "Store" on every surface, and this
+	     page — the people roster — is "Team" for every tenant. The old food-service branch, which
+	     called the roster "Branches" and the store registry "Stores", is the inversion being killed. -->
+	<title>Team — Veent HRIS</title>
 </svelte:head>
 
 <div class="space-y-6">
 	<PageHeader
-		title={data.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
+		title="Team Attendance"
 		description="Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across a date range."
 	/>
 

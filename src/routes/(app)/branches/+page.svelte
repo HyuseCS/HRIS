@@ -31,7 +31,7 @@
 <div class="space-y-6">
 	<PageHeader
 		title="Stores"
-		description="Your physical stores — address, contact, branch manager, and who works out of each. Closing a branch keeps its crew on record; it just stops accepting new assignments."
+		description="Your physical stores — address, contact, store manager, and who works out of each. Closing a store keeps its crew on record; it just stops accepting new assignments."
 	/>
 
 	{#if form?.error}
@@ -72,7 +72,7 @@
 
 	<!-- Add -->
 	<details class="rounded-lg border bg-card">
-		<summary class="cursor-pointer px-4 py-3 font-semibold">Add a branch</summary>
+		<summary class="cursor-pointer px-4 py-3 font-semibold">Add a store</summary>
 		<form
 			method="POST"
 			action="?/create"
@@ -100,7 +100,7 @@
 			</div>
 			<div>
 				<label for="a-manager" class="text-xs font-medium text-muted-foreground">
-					Branch manager <span class="text-muted-foreground/70">(optional)</span>
+					Store manager <span class="text-muted-foreground/70">(optional)</span>
 				</label>
 				<select id="a-manager" name="managerId" class="mt-1 {inputClass}">
 					<option value="">— No manager —</option>
@@ -123,13 +123,13 @@
 			</div>
 			<div class="sm:col-span-2 lg:col-span-3">
 				<p class="mb-2 text-xs text-muted-foreground">
-					Naming a manager also assigns them to this branch.
+					Naming a manager also assigns them to this store.
 				</p>
 				<button
 					type="submit"
 					disabled={add.busy}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{add.busy ? 'Adding…' : 'Add branch'}</button
+					>{add.busy ? 'Adding…' : 'Add store'}</button
 				>
 			</div>
 		</form>
@@ -140,7 +140,7 @@
 		<h2 class="font-semibold">Stores ({data.branches.length})</h2>
 		{#if data.branches.length === 0}
 			<p class="text-sm text-muted-foreground">
-				No branches match — add one above or adjust the filters.
+				No stores match — add one above or adjust the filters.
 			</p>
 		{:else}
 			<div class="overflow-x-auto rounded-md border">
@@ -227,8 +227,8 @@
 									{#if b.status === 'OPEN'}
 										<ConfirmButton
 											action="?/toggle"
-											title="Close this branch?"
-											message="Its crew stay on record and keep counting toward its roster. The branch stops accepting new assignments and its manager is cleared."
+											title="Close this store?"
+											message="Its crew stay on record and keep counting toward its roster. The store stops accepting new assignments and its manager is cleared."
 											confirmText="Close"
 											triggerLabel="Close"
 											triggerClass="rounded-md border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
@@ -253,9 +253,9 @@
 				</table>
 			</div>
 			<p class="text-xs text-muted-foreground">
-				Staff counts link to that branch's roster. <a href="/employees" class="underline"
+				Staff counts link to that store's roster. <a href="/employees" class="underline"
 					>{data.unassigned}</a
-				> active employees are not assigned to a branch.
+				> active employees are not assigned to a store.
 			</p>
 		{/if}
 	</section>

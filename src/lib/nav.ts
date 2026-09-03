@@ -167,7 +167,7 @@ export function buildNavSections(ctx: NavContext): NavSection[] {
 			},
 			{ href: '/payslips', label: 'Payslips', show: true, icon: ICONS.payslips },
 			{
-				href: '/complaints',
+				href: '/inquiries',
 				label: 'Inquiries',
 				show: true,
 				// A count, not a dot: server-scoped to the same visible-employee set as the list it
@@ -184,10 +184,12 @@ export function buildNavSections(ctx: NavContext): NavSection[] {
 		]),
 		section('People', [
 			{
-				// Food-service tenants organise staff by branch, so the roster reads "Branches"
-				// there; the store registry below is relabelled "Stores" to avoid the clash (#182).
+				// Owner ruling 03-09-26 settles #182 the other way round: the roster is "Team" for
+				// every tenant, and a physical location is a "Store" everywhere. The old pairing
+				// (roster = "Branches", registry = "Stores") read as an inversion to anyone who
+				// knew the route names, so the label no longer varies by tenant.
 				href: '/team',
-				label: hasBranches ? 'Branches' : 'Team',
+				label: 'Team',
 				show: isManager,
 				icon: ICONS.team
 			},
@@ -230,8 +232,8 @@ export function buildNavSections(ctx: NavContext): NavSection[] {
 		]),
 		section('Organization', [
 			{
-				// The physical-store registry. Called "Stores" so it doesn't collide with the
-				// roster tab, which reads "Branches" in these same food-service tenants (#182).
+				// The physical-store registry. "Stores" on every surface per the owner's 03-09-26
+				// ruling on #182; the roster above is "Team", so there is no longer a clash to dodge.
 				href: '/branches',
 				label: 'Stores',
 				show: isAdmin && hasBranches,

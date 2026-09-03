@@ -459,8 +459,10 @@
 				<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
 					<dt class="text-muted-foreground">Primary</dt>
 					<dd>
+						<!-- R3: Last, First in a definition list, matching the roster and the picker
+						     eight lines below. Only prose keeps First Last. -->
 						{employee.reportsTo
-							? `${employee.reportsTo.firstName} ${employee.reportsTo.lastName}`
+							? `${employee.reportsTo.lastName}, ${employee.reportsTo.firstName}`
 							: '—'}
 					</dd>
 					<dt class="text-muted-foreground">Also reports to</dt>
