@@ -17,9 +17,11 @@
 	// #108: a double-submitted period open creates a duplicate payroll period.
 	const openPeriod = createSubmitGuard()
 
-	// #108: the row actions (import/generate/lock/release/void) live inside an {#each}, so each
-	// row needs its OWN guard — a single shared one would disable every row's button at once.
-	// Memoised by `${periodId}:${action}` so the identity is stable across re-renders.
+	// #108: the row actions (import/generate/lock) live inside an {#each}, so each row needs its
+	// OWN guard — a single shared one would disable every row's button at once. Memoised by
+	// `${periodId}:${action}` so the identity is stable across re-renders.
+	// Release and void are NOT here: ConfirmButton renders its own form with its own per-instance
+	// busy state, which is already a per-row single-submit guard.
 	const guards = new Map<string, ReturnType<typeof createSubmitGuard>>()
 	function guard(key: string) {
 		let g = guards.get(key)
@@ -179,18 +181,16 @@
 										</form>
 									{/if}
 									{#if p.status === 'LOCKED'}
-										{@const releaseG = guard(`${p.id}:release`)}
-										<!-- submit={releaseG.enhance} is load-bearing: ConfirmButton renders its own
-										     form, so dropping it loses the per-row #108 double-submit guard. -->
+										<!-- #108: no per-row `guard()` here — ConfirmButton owns its own form and its
+										     own per-instance busy state, which disables this row's trigger while the
+										     release is in flight. That IS the double-submit guard. -->
 										<ConfirmButton
 											action="?/release"
-											title="Release this period?"
-											message="Payslips for this period become visible to every employee in it, and the period leaves LOCKED."
-											confirmText="Release period"
-											triggerLabel={releaseG.busy ? 'Releasing…' : 'Release'}
+											title="Release this period to employees?"
+											message="Every payslip in this period becomes visible to the employee it belongs to. Releasing cannot be undone — the only way back is to void the period."
+											confirmText="Release"
+											triggerLabel="Release"
 											triggerClass="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
-											disabled={releaseG.busy}
-											submit={releaseG.enhance}
 										>
 											<input type="hidden" name="id" value={p.id} />
 										</ConfirmButton>
@@ -199,16 +199,15 @@
 										<a href="/payroll/{run.id}" class="btn-row">Detail</a>
 									{/if}
 									{#if data.canVoid && p.status !== 'VOIDED'}
-										{@const voidG = guard(`${p.id}:void`)}
+										<!-- #108: same as release above — ConfirmButton's per-instance busy state is
+										     this row's double-submit guard, so no `guard()` entry is needed. -->
 										<ConfirmButton
 											action="?/void"
 											title="Void this payroll period?"
-											message="The period is marked VOIDED. This cannot be undone, and the same exact period cannot be created again."
+											message="The period is marked VOIDED and any loan or cash-advance amortization it collected is credited back to the employees. This cannot be undone, and the same date range cannot be used again."
 											confirmText="Void period"
-											triggerLabel={voidG.busy ? 'Voiding…' : 'Void'}
+											triggerLabel="Void"
 											triggerClass="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
-											disabled={voidG.busy}
-											submit={voidG.enhance}
 										>
 											<input type="hidden" name="id" value={p.id} />
 										</ConfirmButton>
