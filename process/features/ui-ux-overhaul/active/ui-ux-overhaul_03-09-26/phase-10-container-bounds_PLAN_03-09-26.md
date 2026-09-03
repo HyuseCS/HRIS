@@ -126,6 +126,24 @@ docstring already claims this order (`dashboard.ts:9-11`: *"Ordered soonest firs
 lead"*) — the query never enforced it. The JS sort **stays** as the belt-and-braces; it is now
 redundant, not wrong, and removing it would make the cap depend on one mechanism instead of two.
 
+> **AMENDED at execution (binding instruction E1, validate-contract concern C1).** The
+> monotonicity proof above is **FALSE**. `regularizationDate = addUTCMonths(startDate, 6)` and
+> `setUTCMonth` **overflows rather than clamps** — the repo's own `dates.ts:168-170` says so, and
+> `tests/unit/dates-add-utc-months.test.ts` pins it. Measured in the shipped service by G3b:
+> `2025-08-30 → 2026-03-02`, `2025-08-31 → 2026-03-03`, but `2025-09-01 → 2026-03-01`. The later
+> start date regularizes FIRST. `startDate` ascending is therefore **not** `daysUntil` ascending
+> across any 31-day-month → February boundary, and the 21-day notice window straddles exactly that.
+>
+> Consequence for the build: the `orderBy: { startDate: 'asc' }` still goes in, for query
+> determinism, but **nothing may be capped off it**. The limit is applied as a `.slice()` AFTER the
+> existing JS `.sort((a, b) => a.daysUntil - b.daysUntil)`. The JS sort is therefore **not**
+> redundant belt-and-braces as claimed above — it is the ONLY thing that orders this card, and
+> deleting it is a correctness bug. Checklist item 18 is superseded accordingly; checklist item
+> 23's RED mutation is VOID (deleting the `orderBy` alone cannot go red once the cap moved off the
+> query) and is replaced by two mutations that were run and recorded in the phase report: delete
+> BOTH ordering mechanisms (G3 red, G1 green), and put the cap back as a query `take` (G3b red,
+> G1 green).
+
 ### D-4 — No new destination pages
 
 Where a view-all target exists, link to it. Where none exists, omit the link.
