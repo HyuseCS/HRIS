@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -176,20 +177,15 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold">{employee.lastName}, {employee.firstName}</h1>
+	<PageHeader title="{employee.lastName}, {employee.firstName}">
+		{#snippet back()}
 			<Badge status={employee.employmentStatus} domain="employment" />
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
 			<BackButton
 				fallback={canManage ? '/employees' : '/team'}
 				label={canManage ? 'Employees' : 'Team'}
 			/>
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
 
 	{#if loose?.error}
 		<div

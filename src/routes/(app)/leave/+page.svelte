@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
@@ -47,25 +48,25 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Leave</h1>
-			<p class="text-sm text-muted-foreground">
-				Your leave balances and history. File leave from
-				<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
-			</p>
-		</div>
-		{#if data.canViewOrgBalances}
+	<!-- The description carries a link, which PageHeader's string `description` cannot, so it
+	     stays its own paragraph directly under the title. -->
+	<PageHeader title="Leave" />
+	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
+		Your leave balances and history. File leave from
+		<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
+	</p>
+
+	<!-- Balances. The org-wide link sits beside the balances it widens, not on the title row. -->
+	{#if data.canViewOrgBalances}
+		<div class="flex justify-end">
 			<a
 				href="/leave/balances"
 				class="rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
 			>
 				View all balances
 			</a>
-		{/if}
-	</div>
-
-	<!-- Balances -->
+		</div>
+	{/if}
 	{#if data.balances.length > 0}
 		<div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
 			{#each data.balances as b (b.id)}

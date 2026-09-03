@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
@@ -199,23 +200,12 @@
 {/snippet}
 
 <div class="space-y-6">
-	<div class="flex items-start justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Attendance</h1>
-			{#if data.canManage}
-				<p class="text-sm text-muted-foreground">
-					Daily records &amp; corrections. For a multi-day team matrix, see Team Attendance.
-				</p>
-			{/if}
-		</div>
-		{#if data.canManage && data.view === 'team'}
-			<a
-				href="/team"
-				class="whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-				>Multi-day matrix →</a
-			>
-		{/if}
-	</div>
+	<PageHeader
+		title="Attendance"
+		description={data.canManage
+			? 'Daily records & corrections. For a multi-day team matrix, see Team Attendance.'
+			: undefined}
+	/>
 
 	{#if form?.error}
 		<div
@@ -229,25 +219,35 @@
 	{/if}
 
 	{#if data.canManage}
-		<!-- View toggle: one employee's range vs the whole team on a day -->
-		<div class="inline-flex rounded-lg border p-1 text-sm">
-			<a
-				href="?view=employee&employeeId={data.selectedEmployeeId ??
-					''}&from={data.from}&to={data.to}"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				By employee
-			</a>
-			<a
-				href="?view=team&date={data.date}"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				Whole team (day)
-			</a>
+		<!-- View toggle: one employee's range vs the whole team on a day. The cross-link to the
+		     multi-day matrix sits here, level with the control it relates to, not on the title row. -->
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<div class="inline-flex rounded-lg border p-1 text-sm">
+				<a
+					href="?view=employee&employeeId={data.selectedEmployeeId ??
+						''}&from={data.from}&to={data.to}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					By employee
+				</a>
+				<a
+					href="?view=team&date={data.date}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					Whole team (day)
+				</a>
+			</div>
+			{#if data.view === 'team'}
+				<a
+					href="/team"
+					class="ml-auto whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+					>Multi-day matrix →</a
+				>
+			{/if}
 		</div>
 	{/if}
 

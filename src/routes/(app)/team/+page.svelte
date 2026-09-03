@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
@@ -52,22 +53,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-start justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">
-				{data.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day
-				across a date range.
-			</p>
-		</div>
-		<a
-			href="/attendance?view=team"
-			class="whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-			>Daily roster &amp; corrections →</a
-		>
-	</div>
+	<PageHeader
+		title={data.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
+		description="Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across a date range."
+	/>
 
 	<!-- Date range filter -->
 	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-md border p-4">
@@ -95,6 +84,11 @@
 				class="flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
+		<a
+			href="/attendance?view=team"
+			class="ml-auto whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+			>Daily roster &amp; corrections →</a
+		>
 	</form>
 
 	<!-- Legend -->
