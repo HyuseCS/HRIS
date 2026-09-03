@@ -10,6 +10,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { Role } from '@prisma/client'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -208,13 +209,10 @@
 						<td class="px-4 py-3 text-muted-foreground">{u.employeeName ?? '—'}</td>
 						<td class="px-4 py-3">
 							<div class="flex items-center gap-2">
-								<span
-									class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {u.isActive
-										? 'bg-green-500/15 text-green-400'
-										: 'bg-gray-500/15 text-gray-400'}"
-								>
-									{u.isActive ? 'ACTIVE' : 'INACTIVE'}
-								</span>
+								<Badge
+									status={u.isActive ? 'ACTIVE' : 'INACTIVE'}
+									tone={u.isActive ? 'green' : 'gray'}
+								/>
 								{#if canManageActive}
 									<form method="POST" action="?/setActive" use:enhance={setActive.enhance}>
 										<input type="hidden" name="userId" value={u.id} />

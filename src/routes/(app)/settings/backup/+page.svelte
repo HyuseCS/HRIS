@@ -7,6 +7,7 @@
 	import { addToast } from '$lib/stores/toast.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	// No `form` prop: the save result is handled in the submit callback below, so nothing on
 	// this page reads `ActionData`.
@@ -65,15 +66,6 @@
 		return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`
 	}
 
-	// PARTIAL is yellow, never green: the run kept real files, but some could not be copied,
-	// and reading that as success is the exact lie the status exists to prevent.
-	const badgeFor: Record<string, string> = {
-		SUCCESS: 'badge-green',
-		PARTIAL: 'badge-yellow',
-		FAILED: 'badge-red',
-		RUNNING: 'badge-blue'
-	}
-
 	const columns: Column[] = [
 		{ key: 'startedAt', label: 'Started', width: 'min' },
 		{ key: 'status', label: 'Status', width: 'min' },
@@ -109,9 +101,10 @@
 			<div class="space-y-1">
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
 				<dd>
-					<span class={data.config.enabled ? 'badge-green' : 'badge-gray'}>
-						{data.config.enabled ? 'On' : 'Off'}
-					</span>
+					<Badge
+						status={data.config.enabled ? 'On' : 'Off'}
+						tone={data.config.enabled ? 'green' : 'gray'}
+					/>
 				</dd>
 			</div>
 			<div class="space-y-1">
@@ -233,7 +226,7 @@
 				{#if column.key === 'startedAt'}
 					{fmt(row.startedAt)}
 				{:else if column.key === 'status'}
-					<span class={badgeFor[row.status] ?? 'badge-gray'}>{row.status}</span>
+					<Badge status={row.status} domain="backupRun" />
 				{:else if column.key === 'files'}
 					<span class="text-sm">
 						{row.fileCount} copied

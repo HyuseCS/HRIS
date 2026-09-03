@@ -3,8 +3,8 @@
 	 * The one status pill. Maps a status (+ optional domain) to one `.badge-*` class and one label.
 	 *
 	 * It invents no colours and holds no logic — see `badge.ts` for both, which is also where the
-	 * unit tests reach. Twelve files each had their own `statusClass` copy before this existed, so
-	 * the same status rendered in four different colours depending on the page.
+	 * unit tests reach. Twelve files each carried their own copy of this lookup before it existed,
+	 * so the same status rendered in four different colours depending on the page.
 	 */
 	import { badgeFor, type BadgeDomain, type BadgeTone } from './badge'
 

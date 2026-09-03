@@ -7,6 +7,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { addToast } from '$lib/stores/toast.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -158,18 +159,9 @@
 								>{formatCurrency(Number(run.totalNet))}</td
 							>
 							<td class="px-4 py-3">
-								<span
-									class={run.status === 'APPROVED'
-										? 'badge-green'
-										: run.status === 'COMPUTED'
-											? 'badge-blue'
-											: run.status === 'VOIDED'
-												? 'badge-red'
-												: 'badge-gray'}
-								>
-									{run.status}
-									{#if run.hasOverride}<span class="ml-1 text-yellow-500">*</span>{/if}
-								</span>
+								<Badge status={run.status} domain="payrollRun" />
+								{#if run.hasOverride}<span class="ml-1 text-yellow-600 dark:text-yellow-500">*</span
+									>{/if}
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex items-center justify-end gap-2">

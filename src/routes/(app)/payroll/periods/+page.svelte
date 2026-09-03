@@ -7,6 +7,7 @@
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showOpen = $state(false)
@@ -22,16 +23,6 @@
 		let g = guards.get(key)
 		if (!g) guards.set(key, (g = createSubmitGuard()))
 		return g
-	}
-
-	// Theme-aware status pills (#76) — see the .badge-* classes in app.css.
-	const badge: Record<string, string> = {
-		OPEN: 'badge-gray',
-		IMPORTED: 'badge-blue',
-		GENERATED: 'badge-blue',
-		LOCKED: 'badge-yellow',
-		RELEASED: 'badge-green',
-		VOIDED: 'badge-red'
 	}
 </script>
 
@@ -138,7 +129,7 @@
 								>{run ? formatCurrency(Number(run.totalNet)) : '—'}</td
 							>
 							<td class="px-4 py-3">
-								<span class={badge[p.status] ?? 'badge-gray'}>{p.status}</span>
+								<Badge status={p.status} domain="payrollPeriod" />
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex flex-wrap items-center justify-end gap-2">

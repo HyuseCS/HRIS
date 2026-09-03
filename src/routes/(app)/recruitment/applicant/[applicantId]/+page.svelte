@@ -6,6 +6,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const applicant = $derived(data.applicant)
@@ -283,15 +284,7 @@
 			<div class="rounded-md border p-4 space-y-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<span class="text-sm font-medium">{offer.jobTitle}</span>
-					<span
-						class="rounded-full px-2 py-0.5 text-xs font-medium {offer.status === 'ACCEPTED'
-							? 'bg-green-500/15 text-green-400'
-							: offer.status === 'DECLINED'
-								? 'bg-red-500/15 text-red-400'
-								: 'bg-yellow-500/15 text-yellow-400'}"
-					>
-						{offer.status === 'SENT' ? 'Pending' : offer.status}
-					</span>
+					<Badge status={offer.status} domain="offer" />
 				</div>
 				<dl class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
 					<dt class="text-muted-foreground">Salary</dt>

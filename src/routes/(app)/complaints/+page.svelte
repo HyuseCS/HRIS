@@ -6,6 +6,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -15,17 +16,6 @@
 		CONDUCT: 'Conduct',
 		PERFORMANCE: 'Performance',
 		OTHER: 'Other'
-	}
-	const STATUS_LABELS: Record<string, string> = {
-		OPEN: 'Awaiting employee',
-		RESPONDED: 'Awaiting HR',
-		RESOLVED: 'Resolved'
-	}
-
-	function statusClass(s: string) {
-		if (s === 'RESOLVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'RESPONDED') return 'bg-blue-500/15 text-blue-400'
-		return 'bg-yellow-500/15 text-yellow-400'
 	}
 
 	const open = createSubmitGuard()
@@ -226,9 +216,7 @@
 								{CATEGORY_LABELS[c.category] ?? c.category}
 							</td>
 							<td class="px-3 py-2">
-								<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(c.status)}">
-									{STATUS_LABELS[c.status] ?? c.status}
-								</span>
+								<Badge status={c.status} domain="complaint" />
 							</td>
 							<td class="px-3 py-2 text-muted-foreground">{formatShortDate(c.updatedAt)}</td>
 							<td class="px-3 py-2 text-right">

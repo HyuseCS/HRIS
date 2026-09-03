@@ -14,6 +14,7 @@ import {
 	APPLICANT_STAGE_LABELS,
 	APPROVAL_DECISION_LABELS,
 	ATTENDANCE_STATUS_LABELS,
+	BACKUP_RUN_STATUS_LABELS,
 	BENEFIT_ENROLLMENT_STATUS_LABELS,
 	BRANCH_STATUS_LABELS,
 	CLEARANCE_STATUS_LABELS,
@@ -22,8 +23,10 @@ import {
 	EMPLOYMENT_STATUS_LABELS,
 	EMPLOYMENT_TYPE_LABELS,
 	INVENTORY_STATUS_LABELS,
+	JOB_POSTING_STATUS_LABELS,
 	LEAVE_REQUEST_STATUS_LABELS,
 	LOAN_STATUS_LABELS,
+	OFFER_STATUS_LABELS,
 	PAYROLL_PERIOD_STATUS_LABELS,
 	PAYROLL_RUN_STATUS_LABELS,
 	REQUEST_STATUS_LABELS,
@@ -62,6 +65,9 @@ export type BadgeDomain =
 	| 'attendance'
 	| 'benefitEnrollment'
 	| 'loan'
+	| 'backupRun'
+	| 'jobPosting'
+	| 'offer'
 
 export const DOMAIN_LABELS: Record<BadgeDomain, Record<string, string>> = {
 	timesheet: TIMESHEET_STATUS_LABELS,
@@ -85,7 +91,10 @@ export const DOMAIN_LABELS: Record<BadgeDomain, Record<string, string>> = {
 	employmentType: EMPLOYMENT_TYPE_LABELS,
 	attendance: ATTENDANCE_STATUS_LABELS,
 	benefitEnrollment: BENEFIT_ENROLLMENT_STATUS_LABELS,
-	loan: LOAN_STATUS_LABELS
+	loan: LOAN_STATUS_LABELS,
+	backupRun: BACKUP_RUN_STATUS_LABELS,
+	jobPosting: JOB_POSTING_STATUS_LABELS,
+	offer: OFFER_STATUS_LABELS
 }
 
 /**
@@ -106,10 +115,14 @@ const BASE_TONES: Record<string, BadgeTone> = {
 	ACTIVE: 'green',
 	PRESENT: 'green',
 	PAID: 'green',
+	SUCCESS: 'green',
+	ACCEPTED: 'green',
 	// terminal-bad
 	REJECTED: 'red',
 	VOIDED: 'red',
 	ABSENT: 'red',
+	FAILED: 'red',
+	DECLINED: 'red',
 	// waiting on someone
 	PENDING: 'yellow',
 	OPEN: 'yellow',
@@ -117,6 +130,8 @@ const BASE_TONES: Record<string, BadgeTone> = {
 	ON_LEAVE: 'yellow',
 	SCREENING: 'yellow',
 	LATE: 'yellow',
+	PARTIAL: 'yellow',
+	PENDING_APPROVAL: 'yellow',
 	WAIVED: 'yellow',
 	// was orange before this phase
 	INCOMPLETE: 'yellow',
@@ -132,6 +147,8 @@ const BASE_TONES: Record<string, BadgeTone> = {
 	ASSIGNED: 'blue',
 	APPLIED: 'blue',
 	HOLIDAY: 'blue',
+	RUNNING: 'blue',
+	SENT: 'blue',
 	// was purple before this phase; purple has no badge token
 	SELF_ASSESSMENT: 'blue',
 	SCORED: 'blue',
@@ -162,6 +179,8 @@ const DOMAIN_TONES: Partial<Record<BadgeDomain, Record<string, BadgeTone>>> = {
 	attendance: { ON_LEAVE: 'blue' },
 	// An active loan is money still being collected — in progress, not a good outcome.
 	loan: { ACTIVE: 'blue' },
+	// A job posting that is open is live and taking applicants — the good state, not a waiting one.
+	jobPosting: { OPEN: 'green' },
 	payrollPeriod: { OPEN: 'gray' }
 }
 
