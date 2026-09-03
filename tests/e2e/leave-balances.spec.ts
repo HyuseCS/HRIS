@@ -145,8 +145,16 @@ test.describe('Leave balances', () => {
 		try {
 			await login(reviewer, USERS.admin)
 			await reviewer.goto('/leave', { waitUntil: 'domcontentloaded' })
-			await reviewer.locator('tbody tr', { hasText: 'Sick Leave' }).first().click()
-			await reviewer.waitForURL(/\/requests\/[^/]+$/)
+			// #287: a click before hydration is silently dropped — retry until the URL moves,
+			// same idiom as the 201-file test above.
+			const sickRow = reviewer.locator('tbody tr', { hasText: 'Sick Leave' }).first()
+			await expect(async () => {
+				await sickRow.click()
+				await reviewer.waitForURL(/\/requests\/[^/]+$/, {
+					waitUntil: 'domcontentloaded',
+					timeout: 2000
+				})
+			}).toPass({ timeout: 30_000 })
 
 			const requested = reviewer.locator('[data-leave-type="Sick Leave"]')
 			await expect(requested).toBeVisible()
