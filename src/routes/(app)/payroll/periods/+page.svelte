@@ -35,7 +35,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Payroll Periods">
+	<PageHeader
+		title="Payroll Periods"
+		description="A period is the pay window. Locking a period creates the payroll run that computes and approves its pay."
+	>
 		{#snippet back()}
 			<BackButton fallback="/payroll" label="Payroll" />
 		{/snippet}
@@ -196,7 +199,11 @@
 										</ConfirmButton>
 									{/if}
 									{#if run}
-										<a href="/payroll/{run.id}" class="btn-row">Detail</a>
+										<a
+											href="/payroll/{run.id}"
+											title="Opens the payroll run for this period"
+											class="btn-row">View run</a
+										>
 									{/if}
 									{#if data.canVoid && p.status !== 'VOIDED'}
 										<!-- #108: same as release above — ConfirmButton's per-instance busy state is
