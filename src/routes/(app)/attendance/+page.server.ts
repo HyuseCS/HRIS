@@ -144,12 +144,12 @@ function ctxOf(event: RequestEvent) {
 	}
 }
 
-function toFail(e: unknown) {
+function toFail(e: unknown, extra?: { importError: true }) {
 	const err = e as { status?: number; body?: { message?: string } }
 	// #200 added 413/415: the backlog import's size and type refusals must reach the operator as a
 	// form message, not as a 500.
 	if (err?.status && [400, 404, 409, 413, 415].includes(err.status))
-		return fail(err.status, { error: err.body?.message ?? 'Action failed' })
+		return fail(err.status, { error: err.body?.message ?? 'Action failed', ...extra })
 	throw e
 }
 
@@ -324,7 +324,7 @@ export const actions: Actions = {
 		requireFoodServiceOrg(event.locals.user!.organizationId)
 		const file = (await event.request.formData()).get('backlog')
 		if (!(file instanceof File) || file.size === 0)
-			return fail(400, { error: 'Choose a CSV file to upload.' })
+			return fail(400, { error: 'Choose a CSV file to upload.', importError: true })
 		try {
 			// Both caps are checked BEFORE the body is read: an oversize upload must cost a size
 			// comparison, not a 2 MB+ decode into memory. The service repeats them as a second layer
@@ -338,7 +338,9 @@ export const actions: Actions = {
 			)
 			return { imported }
 		} catch (e) {
-			return toFail(e)
+			// M-9: flagged so the import card can echo its OWN failure without also echoing every
+			// other action's. `error` alone is set by all thirteen actions on this page.
+			return toFail(e, { importError: true })
 		}
 	},
 
