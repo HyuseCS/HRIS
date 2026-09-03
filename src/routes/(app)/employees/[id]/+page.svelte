@@ -21,8 +21,16 @@
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import { page } from '$app/stores'
+	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
+	import { resolveTab } from '$lib/components/employees/employee-tabs'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
+
+	// The five sections of the 201 file are URL-backed (`?tab=`), so a deep link and the browser's
+	// Back button both work. Panels are always rendered and hidden with the attribute AND the
+	// class — never `{#if}`, which would discard anything typed into an inactive tab's form.
+	const activeTab = $derived(resolveTab($page.url.searchParams.get('tab')))
 
 	// Label + field pairs for the Government IDs card, so the display and its format warning
 	// stay in step with the validator's field names.
@@ -208,6 +216,16 @@
 		<Banner kind="success" message={savedNotice} />
 	{/if}
 
+	<EmployeeTabs active={activeTab} />
+
+	<div
+		id="panel-overview"
+		role="tabpanel"
+		aria-labelledby="tab-overview"
+		tabindex="-1"
+		hidden={activeTab !== 'overview'}
+		class:hidden={activeTab !== 'overview'}
+	>
 	<div class="grid gap-6 lg:grid-cols-2">
 		<!-- Onboarding checklist (HR-only, T178) -->
 		{#if canManage && data.onboarding}
@@ -394,7 +412,8 @@
 				<div class="flex items-center justify-between gap-3">
 					<h2 class="font-semibold">
 						Disbursement
-						<span class="text-xs font-normal text-muted-foreground">(bank / GCash — sensitive)</span
+							<span class="text-xs font-normal text-muted-foreground"
+								>(bank / GCash — sensitive)</span
 						>
 					</h2>
 					{#if data.canReveal && !revealed}
@@ -837,7 +856,9 @@
 								</p>
 							{:else}
 								<p class="mt-1 text-2xl font-bold">{bal.remaining.toFixed(1)}</p>
-								<p class="text-xs text-muted-foreground">of {bal.allocated.toFixed(0)} allocated</p>
+									<p class="text-xs text-muted-foreground">
+										of {bal.allocated.toFixed(0)} allocated
+									</p>
 								<p class="text-xs text-muted-foreground">{bal.used.toFixed(1)} used</p>
 							{/if}
 						</div>
@@ -845,49 +866,9 @@
 				</div>
 			{:else}
 				<p class="text-sm text-muted-foreground">
-					No leave allocated for {new Date().getFullYear()}. Balances are created at onboarding from
-					the org's
+						No leave allocated for {new Date().getFullYear()}. Balances are created at onboarding
+						from the org's
 					<a href="/settings/leave-types" class="text-primary hover:underline">leave types</a>.
-				</p>
-			{/if}
-		</section>
-
-		<!-- Benefits (#198): enrollments on the 201 file, read-only here. HR manages them under
-		     the Benefits section; this just surfaces them alongside the employee's record. -->
-		<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
-			<h2 class="font-semibold">Benefits</h2>
-			{#if data.benefits.length}
-				<div class="overflow-x-auto rounded-md border">
-					<table class="w-full text-sm">
-						<thead class="border-b bg-muted/50">
-							<tr>
-								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Plan</th>
-								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
-								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Coverage</th>
-								<th class="px-3 py-2 text-right font-medium text-muted-foreground">EE Cost</th>
-								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y">
-							{#each data.benefits as b (b.id)}
-								<tr class="hover:bg-muted/30 {b.status === 'ACTIVE' ? '' : 'opacity-60'}">
-									<td class="px-3 py-2 font-medium">{b.plan.name}</td>
-									<td class="px-3 py-2 text-muted-foreground">{b.plan.type.replace('_', ' ')}</td>
-									<td class="px-3 py-2 text-muted-foreground">{b.coverageLevel ?? '—'}</td>
-									<td class="px-3 py-2 text-right">
-										{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}
-									</td>
-									<td class="px-3 py-2">
-										<Badge status={b.status} domain="benefitEnrollment" />
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{:else}
-				<p class="text-xs text-muted-foreground">
-					No benefit enrollments. HR manages enrollments under Benefits.
 				</p>
 			{/if}
 		</section>
@@ -906,7 +887,8 @@
 						<thead class="border-b bg-muted/50">
 							<tr>
 								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
-								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Relationship</th>
+									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Relationship</th
+									>
 								<th class="px-3 py-2 text-left font-medium text-muted-foreground">Phone</th>
 								{#if canManage}<th class="px-3 py-2"></th>{/if}
 							</tr>
@@ -993,6 +975,57 @@
 				</form>
 			{/if}
 		</section>
+		</div>
+	</div>
+
+	<div
+		id="panel-compensation"
+		role="tabpanel"
+		aria-labelledby="tab-compensation"
+		tabindex="-1"
+		hidden={activeTab !== 'compensation'}
+		class:hidden={activeTab !== 'compensation'}
+	>
+		<div class="grid gap-6 lg:grid-cols-2">
+			<!-- Benefits (#198): enrollments on the 201 file, read-only here. HR manages them under
+		     the Benefits section; this just surfaces them alongside the employee's record. -->
+			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
+				<h2 class="font-semibold">Benefits</h2>
+				{#if data.benefits.length}
+					<div class="overflow-x-auto rounded-md border">
+						<table class="w-full text-sm">
+							<thead class="border-b bg-muted/50">
+								<tr>
+									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Plan</th>
+									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
+									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Coverage</th>
+									<th class="px-3 py-2 text-right font-medium text-muted-foreground">EE Cost</th>
+									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y">
+								{#each data.benefits as b (b.id)}
+									<tr class="hover:bg-muted/30 {b.status === 'ACTIVE' ? '' : 'opacity-60'}">
+										<td class="px-3 py-2 font-medium">{b.plan.name}</td>
+										<td class="px-3 py-2 text-muted-foreground">{b.plan.type.replace('_', ' ')}</td>
+										<td class="px-3 py-2 text-muted-foreground">{b.coverageLevel ?? '—'}</td>
+										<td class="px-3 py-2 text-right">
+											{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}
+										</td>
+										<td class="px-3 py-2">
+											<Badge status={b.status} domain="benefitEnrollment" />
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{:else}
+					<p class="text-xs text-muted-foreground">
+						No benefit enrollments. HR manages enrollments under Benefits.
+					</p>
+				{/if}
+			</section>
 
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
@@ -1175,7 +1208,10 @@
 					use:enhance={addEarning.enhance}
 					class="flex flex-wrap items-end gap-2"
 				>
-					<select name="kind" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
+						<select
+							name="kind"
+							class="h-8 rounded-md border border-input bg-background px-2 text-xs"
+						>
 						<option value="ALLOWANCE">Allowance</option>
 						<option value="INCENTIVE">Incentive</option>
 					</select>
@@ -1218,8 +1254,8 @@
 					<h3 class="text-sm font-medium">Statutory contributions</h3>
 					<p class="text-xs text-muted-foreground">
 						SSS, PhilHealth, and Pag-IBIG are computed automatically from the salary. Remove an
-						employee who is not enrolled — both the employee and employer share are zeroed; Restore
-						re-enrolls them. Withholding tax is always computed.
+							employee who is not enrolled — both the employee and employer share are zeroed;
+							Restore re-enrolls them. Withholding tax is always computed.
 					</p>
 					<table class="w-full text-sm">
 						<tbody class="divide-y">
@@ -1230,8 +1266,8 @@
 										{#if s.exempt}
 											<span class="text-muted-foreground">Exempt</span>
 										{:else}
-											{formatCurrency(s.monthlyEe)}<span class="ml-1 text-xs text-muted-foreground"
-												>/mo</span
+												{formatCurrency(s.monthlyEe)}<span
+													class="ml-1 text-xs text-muted-foreground">/mo</span
 											>
 											{#if s.employerSharePaidExternally}
 												<span class="block text-xs font-sans text-muted-foreground"
@@ -1324,9 +1360,9 @@
 
 				<h3 class="text-sm font-medium">Custom deductions</h3>
 				<p class="text-xs text-muted-foreground">
-					Monthly amounts against a deduction code from Settings &rarr; Pay Codes, prorated to each
-					payroll period and taken before loan/cash-advance installments. Ended items stop from the
-					next payroll run.
+						Monthly amounts against a deduction code from Settings &rarr; Pay Codes, prorated to
+						each payroll period and taken before loan/cash-advance installments. Ended items stop
+						from the next payroll run.
 				</p>
 				{#if data.recurringDeductions.length}
 					<table class="w-full text-sm">
@@ -1408,114 +1444,6 @@
 						<a href="/settings/pay-codes" class="underline">Settings &rarr; Pay Codes</a>.
 					</p>
 				{/if}
-			</section>
-		{/if}
-
-		{#if canManage}
-			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
-				<h2 class="font-semibold">
-					Documents <span class="text-xs font-normal text-muted-foreground"
-						>(201 file — contracts, IDs, exit docs)</span
-					>
-				</h2>
-				{@render actionError(['uploadDocument', 'deleteDocument'])}
-
-				{#if data.documents.length}
-					<div class="overflow-x-auto rounded-md border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Category</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Document</th>
-									<th class="px-3 py-2 text-right font-medium text-muted-foreground">Size</th>
-									<th class="px-3 py-2 text-right font-medium text-muted-foreground">Uploaded</th>
-									<th class="px-3 py-2"></th>
-								</tr>
-							</thead>
-							<tbody class="divide-y">
-								{#each data.documents as doc (doc.id)}
-									<tr class="hover:bg-muted/30">
-										<td class="px-3 py-2">{catLabel(doc.category)}</td>
-										<td class="px-3 py-2">
-											<a
-												href="/api/v1/employees/{employee.id}/documents/{doc.id}"
-												class="font-medium text-primary hover:underline">{doc.label}</a
-											>
-											<span class="block text-xs text-muted-foreground">{doc.fileName}</span>
-										</td>
-										<td class="px-3 py-2 text-right text-muted-foreground">{fmtSize(doc.size)}</td>
-										<td class="px-3 py-2 text-right text-muted-foreground"
-											>{formatShortDate(doc.uploadedAt)}</td
-										>
-										<td class="px-3 py-2 text-right">
-											<ConfirmButton
-												action="?/deleteDocument"
-												title="Delete document?"
-												message="“{doc.label}” will be permanently removed."
-												triggerClass="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10"
-											>
-												<input type="hidden" name="docId" value={doc.id} />
-											</ConfirmButton>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{:else}
-					<p class="text-xs text-muted-foreground">No documents uploaded yet.</p>
-				{/if}
-
-				<form
-					method="POST"
-					action="?/uploadDocument"
-					enctype="multipart/form-data"
-					use:enhance={uploadDocument.enhance}
-					class="flex flex-wrap items-end gap-2 border-t pt-3"
-				>
-					<div class="grid gap-1">
-						<label for="doc-category" class="text-xs font-medium text-muted-foreground"
-							>Category</label
-						>
-						<select
-							id="doc-category"
-							name="category"
-							class="h-8 rounded-md border border-input bg-background px-2 text-xs"
-						>
-							{#each DOC_CATEGORIES as c (c.value)}<option value={c.value}>{c.label}</option>{/each}
-						</select>
-					</div>
-					<div class="grid gap-1">
-						<label for="doc-label" class="text-xs font-medium text-muted-foreground"
-							>Label <span class="text-muted-foreground/70">(optional)</span></label
-						>
-						<input
-							id="doc-label"
-							name="label"
-							type="text"
-							placeholder="e.g. 2026 Contract"
-							class="h-8 w-44 rounded-md border border-input bg-background px-2 text-xs"
-						/>
-					</div>
-					<div class="grid gap-1">
-						<label for="doc-file" class="text-xs font-medium text-muted-foreground"
-							>File <span class="text-muted-foreground/70">(PDF/PNG/JPEG, ≤10 MB)</span></label
-						>
-						<input
-							id="doc-file"
-							name="file"
-							type="file"
-							accept="application/pdf,image/png,image/jpeg,image/webp"
-							required
-							class="text-xs"
-						/>
-					</div>
-					<button
-						disabled={uploadDocument.busy}
-						class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-						>{uploadDocument.busy ? 'Uploading…' : 'Upload'}</button
-					>
-				</form>
 			</section>
 		{/if}
 
@@ -1750,7 +1678,139 @@
 				>
 			</form>
 		{/if}
+		</div>
+	</div>
 
+	<div
+		id="panel-documents"
+		role="tabpanel"
+		aria-labelledby="tab-documents"
+		tabindex="-1"
+		hidden={activeTab !== 'documents'}
+		class:hidden={activeTab !== 'documents'}
+	>
+		<div class="grid gap-6 lg:grid-cols-2">
+			{#if canManage}
+				<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
+					<h2 class="font-semibold">
+						Documents <span class="text-xs font-normal text-muted-foreground"
+							>(201 file — contracts, IDs, exit docs)</span
+						>
+					</h2>
+					{@render actionError(['uploadDocument', 'deleteDocument'])}
+
+					{#if data.documents.length}
+						<div class="overflow-x-auto rounded-md border">
+							<table class="w-full text-sm">
+								<thead class="border-b bg-muted/50">
+									<tr>
+										<th class="px-3 py-2 text-left font-medium text-muted-foreground">Category</th>
+										<th class="px-3 py-2 text-left font-medium text-muted-foreground">Document</th>
+										<th class="px-3 py-2 text-right font-medium text-muted-foreground">Size</th>
+										<th class="px-3 py-2 text-right font-medium text-muted-foreground">Uploaded</th>
+										<th class="px-3 py-2"></th>
+									</tr>
+								</thead>
+								<tbody class="divide-y">
+									{#each data.documents as doc (doc.id)}
+										<tr class="hover:bg-muted/30">
+											<td class="px-3 py-2">{catLabel(doc.category)}</td>
+											<td class="px-3 py-2">
+												<a
+													href="/api/v1/employees/{employee.id}/documents/{doc.id}"
+													class="font-medium text-primary hover:underline">{doc.label}</a
+												>
+												<span class="block text-xs text-muted-foreground">{doc.fileName}</span>
+											</td>
+											<td class="px-3 py-2 text-right text-muted-foreground">{fmtSize(doc.size)}</td
+											>
+											<td class="px-3 py-2 text-right text-muted-foreground"
+												>{formatShortDate(doc.uploadedAt)}</td
+											>
+											<td class="px-3 py-2 text-right">
+												<ConfirmButton
+													action="?/deleteDocument"
+													title="Delete document?"
+													message="“{doc.label}” will be permanently removed."
+													triggerClass="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10"
+												>
+													<input type="hidden" name="docId" value={doc.id} />
+												</ConfirmButton>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{:else}
+						<p class="text-xs text-muted-foreground">No documents uploaded yet.</p>
+					{/if}
+
+					<form
+						method="POST"
+						action="?/uploadDocument"
+						enctype="multipart/form-data"
+						use:enhance={uploadDocument.enhance}
+						class="flex flex-wrap items-end gap-2 border-t pt-3"
+					>
+						<div class="grid gap-1">
+							<label for="doc-category" class="text-xs font-medium text-muted-foreground"
+								>Category</label
+							>
+							<select
+								id="doc-category"
+								name="category"
+								class="h-8 rounded-md border border-input bg-background px-2 text-xs"
+							>
+								{#each DOC_CATEGORIES as c (c.value)}<option value={c.value}>{c.label}</option
+									>{/each}
+							</select>
+						</div>
+						<div class="grid gap-1">
+							<label for="doc-label" class="text-xs font-medium text-muted-foreground"
+								>Label <span class="text-muted-foreground/70">(optional)</span></label
+							>
+							<input
+								id="doc-label"
+								name="label"
+								type="text"
+								placeholder="e.g. 2026 Contract"
+								class="h-8 w-44 rounded-md border border-input bg-background px-2 text-xs"
+							/>
+						</div>
+						<div class="grid gap-1">
+							<label for="doc-file" class="text-xs font-medium text-muted-foreground"
+								>File <span class="text-muted-foreground/70">(PDF/PNG/JPEG, ≤10 MB)</span></label
+							>
+							<input
+								id="doc-file"
+								name="file"
+								type="file"
+								accept="application/pdf,image/png,image/jpeg,image/webp"
+								required
+								class="text-xs"
+							/>
+						</div>
+						<button
+							disabled={uploadDocument.busy}
+							class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+							>{uploadDocument.busy ? 'Uploading…' : 'Upload'}</button
+						>
+					</form>
+				</section>
+			{/if}
+		</div>
+	</div>
+
+	<div
+		id="panel-history"
+		role="tabpanel"
+		aria-labelledby="tab-history"
+		tabindex="-1"
+		hidden={activeTab !== 'history'}
+		class:hidden={activeTab !== 'history'}
+	>
+		<div class="grid gap-6 lg:grid-cols-2">
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">
@@ -1804,6 +1864,18 @@
 				{/if}
 			</section>
 		{/if}
+		</div>
+	</div>
+
+	<div
+		id="panel-actions"
+		role="tabpanel"
+		aria-labelledby="tab-actions"
+		tabindex="-1"
+		hidden={activeTab !== 'actions'}
+		class:hidden={activeTab !== 'actions'}
+	>
+		<div class="grid gap-6 lg:grid-cols-2">
 		<!--
 			OUTSIDE the ACTIVE block on purpose: a successful offboard flips employmentStatus to
 			OFFBOARDED, which unmounts the block below — a message placed inside it could never be
@@ -1848,6 +1920,7 @@
 				</div>
 			</form>
 		{/if}
+	</div>
 	</div>
 </div>
 
