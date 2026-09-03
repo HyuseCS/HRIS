@@ -1,12 +1,15 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
 	import { slide } from 'svelte/transition'
 	import { formatDateRange } from '$lib/utils/format'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -146,11 +149,11 @@
 	// #108: a double-click on Approve would post the same decision twice. Each card gets its own
 	// guard — a shared one would disable every row's Approve button while any single row is in
 	// flight. Guards are created lazily per request id, so a card keeps its guard across re-renders.
-	const approveGuards = new Map<string, ReturnType<typeof createSubmitGuard>>()
+	const approveGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function approveGuard(id: string) {
 		let g = approveGuards.get(id)
 		if (!g) {
-			g = createSubmitGuard()
+			g = submitFeedback()
 			approveGuards.set(id, g)
 		}
 		return g
@@ -158,7 +161,7 @@
 
 	// The popup-driven Return/Reject path submits this hidden form via `requestSubmit()`, which
 	// bypasses any button `disabled` — the guard's `cancel()` is what actually stops the double post.
-	const decide = createSubmitGuard()
+	const decide = submitFeedback()
 
 	const unverifiedCount = (docs: { verifiedAt: Date | string | null }[]) =>
 		docs.filter((d) => !d.verifiedAt).length
@@ -169,32 +172,22 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Request Approvals</h1>
-			<p class="text-sm text-muted-foreground">Review requests awaiting your decision.</p>
-		</div>
-		{#if data.pagination.total > 0}
-			<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-				{data.pagination.total} awaiting you
-			</span>
-		{/if}
-	</div>
+	<PageHeader title="Request Approvals" description="Review requests awaiting your decision.">
+		{#snippet back()}
+			{#if data.pagination.total > 0}
+				<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+					{data.pagination.total} awaiting you
+				</span>
+			{/if}
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if data.pendingRequests.length > 0}
@@ -236,8 +229,8 @@
 	{/if}
 
 	{#if data.pendingRequests.length === 0}
-		<div class="rounded-md border bg-muted/50 px-6 py-12 text-center text-muted-foreground text-sm">
-			No requests awaiting your decision.
+		<div class="rounded-md border bg-muted/50">
+			<EmptyState title="No requests awaiting your decision" />
 		</div>
 	{:else}
 		<!-- A real grid, so cards align in columns and share a row height instead of each

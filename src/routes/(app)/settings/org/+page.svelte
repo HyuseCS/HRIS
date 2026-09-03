@@ -1,9 +1,11 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -28,6 +30,20 @@
 
 	const inputClass =
 		'mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
+	// Assignment-wall filters. Client-side only: the load already holds every assignable employee,
+	// so filtering here costs no query and keeps the bulk-assign workflow on one screen.
+	let search = $state('')
+	let onlyUnassigned = $state(false)
+	const filteredEmployees = $derived.by(() => {
+		const q = search.trim().toLowerCase()
+		return data.employees.filter(
+			(e) =>
+				(!onlyUnassigned || !e.positionId) &&
+				(q === '' || e.name.toLowerCase().includes(q) || e.jobTitle.toLowerCase().includes(q))
+		)
+	})
+	const filtering = $derived(search.trim() !== '' || onlyUnassigned)
 </script>
 
 <svelte:head>
@@ -134,13 +150,10 @@
 							<td class="px-4 py-2 text-muted-foreground">{pos.salaryGrade?.name ?? '—'}</td>
 							<td class="px-4 py-2 text-muted-foreground">{pos._count.employees}</td>
 							<td class="px-4 py-2">
-								<span
-									class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {pos.isActive
-										? 'bg-green-500/15 text-green-400'
-										: 'bg-gray-500/15 text-gray-400'}"
-								>
-									{pos.isActive ? 'ACTIVE' : 'INACTIVE'}
-								</span>
+								<Badge
+									status={pos.isActive ? 'ACTIVE' : 'INACTIVE'}
+									tone={pos.isActive ? 'green' : 'gray'}
+								/>
 							</td>
 							<td class="w-[1%] whitespace-nowrap px-4 py-2 text-right">
 								<button
@@ -245,9 +258,7 @@
 						{/if}
 					{:else}
 						<tr>
-							<td colspan="7" class="px-4 py-8 text-center text-muted-foreground"
-								>No positions defined</td
-							>
+							<td colspan="7" class="p-0"><EmptyState title="No positions defined" /></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -259,6 +270,25 @@
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold">Employee Assignments</h2>
 		<p class="text-sm text-muted-foreground">Assign each employee to a position in the catalog.</p>
+		<div class="flex flex-wrap items-center gap-3">
+			<div class="min-w-56 flex-1">
+				<label for="employee-search" class="sr-only">Search employees</label>
+				<input
+					id="employee-search"
+					type="search"
+					bind:value={search}
+					placeholder="Search by name or job title"
+					class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			</div>
+			<label class="flex items-center gap-2 text-sm">
+				<input type="checkbox" bind:checked={onlyUnassigned} class="rounded border-input" />
+				Only unassigned
+			</label>
+			<p class="text-sm text-muted-foreground">
+				Showing {filteredEmployees.length} of {data.employees.length} employees
+			</p>
+		</div>
 		<div class="overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
@@ -271,7 +301,7 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y">
-					{#each data.employees as emp (emp.id)}
+					{#each filteredEmployees as emp (emp.id)}
 						{@const assign = assignGuard(emp.id)}
 						<tr class="hover:bg-muted/30">
 							<td class="px-4 py-2 font-medium">{emp.name}</td>
@@ -306,9 +336,17 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No employees found</td
-							>
+							<td colspan="5" class="p-0">
+								{#if filtering}
+									<EmptyState
+										variant="no-results"
+										title="No employees match this filter"
+										description="Clear the search box or untick “Only unassigned” to see the full list."
+									/>
+								{:else}
+									<EmptyState title="No employees found" />
+								{/if}
+							</td>
 						</tr>
 					{/each}
 				</tbody>

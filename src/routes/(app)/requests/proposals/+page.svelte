@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { tick } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -84,11 +85,7 @@
 	{/if}
 
 	{#if form?.success}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-600"
-		>
-			{form.success}
-		</div>
+		<Banner kind="success" message={form.success} />
 	{/if}
 
 	{#if data.proposals.length === 0}

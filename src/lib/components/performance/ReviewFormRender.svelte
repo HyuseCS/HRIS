@@ -166,7 +166,10 @@
 	<section class="space-y-2">
 		<h3 class="text-sm font-semibold">Rating Scale</h3>
 		<ul class="divide-y rounded-md border text-sm">
-			{#each structure.ratingScale.rows as row (row.value)}
+			<!-- Keyed by index, not row.value: two unedited "Add row" clicks both mint the same
+			     value and a duplicate key kills the preview. Rows are display-only here and are
+			     only ever appended or removed at the end, so the index is stable enough. -->
+			{#each structure.ratingScale.rows as row, i (i)}
 				<li class="flex gap-3 px-3 py-1.5">
 					<span class="w-6 shrink-0 font-medium tabular-nums">{row.value}</span>
 					<span class="text-muted-foreground">{row.description}</span>

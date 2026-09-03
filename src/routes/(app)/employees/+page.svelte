@@ -1,14 +1,21 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
 	import { tenureLabel } from '$lib/utils/dates'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import type { PageData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data }: { data: PageData } = $props()
 	let search = $state($page.url.searchParams.get('search') ?? '')
+	// Read the APPLIED filter from the URL, not the bound input: typing must not flip the empty
+	// state to "no results" before the search is submitted.
+	const filtered = $derived(!!($page.url.searchParams.get('search') || data.branchFilter))
 
 	// Active / Offboarded tab links (#184) — keep the search and branch filters, switch the
 	// status, and drop the page so a tab always opens on its first page.
@@ -27,15 +34,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Employees</h1>
-		<a
-			href="/employees/new"
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			Add Employee
-		</a>
-	</div>
+	<PageHeader title="Employees" />
 
 	<!-- Search -->
 	<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
@@ -60,6 +59,12 @@
 		{/if}
 		<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent">Search</button
 		>
+		<a
+			href="/employees/new"
+			class="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+		>
+			Add Employee
+		</a>
 	</form>
 
 	<!-- Active / Offboarded tabs (#184) -->
@@ -128,16 +133,7 @@
 							<td class="px-4 py-3 text-muted-foreground">{emp.employmentType.replace('_', ' ')}</td
 							>
 							<td class="px-4 py-3">
-								<span
-									class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {emp.employmentStatus ===
-									'ACTIVE'
-										? 'bg-green-500/15 text-green-400'
-										: emp.employmentStatus === 'ON_LEAVE'
-											? 'bg-yellow-500/15 text-yellow-400'
-											: 'bg-gray-500/15 text-gray-400'}"
-								>
-									{emp.employmentStatus.replace('_', ' ')}
-								</span>
+								<Badge status={emp.employmentStatus} domain="employment" />
 								{#if emp.employmentStatus === 'OFFBOARDED' && emp.endDate}
 									<div class="mt-0.5 text-xs text-muted-foreground">
 										left {formatShortDate(emp.endDate)}
@@ -151,16 +147,24 @@
 						</tr>
 					{:else}
 						<tr>
-							<td
-								colspan={data.showBranches ? 8 : 7}
-								class="px-4 py-8 text-center text-muted-foreground"
-								>{data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}</td
-							>
+							<td colspan={data.showBranches ? 8 : 7} class="p-0">
+								<EmptyState
+									variant={filtered ? 'no-results' : 'empty'}
+									title={data.tab === 'offboarded'
+										? 'No offboarded employees'
+										: 'No employees found'}
+									description={filtered
+										? 'No employee matches your search or branch filter.'
+										: undefined}
+								/>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	{:catch}
+		<LoadError what="the employee list" />
 	{/await}
 
 	<Pagination meta={data.pagination} />

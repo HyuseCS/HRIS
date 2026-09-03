@@ -64,10 +64,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		where: { userId: user.id, organizationId: user.organizationId },
 		select: { id: true }
 	})
-	const complaints = myEmployee
-		? await listComplaintsForEmployee(myEmployee.id, user.organizationId)
-		: []
-	return { isHr: false, complaints, hasEmployee: Boolean(myEmployee) }
+	const mine = myEmployee ? await listComplaintsForEmployee(myEmployee.id, user.organizationId) : []
+	// Distinct param and key from the HR branch above so the two tables cannot read each other's
+	// page. Same page size as HR — one feature, one rhythm. Sliced, not queried: giving
+	// `listComplaintsForEmployee` skip/take is a service change and out of this phase's bounds.
+	const myPagination = paginate(url, mine.length, { param: 'myPage', pageSize: 10 })
+	const complaints = mine.slice(myPagination.skip, myPagination.skip + myPagination.take)
+	return { isHr: false, complaints, myPagination, hasEmployee: Boolean(myEmployee) }
 }
 
 const openSchema = z.object({

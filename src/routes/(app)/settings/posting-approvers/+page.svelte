@@ -1,5 +1,7 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -26,11 +28,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<div class="overflow-x-auto rounded-lg border">
@@ -76,11 +74,7 @@
 						</td>
 					</tr>
 				{:else}
-					<tr
-						><td colspan="3" class="px-4 py-8 text-center text-muted-foreground"
-							>No departments yet</td
-						></tr
-					>
+					<tr><td colspan="3" class="p-0"><EmptyState title="No departments yet" /></td></tr>
 				{/each}
 			</tbody>
 		</table>

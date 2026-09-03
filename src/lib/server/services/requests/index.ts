@@ -34,8 +34,9 @@ export async function createRequest(
 
 	// LEAVE carries balance semantics: check the type's tenure gate, compute workdays,
 	// verify balance up front, and stash totalDays into the payload so approval can deduct
-	// it later. This is the only choke point all three filing paths (/leave/new, /requests,
-	// and the v1 API) share, so the gate belongs here rather than in any one route.
+	// it later. This is the only choke point both filing paths (/requests and the v1 API) share,
+	// so the gate belongs here rather than in any one route. It was three until phase 6 retired
+	// /leave/new to a redirect onto /requests.
 	let payload: Record<string, unknown> = parsed
 	if (parsed.type === 'LEAVE') {
 		await assertLeaveEligibility(organizationId, parsed.leaveTypeId, employee.startDate)

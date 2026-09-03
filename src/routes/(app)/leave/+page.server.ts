@@ -93,7 +93,7 @@ export const actions: Actions = {
 			.split(',')
 			.map((s) => s.trim())
 			.filter(Boolean)
-		if (!ids.length) return fail(400, { error: 'No leave requests selected' })
+		if (!ids.length) return fail(400, { action: 'deleteMany', error: 'No leave requests selected' })
 
 		const org = event.locals.user!.organizationId
 		const ctx = ctxOf(event)
@@ -108,6 +108,7 @@ export const actions: Actions = {
 			}
 		}
 		return {
+			action: 'deleteMany',
 			saved: `Deleted ${deleted} leave request${deleted === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}
 	}

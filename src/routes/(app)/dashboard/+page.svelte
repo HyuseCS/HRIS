@@ -1,12 +1,16 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { regularizationStatus, tenureLabel } from '$lib/utils/dates'
 	import { employmentTypeLabel, contractRenewalStatus } from '$lib/utils/employment'
 	import AnnouncementItem from '$lib/components/dashboard/AnnouncementItem.svelte'
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -42,11 +46,38 @@
 		leave: 'bg-sky-400'
 	}
 	const metrics = $derived(data.metrics)
+
+	// "Awaiting you" rows. SCOPING GUARANTEE: every count here comes from the single
+	// `countPendingApprovals` call already made by this page's load — the same service the sidebar
+	// badge and the four inbox pages read, whose per-domain queries ARE those pages' own queries
+	// (listPendingRequestsForApprover / countActionableTimesheets / countActionablePayrollRuns /
+	// listActionableProposals), and which short-circuits to all-zeros for anyone without
+	// APPROVE_REQUESTS (approvals.ts). This block issues NO query of its own and computes no count,
+	// so it cannot widen scope and cannot disagree with the pages it links to.
+	const awaiting = $derived(
+		[
+			{ n: metrics.pendingRequests, href: '/requests/approvals', one: 'request', many: 'requests' },
+			{
+				n: metrics.pendingTimesheets,
+				href: '/requests/timesheets',
+				one: 'timesheet',
+				many: 'timesheets'
+			},
+			{
+				n: metrics.pendingProposals,
+				href: '/requests/proposals',
+				one: 'pay change',
+				many: 'pay changes'
+			},
+			{ n: metrics.pendingPayrollRuns, href: '/payroll', one: 'payroll run', many: 'payroll runs' }
+		].filter((row) => row.n > 0)
+	)
+
 	let showPost = $state(false)
 
 	// Per-posting guards + a reject-note toggle for the approval card (#195).
-	const decideGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const decideGuard = (id: string) => (decideGuards[id] ??= createSubmitGuard())
+	const decideGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const decideGuard = (id: string) => (decideGuards[id] ??= submitFeedback())
 	let rejectingId = $state<string | null>(null)
 
 	// Today's birthday greeting, rendered at the top of the announcements feed (#167).
@@ -103,9 +134,7 @@
 </svelte:head>
 
 <div class="flex flex-1 flex-col gap-6">
-	<div class="page-header">
-		<h1 class="page-title">Dashboard</h1>
-	</div>
+	<PageHeader title="Dashboard" />
 
 	<!-- Attendance and the metric cards stack in the left two thirds; Upcoming Events fills the
 	     right third across both of their rows. Keeping attendance narrower than full width stops
@@ -275,7 +304,7 @@
 				     and a hairline rule between two-line rows reads as clutter where a tile edge
 				     reads as grouping. Unread rows carry the accent ring, so "new" survives without
 				     a separate dot competing with the icon. -->
-				<ul class="space-y-2">
+				<ul class="max-h-96 space-y-2 overflow-y-auto">
 					{#each data.recentActivity as n (n.id)}
 						{@const unread = !n.readAt}
 						<li>
@@ -326,18 +355,10 @@
 			</div>
 
 			{#if form?.posted}
-				<div
-					class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs text-green-400"
-				>
-					Announcement posted.
-				</div>
+				<Banner kind="success" message="Announcement posted." />
 			{/if}
 			{#if form?.awarded}
-				<div
-					class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
-				>
-					Award given.
-				</div>
+				<Banner kind="success" message="Award given." />
 			{/if}
 
 			{#if showAward && data.canPost}
@@ -347,7 +368,9 @@
 					use:enhance={giveAward.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<div class="grid gap-2 sm:grid-cols-2">
 						<select name="employeeId" required class="input h-9">
 							<option value="">Select employee…</option>
@@ -379,7 +402,9 @@
 					use:enhance={postAnnouncement.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'postAnnouncement' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<input name="title" placeholder="Title" required class="input h-9" />
 					<textarea
 						name="body"
@@ -633,6 +658,11 @@
 			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
 				Postings awaiting your approval
 			</p>
+			<!-- Scoped: with the award panel open, a posting failure used to render under
+			     "Give award", where nothing had gone wrong. -->
+			{#if form?.action === 'decidePosting' && form?.error}
+				<Banner kind="error" message={form.error} />
+			{/if}
 			<ul class="divide-y divide-border/60">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}
@@ -687,6 +717,29 @@
 					</li>
 				{/each}
 			</ul>
+		</div>
+	{/if}
+
+	<!-- Awaiting you — one door to the four approval inboxes. Hidden entirely at zero, matching the
+	     status card's rule that "0 pending" is noise on a surface whose job is to say what needs
+	     doing. -->
+	{#if metrics.pendingApprovals > 0}
+		<div class="card space-y-3">
+			<h2 class="text-sm font-semibold text-foreground">Awaiting you</h2>
+			<div class="space-y-1">
+				{#each awaiting as row (row.href)}
+					<a
+						href={row.href}
+						class="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-sm transition-colors hover:text-primary"
+					>
+						<span class="flex items-center gap-2">
+							<Badge status="pending" tone="blue" label={String(row.n)} />
+							<span>{row.n === 1 ? row.one : row.many}</span>
+						</span>
+						<span aria-hidden="true" class="text-muted-foreground">→</span>
+					</a>
+				{/each}
+			</div>
 		</div>
 	{/if}
 
@@ -755,7 +808,7 @@
 		{/if}
 
 		<a
-			href="/leave/new"
+			href="/requests?new=leave"
 			class="card group flex items-center gap-4 transition-colors hover:border-primary/40 hover:bg-card/80"
 		>
 			<div

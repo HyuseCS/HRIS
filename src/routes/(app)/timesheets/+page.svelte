@@ -1,14 +1,19 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import NewTimesheetDialog from '$lib/components/timesheets/NewTimesheetDialog.svelte'
 	import AggregatePanel from '$lib/components/timesheets/AggregatePanel.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -55,12 +60,6 @@
 	}
 
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
-	const statusClass: Record<string, string> = {
-		APPROVED: 'badge-green',
-		REJECTED: 'badge-red',
-		SUBMITTED: 'badge-blue',
-		DRAFT: 'badge-gray'
-	}
 	const btnPrimary =
 		'rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
 </script>
@@ -146,7 +145,8 @@
 							<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 						{/if}
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
-						<th class="w-40 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th
+							class="w-40 px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap"
 							>Total Hours</th
 						>
 						<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
@@ -177,16 +177,14 @@
 							<td class="px-4 py-3 whitespace-nowrap"
 								>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</td
 							>
-							<td class="px-4 py-3">{Number(ts.totalHours).toFixed(2)} hrs</td>
-							<td class="px-4 py-3"
-								><span class={statusClass[ts.status] ?? 'badge-gray'}>{ts.status}</span></td
+							<td class="px-4 py-3 text-right tabular-nums"
+								>{Number(ts.totalHours).toFixed(2)} hrs</td
 							>
+							<td class="px-4 py-3"><Badge status={ts.status} domain="timesheet" /></td>
 						</tr>
 					{:else}
 						<tr>
-							<td colspan={cols} class="px-4 py-8 text-center text-muted-foreground"
-								>No timesheets found</td
-							>
+							<td colspan={cols} class="p-0"><EmptyState title="No timesheets found" /></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -196,28 +194,51 @@
 {/snippet}
 
 <div class="space-y-8">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Timesheets</h1>
-		{#if data.canCreate}
-			<button
-				onclick={() => (showCreate = true)}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-			>
-				New Timesheet
-			</button>
-		{/if}
-	</div>
+	<PageHeader title="Timesheets" />
 
-	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+	<!-- 14 server `fail()` sites are reachable with the modal CLOSED, and the modal owns the only
+	     other error slot on this page — so with it shut the failure rendered nowhere. Gated on
+	     `openTs` so an open modal still shows the message once, in place. -->
+	{#if form?.error && !openTs}
+		<Banner kind="error" message={form.error} />
 	{/if}
 
-	{#if data.isHrAdmin}
-		<AggregatePanel employees={data.employees} />
+	<!-- Both banners stay OUTSIDE the creation section below: they report the result of ANY action
+	     on this page (submit, delete, modal edit), so gating them on `canCreate` would hide a
+	     result from a user who can act but cannot create. -->
+	{#if form?.saved}
+		<Banner kind="success" message={form.saved} />
+	{/if}
+
+	<!-- Phase 6 / T5: the two creation doors sit under ONE heading that names the period shape each
+	     one takes, and points at the third door on /attendance. They were unlabelled siblings. -->
+	{#if data.canCreate || data.isHrAdmin}
+		<section class="space-y-3">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div class="min-w-0 flex-1 space-y-1">
+					<h2 class="text-lg font-semibold">Create a timesheet</h2>
+					<p class="max-w-2xl text-sm text-muted-foreground">
+						Pay period (1–15, 16–end, or whole month) — use New Timesheet. One week of Discord
+						punches — use Aggregate from time logs. A custom same-month range — correct it on
+						<a href="/attendance" class="underline underline-offset-2 hover:text-foreground"
+							>Attendance</a
+						> and use Save as timesheet there.
+					</p>
+				</div>
+				{#if data.canCreate}
+					<button
+						onclick={() => (showCreate = true)}
+						class="ml-auto shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+					>
+						New Timesheet
+					</button>
+				{/if}
+			</div>
+
+			{#if data.isHrAdmin}
+				<AggregatePanel employees={data.employees} />
+			{/if}
+		</section>
 	{/if}
 
 	{#if data.myEmployeeId}
@@ -226,6 +247,8 @@
 		{:then mine}
 			{@render section('My Timesheets', mine, 'mine', false)}
 			<Pagination meta={data.minePagination} />
+		{:catch}
+			<LoadError what="your timesheets" />
 		{/await}
 	{/if}
 	{#if data.isManager}
@@ -234,6 +257,8 @@
 		{:then team}
 			{@render section('Team Timesheets', team, 'team', true)}
 			<Pagination meta={data.teamPagination} />
+		{:catch}
+			<LoadError what="the team timesheets" />
 		{/await}
 	{/if}
 	{#if !data.myEmployeeId && !data.isManager}

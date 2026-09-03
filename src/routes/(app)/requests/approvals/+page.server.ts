@@ -136,8 +136,19 @@ export const actions: Actions = {
 			)
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
+		}
+
+		// The page renders `form?.saved`; this action used to return nothing, so a decision
+		// looked identical to a no-op. Name the decision so the two are distinguishable.
+		return {
+			action: 'decideRequest',
+			saved:
+				decision === 'APPROVED'
+					? 'Request approved.'
+					: decision === 'REJECTED'
+						? 'Request rejected.'
+						: 'Request returned to the filer.'
 		}
 	},
 
@@ -176,6 +187,7 @@ export const actions: Actions = {
 			}
 		}
 		return {
+			action: 'rejectMany',
 			saved: `Rejected ${done} request${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}
 	}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { enhance } from '$app/forms'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -56,11 +57,11 @@
 	{/if}
 
 	{#if data.backfillCount > 0}
-		<p class="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm">
+		<Banner kind="warning">
 			{data.backfillCount} active
 			{data.backfillCount === 1 ? 'employee has' : 'employees have'} no assigned template. This is a readiness
 			note, not a blocker.
-		</p>
+		</Banner>
 	{/if}
 
 	<!-- Create -->

@@ -74,7 +74,7 @@ test('voiding the conflicting run from the payroll page unblocks the overlapping
 	await expect(dialog).toContainText('Void this payroll run?')
 	await dialog.getByRole('button', { name: 'Void run' }).click()
 
-	await expect(firstRow).toContainText('VOIDED')
+	await expect(firstRow).toContainText(/voided/i)
 	// Voided, so it can no longer be voided again — the control is gone from that row.
 	await expect(firstRow.getByRole('button', { name: 'Void' })).toHaveCount(0)
 

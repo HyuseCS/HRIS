@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 
 	// Shared what-if calculator (#72): used by the full /payroll/calculator page and
@@ -36,6 +37,25 @@
 	let selectedEmployee = $state('')
 	let vals = $state<Record<string, string>>({})
 	let result = $state<CalcResult | null>(null)
+
+	// The `error` result type used to fall through every branch, leaving the previous employee's
+	// figures on screen under a stale heading. It now clears the result like any other failure,
+	// and the toast layer says so.
+	const preview = submitFeedback({
+		success: null,
+		inner:
+			() =>
+			async ({ result: r }) => {
+				if (r.type === 'success' && r.data?.result) {
+					result = r.data.result as CalcResult
+					error = ''
+				} else if (r.type !== 'redirect') {
+					result = null
+					error =
+						r.type === 'failure' ? String(r.data?.error ?? 'Preview failed') : 'Preview failed.'
+				}
+			}
+	})
 	let error = $state('')
 
 	// Selecting an employee prefills the ₱ inputs from their recurring
@@ -73,16 +93,7 @@
 	<form
 		method="POST"
 		action="/payroll/calculator?/preview"
-		use:enhance={() => {
-			return async ({ result: r }) => {
-				if (r.type === 'success' && r.data?.result) {
-					result = r.data.result as CalcResult
-					error = ''
-				} else if (r.type === 'failure') {
-					error = String(r.data?.error ?? 'Preview failed')
-				}
-			}
-		}}
+		use:enhance={preview.enhance}
 		class="rounded-lg border p-5 space-y-4"
 	>
 		<div>

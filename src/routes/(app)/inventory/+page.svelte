@@ -1,9 +1,14 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
+	import { INVENTORY_STATUS_LABELS } from '$lib/labels'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -11,16 +16,6 @@
 	const saveGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
 	const saveGuard = (id: string) => (saveGuards[id] ??= createSubmitGuard())
 
-	const STATUS_LABEL: Record<string, string> = {
-		IN_STOCK: 'In stock',
-		ASSIGNED: 'Assigned',
-		RETIRED: 'Retired'
-	}
-	function statusClass(s: string) {
-		if (s === 'IN_STOCK') return 'bg-green-500/15 text-green-400'
-		if (s === 'ASSIGNED') return 'bg-blue-500/15 text-blue-400'
-		return 'bg-muted text-muted-foreground'
-	}
 	const empName = (e: { firstName: string; lastName: string }) => `${e.lastName}, ${e.firstName}`
 
 	const inputClass =
@@ -34,20 +29,13 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Inventory</h1>
-		<p class="text-sm text-muted-foreground">
-			Track company assets, equipment, and supplies — quantity, location, status, and who holds each
-			item.
-		</p>
-	</div>
+	<PageHeader
+		title="Inventory"
+		description="Track company assets, equipment, and supplies — quantity, location, status, and who holds each item."
+	/>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<!-- Filters -->
@@ -75,7 +63,7 @@
 			<label for="f-status" class="text-xs font-medium text-muted-foreground">Status</label>
 			<select id="f-status" name="status" class="mt-1 {inputClass}">
 				<option value="">All</option>
-				{#each Object.entries(STATUS_LABEL) as [val, label] (val)}
+				{#each Object.entries(INVENTORY_STATUS_LABELS) as [val, label] (val)}
 					<option value={val} selected={data.filter.status === val}>{label}</option>
 				{/each}
 			</select>
@@ -143,7 +131,7 @@
 			<div>
 				<label for="a-status" class="text-xs font-medium text-muted-foreground">Status</label>
 				<select id="a-status" name="status" class="mt-1 {inputClass}">
-					{#each Object.entries(STATUS_LABEL) as [val, label] (val)}
+					{#each Object.entries(INVENTORY_STATUS_LABELS) as [val, label] (val)}
 						<option value={val}>{label}</option>
 					{/each}
 				</select>
@@ -268,15 +256,13 @@
 								</td>
 								<td class="px-3 py-2">
 									<select form="edit-{item.id}" name="status" class="{cellInputClass} w-28">
-										{#each Object.entries(STATUS_LABEL) as [val, label] (val)}
+										{#each Object.entries(INVENTORY_STATUS_LABELS) as [val, label] (val)}
 											<option value={val} selected={item.status === val}>{label}</option>
 										{/each}
 									</select>
-									<span
-										class="ml-1 hidden rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline {statusClass(
-											item.status
-										)}">{STATUS_LABEL[item.status]}</span
-									>
+									<span class="ml-1 hidden sm:inline">
+										<Badge status={item.status} domain="inventory" />
+									</span>
 								</td>
 								<td class="px-3 py-2">
 									<select form="edit-{item.id}" name="assignedToId" class="{cellInputClass} w-40">
@@ -312,7 +298,7 @@
 										class="{cellInputClass} w-24 text-right"
 									/>
 									{#if item.value != null}
-										<span class="block text-[10px] text-muted-foreground"
+										<span class="block text-[10px] tabular-nums text-muted-foreground"
 											>{formatCurrency(Number(item.value))}</span
 										>
 									{/if}
@@ -349,6 +335,7 @@
 					</tbody>
 				</table>
 			</div>
+			<Pagination meta={data.pagination} />
 			<p class="text-xs text-muted-foreground">
 				Edit a row's fields and press <span class="font-medium">Save</span>. Setting status to
 				<span class="font-medium">Assigned</span> requires choosing an employee.

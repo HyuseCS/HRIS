@@ -2,6 +2,7 @@ import { fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
+import { paginate } from '$lib/server/pagination'
 import {
 	listInventory,
 	listCategories,
@@ -23,7 +24,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		status: url.searchParams.get('status') ?? ''
 	}
 
-	const [items, categories, employees] = await Promise.all([
+	const [allItems, categories, employees] = await Promise.all([
 		listInventory(organizationId, filter),
 		listCategories(organizationId),
 		db.employee.findMany({
@@ -33,7 +34,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		})
 	])
 
-	return { items, categories, employees, filter }
+	// Sliced after the filter, so paging follows the filtered set. `listInventory` is a shared
+	// service and giving it skip/take is out of this phase's bounds — this caps what the page
+	// renders, not what the load fetches (tracked as a backlog item).
+	const pagination = paginate(url, allItems.length, { pageSize: 20 })
+	const items = allItems.slice(pagination.skip, pagination.skip + pagination.take)
+
+	return { items, categories, employees, filter, pagination }
 }
 
 const itemSchema = z.object({

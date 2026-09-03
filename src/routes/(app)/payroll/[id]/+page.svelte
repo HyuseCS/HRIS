@@ -1,10 +1,14 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { periodDays } from '$lib/utils/pay-periods'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const run = $derived(data.run)
@@ -14,7 +18,9 @@
 
 	// #108: a double-submitted recompute rebuilds every entry twice — expensive to unwind.
 	const compute = createSubmitGuard()
-	const decideGuard = createSubmitGuard()
+	// Final sign-off. The page banner is far above the fold on a long run, so the toast is the
+	// only cue that lands where the operator is looking.
+	const decideGuard = submitFeedback()
 
 	// Maker-checker chain (#134): each attempt is MAKE → VERIFY → APPROVE. Group the
 	// append-only steps by attempt so a recomputed/refiled run shows its full history.
@@ -71,6 +77,45 @@
 		if (!g) overrideGuards.set(entryId, (g = createSubmitGuard()))
 		return g
 	}
+
+	// Overriding a net pay rewrites what a person is paid, so it confirms first and the dialog
+	// names the delta. Only one override panel is open at a time, so one set of state and one
+	// dialog serve every row.
+	//
+	// `overrideBaseline` is $state captured once when the panel opens, NOT $derived: a $derived
+	// would follow `entry.netPay` and collapse the delta to zero the moment a save re-renders.
+	// Known limitation: PayrollEntry.netPay is overwritten in place, so there is no stored
+	// "originally computed" figure — the baseline is the value that was on screen when the panel
+	// opened, and the copy says "vs {amount}" rather than "vs computed" for exactly that reason.
+	let overrideBaseline = $state(0)
+	let overrideValue = $state<number | null>(0)
+	let overrideName = $state('')
+	let overrideConfirm = $state(false)
+	let overrideFormEl = $state<HTMLFormElement>()
+
+	function openOverride(entryId: string, netPay: number, name: string) {
+		overrideEntryId = entryId
+		overrideBaseline = netPay
+		overrideValue = netPay
+		overrideName = name
+	}
+
+	// An empty input reads as `null`; treat it as "unchanged" so a blank field behaves exactly as
+	// it did before this dialog existed rather than claiming a delta it cannot know.
+	const overrideEntered = $derived(overrideValue ?? overrideBaseline)
+	const overrideDelta = $derived(overrideEntered - overrideBaseline)
+	const overrideSignedDelta = $derived(
+		`${overrideDelta > 0 ? '+' : '−'}${formatCurrency(Math.abs(overrideDelta))}`
+	)
+	const overrideMessage = $derived(
+		`${overrideName}'s net pay for this run changes from ${formatCurrency(overrideBaseline)} to ${formatCurrency(overrideEntered)} — a difference of ${overrideSignedDelta}. The figure you type is what gets paid and what prints on the payslip; the computed amount is replaced, not adjusted. Your reason is written to the audit log.`
+	)
+
+	// A save that changes nothing has no consequence to name, so it goes straight through.
+	function submitOverride() {
+		if (overrideDelta === 0) overrideFormEl?.requestSubmit()
+		else overrideConfirm = true
+	}
 </script>
 
 <svelte:head>
@@ -78,41 +123,38 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-			<!-- #163: a custom range is no longer self-evident from its dates, so the inclusive day
-			     count is spelled out — it is what statutory and loans are prorated against. -->
-			<h1 class="text-2xl font-bold">
-				{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)}
-				<span class="text-base font-normal text-muted-foreground"
-					>({periodDays(run.periodStart, run.periodEnd)} days)</span
-				>
-			</h1>
-			<span class={run.status === 'APPROVED' ? 'badge-green' : 'badge-blue'}>
-				{run.status}
-			</span>
+	<!-- #163: a custom range is no longer self-evident from its dates, so the inclusive day
+	     count is spelled out — it is what statutory and loans are prorated against. -->
+	<PageHeader
+		title="{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)} ({periodDays(
+			run.periodStart,
+			run.periodEnd
+		)} days)"
+	>
+		{#snippet back()}
+			<Badge status={run.status} domain="payrollRun" />
 			{#if run.hasOverride}
 				<span class="text-xs text-yellow-600 font-medium dark:text-yellow-500">Has overrides</span>
 			{/if}
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
 			<BackButton fallback="/payroll" label="Payroll" />
-			{#if data.canManage && run.status === 'COMPUTED'}
-				<!-- Recompute rebuilds all entries from current data (e.g. after assigning
-				     recurring earnings/deductions). Managers only; disabled once approved. -->
-				<form method="POST" action="?/compute" use:enhance={compute.enhance}>
-					<button
-						type="submit"
-						disabled={compute.busy}
-						class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{compute.busy ? 'Computing…' : 'Recompute'}</button
-					>
-				</form>
-			{/if}
+		{/snippet}
+	</PageHeader>
+
+	<!-- Recompute rebuilds all entries from current data (e.g. after assigning recurring
+	     earnings/deductions). Managers only; disabled once approved. It sits above the totals
+	     and the entry table it rebuilds, not on the title row. -->
+	{#if data.canManage && run.status === 'COMPUTED'}
+		<div class="flex justify-end">
+			<form method="POST" action="?/compute" use:enhance={compute.enhance}>
+				<button
+					type="submit"
+					disabled={compute.busy}
+					class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{compute.busy ? 'Computing…' : 'Recompute'}</button
+				>
+			</form>
 		</div>
-	</div>
+	{/if}
 
 	{#if form?.error}
 		<div
@@ -177,20 +219,22 @@
 								<div class="text-xs text-yellow-600 dark:text-yellow-500">⚠ {entry.flagReason}</div>
 							{/if}
 						</td>
-						<td class="px-4 py-3 text-right font-mono">{formatCurrency(Number(entry.grossPay))}</td>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums"
+							>{formatCurrency(Number(entry.grossPay))}</td
+						>
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.sssEe))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.philhealthEe))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.pagibigEe))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+						<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 							>{formatCurrency(Number(entry.withholdingTax))}</td
 						>
-						<td class="px-4 py-3 text-right font-mono font-medium"
+						<td class="px-4 py-3 text-right font-mono font-medium tabular-nums"
 							>{formatCurrency(Number(entry.netPay))}</td
 						>
 						<td class="px-4 py-3">
@@ -203,8 +247,14 @@
 									class="btn-row">{expandedEntryId === entry.id ? 'Hide' : 'Breakdown'}</button
 								>
 								{#if data.canManage && run.status !== 'APPROVED'}
-									<button onclick={() => (overrideEntryId = entry.id)} class="btn-row"
-										>Override</button
+									<button
+										onclick={() =>
+											openOverride(
+												entry.id,
+												Number(entry.netPay),
+												`${entry.employee.firstName} ${entry.employee.lastName}`
+											)}
+										class="btn-row">Override</button
 									>
 								{/if}
 							</div>
@@ -223,7 +273,7 @@
 												{#each entry.earnings as c (c.id)}
 													<tr
 														><td class="py-0.5">{c.label}{c.taxable ? '' : ' (non-taxable)'}</td><td
-															class="py-0.5 text-right font-mono"
+															class="py-0.5 text-right font-mono tabular-nums"
 															>{formatCurrency(Number(c.amount))}</td
 														></tr
 													>
@@ -242,7 +292,7 @@
 												{#each entry.deductions as c (c.id)}
 													<tr
 														><td class="py-0.5">{c.label}</td><td
-															class="py-0.5 text-right font-mono text-muted-foreground"
+															class="py-0.5 text-right font-mono tabular-nums text-muted-foreground"
 															>{formatCurrency(Number(c.amount))}</td
 														></tr
 													>
@@ -264,6 +314,7 @@
 									method="POST"
 									action="?/override"
 									use:enhance={overrideG.enhance}
+									bind:this={overrideFormEl}
 									class="flex items-end gap-3"
 								>
 									<input type="hidden" name="entryId" value={entry.id} />
@@ -271,14 +322,22 @@
 										<label for={'netPay-' + entry.id} class="text-xs font-medium"
 											>Override Net Pay</label
 										>
+										<!-- min="0" matches the server's existing z.coerce.number().finite().min(0) so the
+										     browser refuses a negative before the round-trip. The schema is not touched. -->
 										<input
 											id={'netPay-' + entry.id}
 											name="netPay"
 											type="number"
 											step="any"
-											value={Number(entry.netPay)}
+											min="0"
+											bind:value={overrideValue}
 											class="mt-1 flex h-8 w-36 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										/>
+										<p class="mt-1 text-xs text-muted-foreground">
+											{overrideDelta === 0
+												? 'No change'
+												: `${overrideSignedDelta} vs ${formatCurrency(overrideBaseline)}`}
+										</p>
 									</div>
 									<div class="flex-1">
 										<label for={'note-' + entry.id} class="text-xs font-medium"
@@ -292,7 +351,8 @@
 										/>
 									</div>
 									<button
-										type="submit"
+										type="button"
+										onclick={submitOverride}
 										disabled={overrideG.busy}
 										class="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 										>{overrideG.busy ? 'Saving…' : 'Save'}</button
@@ -457,3 +517,13 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Outside the table: the override panel is a row inside <tbody>, and a dialog overlay cannot
+     live there. Only one panel is open at a time, so one dialog serves every row. -->
+<ConfirmDialog
+	bind:open={overrideConfirm}
+	title="Override this net pay?"
+	message={overrideMessage}
+	confirmText="Override net pay"
+	onconfirm={() => overrideFormEl?.requestSubmit()}
+/>
