@@ -38,6 +38,23 @@
 			? true
 			: undefined
 
+	// The "Complete later" disclosure hides 12 optional fields, so a server rejection inside it
+	// would otherwise render in a collapsed container — a silent failure. Open it in that case.
+	const OPTIONAL_FIELDS = [
+		'sssNumber',
+		'philhealthNumber',
+		'pagibigNumber',
+		'tinNumber',
+		'emergencyContactName',
+		'emergencyContactRelation',
+		'emergencyContactPhone',
+		'bankName',
+		'bankAccountName',
+		'bankAccountNumber',
+		'gcashNumber'
+	]
+	const optionalHasError = $derived(OPTIONAL_FIELDS.some((f) => invalid(f)))
+
 	// #188: new hires start on probation.
 	let employmentType = $state('PROBATIONARY')
 	$effect(() => {
@@ -78,6 +95,8 @@
 	     blanking the required Department field and wedging submit (#ceo-switch). -->
 	{#key data.organizationId}
 		<form method="POST" action="?/create" use:enhance={create.enhance} class="space-y-8">
+			<h2 class="text-sm font-semibold text-muted-foreground">Required to hire</h2>
+
 			<!-- Personal Information -->
 			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
 				<legend class="float-left mb-4 w-full font-semibold">Personal Information</legend>
@@ -389,6 +408,15 @@
 				</div>
 			</fieldset>
 
+			<details open={optionalHasError} class="rounded-md border">
+				<summary class="cursor-pointer px-4 py-3 text-sm font-semibold"
+					>Complete later — 12 optional fields</summary
+				>
+				<div class="space-y-8 border-t p-4">
+					<p class="text-sm text-muted-foreground">
+						You can save these now or add them to the 201 file after the employee is created.
+					</p>
+
 			<!-- Government IDs -->
 			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
 				<legend class="float-left mb-4 w-full font-semibold">Government IDs</legend>
@@ -466,7 +494,9 @@
 						/>
 					</div>
 					<div>
-						<label for="emergencyContactRelation" class="text-sm font-medium">Relationship</label>
+								<label for="emergencyContactRelation" class="text-sm font-medium"
+									>Relationship</label
+								>
 						<input
 							id="emergencyContactRelation"
 							name="emergencyContactRelation"
@@ -521,7 +551,9 @@
 							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						/>
 						{#if form?.fieldErrors?.bankAccountNumber}
-							<p class="mt-1 text-xs text-destructive">{form.fieldErrors.bankAccountNumber[0]}</p>
+									<p class="mt-1 text-xs text-destructive">
+										{form.fieldErrors.bankAccountNumber[0]}
+									</p>
 						{/if}
 					</div>
 					<div>
@@ -540,6 +572,8 @@
 					</div>
 				</div>
 			</fieldset>
+				</div>
+			</details>
 
 			<div class="flex justify-end gap-3">
 				<a href="/employees" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>
