@@ -1950,14 +1950,25 @@
 			</div>
 		{/if}
 		{#if canManage && employee.employmentStatus === 'ACTIVE'}
+				<!--
+					The Actions tab holds this one form and nothing else: reaching the only irreversible
+					thing on the 201 file should take a deliberate move, not a scroll past it. The
+					confirm dialog and its reportValidity() gate are phase 05's — left exactly as they are.
+				-->
+				<section class="rounded-lg border border-destructive p-6 space-y-4 lg:col-span-2">
+					<h2 class="font-semibold text-destructive">Danger zone</h2>
+					<p class="text-sm text-muted-foreground">
+						Offboarding ends this employment record and disables the login. Reversing it needs a
+						Super Admin.
+					</p>
 			<form
 				bind:this={offboardFormEl}
 				method="POST"
 				action="?/offboard"
 				use:enhance={offboard.enhance}
-				class="rounded-lg border border-destructive/50 p-6 space-y-4 lg:col-span-2"
+						class="space-y-4"
 			>
-				<h2 class="font-semibold text-destructive">Offboard Employee</h2>
+						<h3 class="font-semibold text-destructive">Offboard Employee</h3>
 				<div class="flex items-end gap-4">
 					<div>
 						<label for="endDate" class="text-sm font-medium">Last Day</label>
@@ -1978,6 +1989,7 @@
 					>
 				</div>
 			</form>
+				</section>
 		{/if}
 	</div>
 	</div>
