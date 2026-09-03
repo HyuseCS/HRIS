@@ -7,6 +7,7 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import type { PageData, ActionData } from './$types'
 
@@ -27,22 +28,22 @@
 	// #108: these bulk actions rewrite whole ranges/days — a double-click re-runs the derive or
 	// re-locks mid-flight. One guard per singleton form.
 	const derive = createSubmitGuard()
-	const lock = createSubmitGuard()
-	const unlock = createSubmitGuard()
+	const lock = submitFeedback()
+	const unlock = submitFeedback()
 	const saveTimesheet = createSubmitGuard()
 	const deriveTeam = createSubmitGuard()
-	const lockTeam = createSubmitGuard()
-	const unlockTeam = createSubmitGuard()
+	const lockTeam = submitFeedback()
+	const unlockTeam = submitFeedback()
 	// #200: the backlog import writes punches for a whole file — a double-submit would re-run it.
 	const importBacklog = createSubmitGuard()
 
 	// Per-row forms live inside {#each}, so they need a guard per row — a shared one would grey out
 	// every row's button at once. Created lazily and cached by record id.
-	const rowGuards = new Map<string, ReturnType<typeof createSubmitGuard>>()
+	const rowGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function rowGuard(key: string, inner?: SubmitFunction) {
 		let g = rowGuards.get(key)
 		if (!g) {
-			g = createSubmitGuard(inner)
+			g = submitFeedback({ inner })
 			rowGuards.set(key, g)
 		}
 		return g

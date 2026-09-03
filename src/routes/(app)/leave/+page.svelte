@@ -80,6 +80,11 @@
 		</div>
 	{/if}
 
+	<!-- `deleteMany` can fail per item; without this slot the page rendered nothing at all. -->
+	{#if form?.error}
+		<Banner kind="error" message={form.error} />
+	{/if}
+
 	{#if form?.saved}
 		<Banner kind="success" message={form.saved} />
 	{/if}

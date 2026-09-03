@@ -57,6 +57,33 @@ describe('submitFeedback', () => {
 		expect(fb.busy).toBe(false)
 	})
 
+	// E3: the success contract is `saved: true | string`, and a string IS the message. Reading it
+	// here is what lets an adopting page pass no options at all.
+	it('toasts the action’s own `saved` string when no success option is given', async () => {
+		const fb = submitFeedback()
+		const s = await submit(fb, { type: 'success', data: { action: 'void', saved: 'Run voided.' } })
+		await s.settle()
+
+		expect(texts()).toEqual(['Run voided.'])
+		expect(getToasts()[0].kind).toBe('success')
+	})
+
+	it('stays silent for `saved: true`, which carries no message', async () => {
+		const fb = submitFeedback()
+		const s = await submit(fb, { type: 'success', data: { action: 'void', saved: true } })
+		await s.settle()
+
+		expect(texts()).toEqual([])
+	})
+
+	it('lets an explicit success option win over the action’s `saved` string', async () => {
+		const fb = submitFeedback({ success: null })
+		const s = await submit(fb, { type: 'success', data: { saved: 'Run voided.' } })
+		await s.settle()
+
+		expect(texts()).toEqual([])
+	})
+
 	it('takes the failure toast text from data.error and still calls update()', async () => {
 		const fb = submitFeedback()
 		// update() must still run or the page-local banner never renders — the util is additive
