@@ -277,7 +277,7 @@
 				     and a hairline rule between two-line rows reads as clutter where a tile edge
 				     reads as grouping. Unread rows carry the accent ring, so "new" survives without
 				     a separate dot competing with the icon. -->
-				<ul class="space-y-2">
+				<ul class="max-h-96 space-y-2 overflow-y-auto">
 					{#each data.recentActivity as n (n.id)}
 						{@const unread = !n.readAt}
 						<li>

@@ -52,11 +52,14 @@
 				body: JSON.stringify({ organizationId })
 			})
 			if (!res.ok) {
-				addToast('Could not switch organization.')
+				addToast('Could not switch organization.', { kind: 'error' })
 				return
 			}
 			orgMenuOpen = false
 			await invalidateAll()
+		} catch {
+			// Offline, or the request threw. Without this the switcher just silently gave up.
+			addToast('Could not switch organization.', { kind: 'error' })
 		} finally {
 			switchingOrg = false
 		}
@@ -84,7 +87,13 @@
 			seenNotifications.add(n.id)
 			addToast(n.message, { link: n.link })
 		}
-		fetch('/api/v1/notifications/read', { method: 'POST' })
+		// Exactly the ids just toasted, never "all": `listUnread` caps at 10, so a mark-all
+		// consumed the overflow without it ever being shown.
+		fetch('/api/v1/notifications/read', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ ids: fresh.map((n) => n.id) })
+		})
 	})
 
 	// A redirect-after-success parks its message in the flash cookie; the layout load reads and
