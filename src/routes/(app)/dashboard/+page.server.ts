@@ -86,7 +86,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listRecentAwards(orgId),
 		// Side panel. Employment matters (probation reviews, contract ends, other people's
 		// leave) go only to the HR ladder; everyone still sees their own.
-		listUpcomingEvents(orgId, { userId: user.id, canSeeSensitive: canPost })
+		// 10: a fortnight's worth of the events a person actually acts on. The card shares a grid
+		// row, so a list that grows with the roster pushes the column past the one beside it. The
+		// full set is unreachable by design — there is no /events page and this phase does not
+		// build one — which is why this card carries no "view all" link.
+		listUpcomingEvents(orgId, { userId: user.id, canSeeSensitive: canPost }, new Date(), 10)
 	])
 
 	// HR grants awards from the dashboard — roster for the recipient picker.

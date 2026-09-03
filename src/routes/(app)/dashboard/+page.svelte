@@ -253,7 +253,27 @@
 				Upcoming Events
 			</p>
 			{#if data.upcomingEvents.length}
-				<ul class="divide-y divide-border/40">
+				<!-- Scrolls to the card's own height rather than to a fixed rem value: the card
+				     already declares `flex h-full flex-col`, so `min-h-0 flex-1 overflow-y-auto`
+				     makes the list fill the grid row and scroll inside it. `.card-scroll` would
+				     fight that with a second, unrelated ceiling.
+
+				     `tabindex="0"` with a region role because the rows here are text only — no
+				     link, no button, nothing focusable — and a scroll region with no focusable
+				     child cannot be reached by keyboard at all (WCAG 2.1.1). The sibling
+				     regularization and posting lists carry real links and buttons, so they need
+				     no tab stop of their own.
+
+				     The rule fires on any nonnegative tabindex on a non-interactive element, which
+				     is right in general and wrong for a scroll container — WCAG needs the tab stop
+				     precisely BECAUSE nothing inside is focusable. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<ul
+					class="min-h-0 flex-1 divide-y divide-border/40 overflow-y-auto"
+					tabindex="0"
+					role="region"
+					aria-label="Upcoming events"
+				>
 					{#each data.upcomingEvents as event (event.kind + event.date + event.title)}
 						<li class="flex items-start gap-3 py-2">
 							<div class="w-11 shrink-0 text-center">

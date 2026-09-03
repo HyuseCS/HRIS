@@ -449,7 +449,8 @@ function nextAnniversaryKey(source: Date, todayKey: string, endKey: string): str
 export async function listUpcomingEvents(
 	organizationId: string,
 	viewer: { userId: string; canSeeSensitive: boolean },
-	asOf: Date = new Date()
+	asOf: Date = new Date(),
+	limit?: number
 ): Promise<UpcomingEvent[]> {
 	const todayKey = manilaDayKey(asOf)
 	const endKey = dayKeyIn(asOf, UPCOMING_EVENT_DAYS)
@@ -588,5 +589,14 @@ export async function listUpcomingEvents(
 		})
 	}
 
-	return events.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+	// The cap belongs HERE, on the merged sorted output — never on any of the four queries above.
+	// The roster read feeds birthdays, anniversaries, regularizations and contract ends at once
+	// (see its comment), so a `take` on it would drop whole event kinds rather than trailing rows,
+	// and a `take` on holidays or leave would do the same. Slicing the sorted merge keeps every
+	// kind eligible for the first N days. The query cost is unchanged; that residual is recorded
+	// in the query-level-pagination backlog note.
+	const sorted = events.sort(
+		(a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)
+	)
+	return limit === undefined ? sorted : sorted.slice(0, limit)
 }
