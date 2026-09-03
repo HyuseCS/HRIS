@@ -9,6 +9,7 @@
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -47,8 +48,8 @@
 	let showPost = $state(false)
 
 	// Per-posting guards + a reject-note toggle for the approval card (#195).
-	const decideGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const decideGuard = (id: string) => (decideGuards[id] ??= createSubmitGuard())
+	const decideGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const decideGuard = (id: string) => (decideGuards[id] ??= submitFeedback())
 	let rejectingId = $state<string | null>(null)
 
 	// Today's birthday greeting, rendered at the top of the announcements feed (#167).
@@ -339,7 +340,9 @@
 					use:enhance={giveAward.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<div class="grid gap-2 sm:grid-cols-2">
 						<select name="employeeId" required class="input h-9">
 							<option value="">Select employee…</option>
@@ -371,7 +374,9 @@
 					use:enhance={postAnnouncement.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'postAnnouncement' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<input name="title" placeholder="Title" required class="input h-9" />
 					<textarea
 						name="body"
@@ -625,6 +630,11 @@
 			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
 				Postings awaiting your approval
 			</p>
+			<!-- Scoped: with the award panel open, a posting failure used to render under
+			     "Give award", where nothing had gone wrong. -->
+			{#if form?.action === 'decidePosting' && form?.error}
+				<Banner kind="error" message={form.error} />
+			{/if}
 			<ul class="divide-y divide-border/60">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}

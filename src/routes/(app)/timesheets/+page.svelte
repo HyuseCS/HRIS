@@ -7,6 +7,7 @@
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import NewTimesheetDialog from '$lib/components/timesheets/NewTimesheetDialog.svelte'
@@ -208,6 +209,13 @@
 		</div>
 	{/if}
 
+	<!-- 14 server `fail()` sites are reachable with the modal CLOSED, and the modal owns the only
+	     other error slot on this page — so with it shut the failure rendered nowhere. Gated on
+	     `openTs` so an open modal still shows the message once, in place. -->
+	{#if form?.error && !openTs}
+		<Banner kind="error" message={form.error} />
+	{/if}
+
 	{#if form?.saved}
 		<Banner kind="success" message={form.saved} />
 	{/if}
@@ -222,6 +230,8 @@
 		{:then mine}
 			{@render section('My Timesheets', mine, 'mine', false)}
 			<Pagination meta={data.minePagination} />
+		{:catch}
+			<LoadError what="your timesheets" />
 		{/await}
 	{/if}
 	{#if data.isManager}
@@ -230,6 +240,8 @@
 		{:then team}
 			{@render section('Team Timesheets', team, 'team', true)}
 			<Pagination meta={data.teamPagination} />
+		{:catch}
+			<LoadError what="the team timesheets" />
 		{/await}
 	{/if}
 	{#if !data.myEmployeeId && !data.isManager}

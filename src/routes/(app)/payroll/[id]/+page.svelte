@@ -5,6 +5,7 @@
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { periodDays } from '$lib/utils/pay-periods'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -16,7 +17,9 @@
 
 	// #108: a double-submitted recompute rebuilds every entry twice — expensive to unwind.
 	const compute = createSubmitGuard()
-	const decideGuard = createSubmitGuard()
+	// Final sign-off. The page banner is far above the fold on a long run, so the toast is the
+	// only cue that lands where the operator is looking.
+	const decideGuard = submitFeedback()
 
 	// Maker-checker chain (#134): each attempt is MAKE → VERIFY → APPROVE. Group the
 	// append-only steps by attempt so a recomputed/refiled run shows its full history.

@@ -9,7 +9,7 @@
 	import { formatDateRange } from '$lib/utils/format'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -149,11 +149,11 @@
 	// #108: a double-click on Approve would post the same decision twice. Each card gets its own
 	// guard — a shared one would disable every row's Approve button while any single row is in
 	// flight. Guards are created lazily per request id, so a card keeps its guard across re-renders.
-	const approveGuards = new Map<string, ReturnType<typeof createSubmitGuard>>()
+	const approveGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function approveGuard(id: string) {
 		let g = approveGuards.get(id)
 		if (!g) {
-			g = createSubmitGuard()
+			g = submitFeedback()
 			approveGuards.set(id, g)
 		}
 		return g
@@ -161,7 +161,7 @@
 
 	// The popup-driven Return/Reject path submits this hidden form via `requestSubmit()`, which
 	// bypasses any button `disabled` — the guard's `cancel()` is what actually stops the double post.
-	const decide = createSubmitGuard()
+	const decide = submitFeedback()
 
 	const unverifiedCount = (docs: { verifiedAt: Date | string | null }[]) =>
 		docs.filter((d) => !d.verifiedAt).length

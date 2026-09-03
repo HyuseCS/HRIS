@@ -45,7 +45,9 @@
 	// Both are read through a closure so a call site that swaps them per row still works —
 	// reading them here directly would snapshot whatever they were on first render.
 	const fb = submitFeedback({
-		success: () => successMessage,
+		// An explicit prop wins; otherwise the action's own `saved` string is the message, so a
+		// call site whose server already says what happened needs no prop at all.
+		success: (data) => successMessage ?? (typeof data?.saved === 'string' ? data.saved : null),
 		inner: (input) => submit?.(input)
 	})
 

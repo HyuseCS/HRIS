@@ -35,8 +35,13 @@ function resolve(msg: FeedbackMessage | undefined, data: FeedbackData): string |
 	return typeof msg === 'function' ? msg(data) : msg
 }
 
+/** The `saved: true | string` success contract: only a string carries a message. */
+function savedMessage(data: FeedbackData): string | null {
+	return typeof data?.saved === 'string' ? data.saved : null
+}
+
 export interface SubmitFeedbackOptions {
-	/** Toast text on success. Omit or return `null` for no toast. */
+	/** Toast text on success. Omit to use the action's own `saved` string; `null` for no toast. */
 	success?: FeedbackMessage
 	/** Overrides the failure toast. Omit to read `data.error`. */
 	error?: FeedbackMessage
@@ -66,7 +71,13 @@ export function submitFeedback(opts: SubmitFeedbackOptions = {}) {
 
 			if (result.type === 'success') {
 				await opts.onSuccess?.(result.data)
-				const msg = resolve(opts.success, result.data)
+				// The success contract is `saved: true | string` — a string IS the message. With no
+				// explicit `success` option a site gets its server's own words for free, which is
+				// why an adopting page needs no bespoke wiring.
+				const msg =
+					opts.success === undefined
+						? savedMessage(result.data)
+						: resolve(opts.success, result.data)
 				if (msg) addToast(msg, { kind: 'success' })
 				if (!after) await o.update()
 			} else if (result.type === 'failure') {

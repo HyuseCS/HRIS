@@ -160,7 +160,10 @@ export const actions: Actions = {
 
 		const parsed = announcementSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success)
-			return fail(422, { error: parsed.error.errors[0]?.message ?? 'Invalid input' })
+			return fail(422, {
+				action: 'postAnnouncement',
+				error: parsed.error.errors[0]?.message ?? 'Invalid input'
+			})
 
 		await createAnnouncement(user.organizationId, parsed.data, {
 			organizationId: user.organizationId,
@@ -168,7 +171,7 @@ export const actions: Actions = {
 			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		})
-		return { posted: true }
+		return { action: 'postAnnouncement', posted: true }
 	},
 
 	// Approve or send back a job posting from the approver's dashboard card (#195).
@@ -179,7 +182,7 @@ export const actions: Actions = {
 		const id = data.get('id') as string
 		const approve = data.get('action') === 'approve'
 		const note = (data.get('note') as string) || undefined
-		if (!id) return fail(400, { error: 'Missing posting id' })
+		if (!id) return fail(400, { action: 'decidePosting', error: 'Missing posting id' })
 
 		const myEmployee = await db.employee.findFirst({
 			where: { userId: user.id, organizationId: user.organizationId },
@@ -199,10 +202,16 @@ export const actions: Actions = {
 				}
 			)
 		} catch (e) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e))
+				return fail(e.status, { action: 'decidePosting', error: String(e.body.message) })
 			throw e
 		}
-		return { postingDecided: true }
+		// `postingDecided` was a dead flag — nothing rendered it. The named action is what lets the
+		// error land under Postings instead of under "Give award".
+		return {
+			action: 'decidePosting',
+			saved: approve ? 'Posting approved.' : 'Posting sent back to draft.'
+		}
 	},
 
 	// HR grants an employee award, announced on the dashboard feed (#180).
@@ -213,7 +222,8 @@ export const actions: Actions = {
 		const employeeId = data.get('employeeId') as string
 		const title = (data.get('title') as string) ?? ''
 		const note = (data.get('note') as string) || undefined
-		if (!employeeId || !title.trim()) return fail(422, { error: 'Pick an employee and a title.' })
+		if (!employeeId || !title.trim())
+			return fail(422, { action: 'giveAward', error: 'Pick an employee and a title.' })
 		try {
 			await grantAward(
 				user.organizationId,
@@ -226,9 +236,10 @@ export const actions: Actions = {
 				}
 			)
 		} catch (e) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e))
+				return fail(e.status, { action: 'giveAward', error: String(e.body.message) })
 			throw e
 		}
-		return { awarded: true }
+		return { action: 'giveAward', awarded: true }
 	}
 }
