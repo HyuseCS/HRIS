@@ -563,12 +563,27 @@
 			<!-- Edit Form (HR-only; the update/offboard actions require HR_ADMIN) -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
 				<form
+					id="update-profile"
 					method="POST"
 					action="?/update"
 					use:enhance={update.enhance}
 					class="rounded-lg border p-6 space-y-4 lg:col-span-2"
 				>
 					<h2 class="font-semibold">Update Profile</h2>
+					<!--
+						Three forms on this page can look like the right one for a pay change, and picking
+						the wrong one silently skips the audited career event. Each says what it is for and
+						links the other two.
+					-->
+					<p class="text-sm text-muted-foreground">
+						Corrects personal and contact details. Does not change pay or position — use
+						<a href="?tab=compensation#change-salary" class="text-primary hover:underline"
+							>Change Salary</a
+						>
+						or
+						<a href="?tab=compensation#promote" class="text-primary hover:underline">Promote</a>
+						for those.
+					</p>
 					<!--
 					Gated on form.action: this is the ONLY error slot on a page with 21 actions, so
 					an ungated block painted a failed addLoan (or document delete) into this form.
@@ -1440,6 +1455,7 @@
 		     and re-derives the current cache. Salary is masked (reveal above to edit). -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
 				<form
+					id="change-salary"
 					method="POST"
 					action="?/changeCompensation"
 					use:enhance={changeCompensation.enhance}
@@ -1451,6 +1467,11 @@
 							>(records an effective-dated change; payroll splits a run that straddles it)</span
 						>
 					</h2>
+					<p class="text-sm text-muted-foreground">
+						Records a dated pay change in the employment history. Use
+						<a href="?tab=compensation#promote" class="text-primary hover:underline">Promote</a>
+						if the job title or position is also changing.
+					</p>
 					{#if form?.action === 'changeCompensation' && form?.notice}
 						<Banner kind="warning" message={form.notice} />
 					{:else if form?.action === 'changeCompensation' && form?.success}
@@ -1534,6 +1555,7 @@
 		     on its date. Empty fields mean "not part of this promotion", never "clear". -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
 				<form
+					id="promote"
 					method="POST"
 					action="?/promote"
 					use:enhance={promote.enhance}
@@ -1545,6 +1567,14 @@
 							>(one audited event — leave anything unchanged blank)</span
 						>
 					</h2>
+					<p class="text-sm text-muted-foreground">
+						Records a dated position or title change, with an optional pay change in the same event.
+						Use
+						<a href="?tab=compensation#change-salary" class="text-primary hover:underline"
+							>Change Salary</a
+						>
+						if only the pay is changing.
+					</p>
 					{#if form?.action === 'promote' && form?.notice}
 						<Banner kind="warning" message={form.notice} />
 					{:else if form?.action === 'promote' && form?.success}
