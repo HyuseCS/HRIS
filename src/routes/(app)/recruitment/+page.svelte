@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
@@ -226,9 +227,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No job postings yet</td
-						>
+						<td colspan="6" class="p-0"><EmptyState title="No job postings yet" /></td>
 					</tr>
 				{/each}
 			</tbody>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -439,11 +440,7 @@
 						</td>
 					</tr>
 				{:else}
-					<tr
-						><td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No requests yet.</td
-						></tr
-					>
+					<tr><td colspan="6" class="p-0"><EmptyState title="No requests yet" /></td></tr>
 				{/each}
 			</tbody>
 		</table>

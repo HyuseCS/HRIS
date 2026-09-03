@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
@@ -11,6 +12,9 @@
 
 	let { data }: { data: PageData } = $props()
 	let search = $state($page.url.searchParams.get('search') ?? '')
+	// Read the APPLIED filter from the URL, not the bound input: typing must not flip the empty
+	// state to "no results" before the search is submitted.
+	const filtered = $derived(!!($page.url.searchParams.get('search') || data.branchFilter))
 
 	// Active / Offboarded tab links (#184) — keep the search and branch filters, switch the
 	// status, and drop the page so a tab always opens on its first page.
@@ -142,11 +146,17 @@
 						</tr>
 					{:else}
 						<tr>
-							<td
-								colspan={data.showBranches ? 8 : 7}
-								class="px-4 py-8 text-center text-muted-foreground"
-								>{data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}</td
-							>
+							<td colspan={data.showBranches ? 8 : 7} class="p-0">
+								<EmptyState
+									variant={filtered ? 'no-results' : 'empty'}
+									title={data.tab === 'offboarded'
+										? 'No offboarded employees'
+										: 'No employees found'}
+									description={filtered
+										? 'No employee matches your search or branch filter.'
+										: undefined}
+								/>
+							</td>
 						</tr>
 					{/each}
 				</tbody>

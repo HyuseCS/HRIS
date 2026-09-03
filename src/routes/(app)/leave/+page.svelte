@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -186,9 +187,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan={cols} class="px-4 py-8 text-center text-muted-foreground"
-							>No leave requests</td
-						>
+						<td colspan={cols} class="p-0"><EmptyState title="No leave requests" /></td>
 					</tr>
 				{/each}
 			</tbody>

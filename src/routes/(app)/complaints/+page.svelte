@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -233,10 +234,13 @@
 			<Pagination meta={data.pagination} />
 		{/if}
 	{:else}
-		<p class="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-			{data.isHr
-				? 'No inquiries yet. Open one to ask an employee about an issue.'
-				: 'No inquiries. HR has not raised anything with you.'}
-		</p>
+		<div class="rounded-md border border-dashed">
+			<EmptyState
+				title="No inquiries yet"
+				description={data.isHr
+					? 'Open one to ask an employee about an issue.'
+					: 'HR has not raised anything with you.'}
+			/>
+		</div>
 	{/if}
 </div>

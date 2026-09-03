@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -272,9 +273,11 @@
 						</tr>
 					{:else}
 						<tr
-							><td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No schedules yet. Until one is marked the organization default, unassigned
-								employees fall back to Mon–Fri 8:00–17:00.</td
+							><td colspan="5" class="p-0"
+								><EmptyState
+									title="No schedules yet"
+									description="Until one is marked the organization default, unassigned employees fall back to Mon–Fri 8:00–17:00."
+								/></td
 							></tr
 						>
 					{/each}

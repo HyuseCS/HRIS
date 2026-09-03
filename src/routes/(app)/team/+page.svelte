@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
@@ -106,8 +107,8 @@
 
 	<!-- Attendance table -->
 	{#if data.members.length === 0}
-		<div class="rounded-md border bg-muted/50 px-6 py-12 text-center text-muted-foreground text-sm">
-			No team members found.
+		<div class="rounded-md border bg-muted/50">
+			<EmptyState title="No team members found" />
 		</div>
 	{:else}
 		<div class="overflow-x-auto rounded-md border">

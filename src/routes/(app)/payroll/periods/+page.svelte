@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
@@ -217,9 +218,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No payroll periods yet</td
-							>
+							<td colspan="5" class="p-0"><EmptyState title="No payroll periods yet" /></td>
 						</tr>
 					{/each}
 				</tbody>
