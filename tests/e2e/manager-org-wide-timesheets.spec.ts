@@ -108,7 +108,9 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	}).toPass({ timeout: 15000 })
 	await modal.getByRole('button', { name: 'Sync from attendance' }).click()
 
-	await expect(page.getByText(/Synced \d+ days? from attendance/)).toBeVisible()
+	// Scoped to <main>: phase 04 also toasts this message, and a page-wide locator now matches
+	// both the page banner and the toast.
+	await expect(page.getByRole('main').getByText(/Synced \d+ days? from attendance/)).toBeVisible()
 	await expect(page.getByText('You can only review items for your direct reports')).toHaveCount(0)
 })
 
