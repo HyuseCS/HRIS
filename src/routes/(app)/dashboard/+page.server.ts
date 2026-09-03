@@ -117,7 +117,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the
 	// toast is gone.
-	const recentActivity = await listRecent(user.id, 8)
+	// 25, not 8: this panel is the ONLY way to recover a toast that was missed, and an unread
+	// backlog longer than the list was unrecoverable.
+	const recentActivity = await listRecent(user.id, 25)
 
 	return {
 		canPost,
