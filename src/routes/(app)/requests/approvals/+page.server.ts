@@ -6,22 +6,34 @@ import { decide, listPendingRequestsForApprover } from '$lib/server/services/app
 import type { ApprovalDecision } from '@prisma/client'
 import type { Actions, PageServerLoad } from './$types'
 
+/**
+ * #6 — the caller's OWN employee row, scoped to the ACTIVE org. An unscoped `userId` lookup
+ * resolves a cross-org account's home-tenant profile whichever org the session is in.
+ *
+ * Null-tolerant by design: every caller passes `?.id ?? null`, because an approver with no
+ * employee row in the active org still legitimately reviews other people's requests.
+ */
+function findSelfEmployee(user: { id: string; organizationId: string }) {
+	return db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
+}
+
 // Request approvals (all request types) — reachable by any role that can approve, with
 // the actual per-stage authority (make/verify/approve) resolved in the service (#134).
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
-	const roles = user.roles ?? [user.role]
+	const roles = user.roles
 	if (!canAny(roles, 'APPROVE_REQUESTS')) redirect(303, '/requests')
 
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
-		select: { id: true }
-	})
+	const myEmployee = await findSelfEmployee(user)
 
 	const actionable = await listPendingRequestsForApprover(
 		user.organizationId,
 		roles,
-		myEmployee?.id ?? null
+		myEmployee?.id ?? null,
+		user.id
 	)
 
 	// #64: "at my stage" is decided in JS (canActOnStage), so this page paginates
@@ -92,7 +104,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 export const actions: Actions = {
 	decideRequest: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const roles = user.roles ?? [user.role]
+		const roles = user.roles
 		if (!canAny(roles, 'APPROVE_REQUESTS')) return fail(403, { error: 'Insufficient permissions' })
 
 		const data = await request.formData()
@@ -107,10 +119,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'A note is required for rejected or returned requests.' })
 		}
 
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 
 		try {
 			await decide(
@@ -120,7 +129,6 @@ export const actions: Actions = {
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
 					actorRoles: roles,
 					ipAddress: getClientAddress()
 				},
@@ -137,7 +145,7 @@ export const actions: Actions = {
 	// decide (e.g. no longer at their stage) throw and are counted as skipped, not aborting the batch.
 	rejectMany: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const roles = user.roles ?? [user.role]
+		const roles = user.roles
 		if (!canAny(roles, 'APPROVE_REQUESTS')) return fail(403, { error: 'Insufficient permissions' })
 
 		const data = await request.formData()
@@ -149,14 +157,10 @@ export const actions: Actions = {
 		if (!ids.length) return fail(400, { error: 'No requests selected' })
 		if (note.trim() === '') return fail(400, { error: 'A note is required to reject requests.' })
 
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 		const ctx = {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
 			actorRoles: roles,
 			ipAddress: getClientAddress()
 		}

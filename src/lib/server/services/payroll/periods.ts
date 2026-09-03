@@ -2,11 +2,19 @@ import { db } from '$lib/server/db'
 import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import { Prisma } from '@prisma/client'
-import { computePayroll } from './index'
-import { D, q2, sum } from './money'
+import {
+	assertCustomRangeClearOfCutoff,
+	assertNoOverlappingRun,
+	computePayroll,
+	lockPayrollRuns
+} from './index'
+import { voidedOwnApproval } from './audit-markers'
+import { D, q2 } from './money'
+import { reverseAmortization } from './amortization'
 import { deriveRange, lockRange } from '../attendance'
-import { isValidStandardPeriod } from '$lib/utils/pay-periods'
+import { customRangeError } from '$lib/utils/pay-periods'
 import { notifyMany } from '../notifications'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { formatShortDate } from '$lib/utils/format'
 import type { AuditContext } from '../types'
 
@@ -41,27 +49,40 @@ export async function openPeriod(
 		startDate: Date
 		endDate: Date
 		cutoff?: number
-		// Escape hatch for seeds / legacy imports only (#129).
-		allowNonStandardPeriod?: boolean
 	},
 	ctx: AuditContext
 ) {
-	if (!input.allowNonStandardPeriod && !isValidStandardPeriod(input.startDate, input.endDate)) {
-		error(400, 'A payroll period must be a standard pay period (1–15, 16–EOM, or the whole month)')
-	}
-
-	const existing = await db.payrollRun.findUnique({
-		where: {
-			organizationId_periodStart_periodEnd: {
-				organizationId,
-				periodStart: input.startDate,
-				periodEnd: input.endDate
-			}
-		}
-	})
-	if (existing) error(409, 'A payroll run for this period already exists')
+	// #3: a range may now cross a calendar-month boundary; the same-month rule is replaced by a
+	// SIZE cap. One service, two callers — the form action and the v1 API twin both land here, so
+	// there is no second gate to keep in sync. See createPayrollRun.
+	const invalid = customRangeError(input.startDate, input.endDate)
+	if (invalid) error(400, invalid)
 
 	const period = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		// The same per-org advisory lock `createPayrollRun` takes, keyed identically, so the two
+		// write paths serialize against each other. It used to carry the period's month too; #3
+		// dropped that, because a range may now touch two months and two overlapping ranges either
+		// side of a boundary would otherwise take two different locks. Both checks below run inside
+		// it; when either throws, the transaction rolls back and NEITHER row is written.
+		await lockPayrollRuns(tx, organizationId)
+
+		// S1: kept ahead of the overlap guard — a VOIDED run keeps its row and its unique constraint,
+		// and the guard skips VOIDED, so without this the recreate would raise a raw Prisma P2002
+		// and surface as a 500.
+		const existing = await tx.payrollRun.findUnique({
+			where: {
+				organizationId_periodStart_periodEnd: {
+					organizationId,
+					periodStart: input.startDate,
+					periodEnd: input.endDate
+				}
+			}
+		})
+		if (existing) error(409, 'A payroll run for this period already exists')
+
+		await assertNoOverlappingRun(organizationId, input.startDate, input.endDate, tx)
+		await assertCustomRangeClearOfCutoff(organizationId, input.startDate, input.endDate, tx)
+
 		const p = await tx.payrollPeriod.create({
 			data: {
 				organizationId,
@@ -79,15 +100,21 @@ export async function openPeriod(
 				periodEnd: input.endDate
 			}
 		})
+		// #5: the audit row commits with the period it records.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'PayrollPeriod',
+				entityId: p.id,
+				newValue: { name: input.name, startDate: input.startDate, endDate: input.endDate }
+			},
+			tx
+		)
+
 		return p
 	})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'PayrollPeriod',
-		entityId: period.id,
-		newValue: { name: input.name, startDate: input.startDate, endDate: input.endDate }
-	})
 	return period
 }
 
@@ -100,14 +127,22 @@ export async function importAttendance(id: string, organizationId: string, ctx: 
 	await deriveRange(organizationId, range, ctx)
 	await lockRange(organizationId, range, ctx)
 
-	const updated = await db.payrollPeriod.update({ where: { id }, data: { status: 'IMPORTED' } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'IMPORTED' }
+	// #5: the status flip and its audit row commit together. `deriveRange`/`lockRange` stay outside
+	// — they are long-running and already audited in their own right.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const updated = await tx.payrollPeriod.update({ where: { id }, data: { status: 'IMPORTED' } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: { status: 'IMPORTED' }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 export async function generate(id: string, organizationId: string, ctx: AuditContext) {
@@ -124,14 +159,22 @@ export async function generate(id: string, organizationId: string, ctx: AuditCon
 	}
 	await computePayroll(run.id, organizationId, ctx)
 
-	const updated = await db.payrollPeriod.update({ where: { id }, data: { status: 'GENERATED' } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'GENERATED' }
+	// #5: the status flip and its audit row commit together. `computePayroll` stays outside — it is
+	// the long-running engine pass and writes its own audit row.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const updated = await tx.payrollPeriod.update({ where: { id }, data: { status: 'GENERATED' } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: { status: 'GENERATED' }
+			},
+			tx
+		)
+		return updated
 	})
-	return updated
 }
 
 export async function lock(
@@ -167,7 +210,10 @@ export async function lock(
 		// transaction before any money moves.
 		const claimed = await tx.payrollPeriod.updateMany({
 			where: { id, status: 'GENERATED' },
-			data: { status: 'LOCKED', lockedAt: new Date() }
+			// #298: `lockedById` is written HERE, inside the claim — who and when are stamped by
+			// the single caller that wins the race. A second statement would let the loser of the
+			// race stamp its name onto a lock it did not perform.
+			data: { status: 'LOCKED', lockedAt: new Date(), lockedById: ctx.actorId }
 		})
 		if (claimed.count === 0) {
 			error(409, 'This period is already being locked or is no longer GENERATED')
@@ -221,12 +267,24 @@ export async function lock(
 					const ca = await tx.cashAdvance.findUnique({ where: { id: d.refId } })
 					if (!ca) continue
 
-					// Cash advances have no payment ledger, so there is no idempotency key to
-					// lean on — the atomic period claim above is what stops a second pass, and
-					// this conditional update is what stops a concurrent one.
+					// `amount` is the frozen deduction line; re-cap it against the live balance
+					// exactly as the loan arm does.
 					const liveBalance = D(ca.balance)
 					const applied = q2(amount.lt(liveBalance) ? amount : liveBalance)
 					if (applied.lte(0)) continue
+
+					// #309: record what was ACTUALLY taken. The void reverses these rows, so a
+					// capped payment can no longer be credited back at the uncapped figure. The
+					// unique key on (advance, entry) makes a replayed lock a no-op.
+					try {
+						await tx.cashAdvancePayment.create({
+							data: { cashAdvanceId: d.refId, payrollEntryId: entry.id, amount: applied }
+						})
+					} catch (e) {
+						if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') continue
+						throw e
+					}
+
 					const newBalance = liveBalance.minus(applied)
 					const res = await tx.cashAdvance.updateMany({
 						where: { id: d.refId, balance: ca.balance },
@@ -242,25 +300,37 @@ export async function lock(
 			}
 		}
 
-		// Record who/when locked + any override, but DO NOT flip run.status to APPROVED —
-		// payslip visibility is gated on the PERIOD being RELEASED, and the LOCKED period
-		// already blocks re-generation. Keeping the run COMPUTED keeps the two flows distinct.
-		await tx.payrollRun.update({
-			where: { id: run.id },
-			data: {
-				approvedById: ctx.actorId,
-				approvedAt: new Date(),
-				...(overrideNote ? { hasOverride: true, overrideNote } : {})
-			}
-		})
+		// Record any override on the run. The lock records NO approver (#298) — who locked lives
+		// on `PayrollPeriod.lockedById`; writing `approvedById` here made the field mean "approver
+		// or locker, last write wins". And still DO NOT flip run.status to APPROVED — payslip
+		// visibility is gated on the PERIOD being RELEASED, and the LOCKED period already blocks
+		// re-generation. Keeping the run COMPUTED keeps the two flows distinct.
+		if (overrideNote) {
+			await tx.payrollRun.update({
+				where: { id: run.id },
+				data: { hasOverride: true, overrideNote }
+			})
+		}
+
+		// #5: the audit row joins the same transaction as the claim and the balance decrements. A
+		// lock that moved money but is not findable is exactly what this trail exists to prevent.
+		await writeAuditLog(
+			ctx,
+			{
+				action: overrideNote ? 'PAYROLL_OVERRIDE' : 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				// #298: `lockedById` is a plain FACT key, always present — a lock is not an override.
+				newValue: {
+					status: 'LOCKED',
+					lockedById: ctx.actorId,
+					...(overrideNote ? { overrideNote } : {})
+				}
+			},
+			tx
+		)
 	})
 
-	await writeAuditLog(ctx, {
-		action: overrideNote ? 'PAYROLL_OVERRIDE' : 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'LOCKED', ...(overrideNote ? { overrideNote } : {}) }
-	})
 	return db.payrollPeriod.findUnique({ where: { id } })
 }
 
@@ -269,15 +339,32 @@ export async function release(id: string, organizationId: string, ctx: AuditCont
 	if (period.status !== 'LOCKED')
 		error(400, `Only a LOCKED period can be released (is ${period.status})`)
 
-	const updated = await db.payrollPeriod.update({
-		where: { id },
-		data: { status: 'RELEASED', releasedAt: new Date() }
-	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'RELEASED' }
+	// Claim the release the same way `lock()` claims the lock. Two concurrent releases would
+	// otherwise both succeed, and the loser's `releasedAt` would overwrite the winner's — which
+	// since #298 is the date printed on every payslip in the period (PAYDATE). #5: the claim, its
+	// read-back and the audit row now share one transaction — a failed audit write must not leave
+	// the release standing unrecorded.
+	const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+		const claimed = await tx.payrollPeriod.updateMany({
+			where: { id, status: 'LOCKED' },
+			data: { status: 'RELEASED', releasedAt: new Date(), releasedById: ctx.actorId }
+		})
+		if (claimed.count === 0) error(409, 'The period was already released or changed — nothing done')
+		const row = await tx.payrollPeriod.findUniqueOrThrow({ where: { id } })
+		await writeAuditLog(
+			ctx,
+			{
+				// #298: `releasedById` is a plain FACT key, always present — a release is not an override,
+				// so this is never a marker. It is the copy a reveal can read back if the row is later
+				// edited by hand.
+				action: 'UPDATE',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: { status: 'RELEASED', releasedById: ctx.actorId }
+			},
+			tx
+		)
+		return row
 	})
 
 	// Notify every employee with a payslip in this period that it's now available (#169).
@@ -300,70 +387,44 @@ export async function release(id: string, organizationId: string, ctx: AuditCont
 	return updated
 }
 
+/** Run void vs period void — what each one does and does not reverse: `docs/payroll-void-semantics.md`. */
 export async function voidPeriod(id: string, organizationId: string, ctx: AuditContext) {
+	// Voiding a finalized period is Super-Admin-only (#224) — enforced here, not just at the route,
+	// so the form action and the v1 API twin are covered by one check, as `voidRun` already is.
+	requireAnyCapability(ctx.actorRoles, 'OVERRIDE_FINALIZED')
+
 	const period = await requirePeriod(id, organizationId)
 	if (period.status === 'VOIDED') error(400, 'Period is already voided')
 	const run = period.runs[0]
 	const wasLocked = period.status === 'LOCKED' || period.status === 'RELEASED'
 
 	await db.$transaction(async (tx: Prisma.TransactionClient) => {
-		if (run && wasLocked) {
-			// Reverse the amortization committed at lock.
-			const entries = await tx.payrollEntry.findMany({
-				where: { payrollRunId: run.id },
-				include: { deductions: true }
-			})
-			for (const entry of entries) {
-				for (const d of entry.deductions) {
-					// #119: balances stay in exact decimal — no Number() round-trip. Both operands are
-					// scale-2 at rest, so decrements introduce no drift and the running balance stays
-					// reconcilable against the original principal.
-					const amount = D(d.amount)
-					if (amount.lte(0) || !d.refId) continue
-					if (d.code === 'LOAN') {
-						// Reverse what was actually applied, not the frozen deduction line. Lock
-						// re-caps against the live balance, so the two can differ; the payment
-						// rows are the record of what really moved. Reversing `d.amount` blind
-						// would credit back money that was never collected.
-						const payments = await tx.loanPayment.findMany({
-							where: { loanId: d.refId, payrollEntryId: entry.id },
-							select: { amount: true }
-						})
-						const reversal = sum(payments.map((p) => p.amount))
-						const loan = await tx.loan.findUnique({ where: { id: d.refId } })
-						if (loan && reversal.gt(0)) {
-							const restored = D(loan.balance).plus(reversal)
-							await tx.loan.update({
-								where: { id: d.refId },
-								// Only reopen a loan the reversal actually un-pays; a loan settled
-								// by some other payment stays PAID.
-								data: { balance: restored, status: restored.gt(0) ? 'ACTIVE' : loan.status }
-							})
-						}
-						await tx.loanPayment.deleteMany({
-							where: { loanId: d.refId, payrollEntryId: entry.id }
-						})
-					} else if (d.code === 'CASH_ADVANCE') {
-						const ca = await tx.cashAdvance.findUnique({ where: { id: d.refId } })
-						if (ca) {
-							await tx.cashAdvance.update({
-								where: { id: d.refId },
-								data: { balance: D(ca.balance).plus(amount), status: 'ACTIVE' }
-							})
-						}
-					}
-				}
-			}
-		}
-		if (run) await tx.payrollRun.update({ where: { id: run.id }, data: { status: 'VOIDED' } })
-		await tx.payrollPeriod.update({ where: { id }, data: { status: 'VOIDED' } })
-	})
+		// Compare-and-set, same reason as `voidRun`: the status read above is preliminary, and two
+		// concurrent voids would otherwise both reverse the amortization and credit it back twice.
+		const claimed = await tx.payrollPeriod.updateMany({
+			where: { id, status: { not: 'VOIDED' } },
+			data: { status: 'VOIDED' }
+		})
+		if (claimed.count === 0) error(400, 'Period is already voided')
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PayrollPeriod',
-		entityId: id,
-		newValue: { status: 'VOIDED' }
+		if (run && wasLocked) await reverseAmortization(tx, run.id)
+		if (run) await tx.payrollRun.update({ where: { id: run.id }, data: { status: 'VOIDED' } })
+
+		// Inside the transaction: a void that is not findable in the audit log is the defect #298
+		// exists to close, so the marker must never outlive — or be outlived by — the void itself.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'PAYROLL_VOID',
+				entityType: 'PayrollPeriod',
+				entityId: id,
+				newValue: {
+					status: 'VOIDED',
+					...(voidedOwnApproval(ctx.actorId, run, period) && { sameActorAsApprover: true })
+				}
+			},
+			tx
+		)
 	})
 	return db.payrollPeriod.findUnique({ where: { id } })
 }

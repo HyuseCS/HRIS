@@ -57,7 +57,7 @@ async function main() {
 				organizationId: org!.id,
 				email: opts.email,
 				passwordHash,
-				role: 'EMPLOYEE',
+				roles: ['EMPLOYEE'],
 				isActive: !opts.offboarded
 			}
 		})

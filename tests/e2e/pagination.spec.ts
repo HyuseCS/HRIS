@@ -32,7 +32,7 @@ test.beforeAll(async () => {
 					email: `zzpagetest${n}@example.test`,
 					// These rows are list fixtures only — nobody logs in as them.
 					passwordHash: 'not-a-real-hash',
-					role: 'EMPLOYEE',
+					roles: ['EMPLOYEE'],
 					isActive: false
 				}
 			})

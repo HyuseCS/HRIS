@@ -29,7 +29,14 @@ async function main() {
 		db.requestDocument.findMany({ select: { storageKey: true } })
 	])
 
-	const known = new Set([...empDocs, ...reqDocs].map((d) => d.storageKey))
+	// #299/AC-7: the requestDocument query above is deliberately UNFILTERED. A tombstoned document
+	// whose bytes have not been evicted yet still owns its file, and dropping it from the known-set
+	// would make this sweep delete a file that still has a row pointing at it. The null filter is
+	// the already-evicted case — that row correctly no longer claims any file — and it is not
+	// cosmetic: `storageKey` is `String?` since #299 and nothing typechecks this directory.
+	const known = new Set(
+		[...empDocs, ...reqDocs].map((d) => d.storageKey).filter((k): k is string => k !== null)
+	)
 	const now = Date.now()
 	const orphans = stored.filter((s) => !known.has(s.key))
 	const recent = orphans.filter((o) => now - o.mtimeMs < graceMs)

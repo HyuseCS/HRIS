@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -37,11 +38,14 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Company Information</h1>
-		<p class="text-sm text-muted-foreground">Appears on payslips, reports, and the org header.</p>
-	</div>
+	<PageHeader
+		title="Company Information"
+		description="Appears on payslips, reports, and the org header."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.success}
 		<div

@@ -150,6 +150,31 @@ export function tenureLabel(startDate: Date, endDate?: Date): string {
 	return parts.join(', ')
 }
 
+// ─── Month stepping ──────────────────────────────────────────────────────────
+
+/**
+ * `date` moved by `months` calendar months, stepping in **UTC** (negative steps go back).
+ *
+ * UTC is the basis on purpose. The dates this steps are stored as UTC midnight, and the
+ * caller needs the day-of-month to survive the step: local-time month math drifts a day
+ * for PHT (UTC+8), which would silently move a period start or end onto the wrong calendar
+ * day. This is the same reason `regularizationDate` below has always been UTC — it now
+ * calls this helper rather than repeating the arithmetic.
+ *
+ * Distinct from `monthsOfService`, which is deliberately **Manila**-based: it answers a
+ * wall-clock business question ("has the anniversary come round yet?"), not a date-stepping
+ * one. The two bases disagree by design — do not harmonise them.
+ *
+ * Short months overflow the way `Date.prototype.setUTCMonth` does: Jan 31 + 1 month is
+ * Mar 3 (Mar 2 in a leap year), not Feb 28. Deterministic, and pinned by
+ * `tests/unit/dates-add-utc-months.test.ts`.
+ */
+export function addUTCMonths(date: Date, months: number): Date {
+	const d = new Date(date)
+	d.setUTCMonth(d.getUTCMonth() + months)
+	return d
+}
+
 // ─── Regularization (#168) ─────────────────────────────────────────────────────
 // A probationary employee becomes regular after 6 months of service. HR needs advance
 // warning to decide before the date lands, so the dashboard surfaces anyone due within
@@ -160,13 +185,11 @@ export const REGULARIZATION_MONTHS = 6
 
 /**
  * The date a probationary employee becomes regular: their start date + 6 months.
- * Computed in UTC to keep the day-of-month stable against the UTC-midnight start dates
- * we store (local-time month math would drift a day for PHT).
+ * Stepped in UTC (see `addUTCMonths`) to keep the day-of-month stable against the
+ * UTC-midnight start dates we store — local-time month math would drift a day for PHT.
  */
 export function regularizationDate(startDate: Date): Date {
-	const d = new Date(startDate)
-	d.setUTCMonth(d.getUTCMonth() + REGULARIZATION_MONTHS)
-	return d
+	return addUTCMonths(startDate, REGULARIZATION_MONTHS)
 }
 
 /** Whole days between two dates, counting calendar days in UTC (positive if `to` is later). */

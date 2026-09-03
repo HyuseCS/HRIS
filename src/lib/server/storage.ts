@@ -58,13 +58,29 @@ export function contentMatchesType(bytes: Buffer, declaredMime: string): boolean
 	return sniffMime(bytes) === declaredMime
 }
 
-// Resolve a storageKey to an absolute path, refusing anything that escapes UPLOAD_DIR.
-function resolveKey(storageKey: string): string {
-	const abs = path.resolve(UPLOAD_DIR, storageKey)
-	if (abs !== UPLOAD_DIR && !abs.startsWith(UPLOAD_DIR + path.sep)) {
+// Resolve `rel` against `root`, refusing anything that escapes it. Extracted from
+// resolveKey for #164 so the backup destination writer reuses this exact check instead of
+// growing a second one — two implementations of a containment check drift, and only one of
+// them gets fixed.
+//
+// The root itself is REJECTED (#164/E-18): '' and '.' both resolve to `root`, and every
+// caller here wants a file, never the directory. Returning the directory would let a null
+// or empty storageKey address the whole store.
+//
+// The `+ path.sep` is load-bearing: a bare startsWith(root) would accept a sibling whose
+// name merely begins with the root's ("/data/uploads-evil/x").
+export function resolveWithin(root: string, rel: string): string {
+	const base = path.resolve(root)
+	const abs = path.resolve(base, rel)
+	if (!abs.startsWith(base + path.sep)) {
 		throw new Error('Invalid storage key')
 	}
 	return abs
+}
+
+// Resolve a storageKey to an absolute path, refusing anything that escapes UPLOAD_DIR.
+function resolveKey(storageKey: string): string {
+	return resolveWithin(UPLOAD_DIR, storageKey)
 }
 
 export interface SavedFile {

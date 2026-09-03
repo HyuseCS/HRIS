@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit'
 import { getRequestDocument } from '$lib/server/services/requests/documents'
-import { APPROVER_ROLES } from '$lib/server/services/approvals'
+import { canAny } from '$lib/server/rbac'
 import { readStoredFile } from '$lib/server/storage'
 import { db } from '$lib/server/db'
 import type { RequestHandler } from './$types'
@@ -14,10 +14,21 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 	const doc = await getRequestDocument(params.docId, user.organizationId)
 	if (doc.requestId !== params.id) error(404, 'Document not found')
 
-	if (!APPROVER_ROLES.includes(user.role)) {
-		const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+	if (!canAny(user.roles, 'APPROVE_REQUESTS')) {
+		// #6: scoped to the ACTIVE org, so a cross-org account no longer resolves its home-tenant
+		// profile here.
+		const me = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
+			select: { id: true }
+		})
 		if (me?.id !== doc.request.employeeId) error(403, 'Insufficient permissions')
 	}
+
+	// #299/D-3: a tombstoned document is still downloadable WHILE its bytes survive — the reviewer
+	// can see it in the detail page's history panel, so serving it is the honest answer. The 404 is
+	// keyed on the bytes being gone (storageKey nulled by eviction), never on `deletedAt`. Enforced
+	// here at the route, not only in Svelte, because this URL is reachable directly.
+	if (!doc.storageKey) error(404, 'File no longer available')
 
 	const bytes = await readStoredFile(doc.storageKey)
 	return new Response(new Uint8Array(bytes), {

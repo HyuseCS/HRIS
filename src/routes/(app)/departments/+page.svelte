@@ -53,6 +53,23 @@
 		assignId = ''
 	})
 
+	// #178: the head picker. Options are this department's ACTIVE members — the invariant the
+	// service enforces is that the head belongs to the department — plus the sitting head when
+	// they are not on that roster (e.g. ON_LEAVE), so opening the panel cannot silently blank
+	// them out and clear the column on save.
+	function headOptions(dept: PageData['departments'][number]) {
+		const members = membersOf(dept.id)
+		const head = dept.head
+		return head && !members.some((m) => m.id === head.id)
+			? [{ id: head.id, firstName: head.firstName, lastName: head.lastName }, ...members]
+			: members
+	}
+
+	// #108: one members panel is open at a time, so a single guard covers the one mounted form.
+	const setHead = createSubmitGuard(() => async ({ update }) => {
+		await update()
+	})
+
 	function formatDate(date: Date | string) {
 		return new Date(date).toLocaleDateString('en-PH', {
 			year: 'numeric',
@@ -222,6 +239,39 @@
 										<p class="text-xs text-muted-foreground">
 											No active employees in this department.
 										</p>
+									{/if}
+									{#if data.canSetHead}
+										<form
+											method="POST"
+											action="?/setHead"
+											use:enhance={setHead.enhance}
+											class="flex flex-wrap items-center gap-2"
+										>
+											<input type="hidden" name="departmentId" value={dept.id} />
+											<label for="head-{dept.id}" class="text-xs text-muted-foreground"
+												>Department head</label
+											>
+											<select
+												id="head-{dept.id}"
+												name="headEmployeeId"
+												value={dept.headEmployeeId ?? ''}
+												class="h-8 max-w-xs rounded-md border border-input bg-background px-2 text-xs"
+											>
+												<option value="">No head assigned</option>
+												{#each headOptions(dept) as emp (emp.id)}
+													<option value={emp.id}>{emp.lastName}, {emp.firstName}</option>
+												{/each}
+											</select>
+											<button
+												type="submit"
+												disabled={setHead.busy}
+												class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+												>{setHead.busy ? 'Saving…' : 'Save head'}</button
+											>
+											<span class="text-xs text-muted-foreground"
+												>Signs the Department Head slot on this department's performance reviews.</span
+											>
+										</form>
 									{/if}
 									<form
 										method="POST"

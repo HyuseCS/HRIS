@@ -37,3 +37,13 @@ coverage/
 
 # Private HR document storage (T162)
 /uploads/
+
+# Nightly document backups (#164) - real government IDs and contracts, never commit
+/backups/
+
+# Scratch schemas/seeds written by the schema-upgrade CI job (#236)
+prisma/.deployed-*
+prisma/.selftest-*
+
+# Playwright MCP scratch output
+.playwright-mcp/

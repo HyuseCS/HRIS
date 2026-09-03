@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -15,15 +16,14 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Posting Approvers</h1>
-		<p class="text-sm text-muted-foreground">
-			Job postings must be approved before they go live. Choose who signs off each department's
-			postings (for example, the Senior Developer for Software Developers). Departments left unset
-			fall back to HR.
-		</p>
-	</div>
+	<PageHeader
+		title="Posting Approvers"
+		description="Job postings must be approved before they go live. Choose who signs off each department's postings (for example, the Senior Developer for Software Developers). Departments left unset fall back to HR."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div

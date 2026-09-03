@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
+	import { periodDays } from '$lib/utils/pay-periods'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -77,29 +78,40 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center gap-4">
-		<BackButton fallback="/payroll" label="Payroll" />
-		<h1 class="text-2xl font-bold">
-			{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)}
-		</h1>
-		<span class={run.status === 'APPROVED' ? 'badge-green' : 'badge-blue'}>
-			{run.status}
-		</span>
-		{#if run.hasOverride}
-			<span class="text-xs text-yellow-600 font-medium dark:text-yellow-500">Has overrides</span>
-		{/if}
-		{#if data.canManage && run.status === 'COMPUTED'}
-			<!-- Recompute rebuilds all entries from current data (e.g. after assigning
-			     recurring earnings/deductions). Managers only; disabled once approved. -->
-			<form method="POST" action="?/compute" use:enhance={compute.enhance} class="ml-auto">
-				<button
-					type="submit"
-					disabled={compute.busy}
-					class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{compute.busy ? 'Computing…' : 'Recompute'}</button
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+			<!-- #163: a custom range is no longer self-evident from its dates, so the inclusive day
+			     count is spelled out — it is what statutory and loans are prorated against. -->
+			<h1 class="text-2xl font-bold">
+				{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)}
+				<span class="text-base font-normal text-muted-foreground"
+					>({periodDays(run.periodStart, run.periodEnd)} days)</span
 				>
-			</form>
-		{/if}
+			</h1>
+			<span class={run.status === 'APPROVED' ? 'badge-green' : 'badge-blue'}>
+				{run.status}
+			</span>
+			{#if run.hasOverride}
+				<span class="text-xs text-yellow-600 font-medium dark:text-yellow-500">Has overrides</span>
+			{/if}
+		</div>
+		<div
+			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+		>
+			<BackButton fallback="/payroll" label="Payroll" />
+			{#if data.canManage && run.status === 'COMPUTED'}
+				<!-- Recompute rebuilds all entries from current data (e.g. after assigning
+				     recurring earnings/deductions). Managers only; disabled once approved. -->
+				<form method="POST" action="?/compute" use:enhance={compute.enhance}>
+					<button
+						type="submit"
+						disabled={compute.busy}
+						class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{compute.busy ? 'Computing…' : 'Recompute'}</button
+					>
+				</form>
+			{/if}
+		</div>
 	</div>
 
 	{#if form?.error}
@@ -108,6 +120,18 @@
 		>
 			{form.error}
 		</div>
+	{/if}
+
+	<!-- #249: the figures below and the table are this viewer's team only, not the run. Said out
+	     loud because the totals were recomputed to match the rows, which makes a scoped view look
+	     exactly like a complete one. -->
+	{#if data.scopedToTeam}
+		<p
+			class="rounded-md border border-sky-500/20 bg-sky-500/10 px-4 py-2 text-sm text-sky-600 dark:text-sky-400"
+		>
+			Showing your team only — employees who report to you or work in a branch you manage. Totals
+			cover these entries, not the whole run.
+		</p>
 	{/if}
 
 	<div class="grid gap-4 sm:grid-cols-3">
@@ -171,7 +195,9 @@
 						>
 						<td class="px-4 py-3">
 							<div class="flex items-center justify-end gap-2">
-								<a href={`/payslips/${entry.id}`} class="btn-row">Payslip</a>
+								{#if data.payslipVisible}
+									<a href={`/payslips/${entry.id}`} class="btn-row">Payslip</a>
+								{/if}
 								<button
 									onclick={() => (expandedEntryId = expandedEntryId === entry.id ? null : entry.id)}
 									class="btn-row">{expandedEntryId === entry.id ? 'Hide' : 'Breakdown'}</button
@@ -394,6 +420,35 @@
 						>
 					</form>
 				{/if}
+			</div>
+		{:else if data.actBlockedReason}
+			<!-- #283/D12: a barred approver navigated HERE, to this one run, so a control that simply
+			     vanishes reads as a bug and teaches nothing. The button stays visible, is announced
+			     as disabled, and carries the reason.
+
+			     type="button" + aria-disabled rather than the native `disabled` attribute: a disabled
+			     button leaves the tab order and fires no events, so a keyboard or screen-reader user
+			     could never reach the explanation — exactly the people who need it most. type="button"
+			     (not submit) is what makes the control a real no-op. The reason is always-visible
+			     adjacent text bound with aria-describedby, not a tooltip, because hover-only fails the
+			     same users for the same reason.
+
+			     focus-visible:opacity-100 + ring-2 because the dimming defeats its own focus ring:
+			     btn-row's default ring is 1px, and at opacity-50 that is invisible in practice — so
+			     a sighted keyboard user tabs onto the control and sees nothing happen, which reads
+			     exactly like being skipped. Reachable but invisible is not reachable. -->
+			<div class="rounded-lg border bg-card p-4">
+				<button
+					type="button"
+					aria-disabled="true"
+					aria-describedby="act-blocked"
+					class="btn-row cursor-not-allowed opacity-50 focus-visible:opacity-100 focus-visible:ring-2"
+				>
+					{actVerb}
+				</button>
+				<p id="act-blocked" class="mt-2 text-xs text-muted-foreground">
+					{data.actBlockedReason}
+				</p>
 			</div>
 		{:else if run.status === 'COMPUTED' && haltedLatest}
 			<p class="text-sm text-orange-600 dark:text-orange-500">

@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { Role } from '@prisma/client'
 
 /**
  * Guard behaviour of the page-load derive (`skipUnpunched`). The DB and audit log are mocked so
- * these stay in the pure/fast unit suite; the assertions are on which days get upserted.
+ * these stay in the pure/fast unit suite; the assertions are on which days get written.
+ *
+ * #324/D8: the per-day findUnique + upsert became one batch `attendanceDay.findMany` read, an
+ * in-memory diff, and one short transaction holding a `createMany` for new days, one set-based
+ * bulk `UPDATE` for changed ones, and the audit row. So the mocks feed `findMany` and the
+ * assertions read `tx`, not the bare client.
  *
  * Regression target: a day materialised as ABSENT *before* the employee punched used to freeze,
  * because the old `onlyMissing` guard skipped every existing day. `skipUnpunched` instead skips
@@ -17,13 +23,28 @@ const { dbMock } = vi.hoisted(() => ({
 		timeLog: { findMany: vi.fn(), count: vi.fn() },
 		request: { findMany: vi.fn() },
 		workSchedule: { findFirst: vi.fn() },
-		attendanceDay: { findUnique: vi.fn(), upsert: vi.fn() },
-		organization: { findUnique: vi.fn() }
+		attendanceDay: { findMany: vi.fn() },
+		organization: { findUnique: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
-vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const writeAuditLog = vi.fn().mockResolvedValue(undefined)
+vi.mock('$lib/server/audit', () => ({
+	writeAuditLog: (...args: unknown[]) => writeAuditLog(...args)
+}))
+
+// A distinct transaction client, so a regression back to a bare `db.` write is visible here
+// instead of silently committing outside the transaction.
+const tx = {
+	attendanceDay: { createMany: vi.fn(), findMany: vi.fn() },
+	$executeRaw: vi.fn()
+}
+
+/** Rows carried by the single bulk UPDATE, if it was issued. */
+const bulkRows = (): Record<string, unknown>[] =>
+	tx.$executeRaw.mock.calls.length ? JSON.parse(tx.$executeRaw.mock.calls[0][2] as string) : []
 
 const { deriveRange, autoDeriveFromPunches } = await import('$lib/server/services/attendance')
 
@@ -31,7 +52,7 @@ const EMP = { id: 'emp1', organizationId: 'org1', workSchedule: null }
 const CTX = {
 	organizationId: 'org1',
 	actorId: 'user1',
-	actorRole: 'EMPLOYEE' as const,
+	actorRoles: ['EMPLOYEE'] as Role[],
 	ipAddress: 'test'
 }
 // Single PHT day: Mon 2026-07-13, a regular weekday. The employee has no assigned schedule and
@@ -42,7 +63,22 @@ const WORKED = [
 	{ punchType: 'IN' as const, timestamp: new Date('2026-07-13T00:00:00Z') },
 	{ punchType: 'OUT' as const, timestamp: new Date('2026-07-13T09:00:00Z') }
 ]
-const machineDay = { isLocked: false, manuallyEdited: false }
+/** An already-materialised row for the single day under test, keyed the way the batch read is. */
+const existingDay = (over: Record<string, unknown> = {}) => ({
+	id: 'ad1',
+	employeeId: 'emp1',
+	date: new Date('2026-07-13'),
+	isLocked: false,
+	manuallyEdited: false,
+	...over
+})
+
+/** How many AttendanceDay rows the transaction actually wrote (inserts + bulk-updated rows). */
+const writeCount = () =>
+	(tx.attendanceDay.createMany.mock.calls[0]?.[0].data.length ?? 0) + bulkRows().length
+
+/** The single row that landed, whether it went in as an insert or as an update. */
+const written = () => tx.attendanceDay.createMany.mock.calls[0]?.[0].data[0] ?? bulkRows()[0]
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -51,8 +87,15 @@ beforeEach(() => {
 	dbMock.request.findMany.mockResolvedValue([])
 	// No org-default schedule configured — exercises the last-resort shift.
 	dbMock.workSchedule.findFirst.mockResolvedValue(null)
-	dbMock.attendanceDay.upsert.mockResolvedValue({})
+	dbMock.attendanceDay.findMany.mockResolvedValue([])
 	dbMock.organization.findUnique.mockResolvedValue({ trackTardiness: true }) // #190 master on
+	tx.attendanceDay.createMany.mockResolvedValue({ count: 1 })
+	tx.$executeRaw.mockResolvedValue(0)
+	// Nothing locked between the batch snapshot and the write.
+	tx.attendanceDay.findMany.mockImplementation(async (args: { where: { id: { in: string[] } } }) =>
+		args.where.id.in.map((id) => ({ id }))
+	)
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 describe('deriveRange — skipUnpunched guard', () => {
@@ -60,42 +103,46 @@ describe('deriveRange — skipUnpunched guard', () => {
 		// The exact bug: the day already exists (ABSENT, materialised before the punch) but now has
 		// punches. skipUnpunched must re-derive it rather than skip it.
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED)
-		dbMock.attendanceDay.findUnique.mockResolvedValue(machineDay)
+		dbMock.attendanceDay.findMany.mockResolvedValue([existingDay({ status: 'ABSENT' })])
 
 		const res = await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		expect(dbMock.attendanceDay.upsert).toHaveBeenCalledTimes(1)
-		expect(dbMock.attendanceDay.upsert.mock.calls[0][0].update.status).toBe('PRESENT')
+		expect(writeCount()).toBe(1)
+		expect(tx.$executeRaw).toHaveBeenCalledTimes(1)
+		expect(written().status).toBe('PRESENT')
 		expect(res.derived).toBe(1)
+		// #324: the audit write shares the transaction.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('never re-derives a manually-edited day, even when it has punches', async () => {
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED)
-		dbMock.attendanceDay.findUnique.mockResolvedValue({ isLocked: false, manuallyEdited: true })
+		dbMock.attendanceDay.findMany.mockResolvedValue([existingDay({ manuallyEdited: true })])
 
 		const res = await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		expect(dbMock.attendanceDay.upsert).not.toHaveBeenCalled()
+		expect(writeCount()).toBe(0)
 		expect(res.derived).toBe(0)
 	})
 
 	it('leaves an existing punch-less day untouched (no churn on cheap loads)', async () => {
 		dbMock.timeLog.findMany.mockResolvedValue([])
-		dbMock.attendanceDay.findUnique.mockResolvedValue(machineDay)
+		dbMock.attendanceDay.findMany.mockResolvedValue([existingDay()])
 
 		await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		expect(dbMock.attendanceDay.upsert).not.toHaveBeenCalled()
+		expect(writeCount()).toBe(0)
 	})
 
 	it('still fills a missing day from punches (gap derive)', async () => {
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED)
-		dbMock.attendanceDay.findUnique.mockResolvedValue(null)
+		dbMock.attendanceDay.findMany.mockResolvedValue([])
 
 		await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		expect(dbMock.attendanceDay.upsert).toHaveBeenCalledTimes(1)
-		expect(dbMock.attendanceDay.upsert.mock.calls[0][0].update.status).toBe('PRESENT')
+		expect(writeCount()).toBe(1)
+		expect(tx.attendanceDay.createMany).toHaveBeenCalledTimes(1)
+		expect(written().status).toBe('PRESENT')
 	})
 })
 
@@ -103,11 +150,11 @@ describe('autoDeriveFromPunches — public entrypoint', () => {
 	it('self-heals a stale ABSENT day through the page-load path', async () => {
 		dbMock.timeLog.count.mockResolvedValue(2)
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED)
-		dbMock.attendanceDay.findUnique.mockResolvedValue(machineDay)
+		dbMock.attendanceDay.findMany.mockResolvedValue([existingDay({ status: 'ABSENT' })])
 
 		const res = await autoDeriveFromPunches('org1', RANGE, CTX)
 
-		expect(dbMock.attendanceDay.upsert).toHaveBeenCalledTimes(1)
+		expect(writeCount()).toBe(1)
 		expect(res.derived).toBe(1)
 	})
 
@@ -116,8 +163,8 @@ describe('autoDeriveFromPunches — public entrypoint', () => {
 
 		const res = await autoDeriveFromPunches('org1', RANGE, CTX)
 
-		expect(dbMock.attendanceDay.findUnique).not.toHaveBeenCalled()
-		expect(dbMock.attendanceDay.upsert).not.toHaveBeenCalled()
+		expect(dbMock.attendanceDay.findMany).not.toHaveBeenCalled()
+		expect(dbMock.$transaction).not.toHaveBeenCalled()
 		expect(res).toEqual({ derived: 0, flagged: 0 })
 	})
 })
@@ -137,14 +184,13 @@ describe('org default schedule is consulted for unassigned employees', () => {
 	it('derives an unassigned employee against the org default, not a hardcoded shift', async () => {
 		dbMock.workSchedule.findFirst.mockResolvedValue(orgDefault(480, 1020)) // 08:00–17:00
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED) // punched 08:00–17:00
-		dbMock.attendanceDay.findUnique.mockResolvedValue(null)
+		dbMock.attendanceDay.findMany.mockResolvedValue([])
 
 		await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		const written = dbMock.attendanceDay.upsert.mock.calls[0][0].update
-		expect(written.status).toBe('PRESENT')
-		expect(written.lateMinutes).toBe(0)
-		expect(written.undertimeMinutes).toBe(0)
+		expect(written().status).toBe('PRESENT')
+		expect(written().lateMinutes).toBe(0)
+		expect(written().undertimeMinutes).toBe(0)
 	})
 
 	it('honours a non-default-hours org schedule, proving the lookup is real', async () => {
@@ -152,13 +198,12 @@ describe('org default schedule is consulted for unassigned employees', () => {
 		// but two hours short at the end. A hardcoded shift could not produce this.
 		dbMock.workSchedule.findFirst.mockResolvedValue(orgDefault(600, 1140))
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED)
-		dbMock.attendanceDay.findUnique.mockResolvedValue(null)
+		dbMock.attendanceDay.findMany.mockResolvedValue([])
 
 		await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		const written = dbMock.attendanceDay.upsert.mock.calls[0][0].update
-		expect(written.lateMinutes).toBe(0)
-		expect(written.undertimeMinutes).toBe(120)
+		expect(written().lateMinutes).toBe(0)
+		expect(written().undertimeMinutes).toBe(120)
 	})
 
 	it('an assigned schedule still wins over the org default', async () => {
@@ -167,11 +212,10 @@ describe('org default schedule is consulted for unassigned employees', () => {
 		])
 		dbMock.workSchedule.findFirst.mockResolvedValue(orgDefault(600, 1140)) // default 10:00–19:00
 		dbMock.timeLog.findMany.mockResolvedValue(WORKED)
-		dbMock.attendanceDay.findUnique.mockResolvedValue(null)
+		dbMock.attendanceDay.findMany.mockResolvedValue([])
 
 		await deriveRange('org1', RANGE, CTX, { skipUnpunched: true })
 
-		const written = dbMock.attendanceDay.upsert.mock.calls[0][0].update
-		expect(written.undertimeMinutes).toBe(0) // assigned shift matched exactly
+		expect(written().undertimeMinutes).toBe(0) // assigned shift matched exactly
 	})
 })

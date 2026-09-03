@@ -1,6 +1,6 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import {
 	listInventory,
@@ -14,7 +14,7 @@ import {
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	requireCapability(locals.user!.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 	const organizationId = locals.user!.organizationId
 
 	const filter = {
@@ -72,7 +72,7 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }
@@ -89,7 +89,7 @@ async function run(fn: () => Promise<unknown>) {
 
 export const actions: Actions = {
 	create: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = itemSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(422, { error: 'Check the item fields and try again.' })
 		return run(() =>
@@ -102,7 +102,7 @@ export const actions: Actions = {
 	},
 
 	update: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = Object.fromEntries(await request.formData())
 		const id = data.id as string
 		if (!id) return fail(400, { error: 'Missing id' })
@@ -119,7 +119,7 @@ export const actions: Actions = {
 	},
 
 	remove: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const id = (await request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing id' })
 		return run(() =>

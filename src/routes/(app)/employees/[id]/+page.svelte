@@ -37,6 +37,9 @@
 	// The full values exist client-side only after the audited ?/reveal action, and any other
 	// action result (e.g. a save) drops back to the masked display.
 	const revealed = $derived(form?.revealed ?? null)
+	// #290: the Employment History panel's salary figures arrive masked from the load and are
+	// released by the same ?/reveal, which returns the unmasked timeline alongside `revealed`.
+	const history = $derived(form?.history ?? data.history)
 
 	const DOC_CATEGORIES = [
 		{ value: 'CONTRACT', label: 'Contract' },
@@ -117,6 +120,7 @@
 	const setAllocation = createSubmitGuard()
 	const changeCompensation = createSubmitGuard()
 	const promote = createSubmitGuard()
+	const assignTemplate = createSubmitGuard()
 	const STATUTORY_LABELS: Record<string, string> = {
 		SSS: 'SSS',
 		PHILHEALTH: 'PhilHealth',
@@ -130,19 +134,25 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center gap-4">
-		<BackButton
-			fallback={canManage ? '/employees' : '/team'}
-			label={canManage ? 'Employees' : 'Team'}
-		/>
-		<h1 class="text-2xl font-bold">{employee.lastName}, {employee.firstName}</h1>
-		<span
-			class="rounded-full px-2.5 py-1 text-xs font-medium {employee.employmentStatus === 'ACTIVE'
-				? 'bg-green-500/15 text-green-400'
-				: 'bg-gray-500/15 text-gray-400'}"
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+			<h1 class="text-2xl font-bold">{employee.lastName}, {employee.firstName}</h1>
+			<span
+				class="rounded-full px-2.5 py-1 text-xs font-medium {employee.employmentStatus === 'ACTIVE'
+					? 'bg-green-500/15 text-green-400'
+					: 'bg-gray-500/15 text-gray-400'}"
+			>
+				{employee.employmentStatus}
+			</span>
+		</div>
+		<div
+			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
 		>
-			{employee.employmentStatus}
-		</span>
+			<BackButton
+				fallback={canManage ? '/employees' : '/team'}
+				label={canManage ? 'Employees' : 'Team'}
+			/>
+		</div>
 	</div>
 
 	<div class="grid gap-6 lg:grid-cols-2">
@@ -277,7 +287,7 @@
 					</dd>
 				{/if}
 				<dt class="text-muted-foreground">Role</dt>
-				<dd>{employee.user.role}</dd>
+				<dd>{employee.user.roles.join(', ')}</dd>
 			</dl>
 		</div>
 
@@ -414,6 +424,53 @@
 				</form>
 			{/if}
 		</div>
+
+		<!-- Evaluation template (#178): the explicit assignment is the ONLY source of an
+		     employee's template — it is never inferred from department, position or role (SPEC AC2). -->
+		{#if data.canAssignTemplate}
+			<div class="rounded-lg border bg-card p-6 space-y-4">
+				<h2 class="font-semibold">Evaluation Template</h2>
+				{#if form?.action === 'assignTemplate' && form?.success}
+					<div
+						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
+					>
+						Saved.
+					</div>
+				{:else if form?.action === 'assignTemplate' && form?.error}
+					<div
+						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
+					>
+						{form.error}
+					</div>
+				{/if}
+				<form
+					method="POST"
+					action="?/assignTemplate"
+					use:enhance={assignTemplate.enhance}
+					class="space-y-2"
+				>
+					<label for="assignedTemplateId" class="text-xs font-medium text-muted-foreground"
+						>Assigned template</label
+					>
+					<select
+						id="assignedTemplateId"
+						name="assignedTemplateId"
+						class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+					>
+						<option value="" selected={!data.assignedTemplateId}>— none —</option>
+						{#each data.performanceTemplates as t (t.id)}
+							<option value={t.id} selected={t.id === data.assignedTemplateId}>{t.name}</option>
+						{/each}
+					</select>
+					<button
+						type="submit"
+						disabled={assignTemplate.busy}
+						class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{assignTemplate.busy ? 'Saving…' : 'Save template'}</button
+					>
+				</form>
+			</div>
+		{/if}
 
 		<!-- Emergency Contact Card (visible to managers) -->
 		<div class="rounded-lg border bg-card p-6 space-y-4">
@@ -1679,9 +1736,9 @@
 					>
 				</h2>
 
-				{#if data.history.length}
+				{#if history.length}
 					<ol class="relative space-y-5 border-l pl-6">
-						{#each data.history as ev (ev.id)}
+						{#each history as ev (ev.id)}
 							<li class="relative">
 								<span
 									class="absolute -left-[27px] mt-1 h-3 w-3 rounded-full border-2 border-background {ev.type ===

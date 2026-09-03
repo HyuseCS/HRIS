@@ -39,7 +39,12 @@ vi.mock('bcrypt', () => ({ default: { hash: vi.fn().mockResolvedValue('hashed') 
 
 const { promoteEmployee } = await import('$lib/server/services/employees')
 
-const CTX = { organizationId: 'org1', actorId: 'u1', actorRole: 'HR_ADMIN' as Role, ipAddress: 't' }
+const CTX = {
+	organizationId: 'org1',
+	actorId: 'u1',
+	actorRoles: ['HR_ADMIN'] as Role[],
+	ipAddress: 't'
+}
 const TODAY = new Date()
 
 /** A part-time, hourly-paid hire — the case #222 calls out as the invalid-pairing trap. */
@@ -221,6 +226,61 @@ describe('promoteEmployee future dating (#222)', () => {
 		expect(data).not.toHaveProperty('basicMonthlySalary')
 		expect(data).not.toHaveProperty('rateType')
 		expect(data).not.toHaveProperty('employmentType')
+	})
+})
+
+describe('promoteEmployee hire-date floor (#266)', () => {
+	/**
+	 * The floor guards records that CARRY the effective date — the pay/type snapshots, and the
+	 * HISTORY_FIELDS the timeline renders it against. It ran unconditionally, so it also refused a
+	 * reporting-line change, which is neither: `reportsToId` is not a HISTORY_FIELD, and as a plain
+	 * column it applies the moment the promotion saves whatever date it carries. The visible cost
+	 * was that a hire who had not started yet could not be re-pointed at a different manager at all,
+	 * through `?/promote` or (after #263) through the v1 PATCH — both pass today's date.
+	 *
+	 * `:158-167` above is the companion case and stays UNMODIFIED: it sends a jobTitle, which IS a
+	 * HISTORY_FIELD, so the floor must still refuse it. The two together pin both edges of the gate.
+	 */
+	const PRE_BOARDED = { ...PART_TIMER, startDate: new Date(Date.now() + 30 * DAY) }
+
+	it('lets a reporting-line change through for a hire who has not started yet', async () => {
+		// #1 getEmployee resolves the subject; #2 the org-scoped manager lookup finds the new manager.
+		dbMock.employee.findFirst
+			.mockResolvedValueOnce(PRE_BOARDED)
+			.mockResolvedValueOnce({ id: 'mgr9' })
+
+		await expect(
+			promoteEmployee('emp1', 'org1', { reportsToId: 'mgr9', effectiveDate: TODAY }, CTX)
+		).resolves.toBeTruthy()
+
+		expect(txMock.employee.update.mock.calls[0][0].data.reportsToId).toBe('mgr9')
+		expect(writeAuditLog).toHaveBeenCalledTimes(1)
+	})
+
+	it('still refuses a pay change dated before the hire date', async () => {
+		dbMock.employee.findFirst.mockResolvedValue(PRE_BOARDED)
+
+		// The message, not just the status: three different 400s are reachable from this input shape
+		// (the pairing check, NO_CHANGE and the floor), and only one of them proves the floor fired.
+		await expect(
+			promoteEmployee(
+				'emp1',
+				'org1',
+				{
+					basicMonthlySalary: 30000,
+					rateType: 'MONTHLY',
+					employmentType: 'REGULAR',
+					effectiveDate: TODAY
+				},
+				CTX
+			)
+		).rejects.toMatchObject({
+			status: 400,
+			body: { message: 'Effective date cannot be before the hire date.' }
+		})
+
+		expect(txMock.employee.update).not.toHaveBeenCalled()
+		expect(txMock.employeeCompensation.create).not.toHaveBeenCalled()
 	})
 })
 

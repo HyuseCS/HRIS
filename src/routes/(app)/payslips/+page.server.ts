@@ -7,7 +7,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 
 	const myEmployee = await db.employee.findFirst({
-		where: { userId: user.id }
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
 	})
 
 	// Accounts without a linked employee record (e.g. approver, verifier, CEO)

@@ -3,10 +3,9 @@ import type { Role } from '@prisma/client'
 export interface AuditContext {
 	organizationId: string
 	actorId: string
-	actorRole: Role
-	// Full multi-role set (#133/#134). Absent → treated as [actorRole]. Approval-stage
-	// checks read this so a [MANAGER, VERIFIER] user can act on the stage either holds.
-	actorRoles?: Role[]
+	// Every role the actor holds (#133/#134). Required, so a route that forgets to pass the
+	// full set is a compile error rather than a silent narrowing (#247, #272, #275).
+	actorRoles: Role[]
 	ipAddress?: string
 	userAgent?: string
 }

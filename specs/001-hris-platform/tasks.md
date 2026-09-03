@@ -132,14 +132,14 @@ description: 'Task list for Veent HRIS Core Platform'
 **Independent Test**: Log in as manager → view approvals queue → approve a seeded SUBMITTED timesheet → verify employee's timesheet status changes to APPROVED → reject a leave request with reason → verify employee sees rejection reason.
 
 - [x] T061 Extend `src/lib/server/services/timesheets.ts`: add `getPendingForManager(db, managerId)`, `approve(db, id, actor)`, `reject(db, id, reason, actor)` — all write AuditLog; `approve` also notifies employee
-- [x] T062 Extend `src/lib/server/services/leave.ts`: add `getPendingForManager(db, managerId)`, `approve(db, id, actor)` (deducts LeaveBalance), `reject(db, id, reason, actor)`, `overrideApprove(db, id, note, actor)` — writes `LEAVE_OVERRIDE` AuditLog entry
+- [x] T062 Extend `src/lib/server/services/leave.ts`: add `getPendingForManager(db, managerId)`, `approve(db, id, actor)` (deducts LeaveBalance), `reject(db, id, reason, actor)` — the planned `overrideApprove(db, id, note, actor)` writing a `LEAVE_OVERRIDE` AuditLog entry was never built (#295)
 - [x] T063 [P] [US3] Create `src/lib/components/approvals/ApprovalCard.svelte`: card showing submitter name, period/dates, hours/days, approve + reject buttons; reject reveals inline reason textarea
 - [x] T064 [P] [US3] Create `src/routes/(app)/approvals/+page.svelte`: tabbed layout (Timesheets | Leave), lists ApprovalCards for each pending item, shows count badge per tab
-- [x] T065 [US3] Create `src/routes/(app)/approvals/+page.server.ts`: `requireRole(MANAGER, HR_ADMIN, SUPER_ADMIN)`; `load` — call `getPendingForManager` / all pending for admin; `action: approveTimesheet`, `action: rejectTimesheet`, `action: approveLeave`, `action: rejectLeave`, `action: overrideLeave`
+- [x] T065 [US3] Create `src/routes/(app)/approvals/+page.server.ts`: `requireRole(MANAGER, HR_ADMIN, SUPER_ADMIN)`; `load` — call `getPendingForManager` / all pending for admin; `action: approveTimesheet`, `action: rejectTimesheet`, `action: approveLeave`, `action: rejectLeave` (`action: overrideLeave` was never built — #295)
 - [x] T066 [P] [US3] Create `src/routes/(app)/team/+page.svelte`: team attendance overview — date range picker, table with employee rows and day columns, colour-coded cells (PRESENT / ABSENT / ON_LEAVE / HOLIDAY)
 - [x] T067 [US3] Create `src/routes/(app)/team/+page.server.ts`: `requireRole(MANAGER, HR_ADMIN, SUPER_ADMIN)`; `load` — query approved timesheets + leave requests for team within date range, compute per-day status per employee
 - [x] T068 [P] [US3] Create `src/routes/api/v1/timesheets/[id]/+server.ts`: `PATCH` (approve / reject actions) with role enforcement
-- [x] T069 [P] [US3] Create `src/routes/api/v1/leave/[id]/+server.ts`: `PATCH` (approve / reject / override-approve) with role enforcement
+- [x] T069 [P] [US3] Create `src/routes/api/v1/leave/[id]/+server.ts`: `PATCH` (approve / reject) with role enforcement
 
 **Checkpoint**: Manager can process full approvals queue independently. Employee self-service (US1) and HR employee management (US2) can run in parallel with this story.
 

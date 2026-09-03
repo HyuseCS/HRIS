@@ -1,6 +1,8 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
+import { db } from '$lib/server/db'
+import { CLEARANCE_AREAS } from '$lib/utils/clearance-area'
 import {
 	listOffboardingItems,
 	ensureSeeded,
@@ -13,22 +15,35 @@ import {
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
-	requireCapability(locals.user!.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 	// Materialize the default clearance steps on first visit so HR has them to edit/reorder.
 	await ensureSeeded(locals.user!.organizationId)
-	return { items: await listOffboardingItems(locals.user!.organizationId) }
+	const organizationId = locals.user!.organizationId
+	return {
+		items: await listOffboardingItems(organizationId),
+		// The optional per-item department pointer (#306) — the only consumer of `departmentId`.
+		departments: await db.department.findMany({
+			where: { organizationId },
+			orderBy: { name: 'asc' },
+			select: { id: true, name: true }
+		})
+	}
 }
 
 const itemSchema = z.object({
 	label: z.string().min(1).max(120),
-	department: z.string().min(1).max(80)
+	area: z.enum(CLEARANCE_AREAS),
+	departmentId: z
+		.string()
+		.optional()
+		.transform((v) => v || null)
 })
 
 function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }
@@ -45,42 +60,42 @@ async function run(fn: () => Promise<unknown>) {
 
 export const actions: Actions = {
 	add: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = itemSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(422, { error: 'A label and department are required.' })
+		if (!parsed.success) return fail(422, { error: 'A label and clearance area are required.' })
 		return run(() =>
 			addItem(locals.user!.organizationId, parsed.data, ctxOf(locals, getClientAddress()))
 		)
 	},
 
 	update: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = Object.fromEntries(await request.formData())
 		const id = data.id as string
 		if (!id) return fail(400, { error: 'Missing id' })
 		const parsed = itemSchema.safeParse(data)
-		if (!parsed.success) return fail(422, { error: 'A label and department are required.' })
+		if (!parsed.success) return fail(422, { error: 'A label and clearance area are required.' })
 		return run(() =>
 			updateItem(locals.user!.organizationId, id, parsed.data, ctxOf(locals, getClientAddress()))
 		)
 	},
 
 	toggle: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const id = (await request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing id' })
 		return run(() => toggleItem(locals.user!.organizationId, id, ctxOf(locals, getClientAddress())))
 	},
 
 	remove: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const id = (await request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing id' })
 		return run(() => deleteItem(locals.user!.organizationId, id, ctxOf(locals, getClientAddress())))
 	},
 
 	move: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const id = data.get('id') as string
 		const direction = data.get('direction') === 'up' ? 'up' : 'down'

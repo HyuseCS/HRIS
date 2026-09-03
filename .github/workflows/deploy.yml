@@ -84,3 +84,24 @@ jobs:
             docker compose pull
             docker compose up -d --no-build
             docker image prune -f
+
+            # `up -d` returns as soon as the container STARTS, so a failure inside
+            # prestart.sh (the migration or `prisma db push`) means `node build` never runs
+            # and the app crash-loops while this workflow reports a successful deploy —
+            # exactly the #236 failure mode. Wait for the app to actually answer.
+            command -v curl >/dev/null || { echo "curl is not installed on the droplet, so the post-deploy check cannot run. Install it (apt-get install -y curl)."; exit 1; }
+            echo "Waiting for the app to serve on :3000 ..."
+            for i in $(seq 1 30); do
+              # `|| code=000` on the assignment, NOT `|| echo 000` inside the substitution:
+              # curl prints 000 itself on a connection failure, so appending a second 000
+              # would make $code "000\n000" — which is != "000", i.e. a dead app read as up.
+              code=$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:3000/) || code=000
+              if [ "$code" != "000" ]; then
+                echo "App answered HTTP $code after $((i * 2))s."
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "App never answered on :3000 after 60s — deploy failed. Last 80 log lines:"
+            docker compose logs --tail=80 app || true
+            exit 1

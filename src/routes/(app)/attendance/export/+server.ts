@@ -1,9 +1,10 @@
-import { can } from '$lib/server/rbac'
+import { canAny } from '$lib/server/rbac'
 import { error } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { listAttendanceDays, listTeamDay } from '$lib/server/services/attendance'
 import { exportToCSV } from '$lib/server/services/reports'
 import { manilaDayKey } from '$lib/utils/dates'
+import { isFoodServiceOrg } from '$lib/orgs'
 import type { RequestHandler } from './$types'
 
 const DAY_MS = 86_400_000
@@ -25,12 +26,36 @@ const num = (x: unknown) => Number(x).toFixed(2)
 export const GET: RequestHandler = async ({ locals, url }) => {
 	if (!locals.user) error(401, 'Unauthorized')
 	const user = locals.user
-	const canManage = can(user.role, 'MANAGE_HR')
+	const canManage = canAny(user.roles, 'MANAGE_HR')
 	const view = canManage && url.searchParams.get('view') === 'team' ? 'team' : 'employee'
 	const today = manilaDayKey(new Date())
 
 	let rows: Record<string, unknown>[] = []
 	let filename = 'attendance.csv'
+
+	// #162 — four extra columns for food-service tenants. Spread into EVERY row, including rows
+	// with no day: `exportToCSV` takes its header list from `rows[0]` only, so a key present on
+	// some rows and absent on others silently drops columns for the rest of the file.
+	const showAmPm = isFoodServiceOrg(user.organizationId)
+	const amPmCols = (
+		d:
+			| {
+					amTimeIn: Date | null
+					amTimeOut: Date | null
+					pmTimeIn: Date | null
+					pmTimeOut: Date | null
+			  }
+			| null
+			| undefined
+	) =>
+		showAmPm
+			? {
+					'AM In': fmtTime(d?.amTimeIn ?? null),
+					'AM Out': fmtTime(d?.amTimeOut ?? null),
+					'PM In': fmtTime(d?.pmTimeIn ?? null),
+					'PM Out': fmtTime(d?.pmTimeOut ?? null)
+				}
+			: {}
 
 	if (view === 'team') {
 		const date = url.searchParams.get('date') ?? today
@@ -43,6 +68,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			Status: t.day?.status ?? 'NO RECORD',
 			'Time In': fmtTime(t.day?.timeIn ?? null),
 			'Time Out': fmtTime(t.day?.timeOut ?? null),
+			...amPmCols(t.day),
 			'Regular Hrs': t.day ? num(t.day.regularHours) : '',
 			'OT Hrs': t.day ? num(t.day.overtimeHours) : '',
 			'Night Diff Hrs': t.day ? num(t.day.nightDiffHours) : '',
@@ -54,7 +80,10 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	} else {
 		let employeeId = canManage ? url.searchParams.get('employeeId') : null
 		if (!canManage) {
-			const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+			const me = await db.employee.findFirst({
+				where: { userId: user.id, organizationId: user.organizationId },
+				select: { id: true }
+			})
 			employeeId = me?.id ?? null
 		}
 		if (!employeeId) error(400, 'No employee selected')
@@ -77,6 +106,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			Status: d.status,
 			'Time In': fmtTime(d.timeIn),
 			'Time Out': fmtTime(d.timeOut),
+			...amPmCols(d),
 			'Regular Hrs': num(d.regularHours),
 			'OT Hrs': num(d.overtimeHours),
 			'Night Diff Hrs': num(d.nightDiffHours),

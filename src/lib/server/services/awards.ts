@@ -1,5 +1,6 @@
 import { db } from '$lib/server/db'
 import { error } from '@sveltejs/kit'
+import { canAny } from '$lib/server/rbac'
 import { writeAuditLog } from '$lib/server/audit'
 import { notify } from './notifications'
 import type { AuditContext } from './types'
@@ -18,26 +19,51 @@ export async function grantAward(
 	const title = input.title.trim()
 	if (!title) error(400, 'An award title is required')
 	const employee = await db.employee.findFirst({
-		where: { id: input.employeeId, user: { organizationId } },
-		select: { id: true, userId: true, firstName: true, lastName: true }
+		where: { id: input.employeeId, organizationId },
+		select: {
+			id: true,
+			userId: true,
+			firstName: true,
+			lastName: true,
+			user: { select: { roles: true } }
+		}
 	})
 	if (!employee) error(404, 'Employee not found')
 
-	const award = await db.award.create({
-		data: {
-			organizationId,
-			employeeId: employee.id,
-			title,
-			note: input.note?.trim() || null,
-			awardedById: ctx.actorId
-		}
-	})
+	// Recognition is only worth something if somebody else confers it (#308). The route gate is
+	// MANAGE_HR, which MANAGER holds, so without this a manager could decorate themselves.
+	if (employee.userId === ctx.actorId)
+		error(403, 'You cannot award yourself — ask another admin to do it.')
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Award',
-		entityId: award.id,
-		newValue: { employeeId: employee.id, title }
+	// And HR does not decorate HR: awarding anyone who themselves holds MANAGE_HR is reserved to
+	// the executives. #282 deleted ROLE_HIERARCHY, so "higher rank" is expressed the only way this
+	// codebase still has — a capability. ADMINISTER_SYSTEM is exactly {CEO, SUPER_ADMIN}.
+	if (canAny(employee.user.roles, 'MANAGE_HR') && !canAny(ctx.actorRoles, 'ADMINISTER_SYSTEM'))
+		error(403, 'Only an executive may award a manager or HR admin.')
+
+	// One transaction: a failed audit write must not leave an award standing unrecorded.
+	const award = await db.$transaction(async (tx) => {
+		const created = await tx.award.create({
+			data: {
+				organizationId,
+				employeeId: employee.id,
+				title,
+				note: input.note?.trim() || null,
+				awardedById: ctx.actorId
+			}
+		})
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'Award',
+				entityId: created.id,
+				newValue: { employeeId: employee.id, title }
+			},
+			tx
+		)
+		return created
 	})
 
 	await notify(

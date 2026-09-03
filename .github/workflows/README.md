@@ -31,8 +31,14 @@ No repository secrets are required — the DB is throwaway and the app secrets a
 # with the local Postgres running (see CLAUDE.md / .env.example)
 pnpm db:push        # provision schema
 pnpm db:seed        # seed the demo org + users (global-setup needs employee@veent.ph)
-pnpm test:e2e       # Playwright starts `pnpm dev` and runs the suite
+pnpm test:e2e       # Playwright runs `pnpm build` + `pnpm preview`, then the suite (#287)
 ```
+
+`test:e2e` runs Playwright under `dotenv -e .env.dev`, because `global-setup.ts` opens its own
+`PrismaClient` in Playwright's process — the dev server's env does not reach it, so without this
+the local run dies on `Environment variable not found: DATABASE_URL` before a single test starts.
+It stays correct in CI: `dotenv -e` on a missing file is a no-op, and it never overrides a variable
+the environment already set, so the workflow's own env still wins.
 
 ## Branch protection (manual, one-time)
 

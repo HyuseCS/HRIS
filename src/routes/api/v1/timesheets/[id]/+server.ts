@@ -1,11 +1,11 @@
 import { json } from '@sveltejs/kit'
-import { requireMinRole } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { reviewTimesheet } from '$lib/server/services/timesheets'
 import { apiError } from '$lib/server/api-error'
 import type { RequestHandler } from './$types'
 
 // PATCH: body = { action: 'approve' | 'reject', rejectionReason?: string }
-// requireMinRole MANAGER
+// requireAnyCapability VIEW_TEAM
 // call reviewTimesheet
 // return json(result)
 export const PATCH: RequestHandler = async ({ params, request, locals, getClientAddress }) => {
@@ -14,7 +14,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals, getClient
 	const user = locals.user
 
 	try {
-		requireMinRole(user.role, 'MANAGER')
+		requireAnyCapability(user.roles, 'VIEW_TEAM')
 	} catch {
 		return apiError(403, 'Insufficient permissions')
 	}
@@ -47,7 +47,9 @@ export const PATCH: RequestHandler = async ({ params, request, locals, getClient
 			{
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				// #247: `reviewTimesheet` resolves stage authority from the full set, so a
+				// [MANAGER, VERIFIER] user gets the VERIFY stage they hold.
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			}
 		)

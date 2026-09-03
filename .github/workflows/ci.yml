@@ -112,3 +112,115 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  schema-upgrade:
+    name: db push against a populated database
+    runs-on: ubuntu-latest
+
+    # Production applies the schema to a database that already holds data; the e2e job only
+    # ever pushes to an empty one. A destructive change therefore passes CI and then fails
+    # inside the container on deploy, where compose runs `prestart.sh && node build` — so the
+    # server never starts and the app crash-loops (#236; #172 was the near-miss).
+    #
+    # pull_request only, deliberately: on the release PR into `main`, origin/main IS the
+    # deployed schema. A push-triggered run would compare main against itself and pass
+    # vacuously, and by then the merge — and the auto-deploy — has already happened.
+    if: github.event_name == 'pull_request'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: veent_upgrade
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/veent_upgrade
+      LUCIA_SECRET: ci-lucia-secret-do-not-use-in-prod-000000
+      TIMELOG_API_SECRET: ci-timelog-secret-do-not-use-in-prod-0000
+      NODE_ENV: test
+      CI: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the deployed schema
+        run: git fetch --depth=1 --no-tags origin main:refs/remotes/origin/main
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Materialise the deployed schema and seed
+        # These must land inside prisma/: Prisma infers the project root from the schema
+        # file's directory, so a --schema outside the repo makes `generate` try to install
+        # into / and `db push` abort. seed-e2e's own import is rewritten so the old entry
+        # point keeps its old internals.
+        run: |
+          git show origin/main:prisma/schema.prisma > prisma/.deployed-schema.prisma
+          git show origin/main:prisma/seed-core.ts  > prisma/.deployed-seed-core.ts
+          git show origin/main:prisma/seed-e2e.ts \
+            | sed "s|'./seed-core'|'./.deployed-seed-core'|" > prisma/.deployed-seed-e2e.ts
+
+      - name: Provision the deployed schema
+        run: |
+          pnpm exec prisma generate --schema=prisma/.deployed-schema.prisma
+          pnpm exec prisma db push --schema=prisma/.deployed-schema.prisma --skip-generate
+
+      - name: Populate it
+        # The deployed seed, so the rows match the deployed schema. It still pulls
+        # DEFAULT_STATUTORY_RATE_CONFIG from the checked-out (new) src tree — the one place
+        # old data meets new code here, and identical across the two as of #236.
+        run: pnpm exec tsx prisma/.deployed-seed-e2e.ts
+
+      - name: Upgrade to this branch's schema
+        # The actual test, and the exact file the droplet runs on deploy.
+        run: sh scripts/prestart.sh
+
+      - name: Self-test — prove this job can still fail
+        # Most releases are purely additive, so the step above passes almost every time.
+        # Without this, nobody can tell "nothing destructive in this release" from "the
+        # check quietly stopped working".
+        #
+        # The fixture adds a required column with no default to `employees`. That is the
+        # one shape whose verdict is data-dependent in the direction this job cares about:
+        # it SUCCEEDS against an empty database and is REFUSED against a populated one,
+        # with the row count in the message. So a green self-test proves both that the
+        # upgrade check bites and that the seed above really put rows in — a dropped enum
+        # value, by contrast, is refused even against an empty database and would have
+        # stayed green if the seed silently broke.
+        run: |
+          awk '/^model Employee \{/ { print; print "  selftestRequired String"; next } { print }' \
+            prisma/schema.prisma > prisma/.selftest-schema.prisma
+          if cmp -s prisma/schema.prisma prisma/.selftest-schema.prisma; then
+            echo "::error::Self-test fixture changed nothing — no 'model Employee {' in the schema. Repoint it at a model the seed populates."
+            exit 1
+          fi
+          # Redirect rather than pipe: `if cmd | tee` would test tee's exit status, not Prisma's.
+          if pnpm exec prisma db push --schema=prisma/.selftest-schema.prisma --skip-generate > prisma/.selftest-push.log 2>&1; then
+            cat prisma/.selftest-push.log
+            echo "::error::db push added a required column to a populated table without complaint. Either the database is empty (the seed step is broken) or db push no longer refuses — either way this job can no longer detect the #236 failure mode."
+            exit 1
+          fi
+          cat prisma/.selftest-push.log
+          if ! grep -q 'rows in this table' prisma/.selftest-push.log; then
+            echo "::error::db push failed, but not because of existing rows. The database is probably empty, so this job is not testing an upgrade at all."
+            exit 1
+          fi
+          echo "Refused on account of existing rows — the upgrade check is live and the database is populated."

@@ -34,12 +34,12 @@ async function main() {
 	const passwordHash = await bcrypt.hash('Demo@1234', 12)
 	const user = await db.user.upsert({
 		where: { email: 'departing@veent.ph' },
-		update: { isActive: true, role: 'EMPLOYEE' },
+		update: { isActive: true, roles: ['EMPLOYEE'] },
 		create: {
 			organizationId: org.id,
 			email: 'departing@veent.ph',
 			passwordHash,
-			role: 'EMPLOYEE'
+			roles: ['EMPLOYEE']
 		}
 	})
 

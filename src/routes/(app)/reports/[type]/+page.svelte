@@ -5,6 +5,7 @@
 	import { navigating } from '$app/stores'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
@@ -52,14 +53,15 @@
 		'loan-summary': 'Loan Summary',
 		'government-remittance': 'Government Remittance',
 		'bir-withholding': 'BIR Withholding Report',
-		separation: 'Separation Report'
+		separation: 'Separation Report',
+		recruitment: 'Recruitment Report'
 	}
 
 	const title = $derived(REPORT_LABELS[data.reportType] ?? 'Report')
 
 	// Show department filter only for report types that support it
 	const showDeptFilter = $derived(
-		['headcount', 'attendance', 'tardiness', 'overtime'].includes(data.reportType)
+		['headcount', 'attendance', 'tardiness', 'overtime', 'recruitment'].includes(data.reportType)
 	)
 
 	// Build CSV export URL
@@ -111,35 +113,11 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<BackButton fallback="/reports" label="Reports" />
-
-	<!-- Header -->
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
-		{#if data.results.length > 0}
-			<a
-				href={csvUrl()}
-				class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-4 w-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-					<polyline points="7 10 12 15 17 10" />
-					<line x1="12" y1="15" x2="12" y2="3" />
-				</svg>
-				Export CSV
-			</a>
-		{/if}
-	</div>
+	<PageHeader {title}>
+		{#snippet back()}
+			<BackButton fallback="/reports" label="Reports" />
+		{/snippet}
+	</PageHeader>
 
 	<!-- Filter form -->
 	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
@@ -202,52 +180,86 @@
 		</div>
 	</form>
 
-	<!-- Results -->
-	{#if isGenerating}
-		<TableSkeleton rows={8} cols={data.columns.length || 4} />
-	{:else if data.results.length === 0}
-		<div
-			class="flex h-40 items-center justify-center rounded-lg border bg-muted/30 text-muted-foreground"
-		>
-			No results found for the selected filters.
+	<section class="space-y-3">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<h2 class="text-lg font-semibold">Results</h2>
+			{#if data.results.length > 0}
+				<div
+					class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+				>
+					<a
+						href={csvUrl()}
+						class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+							<polyline points="7 10 12 15 17 10" />
+							<line x1="12" y1="15" x2="12" y2="3" />
+						</svg>
+						Export CSV
+					</a>
+				</div>
+			{/if}
 		</div>
-	{:else}
-		<div class="space-y-2">
-			<p class="text-sm text-muted-foreground">
-				Showing {displayResults.length} of {data.results.length} row{data.results.length === 1
-					? ''
-					: 's'}{#if truncated}&nbsp;<span class="font-medium text-amber-600"
-						>(display limited to {MAX_DISPLAY} rows — export CSV for full data)</span
-					>{/if}
-			</p>
-			<div class="overflow-x-auto rounded-lg border">
-				<table class="w-full text-sm">
-					<thead class="border-b bg-muted/50">
-						<tr>
-							{#each data.columns as col (col)}
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-									{col}
-								</th>
-							{/each}
-						</tr>
-					</thead>
-					<tbody class="divide-y">
-						{#each displayResults as row, i (i)}
-							<tr class="hover:bg-muted/30">
+		<!-- Results -->
+		{#if isGenerating}
+			<TableSkeleton rows={8} cols={data.columns.length || 4} />
+		{:else if data.results.length === 0}
+			<div
+				class="flex h-40 items-center justify-center rounded-lg border bg-muted/30 text-muted-foreground"
+			>
+				No results found for the selected filters.
+			</div>
+		{:else}
+			<div class="space-y-2">
+				<p class="text-sm text-muted-foreground">
+					Showing {displayResults.length} of {data.results.length} row{data.results.length === 1
+						? ''
+						: 's'}{#if truncated}&nbsp;<span class="font-medium text-amber-600"
+							>(display limited to {MAX_DISPLAY} rows — export CSV for full data)</span
+						>{/if}
+				</p>
+				<div class="overflow-x-auto rounded-lg border">
+					<table class="w-full text-sm">
+						<thead class="border-b bg-muted/50">
+							<tr>
 								{#each data.columns as col (col)}
-									<td
-										class="px-4 py-3 whitespace-nowrap {CURRENCY_COLS.has(col)
-											? 'text-right font-mono'
-											: ''}"
+									<th
+										class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
 									>
-										{formatCell(col, row[col])}
-									</td>
+										{col}
+									</th>
 								{/each}
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+						</thead>
+						<tbody class="divide-y">
+							{#each displayResults as row, i (i)}
+								<tr class="hover:bg-muted/30">
+									{#each data.columns as col (col)}
+										<td
+											class="px-4 py-3 whitespace-nowrap {CURRENCY_COLS.has(col)
+												? 'text-right font-mono'
+												: ''}"
+										>
+											{formatCell(col, row[col])}
+										</td>
+									{/each}
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
+	</section>
 </div>

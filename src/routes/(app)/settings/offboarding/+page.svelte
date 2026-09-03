@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { CLEARANCE_AREA_OPTIONS } from '$lib/utils/clearance-area'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -24,15 +26,14 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Offboarding Checklist</h1>
-		<p class="text-sm text-muted-foreground">
-			The clearance steps every separation case starts with. Each names a task and the department
-			that signs it off. Opening a separation copies the active steps into the case, and the
-			departing employee is emailed a transition notice listing them.
-		</p>
-	</div>
+	<PageHeader
+		title="Offboarding Checklist"
+		description="The clearance steps every separation case starts with. Each names a task and the clearance area that signs it off, optionally pinned to a specific department. Opening a separation copies the active steps into the case, and the departing employee is emailed a transition notice listing them."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div
@@ -49,7 +50,7 @@
 			method="POST"
 			action="?/add"
 			use:enhance={add.enhance}
-			class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+			class="grid gap-3 sm:grid-cols-[1fr_10rem_12rem_auto] sm:items-end"
 		>
 			<div>
 				<label for="add-label" class="text-xs font-medium text-muted-foreground">Task</label>
@@ -63,17 +64,23 @@
 				/>
 			</div>
 			<div>
-				<label for="add-department" class="text-xs font-medium text-muted-foreground"
+				<label for="add-area" class="text-xs font-medium text-muted-foreground">Area</label>
+				<select id="add-area" name="area" required class="mt-1 {inputClass}">
+					{#each CLEARANCE_AREA_OPTIONS as [value, label] (value)}
+						<option {value}>{label}</option>
+					{/each}
+				</select>
+			</div>
+			<div>
+				<label for="add-departmentId" class="text-xs font-medium text-muted-foreground"
 					>Department</label
 				>
-				<input
-					id="add-department"
-					name="department"
-					required
-					maxlength="80"
-					placeholder="e.g. IT"
-					class="mt-1 {inputClass}"
-				/>
+				<select id="add-departmentId" name="departmentId" class="mt-1 {inputClass}">
+					<option value="">— none —</option>
+					{#each data.departments as dept (dept.id)}
+						<option value={dept.id}>{dept.name}</option>
+					{/each}
+				</select>
 			</div>
 			<button
 				type="submit"
@@ -124,25 +131,41 @@
 							</form>
 						</div>
 
-						<!-- Task + department (editable) -->
-						<div class="grid min-w-[12rem] flex-1 gap-1 sm:grid-cols-[1fr_10rem]">
+						<!-- Task + area + department (editable) -->
+						<div class="grid min-w-[12rem] flex-1 gap-1 sm:grid-cols-[1fr_9rem_11rem]">
 							<input
 								form="edit-{item.id}"
 								name="label"
 								value={item.label}
 								required
 								maxlength="120"
+								aria-label="Task"
 								class={inputClass}
 							/>
-							<input
+							<select
 								form="edit-{item.id}"
-								name="department"
-								value={item.department}
+								name="area"
 								required
-								maxlength="80"
-								placeholder="Department"
+								aria-label="Clearance area"
 								class={inputClass}
-							/>
+							>
+								{#each CLEARANCE_AREA_OPTIONS as [value, label] (value)}
+									<option {value} selected={item.area === value}>{label}</option>
+								{/each}
+							</select>
+							<select
+								form="edit-{item.id}"
+								name="departmentId"
+								aria-label="Department"
+								class={inputClass}
+							>
+								<option value="" selected={!item.departmentId}>— none —</option>
+								{#each data.departments as dept (dept.id)}
+									<option value={dept.id} selected={item.departmentId === dept.id}
+										>{dept.name}</option
+									>
+								{/each}
+							</select>
 						</div>
 
 						<!-- Actions -->

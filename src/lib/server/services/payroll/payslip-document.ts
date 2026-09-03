@@ -86,6 +86,8 @@ export interface PayrollRunLike {
 	periodStart: Date
 	periodEnd: Date
 	approvedAt: Date | null
+	/** The period's `releasedAt`. Null on a legacy APPROVED run, which has no period at all. */
+	releasedAt: Date | null
 }
 
 export interface AttendanceSummaryLike {
@@ -279,7 +281,16 @@ export function assemblePayslipDocument(input: HydrateInput): PayslipDocument {
 		},
 		period: {
 			periodLabel: `${shortDate(run.periodStart)} to  ${shortDate(run.periodEnd)}`,
-			payDate: run.approvedAt ? shortDate(run.approvedAt) : shortDate(run.periodEnd),
+			// PAYDATE is the day the payslip was released — HR's rule, 18-08-26. Deliberately NOT
+			// `approvedAt`: that field was written both by an approval and by a period lock, so it
+			// meant two different things (#298 D2). `releasedAt` means exactly one thing and is set
+			// whenever a period-backed payslip is visible.
+			//
+			// Blank on a legacy APPROVED run, which has no period and therefore no release date.
+			// That path is `runs.ts:17` — a payslip is visible when the run is APPROVED *or* its
+			// period is RELEASED. The owner chose blank over a fallback: a payslip that never went
+			// through a release has no release date to show, and inventing one would be a lie.
+			payDate: run.releasedAt ? shortDate(run.releasedAt) : '',
 			dailyRate: money(dailyRate),
 			daysOfWork: String(attendance.daysOfWork),
 			daysOfPresent: String(attendance.daysOfPresent),

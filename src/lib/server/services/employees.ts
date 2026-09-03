@@ -1,21 +1,31 @@
 import { db } from '$lib/server/db'
 import { writeAuditLog } from '$lib/server/audit'
-import { ROLE_HIERARCHY } from '$lib/server/rbac'
+import { canAny } from '$lib/server/rbac'
 import { error } from '@sveltejs/kit'
 import bcrypt from 'bcrypt'
 import { Prisma } from '@prisma/client'
+import { z } from 'zod'
 import { ensureLeaveBalances } from './leave'
 import { sendDiscordInviteEmail } from '$lib/server/notifications'
 import { notify } from './notifications'
-import { maskEmployee, SENSITIVE_FIELDS } from '$lib/utils/format'
+import { maskEmployee, MASKED_SALARY, SENSITIVE_FIELDS } from '$lib/utils/format'
 import { utcMidnight } from '$lib/utils/pay-periods'
 import { isRateBasisAllowed, RATE_BASIS_MISMATCH } from '$lib/utils/rate-basis'
-import { employmentTypeAt } from '$lib/utils/employment-type'
+import { employmentTypeAt, EMPLOYMENT_TYPES } from '$lib/utils/employment-type'
 import { currentCompensation } from './payroll/compensation'
+import { assertNotSelf } from './employee-access'
+import { assertMayConfirmProposal, createProposal } from './action-proposals'
 import { bandStatus } from './settings/master'
 import { D } from './payroll/money'
 import type { AuditContext } from './types'
-import type { EmploymentType, EmploymentStatus, RateType, Gender, Role } from '@prisma/client'
+import type {
+	EmploymentType,
+	EmploymentStatus,
+	ProposalDomain,
+	RateType,
+	Gender,
+	Role
+} from '@prisma/client'
 
 interface CreateEmployeeInput {
 	email: string
@@ -128,7 +138,7 @@ interface EmployeeListFilters {
 	departmentId?: string
 	branchId?: string
 	search?: string
-	// #232: restrict the roster to a set of ids — a MANAGER sees only their own team and the
+	// #234: restrict the roster to a set of ids — a MANAGER sees only their own team and the
 	// branches they manage. `undefined` means unrestricted (HR/CEO/Super-Admin); an empty array
 	// means "nobody", which is the correct answer for a manager with no reports, not "everybody".
 	ids?: string[]
@@ -147,7 +157,7 @@ function employeeListWhere(
 	filters?: EmployeeListFilters
 ): Prisma.EmployeeWhereInput {
 	return {
-		user: { organizationId },
+		organizationId,
 		...(filters?.ids !== undefined && { id: { in: filters.ids } }),
 		...(filters?.status
 			? { employmentStatus: filters.status }
@@ -195,7 +205,7 @@ export async function listEmployees(
 			endDate: true,
 			department: { select: { id: true, name: true } },
 			branch: { select: { id: true, name: true } },
-			user: { select: { email: true, role: true, isActive: true } }
+			user: { select: { email: true, roles: true, isActive: true } }
 		},
 		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
@@ -205,13 +215,13 @@ export async function listEmployees(
 export async function getEmployee(
 	id: string,
 	organizationId: string,
-	opts?: { viewerRole?: Role; isSelf?: boolean }
+	opts?: { viewerRoles?: Role[]; isSelf?: boolean }
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id, user: { organizationId } },
+		where: { id, organizationId },
 		include: {
 			department: true,
-			user: { select: { email: true, role: true, isActive: true, lastLoginAt: true } },
+			user: { select: { email: true, roles: true, isActive: true, lastLoginAt: true } },
 			reportsTo: { select: { id: true, firstName: true, lastName: true } },
 			position: { include: { salaryGrade: true } },
 			emergencyContacts: { orderBy: { createdAt: 'asc' } }
@@ -265,15 +275,11 @@ export async function getEmployee(
 	// passes opts, so masking is inherited by default: nothing leaks by omission (#111).
 	if (!opts) return employee
 
-	// Compensation, government IDs, and disbursement details are HR-only: below the HR_ADMIN
-	// rank, and not the record's owner, they come back null. Note MANAGER is *not* below it —
-	// #133 made MANAGER on-branch HR and ranks it level with HR_ADMIN — so a manager falls
-	// through to the masked branch. Self always reaches masking too (own data, decision #2).
-	if (
-		!opts.isSelf &&
-		opts.viewerRole &&
-		ROLE_HIERARCHY[opts.viewerRole] < ROLE_HIERARCHY.HR_ADMIN
-	) {
+	// Compensation, government IDs, and disbursement details are HR-only: without MANAGE_HR,
+	// and not the record's owner, they come back null. Note MANAGER *does* hold MANAGE_HR —
+	// #133 made MANAGER on-branch HR — so a manager does not fall into the masked branch.
+	// Self always reaches masking too (own data, decision #2).
+	if (!opts.isSelf && opts.viewerRoles && !canAny(opts.viewerRoles, 'MANAGE_HR')) {
 		return {
 			...employee,
 			basicMonthlySalary: null,
@@ -305,7 +311,7 @@ export async function revealEmployeeSensitive(
 	opts: { audit: boolean }
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id, user: { organizationId } },
+		where: { id, organizationId },
 		select: {
 			id: true,
 			sssNumber: true,
@@ -323,12 +329,18 @@ export async function revealEmployeeSensitive(
 
 	// Constitution P1/P4: reading PII is itself an auditable event.
 	if (opts.audit) {
-		await writeAuditLog(ctx, {
-			action: 'VIEW',
-			entityType: 'Employee',
-			entityId: employee.id,
-			newValue: { fields: [...SENSITIVE_FIELDS] }
-		})
+		// #5: deliberately NOT transactional — `db`, not a `tx`. This audits a READ, so there is no
+		// mutation to roll back with, and a rollback would destroy the record of the PII access.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'VIEW',
+				entityType: 'Employee',
+				entityId: employee.id,
+				newValue: { fields: [...SENSITIVE_FIELDS] }
+			},
+			db
+		)
 	}
 
 	return employee
@@ -380,6 +392,24 @@ function isEmployeeNumberConflict(e: unknown) {
 	return Array.isArray(target) && target.includes('employeeNumber')
 }
 
+/**
+ * A reporting line must not cross tenants. Postgres cannot express "reportsTo belongs to the same
+ * organization" — the same limitation `branchId` and `positionId` carry — so every writer of
+ * `reportsToId` verifies it here (#235, where the check lived on one writer and two others took a
+ * forged id as given).
+ *
+ * `selfId` is the employee being written. Omitted at create time: Prisma generates the row's id at
+ * insert, so a new hire cannot be named as its own manager.
+ */
+async function assertManagerInOrg(reportsToId: string, organizationId: string, selfId?: string) {
+	if (reportsToId === selfId) error(400, 'An employee cannot report to themselves.')
+	const manager = await db.employee.findFirst({
+		where: { id: reportsToId, organizationId },
+		select: { id: true }
+	})
+	if (!manager) error(404, 'Manager not found')
+}
+
 export async function createEmployee(
 	organizationId: string,
 	input: CreateEmployeeInput,
@@ -388,19 +418,16 @@ export async function createEmployee(
 	const existingUser = await db.user.findUnique({ where: { email: input.email } })
 	if (existingUser) error(409, 'Email already in use')
 
+	// #235: the reporting line comes straight off the request, so verify the manager is in this org
+	// before anything is written. Ahead of the hash — a single indexed lookup should not sit behind
+	// 300ms of bcrypt on a hire that cannot succeed.
+	if (input.reportsToId !== undefined) await assertManagerInOrg(input.reportsToId, organizationId)
+
 	// Hashed once, outside the retry loop — bcrypt at cost 12 is by far the expensive part and
 	// the password does not change between attempts.
 	const passwordHash = await bcrypt.hash(input.password, 12)
 
-	const employee = await allocateAndCreate(organizationId, input, passwordHash)
-
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'Employee',
-		// From the created row, not a variable computed up front: a retry changes the number.
-		newValue: { employeeNumber: employee.employeeNumber, email: input.email },
-		entityId: employee.id
-	})
+	const employee = await allocateAndCreate(organizationId, input, passwordHash, ctx)
 
 	// On onboarding, invite the new hire to the company Discord server (#186) — only when
 	// the org has configured an invite link (currently just Veent). Sent to their working
@@ -437,7 +464,8 @@ export async function createEmployee(
 async function allocateAndCreate(
 	organizationId: string,
 	input: CreateEmployeeInput,
-	passwordHash: string
+	passwordHash: string,
+	ctx: AuditContext
 ) {
 	for (let attempt = 1; ; attempt++) {
 		try {
@@ -448,7 +476,7 @@ async function allocateAndCreate(
 						organizationId,
 						email: input.email,
 						passwordHash,
-						role: input.role
+						roles: [input.role]
 					}
 				})
 
@@ -492,7 +520,7 @@ async function allocateAndCreate(
 						workScheduleId: input.workScheduleId || null,
 						positionId: input.positionId || null
 					},
-					include: { department: true, user: { select: { email: true, role: true } } }
+					include: { department: true, user: { select: { email: true, roles: true } } }
 				})
 
 				// Allocate this year's leave entitlement from the org's leave-type defaults (#137).
@@ -525,6 +553,20 @@ async function allocateAndCreate(
 					}
 				})
 
+				// #5: inside the hire transaction — a failed audit write must not leave a new employee
+				// standing unrecorded. A retry replays this along with the rest of the closure.
+				await writeAuditLog(
+					ctx,
+					{
+						action: 'CREATE',
+						entityType: 'Employee',
+						// From the created row, not a variable computed up front: a retry changes the number.
+						newValue: { employeeNumber: created.employeeNumber, email: input.email },
+						entityId: created.id
+					},
+					tx
+				)
+
 				return created
 			})
 		} catch (e) {
@@ -543,6 +585,18 @@ export async function updateEmployee(
 ) {
 	const existing = await getEmployee(id, organizationId)
 
+	// Separation of duties: contact details ARE self-serviceable — `/profile`'s update action routes
+	// here and sends only name/contact/birthdate — but employment terms are HR's to set, so nobody
+	// sets their own. Field-scoped rather than a blanket self-block for exactly that reason.
+	if (
+		input.jobTitle !== undefined ||
+		input.departmentId !== undefined ||
+		input.employmentStatus !== undefined ||
+		input.endDate !== undefined
+	) {
+		assertNotSelf(ctx.actorId, existing)
+	}
+
 	// A branch change is a store transfer. Postgres can't express "the branch belongs to the
 	// same org", so verify it here — a forged id from another tenant must not cross over.
 	// Re-saving an employee who already sits on a closed branch is allowed: the picker keeps
@@ -557,45 +611,129 @@ export async function updateEmployee(
 		if (branch.status === 'CLOSED') error(400, 'That branch is closed — choose an open branch.')
 	}
 
-	const updated = await db.employee.update({
-		where: { id },
-		data: input,
-		include: { department: true, user: { select: { email: true, role: true } } }
-	})
-
-	// Curated audit diff: before/after values for the employment-history fields
-	// only, plus the names (not values) of any other changed fields. This powers
-	// the history timeline (FR-051) and keeps sensitive PII out of the audit log.
-	const norm = (v: unknown) =>
-		v == null ? null : typeof v === 'object' && 'toString' in v ? (v as object).toString() : v
-	const oldValue: Record<string, unknown> = {}
-	const newValue: Record<string, unknown> = {}
-	const otherChanged: string[] = []
-	for (const key of Object.keys(input) as (keyof UpdateEmployeeInput)[]) {
-		const before = norm((existing as Record<string, unknown>)[key])
-		const after = norm((updated as Record<string, unknown>)[key])
-		if (String(before) === String(after)) continue
-		if ((HISTORY_FIELDS as readonly string[]).includes(key)) {
-			oldValue[key] = before
-			newValue[key] = after
-		} else {
-			otherChanged.push(key)
-		}
+	// #235: same reason as the branch above — a reporting line must stay inside the tenant, and
+	// `data: input` writes this column straight through (the v1 PATCH accepts it). Skipped when
+	// unchanged, for the same reason the branch check is: re-saving a 201 file whose manager
+	// predates this check must not fail every unrelated edit on it.
+	if (input.reportsToId !== undefined && input.reportsToId !== existing.reportsToId) {
+		await assertManagerInOrg(input.reportsToId, organizationId, id)
 	}
 
-	// Only record an audit entry when something actually changed.
-	if (Object.keys(newValue).length > 0 || otherChanged.length > 0) {
-		if (otherChanged.length > 0) newValue._otherFields = otherChanged
-		await writeAuditLog(ctx, {
-			action: 'UPDATE',
-			entityType: 'Employee',
-			entityId: id,
-			oldValue,
-			newValue
+	// One transaction (#5): a failed audit write must not leave an edit standing unrecorded. The
+	// `before` snapshot the diff reads is taken inside it too — `existing` above is read through
+	// `getEmployee`, several queries and a heal-on-read write earlier, so a concurrent edit could
+	// make this row's oldValue describe a state this call never overwrote. Only the READ moves;
+	// `existing` still feeds the guards above, which must run before a transaction is opened.
+	return await db.$transaction(async (tx) => {
+		const before = await tx.employee.findUniqueOrThrow({ where: { id } })
+
+		const updated = await tx.employee.update({
+			where: { id },
+			data: input,
+			include: { department: true, user: { select: { email: true, roles: true } } }
 		})
-	}
 
-	return updated
+		// Curated audit diff: before/after values for the employment-history fields
+		// only, plus the names (not values) of any other changed fields. This powers
+		// the history timeline (FR-051) and keeps sensitive PII out of the audit log.
+		const norm = (v: unknown) =>
+			v == null ? null : typeof v === 'object' && 'toString' in v ? (v as object).toString() : v
+		const oldValue: Record<string, unknown> = {}
+		const newValue: Record<string, unknown> = {}
+		const otherChanged: string[] = []
+		for (const key of Object.keys(input) as (keyof UpdateEmployeeInput)[]) {
+			const beforeValue = norm((before as Record<string, unknown>)[key])
+			const after = norm((updated as Record<string, unknown>)[key])
+			if (String(beforeValue) === String(after)) continue
+			if ((HISTORY_FIELDS as readonly string[]).includes(key)) {
+				oldValue[key] = beforeValue
+				newValue[key] = after
+			} else {
+				otherChanged.push(key)
+			}
+		}
+
+		// Only record an audit entry when something actually changed.
+		if (Object.keys(newValue).length > 0 || otherChanged.length > 0) {
+			if (otherChanged.length > 0) newValue._otherFields = otherChanged
+			await writeAuditLog(
+				ctx,
+				{
+					action: 'UPDATE',
+					entityType: 'Employee',
+					entityId: id,
+					oldValue,
+					newValue
+				},
+				tx
+			)
+		}
+
+		return updated
+	})
+}
+
+/**
+ * What the pay writers return. `proposalId` is set only when the change was FILED rather than
+ * applied (#224 Part 2 / #243) — callers that report success must surface that, or an unconfirmed
+ * change reads as a saved one.
+ */
+export interface PayWriteResult {
+	notice?: string
+	proposalId?: string
+}
+
+export const AWAITING_CONFIRMATION =
+	'Submitted for confirmation — this change takes effect once another authorized person confirms it.'
+
+/**
+ * Options only the proposal-confirm path passes.
+ *
+ * `confirmTx` is the claim's transaction client, and its presence carries BOTH meanings: write on
+ * that client (Prisma has no nested interactive transactions, and `confirmProposal` runs `apply`
+ * inside the claim so a failed apply rolls the claim back to PENDING), and skip the propose branch
+ * below (re-proposing an already-confirmed change would loop forever). Deliberately one field
+ * rather than a client plus a boolean: the two can never drift apart, and no caller can skip the
+ * separation-of-duties routing without actually being inside `confirmProposal`'s transaction.
+ *
+ * Same shape as `writeAuditLog(ctx, payload, client = db)`: an optional client that defaults to the
+ * global `db`, so the direct path is byte-identical to what it did before.
+ */
+export interface ProposalWriteOpts {
+	confirmTx?: Prisma.TransactionClient
+}
+
+/**
+ * Separation of duties for the two writers that move pay (#224 Part 2, #243).
+ *
+ * Returns the "awaiting confirmation" result when this actor may not make this change alone, having
+ * filed a PENDING proposal; `null` when they may, and the caller writes as it always has.
+ *
+ * Two shapes route here, and `createProposal` re-derives which from initiator vs target so the
+ * confirmer requirement can't be understated:
+ *   - the actor IS the target — self-dealing, needs `APPROVE_FINANCE` to confirm;
+ *   - the actor lacks `ADMINISTER_HR_ORGWIDE` — i.e. a MANAGER, who passes the route's own
+ *     `requireAnyCapability('MANAGE_HR')` gate, since MANAGE_HR holds MANAGER (#243).
+ *
+ * Keyed on the narrower capability, for exactly that reason. And in the service rather than the
+ * route, so the form action and its v1 API twin are covered by one check.
+ */
+async function proposeIfRequired(
+	organizationId: string,
+	employee: { id: string; userId: string },
+	domain: ProposalDomain,
+	payload: unknown,
+	ctx: AuditContext
+): Promise<PayWriteResult | null> {
+	if (employee.userId !== ctx.actorId && canAny(ctx.actorRoles, 'ADMINISTER_HR_ORGWIDE'))
+		return null
+
+	const proposal = await createProposal(
+		organizationId,
+		{ targetEmployeeId: employee.id, targetUserId: employee.userId, domain, payload },
+		ctx
+	)
+	return { notice: AWAITING_CONFIRMATION, proposalId: proposal.id }
 }
 
 /**
@@ -613,8 +751,9 @@ export async function recordCompensationChange(
 	id: string,
 	organizationId: string,
 	input: { basicMonthlySalary?: number; rateType?: RateType; effectiveDate: Date; note?: string },
-	ctx: AuditContext
-): Promise<{ notice?: string }> {
+	ctx: AuditContext,
+	opts?: ProposalWriteOpts
+): Promise<PayWriteResult> {
 	const employee = await getEmployee(id, organizationId)
 
 	// "Unchanged" is judged against the comp in effect on the effective date, not the current cache —
@@ -663,7 +802,29 @@ export async function recordCompensationChange(
 		? `Backdated to ${eff.toISOString().slice(0, 10)}. Approved runs are not recalculated; applies to current and future open periods.`
 		: undefined
 
-	await db.$transaction(async (tx: Prisma.TransactionClient) => {
+	// #224 Part 2 / #243. Placed after validation and before the first write: the initiator gets the
+	// same immediate 400s they always did rather than discovering them when someone else confirms,
+	// and nothing has landed yet, so filing instead of writing leaves the record untouched. Storing
+	// `input` verbatim — not the values resolved above — keeps the proposal meaning what was typed,
+	// so confirming re-runs every check on the state as it stands then.
+	if (!opts?.confirmTx) {
+		const proposed = await proposeIfRequired(organizationId, employee, 'COMPENSATION', input, ctx)
+		if (proposed) return proposed
+	}
+
+	const write = async (tx: Prisma.TransactionClient) => {
+		// The audit's "before" is re-derived from a tx-scoped read, not from `atEff` above: that one
+		// was read before this transaction opened, so two concurrent changes to the same employee
+		// would both log the same prior pay — one of them a value it never replaced. Read before the
+		// insert, or the new snapshot is itself in the history.
+		const before = currentCompensation(
+			await tx.employeeCompensation.findMany({
+				where: { employeeId: id },
+				select: { basicMonthlySalary: true, rateType: true, effectiveDate: true, changedAt: true }
+			}),
+			input.effectiveDate,
+			{ basicMonthlySalary: currentSalary, rateType: employee.rateType }
+		)
 		const current = await insertCompensationSnapshot(
 			tx,
 			id,
@@ -683,12 +844,15 @@ export async function recordCompensationChange(
 				action: 'UPDATE',
 				entityType: 'Employee',
 				entityId: id,
-				oldValue: { basicMonthlySalary: atEff.salary.toNumber(), rateType: atEff.rateType },
+				oldValue: { basicMonthlySalary: before.salary.toNumber(), rateType: before.rateType },
 				newValue: { basicMonthlySalary, rateType, effectiveDate: eff }
 			},
 			tx
 		)
-	})
+	}
+	// Join the confirm transaction when applying a proposal; own it otherwise (Prisma has no nested
+	// interactive transactions, and the claim must roll back with a failed apply).
+	await (opts?.confirmTx ? write(opts.confirmTx) : db.$transaction(write))
 
 	return { notice }
 }
@@ -768,15 +932,13 @@ export async function promoteEmployee(
 	id: string,
 	organizationId: string,
 	input: PromoteEmployeeInput,
-	ctx: AuditContext
-): Promise<{ notice?: string }> {
+	ctx: AuditContext,
+	opts?: ProposalWriteOpts
+): Promise<PayWriteResult> {
 	const employee = await getEmployee(id, organizationId)
 
 	const eff = utcMidnight(input.effectiveDate)
 	const today = utcMidnight(new Date())
-	if (eff.getTime() < utcMidnight(employee.startDate).getTime()) {
-		error(400, 'Effective date cannot be before the hire date.')
-	}
 
 	// Pay is judged against the comp in effect on the effective date, not today's cache — the same
 	// rule `recordCompensationChange` applies, so a backdated promotion compares like with like.
@@ -822,12 +984,7 @@ export async function promoteEmployee(
 		columns.jobTitle = input.jobTitle
 	}
 	if (input.reportsToId !== undefined && input.reportsToId !== employee.reportsToId) {
-		if (input.reportsToId === id) error(400, 'An employee cannot report to themselves.')
-		const manager = await db.employee.findFirst({
-			where: { id: input.reportsToId, user: { organizationId } },
-			select: { id: true }
-		})
-		if (!manager) error(404, 'Manager not found')
+		await assertManagerInOrg(input.reportsToId, organizationId, id)
 		columns.reportsToId = input.reportsToId
 	}
 
@@ -835,9 +992,32 @@ export async function promoteEmployee(
 		error(NO_CHANGE_STATUS, NO_CHANGE_MESSAGE)
 	}
 
-	// Only pay and employment type are effective-dated; position, title and the reporting line are
-	// plain columns that would apply the moment this is saved. Rather than quietly applying half a
-	// promotion early, a future-dated one must be pay/type-only.
+	// Two bounds on the effective date. They bind different subsets of the promotion, so they are
+	// kept together and each says which.
+	//
+	// LOWER (#266) — a date below the hire date is nonsense for anything that RECORDS it: pay and
+	// employment type are effective-dated snapshots by construction (`recordCompensationChange`
+	// applies the same floor for that reason, :761-767), and positionId/jobTitle are HISTORY_FIELDS,
+	// so `getEmploymentHistory` renders the date back on the 201 timeline (:1310-1319). It binds
+	// nothing about the reporting line: `reportsToId` is deliberately NOT a HISTORY_FIELD (see the
+	// audit block below), so a reporting-line-only change emits no timeline event and surfaces the
+	// date nowhere, and as a plain column it applies the moment this saves regardless of the date.
+	// Running unconditionally, the floor therefore refused a legitimate edit outright — a hire whose
+	// startDate is still in the future could not be re-pointed at a different manager through
+	// `?/promote`, or (after #263) through the v1 PATCH, since both pass today's date.
+	if (
+		(payChanged ||
+			typeChanged ||
+			columns.positionId !== undefined ||
+			columns.jobTitle !== undefined) &&
+		eff.getTime() < utcMidnight(employee.startDate).getTime()
+	) {
+		error(400, 'Effective date cannot be before the hire date.')
+	}
+
+	// UPPER — only pay and employment type are effective-dated; position, title and the reporting
+	// line are plain columns that would apply the moment this is saved. Rather than quietly applying
+	// half a promotion early, a future-dated one must be pay/type-only.
 	if (eff.getTime() > today.getTime() && Object.keys(columns).length > 0) {
 		error(
 			400,
@@ -890,7 +1070,13 @@ export async function promoteEmployee(
 
 	const notice = messages.length ? messages.join(' ') : undefined
 
-	await db.$transaction(async (tx: Prisma.TransactionClient) => {
+	// #224 Part 2 / #243 — same routing, same placement, as `recordCompensationChange`.
+	if (!opts?.confirmTx) {
+		const proposed = await proposeIfRequired(organizationId, employee, 'PROMOTION', input, ctx)
+		if (proposed) return proposed
+	}
+
+	const write = async (tx: Prisma.TransactionClient) => {
 		const data: Prisma.EmployeeUpdateInput = { ...columns }
 
 		if (payChanged) {
@@ -950,9 +1136,107 @@ export async function promoteEmployee(
 			{ action: 'UPDATE', entityType: 'Employee', entityId: id, oldValue, newValue },
 			tx
 		)
-	})
+	}
+	await (opts?.confirmTx ? write(opts.confirmTx) : db.$transaction(write))
 
 	return { notice }
+}
+
+/**
+ * Union of both writers' inputs — the promotion input is a superset of the compensation one.
+ *
+ * `.strict()` so the two cannot drift apart silently: a field added to `PromoteEmployeeInput` and
+ * not to this schema would otherwise be stripped at apply time, and the proposal would apply a
+ * QUIETER change than the one that was reviewed. Strict turns that into a 400 that rolls the claim
+ * back and leaves the row PENDING — loud, and recoverable.
+ */
+export const proposalPayloadSchema = z
+	.object({
+		effectiveDate: z.coerce.date(),
+		basicMonthlySalary: z.number().optional(),
+		rateType: z.enum(['MONTHLY', 'DAILY', 'HOURLY']).optional(),
+		employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
+		positionId: z.string().nullable().optional(),
+		jobTitle: z.string().optional(),
+		reportsToId: z.string().optional(),
+		note: z.string().optional()
+	})
+	.strict()
+
+/**
+ * The `apply` callback for `confirmProposal` — re-enters the writer that filed the proposal, on the
+ * claim's transaction client and with the propose branch bypassed.
+ *
+ * Re-entering the writer rather than replaying a stored diff is the point: every guard the writer
+ * has (no-change, rate-basis pairing, hire-date floor, org-scoped position and manager, frozen-run
+ * notice) re-runs against the state as it stands NOW, so a payload that went stale while the
+ * proposal sat pending throws — and because this runs inside the claim, the claim rolls back and
+ * the proposal is still PENDING rather than burnt.
+ *
+ * The audit row names the confirmer, not the initiator: they are the one who caused the write. The
+ * initiator is on record in the proposal's own CREATE entry.
+ */
+export async function applyProposedChange(
+	organizationId: string,
+	proposal: { targetEmployeeId: string; domain: ProposalDomain; payload: unknown },
+	tx: Prisma.TransactionClient,
+	ctx: AuditContext
+): Promise<void> {
+	// The payload is `Json` read back as `unknown`, so dates arrive as ISO strings — parse rather
+	// than cast, or `utcMidnight` would silently receive a string.
+	const payload = proposalPayloadSchema.parse(proposal.payload)
+
+	if (proposal.domain === 'COMPENSATION') {
+		const { basicMonthlySalary, rateType, effectiveDate, note } = payload
+		await recordCompensationChange(
+			proposal.targetEmployeeId,
+			organizationId,
+			{ basicMonthlySalary, rateType, effectiveDate, note },
+			ctx,
+			{ confirmTx: tx }
+		)
+	} else if (proposal.domain === 'PROMOTION') {
+		await promoteEmployee(proposal.targetEmployeeId, organizationId, payload, ctx, {
+			confirmTx: tx
+		})
+	} else {
+		// Named, not a catch-all: a third ProposalDomain routed here by default would be applied as a
+		// promotion — the wrong writer, on a pay record, silently. Throwing keeps a new domain
+		// unconfirmable until someone wires it up deliberately.
+		error(400, `Unsupported proposal domain: ${proposal.domain}`)
+	}
+}
+
+/**
+ * The salary figures behind a pending proposal, in cleartext, for a confirmer who is about to
+ * decide it (#111's audited reveal, applied to the queue).
+ *
+ * Lives here rather than in `action-proposals.ts` because it goes through
+ * `revealEmployeeSensitive` — the one path that returns these values — and because employees.ts
+ * already imports action-proposals.ts, so the reverse would be a cycle.
+ *
+ * Authority is the authority to DECIDE the row, asserted before anything is read: if you cannot
+ * act on it you cannot read its figure. A reveal that audited and then refused would already have
+ * read the data.
+ */
+export async function revealProposalAmount(
+	organizationId: string,
+	proposalId: string,
+	ctx: AuditContext
+): Promise<{ current: number | null; proposed: number | null }> {
+	const proposal = await assertMayConfirmProposal(organizationId, proposalId, ctx)
+	const employee = await revealEmployeeSensitive(proposal.targetEmployeeId, organizationId, ctx, {
+		audit: true
+	})
+	// The proposal is only as good as its payload; an unreadable one still has to be rejectable,
+	// so a parse failure reveals the current figure and no proposed one rather than 500ing.
+	const parsed = proposalPayloadSchema.safeParse(proposal.payload)
+	return {
+		// A number, matching `proposed` — this is a form-action payload, and the two figures are
+		// rendered side by side, so returning one as a Prisma.Decimal makes the client coerce.
+		current: employee.basicMonthlySalary?.toNumber() ?? null,
+		proposed: parsed.success ? (parsed.data.basicMonthlySalary ?? null) : null
+	}
 }
 
 export async function offboardEmployee(
@@ -971,22 +1255,29 @@ export async function offboardEmployee(
 		error(400, 'You cannot offboard your own employee record — ask another admin to do it.')
 	}
 
-	const [employee] = await db.$transaction([
-		db.employee.update({
+	// One transaction: a failed audit write must not leave an offboarding standing unrecorded.
+	const employee = await db.$transaction(async (tx) => {
+		const updated = await tx.employee.update({
 			where: { id },
 			data: { employmentStatus: 'OFFBOARDED', endDate }
-		}),
-		db.user.updateMany({
+		})
+		await tx.user.updateMany({
 			where: { employee: { id } },
 			data: { isActive: false }
 		})
-	])
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Employee',
-		entityId: id,
-		newValue: { employmentStatus: 'OFFBOARDED', endDate }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Employee',
+				entityId: id,
+				newValue: { employmentStatus: 'OFFBOARDED', endDate }
+			},
+			tx
+		)
+
+		return updated
 	})
 
 	return employee
@@ -1010,9 +1301,13 @@ export interface EmploymentHistoryEvent {
 // Surface an employee's employment history (FR-051) from the audit trail:
 // hiring, promotions, salary adjustments, department/position transfers, and
 // status changes — derived by diffing the HISTORY_FIELDS on each audit entry.
+// #290: salary figures are masked by default and released only through the audited ?/reveal,
+// matching how the current basic monthly salary is handled (#111). Pass { unmask: true } only
+// from that action — it is what writes the VIEW audit row covering both surfaces.
 export async function getEmploymentHistory(
 	employeeId: string,
-	organizationId: string
+	organizationId: string,
+	opts: { unmask?: boolean } = {}
 ): Promise<EmploymentHistoryEvent[]> {
 	const logs = await db.auditLog.findMany({
 		where: {
@@ -1038,6 +1333,10 @@ export async function getEmploymentHistory(
 	const branchMap = new Map(branches.map((b) => [b.id, b.name]))
 	const money = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' })
 
+	// #290: do NOT mask in here, however tidy it looks. display() feeds the `from === to`
+	// equality check below, so a mask here makes both sides of every salary change compare
+	// equal — the change is dropped, and when salary is the only surviving change the whole
+	// timeline event (date, actor and all) is dropped with it. Mask after the check instead.
 	const display = (field: string, raw: unknown): string => {
 		if (raw == null || raw === '') return '—'
 		const v = String(raw)
@@ -1072,7 +1371,12 @@ export async function getEmploymentHistory(
 			const from = display(field, oldValue[field])
 			const to = display(field, newValue[field])
 			if (from === to) continue
-			changes.push({ label: HISTORY_LABELS[field], from, to })
+			// #290: mask AFTER the equality check — masking inside display() makes every salary
+			// change compare equal, dropping the change and (when salary is the only surviving
+			// field) the whole event. '—' passes through: absence hides nothing.
+			const mask = (s: string) =>
+				field === 'basicMonthlySalary' && !opts.unmask && s !== '—' ? MASKED_SALARY : s
+			changes.push({ label: HISTORY_LABELS[field], from: mask(from), to: mask(to) })
 		}
 		if (changes.length > 0) {
 			// #170: a comp change carries the effective date in newValue — surface it so the timeline

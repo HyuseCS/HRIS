@@ -83,24 +83,19 @@ async function main() {
 		await db.payrollRun.deleteMany({ where: { id: { in: runIds } } })
 	}
 	const admin = await db.user.findFirst({
-		where: { organizationId: org.id, role: 'SUPER_ADMIN' }
+		where: { organizationId: org.id, roles: { has: 'SUPER_ADMIN' } }
 	})
 	if (!admin) {
 		throw new Error('No SUPER_ADMIN user in the org — run `pnpm db:seed` first for the base seed.')
 	}
-	// 5/11–5/25 is not a standard pay period; the seed keeps the paper template's dates.
-	await createPayrollRun(
-		org.id,
-		PERIOD_START,
-		PERIOD_END,
-		{
-			organizationId: org.id,
-			actorId: admin.id,
-			actorRole: admin.role,
-			ipAddress: '127.0.0.1'
-		},
-		{ allowNonStandardPeriod: true }
-	)
+	// 5/11–5/25 is not a standard pay period, but it is a legal custom same-month range (#163),
+	// so it no longer needs an escape hatch. It keeps the paper template's dates.
+	await createPayrollRun(org.id, PERIOD_START, PERIOD_END, {
+		organizationId: org.id,
+		actorId: admin.id,
+		actorRoles: admin.roles,
+		ipAddress: '127.0.0.1'
+	})
 
 	console.log('')
 	console.log('✓ Payroll demo seeded (status: COMPUTED — awaiting admin approval).')

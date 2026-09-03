@@ -20,6 +20,32 @@ const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000
 // more than 5 hours, so a short day is never docked for a break they never took.
 const MEAL_BREAK_OWED_AFTER_MS = 5 * 60 * 60 * 1000
 
+// #162 — DEFAULT smallest gap between two work blocks that counts as the AM/PM boundary.
+// Overridable per organization via `Organization.amPmMinGapMinutes`; this value applies when
+// that column is NULL. 30 minutes is the shortest real between-shift break at the food-service
+// tenants. Below the threshold two adjacent segments are treated as one block interrupted by a
+// quick re-punch (a phone double-tap, a corrected mis-punch), not a morning and an evening shift.
+// Exported so the settings page can show the operator the number that applies when the field is
+// blank, rather than hardcoding 30 a second time.
+export const DEFAULT_AM_PM_MIN_GAP_MINUTES = 30
+const DEFAULT_AM_PM_MIN_GAP_MS = DEFAULT_AM_PM_MIN_GAP_MINUTES * 60_000
+
+// Bounds for a per-organization AM/PM threshold (#162/Amendment 1). Below the floor the
+// threshold stops separating a real break from an input error — a re-punch two seconds after a
+// mis-punch would become the day's "longest gap" and manufacture a fake morning. Above the
+// ceiling the gap is not a between-shift break at all but a forgotten clock-out, which
+// `groupPunchesByDay` and timelog.ts's MAX_SHIFT_HOURS already handle. Note the ceiling does NOT
+// eliminate the "silently off" mode: a tenant whose genuine split-shift break is three hours can
+// still set 240 and get no split, no error and no UI signal. That is an accepted residual.
+export const AM_PM_MIN_GAP_FLOOR = 5
+export const AM_PM_MIN_GAP_CEILING = 240
+
+export function isValidAmPmMinGap(minutes: number): boolean {
+	return (
+		Number.isInteger(minutes) && minutes >= AM_PM_MIN_GAP_FLOOR && minutes <= AM_PM_MIN_GAP_CEILING
+	)
+}
+
 export type AttPunchType = 'IN' | 'OUT' | 'BREAK_START' | 'BREAK_END'
 export type AttendanceStatus =
 	'PRESENT' | 'LATE' | 'ABSENT' | 'INCOMPLETE' | 'ON_LEAVE' | 'HOLIDAY' | 'REST_DAY'
@@ -59,6 +85,20 @@ export interface DeriveInput {
 	 * lateMinutes stays 0 and the day resolves to PRESENT. Undertime is unaffected.
 	 */
 	enforceTardiness?: boolean
+	/**
+	 * Whether to compute the AM/PM display split (#162). Defaults to false; the caller passes
+	 * `isFoodServiceOrg(organizationId)`. When false, all four am*\/pm* results stay null and this
+	 * function behaves exactly as it did before #162. The split is DISPLAY ONLY — it never
+	 * changes workedHours, the hour buckets, lateMinutes, or undertimeMinutes.
+	 */
+	splitAmPm?: boolean
+	/**
+	 * Per-organization AM/PM boundary threshold in milliseconds (#162). Undefined → the built-in
+	 * DEFAULT_AM_PM_MIN_GAP_MS. The caller passes `Organization.amPmMinGapMinutes * 60_000`.
+	 * A non-finite or non-positive value is treated as undefined: a bad number must fall back to
+	 * a known-good default, never silently move every boundary in the tenant.
+	 */
+	amPmMinGapMs?: number
 	config?: DeriveConfig
 }
 
@@ -66,6 +106,10 @@ export interface AttendanceDayResult {
 	status: AttendanceStatus
 	timeIn: Date | null
 	timeOut: Date | null
+	amTimeIn: Date | null
+	amTimeOut: Date | null
+	pmTimeIn: Date | null
+	pmTimeOut: Date | null
 	workedHours: number
 	regularHours: number
 	overtimeHours: number
@@ -132,6 +176,12 @@ function emptyResult(status: AttendanceStatus, timeIn: Date | null = null): Atte
 		status,
 		timeIn,
 		timeOut: null,
+		// Load-bearing: an ABSENT / ON_LEAVE / REST_DAY row must CLEAR a stale AM/PM split
+		// rather than leave the previous derive's values behind (#162).
+		amTimeIn: null,
+		amTimeOut: null,
+		pmTimeIn: null,
+		pmTimeOut: null,
 		workedHours: 0,
 		regularHours: 0,
 		overtimeHours: 0,
@@ -147,6 +197,72 @@ function emptyResult(status: AttendanceStatus, timeIn: Date | null = null): Atte
 		undertimeMinutes: 0,
 		breakMinutes: 0
 	}
+}
+
+/**
+ * Split already-paired work segments into an AM block and a PM block at the LONGEST mid-day
+ * gap (#162). `segs` must be ascending, which is what the pairing loop produces from sorted
+ * punches. `openWork` is a dangling IN with no OUT yet — a half-finished PM block. `minGapMs` is
+ * the smallest gap that counts as a boundary; the caller resolves it from the org's setting or
+ * the built-in default.
+ *
+ * The gap before a dangling IN competes on equal terms with the closed gaps — it is one more
+ * candidate, not a fallback. Treating it as an else-branch meant a day with a narrow closed gap
+ * and a wide open one split on the narrow boundary and dropped the still-running block entirely.
+ *
+ * Ties go to the EARLIEST qualifying gap, so the result is deterministic for a day whose two
+ * gaps are exactly equal. Returns all-null when there is no qualifying gap; a single-block day
+ * is deliberately NOT reported as "AM only", because a lone evening shift is not a morning.
+ *
+ * Because the boundary always lands on the longest gap, the threshold can only turn a split ON
+ * or OFF — it can never move an existing boundary. The one exception is the dangling-IN case,
+ * where lowering the threshold can flip an open PM block into a closed one.
+ */
+function splitAmPmBlocks(
+	segs: Array<[number, number]>,
+	openWork: number | null,
+	minGapMs: number
+): { amIn: Date | null; amOut: Date | null; pmIn: Date | null; pmOut: Date | null } {
+	const none = { amIn: null, amOut: null, pmIn: null, pmOut: null }
+	if (segs.length === 0) return none
+
+	let k = -1
+	let widest = -1
+	for (let i = 0; i < segs.length - 1; i++) {
+		const gap = segs[i + 1][0] - segs[i][1]
+		// Strict `>` so the EARLIEST of two equal gaps wins.
+		if (gap > widest) {
+			widest = gap
+			k = i
+		}
+	}
+
+	const lastOut = segs[segs.length - 1][1]
+	const openGap = openWork === null ? -1 : openWork - lastOut
+
+	// The open gap is the LAST gap of the day by construction, so on an exact tie with a closed
+	// gap the strict `>` leaves `widest` in place and the closed (earlier) boundary wins — the
+	// same earliest-wins rule the scan above uses. It must clear the threshold on its own too:
+	// when no closed gap qualifies either, the widest gap of the day being an open one is not
+	// enough to manufacture a PM block out of a short re-punch.
+	if (openWork !== null && openGap > widest && openGap >= minGapMs)
+		// AM complete, PM still running.
+		return {
+			amIn: new Date(segs[0][0]),
+			amOut: new Date(lastOut),
+			pmIn: new Date(openWork),
+			pmOut: null
+		}
+
+	if (k !== -1 && widest >= minGapMs)
+		return {
+			amIn: new Date(segs[0][0]),
+			amOut: new Date(segs[k][1]),
+			pmIn: new Date(segs[k + 1][0]),
+			pmOut: new Date(segs[segs.length - 1][1])
+		}
+
+	return none
 }
 
 export function deriveAttendanceDay(input: DeriveInput): AttendanceDayResult {
@@ -206,16 +322,31 @@ export function deriveAttendanceDay(input: DeriveInput): AttendanceDayResult {
 	// that in full would make it look like a long meal and suppress the deduction below.
 	const punchedBreakMs = grossWorkedMs - punchedNetMs
 
+	// Time between two work segments — clocked OUT and not yet back IN. On a split shift this is
+	// the break, and it never entered `punchedNetMs` because it falls outside every work segment.
+	// `punchedBreakMs` cannot see it: that only measures BREAK_* punches landing INSIDE a segment.
+	//
+	// Without this the scheduled meal break was deducted on top of a break already taken, and a
+	// JoJo Potato split shift paid an hour short (7.00 h for 08:00–11:00 + 13:00–17:00, where the
+	// employee was off the clock for two hours already). It fired on any two-segment day and
+	// predates #162; #162 only made split shifts common enough to notice.
+	const offClockBetweenSegsMs = workSegs.reduce(
+		(s, seg, i) => (i === 0 ? 0 : s + (seg[0] - workSegs[i - 1][1])),
+		0
+	)
+	const breakAlreadyTakenMs = punchedBreakMs + offClockBetweenSegsMs
+
 	// The scheduled meal break is unpaid whether or not it gets punched, and in practice
 	// employees only punch IN and OUT. Deducting it here is what keeps an 8–5 day at 8h
-	// instead of 9h with a phantom hour of overtime. `max` rather than a sum: a punched
-	// break *is* the meal break, so it must never be deducted twice.
+	// instead of 9h with a phantom hour of overtime. `max` rather than a sum: a break the
+	// employee has already taken — punched, or spent clocked out between segments — *is* the
+	// meal break, so only the shortfall comes off. A longer real break is never topped up.
 	const scheduledBreakMs =
 		dayType === 'REGULAR' && schedule && punchedNetMs > MEAL_BREAK_OWED_AFTER_MS
 			? schedule.breakMinutes * 60_000
 			: 0
-	const unpaidBreakMs = Math.max(punchedBreakMs, scheduledBreakMs)
-	const netWorkedMs = Math.max(0, punchedNetMs - (unpaidBreakMs - punchedBreakMs))
+	const unpaidBreakMs = Math.max(breakAlreadyTakenMs, scheduledBreakMs)
+	const netWorkedMs = Math.max(0, punchedNetMs - (unpaidBreakMs - breakAlreadyTakenMs))
 	const workedHours = round2(netWorkedMs / 3_600_000)
 
 	// Night-differential window (may wrap midnight).
@@ -260,6 +391,24 @@ export function deriveAttendanceDay(input: DeriveInput): AttendanceDayResult {
 		firstIn
 	)
 	result.timeOut = lastOut
+
+	if (input.splitAmPm) {
+		// Defence in depth. Validation at the writer is the real gate, but a NaN or a negative
+		// arriving here would silently re-split every day in the tenant, and the resulting numbers
+		// look plausible. Fall back rather than propagate.
+		const minGapMs =
+			typeof input.amPmMinGapMs === 'number' &&
+			Number.isFinite(input.amPmMinGapMs) &&
+			input.amPmMinGapMs > 0
+				? input.amPmMinGapMs
+				: DEFAULT_AM_PM_MIN_GAP_MS
+		const { amIn, amOut, pmIn, pmOut } = splitAmPmBlocks(workSegs, openWork, minGapMs)
+		result.amTimeIn = amIn
+		result.amTimeOut = amOut
+		result.pmTimeIn = pmIn
+		result.pmTimeOut = pmOut
+	}
+
 	result.workedHours = workedHours
 	result.breakMinutes = Math.round(unpaidBreakMs / 60_000)
 	result.nightDiffHours = nightDiffHours

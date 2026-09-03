@@ -1,10 +1,25 @@
 <script lang="ts">
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
-	import type { PageData } from './$types'
+	import type { ActionData, PageData } from './$types'
 
-	let { data }: { data: PageData } = $props()
+	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	// `fail()` contributes its own shape to the ActionData union, so narrow before reading.
+	// Without this the 400 from a reveal with no id renders as silence.
+	const failure = $derived(form && 'message' in form ? form.message : null)
+
+	/**
+	 * The reveal is a full-page POST, so focus resets to the top of the document and the payload
+	 * is rendered in the same pass as the rest of the page — the weakest case for a live region
+	 * announcing. Move focus to it instead, so it is both announced and reachable.
+	 */
+	const focusOnMount = (node: HTMLElement) => {
+		node.focus()
+	}
+
+	// Hand-maintained — extend it whenever `AuditAction` gains a value, or the new action cannot
+	// be filtered for at all. `PAYROLL_VOID` was added in #298.
 	const ACTIONS = [
 		'CREATE',
 		'UPDATE',
@@ -13,7 +28,8 @@
 		'LOGIN',
 		'LOGIN_FAILED',
 		'PAYROLL_OVERRIDE',
-		'LEAVE_OVERRIDE'
+		'LEAVE_OVERRIDE',
+		'PAYROLL_VOID'
 	]
 </script>
 
@@ -23,6 +39,12 @@
 
 <div class="space-y-6">
 	<h1 class="text-2xl font-bold tracking-tight">Audit Log</h1>
+
+	{#if failure}
+		<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{failure}
+		</div>
+	{/if}
 
 	<!-- Filter form -->
 	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
@@ -138,6 +160,8 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each data.logs as log (log.id)}
+						<!-- At most one entry is revealed at a time — whichever ?/reveal just returned. -->
+						{@const revealed = form?.revealed}
 						<tr class="hover:bg-muted/30">
 							<td class="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
 								{new Date(log.createdAt).toLocaleString('en-PH', {
@@ -152,7 +176,7 @@
 							<td class="px-4 py-3 whitespace-nowrap">
 								<span class="font-medium">{log.actor.email}</span>
 								<span class="ml-1 rounded bg-muted px-1 py-0.5 text-xs text-muted-foreground"
-									>{log.actor.role}</span
+									>{log.actorRoles.join(', ')}</span
 								>
 							</td>
 							<td class="px-4 py-3 whitespace-nowrap">
@@ -174,39 +198,56 @@
 							<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
 								{log.entityId.slice(0, 12)}…
 							</td>
+							<!--
+								#242: the payload never arrives with the list. One entry at a time, through the
+								audited ?/reveal action — reaching it is itself a recorded event.
+							-->
 							<td class="px-4 py-3">
-								{#if log.oldValue !== null || log.newValue !== null}
-									<details class="cursor-pointer">
-										<summary class="text-xs text-muted-foreground hover:text-foreground"
-											>View changes</summary
-										>
-										<div class="mt-1 space-y-1">
-											{#if log.oldValue !== null}
-												<div>
-													<span class="text-xs font-medium text-red-600">Before:</span>
-													<pre
-														class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
-															log.oldValue,
-															null,
-															2
-														)}</pre>
-												</div>
-											{/if}
-											{#if log.newValue !== null}
-												<div>
-													<span class="text-xs font-medium text-green-600">After:</span>
-													<pre
-														class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
-															log.newValue,
-															null,
-															2
-														)}</pre>
-												</div>
-											{/if}
-										</div>
-									</details>
-								{:else}
+								{#if !log.hasChanges}
 									<span class="text-xs text-muted-foreground">—</span>
+								{:else if revealed && revealed.id === log.id}
+									<div
+										class="space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										aria-live="polite"
+										tabindex="-1"
+										use:focusOnMount
+									>
+										{#if revealed.oldValue !== null}
+											<div>
+												<span class="text-xs font-medium text-red-600">Before:</span>
+												<pre
+													class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
+														revealed.oldValue,
+														null,
+														2
+													)}</pre>
+											</div>
+										{/if}
+										{#if revealed.newValue !== null}
+											<div>
+												<span class="text-xs font-medium text-green-600">After:</span>
+												<pre
+													class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
+														revealed.newValue,
+														null,
+														2
+													)}</pre>
+											</div>
+										{/if}
+									</div>
+								{:else if data.canReveal}
+									<form method="POST" action="?/reveal">
+										<input type="hidden" name="id" value={log.id} />
+										<button
+											type="submit"
+											class="rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											aria-label="Reveal the recorded changes for {log.action} on {log.entityType} {log.entityId} — this reveal is logged"
+										>
+											Reveal changes
+										</button>
+									</form>
+								{:else}
+									<span class="text-xs text-muted-foreground">Hidden</span>
 								{/if}
 							</td>
 						</tr>

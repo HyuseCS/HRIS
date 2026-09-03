@@ -1,7 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
-import { requireCapability } from '$lib/server/rbac'
+import { HIRE_ROLES } from '$lib/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { createEmployee } from '$lib/server/services/employees'
 import { sendWelcomeEmail } from '$lib/server/notifications'
 import { govIdSchema } from '$lib/utils/gov-ids'
@@ -18,7 +19,7 @@ function generateTempPassword(): string {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	requireCapability(locals.user!.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 
 	const orgId = locals.user!.organizationId
 	const [departments, employees, positions, workSchedules] = await Promise.all([
@@ -28,7 +29,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}),
 		db.employee.findMany({
 			where: {
-				user: { organizationId: orgId },
+				organizationId: orgId,
 				employmentStatus: 'ACTIVE'
 			},
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
@@ -63,7 +64,11 @@ const createSchema = z
 		firstName: z.string().min(1),
 		lastName: z.string().min(1),
 		middleName: z.string().optional(),
-		role: z.enum(['EMPLOYEE', 'MANAGER', 'HR_ADMIN']),
+		// #248: deliberately narrower than ASSIGNABLE_ROLES. This form runs under MANAGE_HR, which
+		// MANAGER holds, so anything listed here is an account a MANAGER can mint at that authority
+		// with no CEO involved. Governance, finance and sign-off roles are granted after hire, in
+		// Settings → Roles. See HIRE_ROLES in $lib/rbac.
+		role: z.enum(HIRE_ROLES),
 		departmentId: z.string().min(1),
 		jobTitle: z.string().min(1),
 		// New hires start probationary (#136/#188) unless HR picks otherwise; regularization to
@@ -119,7 +124,7 @@ const createSchema = z
 
 export const actions: Actions = {
 	create: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
 		const raw = Object.fromEntries(await request.formData())
@@ -145,7 +150,7 @@ export const actions: Actions = {
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: getClientAddress()
 				}
 			)

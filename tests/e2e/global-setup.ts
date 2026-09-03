@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test'
+import { chromium, type FullConfig } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import { E2E_DISCORD_ID } from './helpers'
 
@@ -8,17 +8,15 @@ import { E2E_DISCORD_ID } from './helpers'
  * repeated runs. Relies on the seed having been applied (`pnpm db:seed:e2e`).
  */
 /**
- * Compile the hot routes once, before any test's clock is running.
+ * Prime the hot routes once, before any test's clock is running.
  *
- * The dev server compiles each route on its first request. That cost lands on whichever
- * test happens to reach the route first, and under a cold cache or a loaded runner it
- * blew the 30s per-test budget — `page.goto('/login')` timing out in a different spec on
- * every run. Paying it here makes the failure mode a slow setup instead of a random
- * red test. Best-effort: a warmup miss must never fail the suite.
+ * Written when the suite ran against `pnpm dev`, where vite compiled each route on its first
+ * request and that cost landed on whichever test reached it first. #287 moved the suite onto
+ * the production build (see `playwright.config.ts`), so there is no compilation left to pay
+ * and this is now belt-and-braces: it still primes the OS/page cache and the client bundle,
+ * and it costs a few seconds. Best-effort either way — a warmup miss must never fail the suite.
  */
-async function warmRoutes() {
-	const port = Number(process.env.E2E_PORT ?? 5173)
-	const base = `http://localhost:${port}`
+async function warmRoutes(base: string) {
 	// /login first — every test goes through it. The rest redirect to /login when
 	// unauthenticated, which still forces their server modules to compile.
 	const routes = ['/login', '/dashboard', '/timesheets', '/employees', '/performance', '/benefits']
@@ -55,8 +53,13 @@ async function warmRoutes() {
 	}
 }
 
-async function globalSetup() {
-	await warmRoutes()
+async function globalSetup(config: FullConfig) {
+	// Take the URL from the config Playwright hands us rather than re-deriving it from E2E_PORT.
+	// This file used to parse the port itself and defaulted to 5173, so when #287 moved the suite
+	// to 4173 the warmup silently pointed at whatever was on the old port — your dev server, if
+	// one was up. One source of truth, and it cannot drift again.
+	const base = config.projects[0].use.baseURL!
+	await warmRoutes(base)
 	const db = new PrismaClient()
 	try {
 		const employee = await db.employee.findFirst({

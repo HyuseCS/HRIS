@@ -1,12 +1,12 @@
 import { fail } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
-	requireCapability(user.role, 'MANAGE_HR')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const holidays = await db.publicHoliday.findMany({
 		where: { organizationId: user.organizationId },
@@ -25,7 +25,7 @@ const holidaySchema = z.object({
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = holidaySchema.safeParse(raw)
@@ -50,7 +50,7 @@ export const actions: Actions = {
 
 	update: async ({ request, locals }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const raw = Object.fromEntries(await request.formData())
 		const id = raw.id as string
@@ -90,7 +90,7 @@ export const actions: Actions = {
 
 	delete: async ({ request, locals }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const data = await request.formData()
 		const id = data.get('id') as string

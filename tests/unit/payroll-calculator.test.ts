@@ -74,6 +74,10 @@ describe('computeEmployeeResult (shared run/calculator engine)', () => {
 		const whole = periodOf('WHOLE_MONTH', 2026, may)
 		expect(periodShareOf(firstHalf.periodStart, firstHalf.periodEnd)).toBe(0.5)
 		expect(periodShareOf(whole.periodStart, whole.periodEnd)).toBe(1)
+		// #163: a custom same-month range prorates by day count instead — 7 days of a 31-day May.
+		expect(periodShareOf(new Date(Date.UTC(2026, 4, 3)), new Date(Date.UTC(2026, 4, 9)))).toBe(
+			7 / 31
+		)
 
 		const half = computeEmployeeResult(
 			comp,

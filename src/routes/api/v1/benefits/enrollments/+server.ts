@@ -1,12 +1,12 @@
 import { json, error } from '@sveltejs/kit'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { listAllEnrollments, enrollEmployee } from '$lib/server/services/benefits'
 import { z } from 'zod'
 import type { RequestHandler } from './$types'
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) error(401, 'Unauthorized')
-	requireCapability(locals.user.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user.roles, 'MANAGE_HR')
 	return json({ results: await listAllEnrollments(locals.user.organizationId) })
 }
 
@@ -21,7 +21,7 @@ const enrollSchema = z.object({
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!locals.user) error(401, 'Unauthorized')
 	const user = locals.user
-	requireCapability(user.role, 'MANAGE_HR')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const parsed = enrollSchema.safeParse(await request.json())
 	if (!parsed.success) error(422, parsed.error.errors[0]?.message ?? 'Invalid enrollment')
@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		{
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		}
 	)

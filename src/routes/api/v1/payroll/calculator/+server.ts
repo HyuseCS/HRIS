@@ -4,6 +4,7 @@ import { requirePayrollManage } from '$lib/server/rbac'
 import { apiError, badRequest, forbidden } from '$lib/server/api-error'
 import { previewPayroll } from '$lib/server/services/payroll/calculator'
 import { emptyAttendance } from '$lib/server/services/payroll/types'
+import { listVisiblePayEmployeeIds } from '$lib/server/services/employee-access'
 import type { RequestHandler } from './$types'
 
 const num = z.coerce.number().min(0).default(0)
@@ -31,7 +32,7 @@ const schema = z.object({
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) return apiError(401, 'Unauthorized')
 	try {
-		requirePayrollManage(locals.user.role)
+		requirePayrollManage(locals.user.roles)
 	} catch {
 		return forbidden()
 	}
@@ -44,6 +45,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 	const parsed = schema.safeParse(body)
 	if (!parsed.success) return badRequest('Invalid input', parsed.error.flatten())
+
+	// #275: the guard above says WHAT the caller may do, never WHOSE record — and MANAGE_PAYROLL
+	// holds MANAGER (#133), so without this a branch manager previews any employee's gross,
+	// statutory deductions and net by passing their id. `null` = unrestricted.
+	const visibleEmployeeIds = await listVisiblePayEmployeeIds({
+		id: locals.user.id,
+		roles: locals.user.roles,
+		organizationId: locals.user.organizationId
+	})
+	if (visibleEmployeeIds && !visibleEmployeeIds.includes(parsed.data.employeeId)) return forbidden()
 
 	try {
 		const result = await previewPayroll(parsed.data.employeeId, locals.user.organizationId, {

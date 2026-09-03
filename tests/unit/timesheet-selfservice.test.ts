@@ -17,15 +17,21 @@ const { dbMock } = vi.hoisted(() => ({
 	dbMock: {
 		timesheet: {
 			findFirst: vi.fn(),
+			findMany: vi.fn(),
 			findUnique: vi.fn(),
+			// #324: updateTimesheetEntries re-reads its before-image inside the transaction rather
+			// than carrying one down from the guard read above it.
+			findUniqueOrThrow: vi.fn(),
 			create: vi.fn(),
 			delete: vi.fn(),
 			update: vi.fn()
 		},
 		timesheetEntry: { deleteMany: vi.fn() },
-		employee: { findUnique: vi.fn() },
+		employee: { findFirst: vi.fn() },
 		attendanceDay: { findMany: vi.fn() },
-		$transaction: vi.fn()
+		$transaction: vi.fn(),
+		// #163: createTimesheet takes an advisory lock as the first statement of its transaction.
+		$executeRaw: vi.fn()
 	}
 }))
 
@@ -51,13 +57,17 @@ const makeTs = (over: Record<string, unknown> = {}) => ({
 const ctx = (actorRole: Role, actorId = 'user1') => ({
 	organizationId: ORG,
 	actorId,
-	actorRole,
+	actorRoles: [actorRole],
 	ipAddress: 'test'
 })
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof dbMock) => unknown) => fn(dbMock))
+	dbMock.timesheet.findUniqueOrThrow.mockResolvedValue({
+		totalHours: 8,
+		_count: { entries: 1 }
+	})
 	dbMock.timesheet.update.mockResolvedValue({ entries: [] })
 	dbMock.timesheet.delete.mockResolvedValue({})
 	dbMock.timesheetEntry.deleteMany.mockResolvedValue({})
@@ -66,21 +76,21 @@ beforeEach(() => {
 describe('deleteTimesheet — owner vs manager authorization', () => {
 	it('lets the owner delete their own DRAFT', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' }) // actor is the owner
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' }) // actor is the owner
 		await deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
 
 	it('lets the owner delete their own REJECTED', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'REJECTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
 
 	it('blocks the owner from deleting a SUBMITTED timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await expect(deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 400
 		})
@@ -89,7 +99,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 
 	it('blocks the owner from deleting an APPROVED timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'APPROVED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await expect(deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 400
 		})
@@ -98,7 +108,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 
 	it("blocks a non-owner employee from deleting someone else's timesheet", async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-other' }) // not the owner
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-other' }) // not the owner
 		await expect(deleteTimesheet('ts1', ORG, ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 403
 		})
@@ -107,7 +117,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 
 	it('lets a manager delete a direct report’s timesheet (any status)', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'mgr-emp' }) // actor manages the owner
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'mgr-emp' }) // actor manages the owner
 		await deleteTimesheet('ts1', ORG, ctx('MANAGER'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
@@ -116,7 +126,7 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 	// authority, so it is no longer narrowed to direct reports. Both cases below used to 403.
 	it('lets a manager act on an employee who is not their direct report', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'someone-else' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'someone-else' })
 		await deleteTimesheet('ts1', ORG, ctx('MANAGER'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
@@ -127,14 +137,14 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(
 			makeTs({ employee: { id: 'emp-owner', firstName: 'A', lastName: 'B', reportsToId: null } })
 		)
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'mgr-emp' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'mgr-emp' })
 		await deleteTimesheet('ts1', ORG, ctx('MANAGER'))
 		expect(dbMock.timesheet.delete).toHaveBeenCalledTimes(1)
 	})
 
 	it('still rejects a non-management role acting on someone else’s timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-other' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-other' })
 		await expect(deleteTimesheet('ts1', ORG, ctx('FINANCE'))).rejects.toMatchObject({ status: 403 })
 		expect(dbMock.timesheet.delete).not.toHaveBeenCalled()
 	})
@@ -143,14 +153,19 @@ describe('deleteTimesheet — owner vs manager authorization', () => {
 describe('updateTimesheetEntries — owner sync path', () => {
 	it('lets the owner replace entries on their own DRAFT', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))
 		expect(dbMock.$transaction).toHaveBeenCalledTimes(1)
+		// #324: the before-image is read inside that transaction, not from the guard read above it.
+		expect(dbMock.timesheet.findUniqueOrThrow).toHaveBeenCalledWith({
+			where: { id: 'ts1' },
+			select: { totalHours: true, _count: { select: { entries: true } } }
+		})
 	})
 
 	it('blocks the owner from editing a SUBMITTED timesheet', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs({ status: 'SUBMITTED' }))
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-owner' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-owner' })
 		await expect(updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 400
 		})
@@ -159,7 +174,7 @@ describe('updateTimesheetEntries — owner sync path', () => {
 
 	it('blocks a non-owner employee from editing entries', async () => {
 		dbMock.timesheet.findFirst.mockResolvedValue(makeTs())
-		dbMock.employee.findUnique.mockResolvedValue({ id: 'emp-other' })
+		dbMock.employee.findFirst.mockResolvedValue({ id: 'emp-other' })
 		await expect(updateTimesheetEntries('ts1', ORG, [], ctx('EMPLOYEE'))).rejects.toMatchObject({
 			status: 403
 		})
@@ -167,40 +182,82 @@ describe('updateTimesheetEntries — owner sync path', () => {
 	})
 })
 
-describe('createTimesheet — standard pay period enforcement (#129)', () => {
+// #163 replaced the standard-shape gate (#129) with a same-month sanity gate; #3 then replaced the
+// same-month rule with a SIZE cap. A mid-month week and a cross-month range are both legal custom
+// periods now, and only a reversed range or one covering more than a month of pay is refused.
+describe('createTimesheet — size-cap period gate (#3)', () => {
 	const may = periodOf('FIRST_HALF', 2026, 4) // 2026-05-01 … 2026-05-15
 
-	it('rejects a non-standard period before touching the DB', async () => {
+	it('creates a cross-month period under the cap (19/31 + 2/30 = 0.6796)', async () => {
+		dbMock.timesheet.findMany.mockResolvedValue([])
+		dbMock.timesheet.findUnique.mockResolvedValue(null)
+		dbMock.timesheet.create.mockResolvedValue({ id: 'ts-cross', entries: [] })
+		await createTimesheet(
+			'emp-owner',
+			new Date('2026-05-13'),
+			new Date('2026-06-02'),
+			[],
+			ctx('HR_ADMIN')
+		)
+		expect(dbMock.timesheet.create).toHaveBeenCalledTimes(1)
+	})
+
+	it('rejects an over-cap period before touching the DB', async () => {
+		// The no-DB-call rail the cross-month case used to carry: the refusal is at the service
+		// entry point, ahead of the transaction, so nothing is read and nothing is written.
 		await expect(
 			createTimesheet(
 				'emp-owner',
-				new Date('2026-05-13'),
+				new Date('2026-02-01'),
+				new Date('2026-03-03'),
+				[],
+				ctx('HR_ADMIN')
+			)
+		).rejects.toMatchObject({
+			status: 400,
+			body: {
+				message:
+					'A custom period cannot cover more than one month of pay. This range covers 110% of a month. Shorten it.'
+			}
+		})
+		expect(dbMock.timesheet.findMany).not.toHaveBeenCalled()
+		expect(dbMock.timesheet.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.timesheet.create).not.toHaveBeenCalled()
+	})
+
+	it('rejects a reversed period before touching the DB', async () => {
+		await expect(
+			createTimesheet(
+				'emp-owner',
 				new Date('2026-05-21'),
+				new Date('2026-05-13'),
 				[],
 				ctx('HR_ADMIN')
 			)
 		).rejects.toMatchObject({ status: 400 })
+		expect(dbMock.timesheet.findMany).not.toHaveBeenCalled()
 		expect(dbMock.timesheet.findUnique).not.toHaveBeenCalled()
 		expect(dbMock.timesheet.create).not.toHaveBeenCalled()
 	})
 
 	it('creates a timesheet for a standard period', async () => {
+		dbMock.timesheet.findMany.mockResolvedValue([])
 		dbMock.timesheet.findUnique.mockResolvedValue(null)
 		dbMock.timesheet.create.mockResolvedValue({ id: 'ts-new', entries: [] })
 		await createTimesheet('emp-owner', may.periodStart, may.periodEnd, [], ctx('HR_ADMIN'))
 		expect(dbMock.timesheet.create).toHaveBeenCalledTimes(1)
 	})
 
-	it('allows a non-standard period through the seed/import escape hatch', async () => {
+	it('creates a timesheet for a custom same-month range', async () => {
+		dbMock.timesheet.findMany.mockResolvedValue([])
 		dbMock.timesheet.findUnique.mockResolvedValue(null)
-		dbMock.timesheet.create.mockResolvedValue({ id: 'ts-legacy', entries: [] })
+		dbMock.timesheet.create.mockResolvedValue({ id: 'ts-custom', entries: [] })
 		await createTimesheet(
 			'emp-owner',
 			new Date('2026-05-13'),
 			new Date('2026-05-21'),
 			[],
-			ctx('SUPER_ADMIN'),
-			{ allowNonStandardPeriod: true }
+			ctx('HR_ADMIN')
 		)
 		expect(dbMock.timesheet.create).toHaveBeenCalledTimes(1)
 	})

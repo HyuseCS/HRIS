@@ -69,4 +69,51 @@ _Prereq: bot invited with the **`applications.commands`** scope; the member's Di
 ## 10. Module scaffolds (smoke)
 
 1. **Benefits**, **Performance**, **Settings → Org Structure**, **Settings → Roles** all load.
-2. Roles (Super Admin): change a user's role via the row select → saves; changing **your own** → **"cannot change your own role."**
+2. Roles: role changes are **CEO-only** (`MANAGE_USER_ROLES`, #132) — a Super Admin sees the page for
+   account activation but no role dropdown. As **CEO**, change another user's role via the row select
+   → saves. Self-guards are covered in §11.
+
+## 11. Separation of duties (#224)
+
+Nobody moves their own pay, terms, role or account — enforced in the services, so the form actions
+and the v1 API twins are both covered. Seeded ids below are from `prisma/seed-core.ts`; confirm with
+`pnpm db:studio` if the seed changes.
+
+**11.1 Own pay and employment terms.** As `hr@veent.ph`, open your own 201 file
+(`/employees/<Hannah's id>`) and try each of: Change Compensation · Promote · toggle the SSS
+statutory exemption · add a Loan or Cash Advance · add a Recurring Earning · end an existing
+Earning or Deduction.
+
+Every one refuses inline with **"You cannot record pay or employment changes on your own record —
+ask another admin to do it."** The controls still render — the guard is server-side, so the refusal
+appears on submit, not as a greyed-out button. Repeat any one of them on a **different** employee:
+behaves as before.
+
+**11.2 Self-service profile still works.** As the same user, `/profile` → change contact number or
+address → **saves**. This is the carve-out most likely to break: `/profile` routes through
+`updateEmployee`, which is field-scoped rather than blanket-blocked so contact details stay
+self-serviceable while employment terms do not.
+
+**11.3 Own role and account.** As `admin@veent.ph`, `/settings/roles` → Deactivate on **your own
+row** → inline **"You cannot deactivate your own account."** and you stay logged in. Deactivate a
+different user, then reactivate → both succeed. As **CEO**, demote `admin@veent.ph` (the only Super
+Admin) → inline **"Cannot remove the last active super admin from the organization."**
+
+The CEO's own role change is **not reachable through the UI** (the page hides the role dropdown on
+CEO rows), so check it via the API:
+
+```bash
+curl -s -c /tmp/ceo.jar -X POST http://localhost:5173/api/v1/_dev/login-as \
+  -H 'content-type: application/json' -d '{"email":"ceo@veent.ph"}'
+curl -s -b /tmp/ceo.jar -X PATCH "http://localhost:5173/api/v1/settings/users/<CEO_USER_ID>/role" \
+  -H 'content-type: application/json' -d '{"role":"SUPER_ADMIN"}'
+# → 403 {"message":"You cannot change your own role."}
+```
+
+Then confirm the CEO's role in the DB still reads `CEO`. If it ever reads `SUPER_ADMIN`, that is a
+privilege escalation, not a cosmetic failure.
+
+**11.4 Approvals.** Nobody decides their own request (#75) and the preparer of a payroll run cannot
+sign it off (#174). Both are covered by unit tests (`tests/unit/approval-self-guard.test.ts`); to
+check by hand, file a leave request as a MANAGER and confirm it does not appear in your own
+approvals queue.

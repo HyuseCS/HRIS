@@ -127,15 +127,60 @@ test('HR creates a timesheet for another employee in a period with no punches', 
 })
 
 test('an HR user with no employee record of their own can still create', async ({ page }) => {
-	// The button used to require `myEmployeeId`, so the seeded CEO — who has no Employee row —
-	// never saw it. The picker names the target, so their own record is irrelevant.
-	await login(page, USERS.ceo)
-	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
-	await expect(page.getByRole('heading', { name: 'My Timesheets' })).toHaveCount(0)
+	// The button used to require `myEmployeeId`, so a user with no Employee row never saw it. The
+	// picker names the target, so their own record is irrelevant.
+	//
+	// #315: this used to log in as the seeded CEO, described as having no Employee row. That
+	// stopped being true in `d06ffe2` — `prisma/seed-core.ts` now gives the CEO EMP-900 so the
+	// Profile page resolves, and today EVERY loginable seeded account owns one. The assertion
+	// below was therefore unsatisfiable on a fresh database and failed 3/3 in CI. It needs a user
+	// that genuinely has no employee record, so it makes one and removes it again; the password
+	// hash is copied from the admin so the real login form still drives the sign-in.
+	const db = new PrismaClient()
+	const email = 'e2e-no-employee@veent.ph'
+	try {
+		const admin = await db.user.findUniqueOrThrow({ where: { email: USERS.admin.email } })
+		const solo = await db.user.upsert({
+			where: { email },
+			update: { roles: ['HR_ADMIN'], isActive: true },
+			create: {
+				email,
+				passwordHash: admin.passwordHash,
+				roles: ['HR_ADMIN'],
+				organizationId: admin.organizationId
+			}
+		})
+		await db.userOrganization.upsert({
+			where: {
+				userId_organizationId: { userId: solo.id, organizationId: admin.organizationId }
+			},
+			update: {},
+			create: { userId: solo.id, organizationId: admin.organizationId }
+		})
 
-	const dialog = await openDialog(page)
-	await expect(dialog.locator('#nt-employee')).toBeVisible()
-	await expect(dialog.locator('#nt-employee option', { hasText: 'Employee, Elena' })).toHaveCount(1)
+		await login(page, { email, password: USERS.admin.password })
+		await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
+		// The positive control comes FIRST (#315). `toHaveCount(0)` is satisfied by an error page
+		// just as happily as by correct behaviour, so prove the page rendered before trusting an
+		// absence.
+		await expect(page.getByRole('heading', { name: 'Timesheets', level: 1 })).toBeVisible()
+		await expect(page.getByRole('heading', { name: 'My Timesheets' })).toHaveCount(0)
+
+		const dialog = await openDialog(page)
+		await expect(dialog.locator('#nt-employee')).toBeVisible()
+		await expect(dialog.locator('#nt-employee option', { hasText: 'Employee, Elena' })).toHaveCount(
+			1
+		)
+	} finally {
+		const solo = await db.user.findUnique({ where: { email }, select: { id: true } })
+		if (solo) {
+			// Logging in writes an audit row, and `AuditLog.actorId` is RESTRICT, so the user
+			// cannot go until its own trail does. Sessions cascade, so they need no help.
+			await db.auditLog.deleteMany({ where: { actorId: solo.id } })
+			await db.user.delete({ where: { id: solo.id } })
+		}
+		await db.$disconnect()
+	}
 })
 
 test('creating the same period twice surfaces the conflict in the dialog', async ({ page }) => {

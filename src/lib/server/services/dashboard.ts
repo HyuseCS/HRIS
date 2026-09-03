@@ -21,7 +21,7 @@ export async function listUpcomingRegularizations(organizationId: string, asOf: 
 
 	const employees = await db.employee.findMany({
 		where: {
-			user: { organizationId },
+			organizationId,
 			employmentType: 'PROBATIONARY',
 			employmentStatus: 'ACTIVE',
 			startDate: { lte: startCeiling }
@@ -61,8 +61,7 @@ export async function listTodaysBirthdays(organizationId: string, today: Date = 
 	const rows = await db.$queryRaw<{ firstName: string; lastName: string }[]>`
 		SELECT e."firstName", e."lastName"
 		FROM employees e
-		JOIN users u ON u.id = e."userId"
-		WHERE u."organizationId" = ${organizationId}
+		WHERE e."organizationId" = ${organizationId}
 			AND e."employmentStatus" = 'ACTIVE'
 			AND e."dateOfBirth" IS NOT NULL
 			AND EXTRACT(MONTH FROM e."dateOfBirth") = ${mm}
@@ -108,9 +107,9 @@ function weekdaysLabel(weekdays: number[]): string {
  *
  * All of it is the viewer's own data, so nothing here is capability-gated.
  */
-export async function getMyStatus(userId: string, asOf: Date = new Date()) {
-	const employee = await db.employee.findUnique({
-		where: { userId },
+export async function getMyStatus(userId: string, organizationId: string, asOf: Date = new Date()) {
+	const employee = await db.employee.findFirst({
+		where: { userId, organizationId },
 		select: {
 			id: true,
 			organizationId: true,
@@ -198,7 +197,7 @@ export async function getMyStatus(userId: string, asOf: Date = new Date()) {
 
 export async function getEmployeeMetrics(userId: string, organizationId: string) {
 	const employee = await db.employee.findFirst({
-		where: { userId }
+		where: { userId, organizationId }
 	})
 
 	if (!employee) {
@@ -253,7 +252,7 @@ export async function getEmployeeMetrics(userId: string, organizationId: string)
 
 export async function getManagerMetrics(userId: string, organizationId: string) {
 	const employee = await db.employee.findFirst({
-		where: { userId }
+		where: { userId, organizationId }
 	})
 
 	if (!employee) {
@@ -264,8 +263,13 @@ export async function getManagerMetrics(userId: string, organizationId: string) 
 		}
 	}
 
+	// #259: `reportsToId` alone is not a tenant boundary — a row in another org naming this actor as
+	// its manager would be counted here, leaking that org's pending-approval and headcount totals.
+	// #235 closed the write side, but rows planted before it are still on disk, so the read scopes
+	// itself. Same re-check every other consumer of this relation does (`canTouchEmployee`,
+	// `listVisibleEmployeeIds`).
 	const directReports = await db.employee.findMany({
-		where: { reportsToId: employee.id },
+		where: { reportsToId: employee.id, organizationId },
 		select: { id: true }
 	})
 	const directReportIds = directReports.map((e) => e.id)
@@ -287,15 +291,30 @@ export async function getManagerMetrics(userId: string, organizationId: string) 
 		db.employee.count({
 			where: {
 				reportsToId: employee.id,
-				employmentStatus: 'ACTIVE'
+				employmentStatus: 'ACTIVE',
+				organizationId
 			}
 		}),
+		// #242: an explicit column list, not `include` — a bare include ships every AuditLog
+		// scalar, and `oldValue`/`newValue` hold the before/after salary of every compensation
+		// change. Reaching that payload is an audited event (`/reports/audit-log` ?/reveal), and
+		// the callers who reach this branch (PAYROLL_OFFICER, FINANCE) do not hold the capability
+		// that gates it. `ipAddress`/`userAgent` are dropped for the same reason.
 		db.auditLog.findMany({
 			where: { organizationId },
 			orderBy: { createdAt: 'desc' },
 			take: 5,
-			include: {
-				actor: { select: { email: true, role: true } }
+			select: {
+				id: true,
+				action: true,
+				entityType: true,
+				entityId: true,
+				createdAt: true,
+				// #294: the actor's role set AS RECORDED AT THE TIME. Reaching through the `actor`
+				// relation for `roles` reported today's roles on a historical entry, the same way
+				// `/reports/audit-log` did before #282. `email` is genuinely the live relation.
+				actorRoles: true,
+				actor: { select: { email: true } }
 			}
 		})
 	])
@@ -323,13 +342,13 @@ export async function getAdminMetrics(organizationId: string) {
 	] = await Promise.all([
 		db.employee.count({
 			where: {
-				user: { organizationId },
+				organizationId,
 				employmentStatus: 'ACTIVE'
 			}
 		}),
 		db.request.count({
 			where: {
-				employee: { user: { organizationId } },
+				employee: { organizationId },
 				type: 'LEAVE',
 				status: 'APPROVED',
 				dateFrom: { lte: tomorrow },
@@ -338,13 +357,13 @@ export async function getAdminMetrics(organizationId: string) {
 		}),
 		db.timesheet.count({
 			where: {
-				employee: { user: { organizationId } },
+				employee: { organizationId },
 				status: 'SUBMITTED'
 			}
 		}),
 		db.request.count({
 			where: {
-				employee: { user: { organizationId } },
+				employee: { organizationId },
 				type: 'LEAVE',
 				status: 'PENDING'
 			}
@@ -437,8 +456,8 @@ export async function listUpcomingEvents(
 	const from = new Date(`${todayKey}T00:00:00.000Z`)
 	const to = new Date(`${endKey}T23:59:59.999Z`)
 
-	const me = await db.employee.findUnique({
-		where: { userId: viewer.userId },
+	const me = await db.employee.findFirst({
+		where: { userId: viewer.userId, organizationId },
 		select: { id: true }
 	})
 

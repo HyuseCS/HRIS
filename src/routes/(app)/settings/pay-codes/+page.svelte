@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -25,14 +26,14 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Earnings &amp; Deduction Codes</h1>
-		<p class="text-sm text-muted-foreground">
-			Codes used by the payroll engine. Deactivate instead of deleting — historical payslips
-			reference them.
-		</p>
-	</div>
+	<PageHeader
+		title="Earnings & Deduction Codes"
+		description="Codes used by the payroll engine. Deactivate instead of deleting — historical payslips reference them."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div

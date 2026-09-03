@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
-import { requireMinRole } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { aggregateTimeLogsToTimesheet } from '$lib/server/services/timelog'
 import { apiError } from '$lib/server/api-error'
 import type { RequestHandler } from './$types'
@@ -14,14 +14,15 @@ const aggregateSchema = z.object({
 // POST /api/v1/timesheets/aggregate
 // Roll a week of raw Discord punches into a DRAFT weekly timesheet (pairs IN/OUT
 // per PHT day, flags missing/stray punches), then feeds the existing approval flow.
-// Roles: HR_ADMIN, SUPER_ADMIN.
+// Requires MANAGE_HR: MANAGER, HR_ADMIN, CEO, SUPER_ADMIN. MANAGER is deliberately org-wide
+// on timesheets — see the comment in $lib/server/services/timesheets.ts.
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!locals.user) return apiError(401, 'Unauthorized')
 
 	const user = locals.user
 
 	try {
-		requireMinRole(user.role, 'HR_ADMIN')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 	} catch {
 		return apiError(403, 'Insufficient permissions')
 	}
@@ -49,7 +50,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		const result = await aggregateTimeLogsToTimesheet(employeeId, new Date(weekOf), {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		})
 		return json(result)

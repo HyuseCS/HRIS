@@ -14,14 +14,26 @@ import { meetsLeaveTenure } from '$lib/server/services/requests/leave'
 import { requestSchema } from '$lib/server/schemas/requests'
 import type { Actions, PageServerLoad } from './$types'
 
+/**
+ * #6 — the caller's OWN employee row, scoped to the ACTIVE org.
+ *
+ * A cross-org account (the CEO, #224) carries a profile in its home tenant only, so an
+ * unscoped `userId` lookup resolves that home-tenant employee whichever org the session is
+ * currently in. Same shape as `findSelfEmployee` in punch/+page.server.ts. `startDate` is read
+ * by `load` only (leave-tenure gating); the actions use `id`.
+ */
+function findSelfEmployee(user: { id: string; organizationId: string }) {
+	return db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true, startDate: true }
+	})
+}
+
 // Self-service: the current user's own requests. Approvals live under
 // /requests/timesheets and /requests/approvals.
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
-		select: { id: true, startDate: true }
-	})
+	const myEmployee = await findSelfEmployee(user)
 
 	// #64: one count + one page query.
 	const listParams = myEmployee
@@ -95,10 +107,7 @@ function rawFromForm(type: string, f: FormData): Record<string, unknown> {
 export const actions: Actions = {
 	create: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found.' })
 
 		const f = await request.formData()
@@ -117,7 +126,7 @@ export const actions: Actions = {
 		const ctx = {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		}
 		try {
@@ -148,10 +157,7 @@ export const actions: Actions = {
 
 	cancel: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found.' })
 
 		const id = (await request.formData()).get('id') as string
@@ -161,7 +167,7 @@ export const actions: Actions = {
 			await cancelRequest(id, myEmployee.id, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
@@ -174,10 +180,7 @@ export const actions: Actions = {
 
 	resubmit: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found.' })
 
 		const id = (await request.formData()).get('id') as string
@@ -187,7 +190,7 @@ export const actions: Actions = {
 			await resubmitRequest(id, myEmployee.id, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {

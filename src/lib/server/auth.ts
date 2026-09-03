@@ -14,10 +14,9 @@ export const lucia = new Lucia(adapter, {
 	getUserAttributes(attributes) {
 		return {
 			email: attributes.email,
-			role: attributes.role,
-			// Full multi-role set (#133). Fall back to the primary role for any pre-backfill
-			// row so `roles` is never empty for capability checks.
-			roles: attributes.roles?.length ? attributes.roles : [attributes.role],
+			// The full multi-role set (#133) is the only identity the app reads (#282). The
+			// migration script guarantees it is never empty before `User.role` is dropped.
+			roles: attributes.roles,
 			organizationId: attributes.organizationId,
 			isActive: attributes.isActive
 		}
@@ -34,7 +33,6 @@ declare module 'lucia' {
 		Lucia: typeof lucia
 		DatabaseUserAttributes: {
 			email: string
-			role: Role
 			roles: Role[]
 			organizationId: string
 			isActive: boolean

@@ -1,0 +1,522 @@
+---
+name: plan:ui-ux-overhaul-phase-02-nav-ia
+description: "Phase 02 of the UI/UX overhaul — sectioned sidebar, canonical labels, nav/guard parity table, count pill and nav a11y in (app)/+layout.svelte"
+date: 03-09-26
+feature: ui-ux-overhaul
+phase: "02"
+---
+
+# Phase 02 — Navigation + Information Architecture
+
+**Date**: 03-09-26
+**Status**: ACTIVE — planned, not started
+**Complexity**: COMPLEX (phase 02 of a phase program)
+**Feature**: ui-ux-overhaul
+
+## Overview
+
+Context: the audit scored "recognition rather than recall" 2/10 — an HR_ADMIN meets ~20 ungrouped
+top-level rows, duplicate labels, and a hand-maintained active-state exception list. This phase
+fixes the shell's information architecture only: it resorts the existing nav array into labelled
+sections, makes labels canonical, and hardens the nav/guard parity story. No server file, schema,
+dependency, or route changes.
+
+**TL;DR** — Resort the flat 20-item sidebar into six labelled sections, rename the approval rows by
+task, drop the duplicate `/payroll` row, nest Eval Templates under Performance, replace the
+active-state exception list with longest-prefix matching, and swap the red dot for a count pill.
+The nav config moves into a testable `src/lib/nav.ts`. **The `ADMINISTER_HR_ORGWIDE` gate flip
+lands on ZERO items this phase** — the guard audit below shows every admin route still guards on
+`MANAGE_HR`, so flipping nav alone would make the sidebar lie about what the server allows. That
+becomes a backlog item, not a silent change.
+
+Upstream requirements: `docs/ui-ux-audit-2026-09-03.md` §T1 plus the shell findings in §4. No
+separate SPEC file exists for this program; §T1 + the INNOVATE binding decisions are the locked
+requirements, restated as acceptance criteria N1–N9 below.
+
+---
+
+## Goals
+
+1. A user can find any destination by scanning six short labelled lists instead of one 20-row scroll.
+2. One canonical label per destination — the sidebar label equals the page title.
+3. Nav visibility and server guards keep reading the same capability table (the audit's #1 strength).
+4. No role gains reach. `MANAGER` in particular gains nothing.
+5. The active-state rule is one expression, not a hand-maintained exception list.
+
+## Non-Goals (explicitly out of scope)
+
+| Deferred to | Item |
+|---|---|
+| Phase 06 | Dashboard "awaiting you" aggregator and the summed cross-surface badge |
+| Phase 07 | Settings hub grid regroup, settings sub-nav, payroll sub-nav, settings label reconciliation |
+| Phase 08 | Mobile drawer focus trap, sidebar collapse control |
+| Separate security plan | Any change to a route's `+page.server.ts` guard capability |
+
+Also out of scope here: renaming `/complaints` → `/inquiries` (route change), the `/approvals`
+308-redirect fix (P0-1, belongs with the routing phase), and the 24 inline SVGs → icon module
+refactor (only 2 icon paths change here).
+
+---
+
+## Touchpoints
+
+| File | Change |
+|---|---|
+| `src/routes/(app)/+layout.svelte` | Nav config extracted out; render loop rewritten for sections; group header label, count pill, `aria-current`, `aria-label` |
+| `src/lib/nav.ts` | **NEW** — `buildNavSections(ctx)`, `isNavItemActive(pathname, href, allHrefs)`, exported types |
+| `tests/unit/nav-sections.test.ts` | **NEW** — section/role/active-state/parity tests |
+| `src/lib/rbac.ts` | **READ ONLY** — no edit. Capability table is the source both sides read. |
+| `src/routes/(app)/**/+page.server.ts` | **READ ONLY** — guards audited below, none changed |
+
+Read-only inputs already gathered: `src/lib/orgs.ts` (`isFoodServiceOrg`), `docs/ui-ux-audit-2026-09-03.md`.
+
+---
+
+## Nav array reorganization — exact before/after
+
+### Before (order as rendered today, `+layout.svelte:113-262` + groups)
+
+`Punch` → `Dashboard` → `Timesheets` → `Attendance` → `Leave` → `My Requests` (becomes the
+`Requests/Approvals` group when `canApprove`) → `Payslips` → `Profile` → `Performance` →
+`Eval Templates` → `Inquiries` → `Team|Branches` → `Employees` → `Departments` → `Stores` →
+`Payroll` → `Separations` → `Recruitment` → `Reports` → `Benefits` → `Inventory` → `Settings` group.
+
+### After — six sections
+
+Section headers render as a non-interactive label row above their items. A section whose items all
+filter out is not rendered at all (no empty header).
+
+**Section 1 — "My Work"**
+
+| # | Label | href | `show` condition | Change |
+|---|---|---|---|---|
+| 1 | Punch | `/punch` | `hasBranches` | unchanged (food-service preserved) |
+| 2 | Dashboard | `/dashboard` | `true` | unchanged |
+| 3 | My Requests | `/requests` | `true` | **ALWAYS present.** For `canApprove` the layout renders this entry as the Approvals group anchor instead of a flat link (existing `{#if item.href === '/requests' && canApprove}` branch). Filtering it out would delete the Approvals group entirely — VALIDATE C-2. |
+| 4 | *Approvals group* | — | `canApprove` | header renamed from "Requests/Approvals" → **"Approvals"**; children below |
+| 5 | Payslips | `/payslips` | `true` | unchanged |
+| 6 | Inquiries | `/complaints` | `true` | unchanged label + badge (route rename deferred) |
+| 7 | Profile | `/profile` | `true` | unchanged |
+
+**Approvals group children** (collapsible group KEEPS its current code + toggle pattern):
+
+| # | Before label | After label | href | `show` | badge |
+|---|---|---|---|---|---|
+| 1 | My Requests | **My Requests** | `/requests` | `true` | `0` |
+| 2 | Timesheets | **Approve timesheets** | `/requests/timesheets` | `isManager` | `data.pendingApprovals.timesheets` |
+| 3 | Requests | **Approve requests** | `/requests/approvals` | `canApprove` | `data.pendingApprovals.requests` |
+| 4 | Pay changes | **Pay changes** | `/requests/proposals` | `canConfirmPayChanges` | `data.pendingApprovals.proposals` |
+| 5 | Payroll runs | **Payroll runs** | `/payroll` | `canSignOff` | `data.pendingApprovals.payrollRuns` |
+
+**Section 2 — "Time"**
+
+| # | Label | href | `show` | Change |
+|---|---|---|---|---|
+| 1 | Timesheets | `/timesheets` | `true` | moved out of the top block |
+| 2 | Attendance | `/attendance` | `true` | moved |
+| 3 | Leave | `/leave` | `true` | moved |
+
+**Section 3 — "People"**
+
+| # | Label | href | `show` | Change |
+|---|---|---|---|---|
+| 1 | Team / Branches | `/team` | `isManager` | label stays tenant-conditional (`hasBranches ? 'Branches' : 'Team'`) |
+| 2 | Employees | `/employees` | `isAdmin` | moved only |
+| 3 | Departments | `/departments` | `isAdmin` | moved only |
+| 4 | Recruitment | `/recruitment` | `isAdmin` | moved only |
+| 5 | Separations | `/separations` | `isAdmin` | moved only |
+| 6 | Benefits | `/benefits` | `isAdmin` | moved only |
+
+**Section 4 — "Pay"**
+
+| # | Label | href | `show` | Change |
+|---|---|---|---|---|
+| 1 | Payroll | `/payroll` | **`isPayroll`** (was `isPayroll \|\| canSignOff`) | **duplicate row dropped** for canSignOff-only roles; they keep "Payroll runs" inside Approvals |
+| 2 | Reports | `/reports` | `canViewReports` | moved only |
+| 3 | ↳ Audit Log | `/reports/audit-log` | `isAdmin` | **carried over from phase 01 (P0-2)** — phase 01 adds an always-open child list under Reports. Phase 02 MUST preserve it; render it with the `child: true` style. VALIDATE C-1. |
+
+**Section 5 — "Performance"**
+
+| # | Label | href | `show` | Change |
+|---|---|---|---|---|
+| 1 | Performance | `/performance` | `true` | moved |
+| 2 | ↳ Eval Templates | `/performance/templates` | `canAny(roles,'ADMINISTER_HR_ORGWIDE')` | **nested** — rendered as an indented child row (`ml-4 border-l pl-3`, no icon), same styling as group children. `show` condition UNCHANGED. |
+
+**Section 6 — "Organization"**
+
+| # | Label | href | `show` | Change |
+|---|---|---|---|---|
+| 1 | Stores | `/branches` | `isAdmin && hasBranches` | moved only; label stays "Stores" (#182 clash rule preserved) |
+| 2 | Inventory | `/inventory` | `isAdmin` | moved only |
+| 3 | *Settings group* | — | `showSettings` | collapsible group KEEPS its current code; only its render position moves into this section. Child labels untouched (phase 07 owns them). |
+
+**Net capability deltas across the whole nav: exactly one** — `/payroll` top-level narrows from
+`isPayroll || canSignOff` to `isPayroll`. Nothing widens.
+
+---
+
+## Per-route guard verification table (D2 — the gate flip)
+
+Read from each route's own `+page.server.ts` on 03-09-26. `MANAGE_HR` holders =
+MANAGER, HR_ADMIN, SUPER_ADMIN, CEO. `ADMINISTER_HR_ORGWIDE` holders = HR_ADMIN, SUPER_ADMIN, CEO.
+
+| Nav item | Current nav gate | Route server guard (evidence) | Verdict |
+|---|---|---|---|
+| Employees | `isAdmin` (MANAGE_HR) | `VIEW_TEAM` at `employees/+page.server.ts:18`; `MANAGE_HR` on actions `:69` | **needs-guard-alignment** — nav is already NARROWER than the load guard. Do not touch. |
+| Departments | `isAdmin` | `MANAGE_HR` `departments/+page.server.ts:18` | **needs-guard-alignment** — flipping nav alone hides a page MANAGER may still open |
+| Stores (`/branches`) | `isAdmin && hasBranches` | `MANAGE_HR` + `requireFoodServiceOrg` `branches/+page.server.ts:18-19` | **needs-guard-alignment** |
+| Separations | `isAdmin` | `MANAGE_HR` `separations/+page.server.ts:10` | **needs-guard-alignment** |
+| Recruitment | `isAdmin` | `MANAGE_HR` `recruitment/+page.server.ts:17` | **needs-guard-alignment** |
+| Benefits | `isAdmin` | `MANAGE_HR` `benefits/+page.server.ts:16` | **needs-guard-alignment** |
+| Inventory | `isAdmin` | `MANAGE_HR` `inventory/+page.server.ts:17` | **needs-guard-alignment** |
+| Settings (group + `/settings`) | `isAdmin` | `MANAGE_HR` `settings/+page.server.ts:6` | **needs-guard-alignment** |
+| Settings → Company | `isAdmin` | `MANAGE_HR` `settings/company:9` | **needs-guard-alignment** |
+| Settings → Earnings & Deductions | `isAdmin` | `MANAGE_HR` `settings/pay-codes:15` | **needs-guard-alignment** |
+| Settings → Salary Grades | `isAdmin` | `MANAGE_HR` `settings/salary-grades:15` | **needs-guard-alignment** |
+| Settings → Org Structure | `isAdmin` | `MANAGE_HR` `settings/org:17` | **needs-guard-alignment** |
+| Settings → Schedules | `isAdmin` | `MANAGE_HR` `settings/schedules:20` | **needs-guard-alignment** |
+| Settings → Holidays | `isAdmin` | `MANAGE_HR` `settings/holidays:9` | **needs-guard-alignment** |
+| Settings → Roles | `isSuperAdmin \|\| canManageUserRoles` | `MANAGE_USER_ROLES \|\| ADMINISTER_SYSTEM` `settings/roles:14-16` | **already aligned** — no change |
+| Eval Templates | `ADMINISTER_HR_ORGWIDE` | `ADMINISTER_HR_ORGWIDE` `performance/templates:28` | **already flipped** — no change |
+| Team | `isManager` (VIEW_TEAM) | `VIEW_TEAM` `team/+page.server.ts:10` | **already aligned** |
+| Reports | `canViewReports` | `MANAGE_HR \|\| VIEW_PAYROLL_REPORTS` `reports:14-16` | **already aligned** (nav narrower, deliberate) |
+| Payroll | `isPayroll \|\| canSignOff` → `isPayroll` | `MANAGE_PAYROLL \|\| signOff` `payroll/+layout.server.ts:15-18` | **safe-to-flip** — the sign-off row still exists inside Approvals, so no destination is lost |
+| Pay changes | `canConfirmPayChanges` | route gates on the same two capabilities (#243) | **already aligned** |
+
+**Verdict for D2: flip nothing this phase.** Every candidate item is `needs-guard-alignment`.
+Flipping nav to `ADMINISTER_HR_ORGWIDE` while the route still admits `MANAGE_HR` would break the
+invariant the audit calls the system's #1 strength — nav and guard reading one table — in the
+*other* direction: MANAGER would keep server access to a page the sidebar denies. That is a
+discoverability lie, and the correct repair is a paired guard change, which is a security change
+and needs its own SPEC and its own tests.
+
+**Action:** write a backlog stub
+`process/features/ui-ux-overhaul/backlog/manager-admin-nav-gate-alignment_NOTE_03-09-26.md`
+recording the 14 `needs-guard-alignment` routes, and leave the nav gates exactly as they are.
+Phase 02 delivers the audited table as its evidence, not a flip.
+
+---
+
+## Public Contracts
+
+- **`src/lib/nav.ts` (new module).** Exports `buildNavSections(ctx: NavContext): NavSection[]` and
+  `isNavItemActive(pathname: string, href: string, allHrefs: string[]): boolean`, plus the
+  `NavContext` / `NavSection` / `NavItem` types. `NavContext` carries only plain values —
+  `roles: Role[]`, `hasBranches: boolean`, `pendingApprovals`, `waitingInquiries` — so the module
+  is pure and unit-testable with no Svelte or SvelteKit import.
+- **No route, load-function, form-action, or API contract changes.** No server file is edited.
+- **Rendered DOM contract changes** (things e2e/Playwright locators can see): the group header text
+  `Requests/Approvals` → `Approvals`; child link names `Timesheets` → `Approve timesheets` and
+  `Requests` → `Approve requests`; a new count `<span>` replaces the red dot `<span>`; new section
+  header rows; `aria-current="page"` on the active link; `aria-label="Main"` on `<nav>`.
+
+---
+
+## Blast Radius
+
+- **Files changed:** 2 edited (`+layout.svelte`, plus 1 new `src/lib/nav.ts`), 1 new test file. No
+  server files, no schema, no migrations, no deps.
+- **Packages:** single app (`src`). No workspace fan-out.
+- **Surfaces reached:** every authenticated page renders this layout, so a compile error here is a
+  total outage of `(app)`. Mitigated by `pnpm check` + a live load of `/dashboard`.
+- **Risk class:** medium. It is *auth-adjacent* — nav visibility mirrors capabilities — but no
+  guard, capability, or server file is modified, so no enforcement path changes. The single
+  capability delta is a narrowing.
+- **Known locator dependants:** `tests/e2e/settings-visibility.spec.ts` asserts settings card and
+  `Holidays` child link names — all unchanged by this phase. `tests/e2e/dashboard.spec.ts` clicks
+  dashboard card links, not sidebar links. No spec asserts the strings this phase renames; confirm
+  with the grep in step 12 before calling done.
+
+---
+
+## Implementation Checklist
+
+1. Create `src/lib/nav.ts`. Define `NavItem` (`href`, `label`, `show`, `icon?`, `badge?`,
+   `child?: boolean`), `NavSection` (`label: string`, `items: NavItem[]`), and `NavContext`
+   (`roles: Role[]`, `hasBranches: boolean`, `pendingApprovals: { timesheets; requests; proposals; payrollRuns; total }`,
+   `waitingInquiries: number`).
+2. In `src/lib/nav.ts`, port the capability derivations verbatim from `+layout.svelte:92-111`
+   (`isManager`, `isAdmin`, `isSuperAdmin`, `canManageUserRoles`, `isPayroll`, `canViewReports`,
+   `canSignOff`, `canApprove`, `canConfirmPayChanges`) as local consts inside `buildNavSections`,
+   using `canAny` from `$lib/rbac`. Keep every explanatory comment — they carry issue numbers.
+3. In `buildNavSections`, build the six sections in the exact order and membership of the
+   "After — six sections" tables above. Each section filters its own items on `show`; sections with
+   zero items are dropped from the returned array.
+4. Copy every existing `icon` path string across unchanged EXCEPT the two below (audit §4, shell —
+   three concepts share one clipboard path):
+   - Approvals group icon → heroicons v2 outline **inbox**:
+     `M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z`
+   - Eval Templates → **no icon at all.** It renders as an indented child row, and child rows
+     carry no `<svg>`. Delete its clipboard path rather than replacing it — adding an unused
+     path would be dead code (minimal-diff rule). After this step no two nav entries share the
+     clipboard glyph: only `My Requests` keeps it. VALIDATE C-3.
+   `My Requests` keeps the original clipboard path.
+5. In `src/lib/nav.ts`, implement `isNavItemActive(pathname, href, allHrefs)`:
+   returns `true` when (`pathname === href` or `pathname.startsWith(href + '/')`) **and** no other
+   entry in `allHrefs` that also matches is longer than `href`. Longest-prefix-wins removes the
+   `/dashboard` and `/performance` exception list at `+layout.svelte:587-590` and stops
+   `/payroll` + `/performance` double-highlighting.
+6. In `+layout.svelte`, replace the `navItems` `$derived` block with
+   `const navSections = $derived(buildNavSections({ roles, hasBranches, pendingApprovals: data.pendingApprovals, waitingInquiries: data.waitingInquiries }))`
+   and `const allNavHrefs = $derived(navSections.flatMap(s => s.items.map(i => i.href)))`.
+   Delete the inlined capability consts that moved into `nav.ts`, keeping only those the rest of
+   the layout still uses (`canApprove`, `showSettings`, `inSettings`, `inRequests`, toggles).
+7. In `+layout.svelte`, rewrite the render loop: outer `{#each navSections as section (section.label)}`
+   emitting `<div role="group" aria-labelledby={headerId}>` with a header
+   `<div id={headerId} class="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{section.label}</div>`
+   then the existing inner `{#each section.items as item (item.href)}` body unchanged apart from
+   steps 8–11. `headerId` = `nav-section-` + slugified label.
+   **Carry-forward (mandatory):** phase 01's `{:else if item.href === '/reports' && reportsChildren.length > 0}`
+   arm and its `reportsChildren` derived list survive this rewrite. Either keep the arm verbatim
+   inside the new inner loop, or express the audit-log row as a `child: true` item in the Pay
+   section — never both, and never neither. Grep for `reportsChildren` before and after step 7;
+   a zero-hit "after" is a phase-01 regression, not a cleanup.
+8. In the item body, replace the `{@const active = ...}` exception expression with
+   `{@const active = isNavItemActive($page.url.pathname, item.href, allNavHrefs)}` and add
+   `aria-current={active ? 'page' : undefined}` to the `<a>`.
+   Constraint: `{@const}` must stay an immediate child of the `{#if}`/`{#each}` block tag.
+9. In the item body, render an item with `child: true` using the group-child styling
+   (`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm`, wrapped in
+   `mt-0.5 space-y-0.5 border-l border-border pl-3 ml-4`) and no icon `<svg>`.
+10. Keep the `{#if item.href === '/requests' && canApprove}` branch that renders the Approvals
+    collapsible group, with its toggle, `requestsExpanded`, and child loop unchanged, and:
+    - change the header text `Requests/Approvals` → `Approvals`;
+    - replace the red dot at `+layout.svelte:539-543` with the numeric pill markup already used for
+      top-level badges:
+      `<span class="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground" aria-label="{data.pendingApprovals.total} awaiting your decision">{data.pendingApprovals.total}</span>`
+      shown under the same condition (`total > 0 && !requestsExpanded`).
+    - add `aria-current` to the active child link the same way as step 8 (child match stays exact).
+11. Move the `{#if showSettings}` Settings group block from after the nav loop into the
+    "Organization" section render position. Its internal markup, children array, toggle state, and
+    labels are unchanged. Simplest mechanism: render it inside the section loop when
+    `section.label === 'Organization'`, after that section's items.
+12. Add `aria-label="Main"` to the sidebar `<nav>` element. Then run
+    `grep -rn "Requests/Approvals\|name: 'Requests'\|name: 'Timesheets'" tests/` and update any
+    locator the renames broke (expected: none).
+13. Create `tests/unit/nav-sections.test.ts` per the Verification Evidence table below.
+14. Create the backlog stub
+    `process/features/ui-ux-overhaul/backlog/manager-admin-nav-gate-alignment_NOTE_03-09-26.md`
+    listing the 14 `needs-guard-alignment` routes and why the flip was not made.
+15. Run the full gate set (see Exit Criteria) and the role-matrix live check.
+
+---
+
+## Verification Evidence
+
+TDD: write the step-13 tests first, red, then implement steps 1–12.
+
+| Gate / Scenario | Strategy | Proves SPEC criterion |
+|---|---|---|
+| `pnpm test tests/unit/nav-sections.test.ts` — section labels and order are exactly `My Work, Time, People, Pay, Performance, Organization` for HR_ADMIN | Fully-Automated | N1 sectioned nav |
+| Same suite — EMPLOYEE sees only `My Work`, `Time`, `Performance` sections and zero `isAdmin` hrefs | Fully-Automated | N4 no reach gained |
+| Same suite — MANAGER's item set is byte-identical to the pre-change MANAGER set minus nothing (fixture snapshot of hrefs) | Fully-Automated | N4 MANAGER unchanged |
+| Same suite — a canSignOff-only role (VERIFIER) gets NO top-level `/payroll` item and DOES get the `Payroll runs` child | Fully-Automated | N5 duplicate row dropped |
+| Same suite — parity: every item's gating capability is in a hand-written `ROUTE_GUARDS` fixture and each nav gate is equal-or-narrower than the route guard | Fully-Automated | N3 nav/guard parity |
+| Same suite — **fixture staleness canary**: for every `ROUTE_GUARDS` entry, `readFileSync` the named `+page.server.ts` (`+layout.server.ts` for `/payroll`) and assert the recorded capability string literally appears in it. Without this the parity test proves only nav ⊆ fixture, never nav ⊆ reality — the fixture can rot silently. vitest runs in `environment: 'node'`, so `fs` is available. | Fully-Automated | N3 nav/guard parity (anti-drift) |
+| Same suite — `isNavItemActive('/performance/templates', '/performance', hrefs) === false` and `(…, '/performance/templates', hrefs) === true`; `('/dashboard/x', '/dashboard', hrefs)` behaves per longest-prefix | Fully-Automated | N6 no exception list |
+| Same suite — non-food-service context yields no `/punch` and no `/branches`; food-service yields both and label `Branches` for `/team` | Fully-Automated | N8 tenant conditionals preserved |
+| Same suite — child labels are `My Requests, Approve timesheets, Approve requests, Pay changes, Payroll runs` | Fully-Automated | N2 canonical labels |
+| `pnpm test:e2e tests/e2e/settings-visibility.spec.ts` green (precondition: seeded DB + built preview per `all-tests.md`) | Hybrid | N9 no locator regression |
+| Role-matrix live check: log in via `POST /api/v1/_dev/login-as` as HR_ADMIN, MANAGER, EMPLOYEE, CEO; screenshot the sidebar for each; assert section headers present, no empty header, `aria-current` on exactly one link, count pill shows a number not a dot | Agent-Probe | N1, N4, N7 |
+| Live load of `/dashboard` and `/performance/templates` in a real browser after the change | Agent-Probe | layout compiles and renders (per uxui context: green tests never proved a page loads) |
+| Sidebar collapse control, mobile drawer focus trap | Known-Gap → phase 08 backlog | not developed behaviour this phase; gate stays CONDITIONAL on phase 08 |
+
+Failing stubs (red-first, for the fully-automated rows):
+
+```
+test("should return sections in order My Work, Time, People, Pay, Performance, Organization for HR_ADMIN", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: section labels and order")
+})
+test("should give a canSignOff-only role no top-level /payroll item", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: duplicate payroll row dropped")
+})
+test("should keep every nav gate equal-or-narrower than its route guard", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: nav/guard parity")
+})
+test("should mark only the longest matching href active", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: longest-prefix active matching")
+})
+```
+
+### Acceptance criteria (N1–N9)
+
+- **N1** Sidebar renders six labelled sections; no empty section header appears for any role.
+  *proven by:* section-order + role-matrix probe. *strategy:* Fully-Automated + Agent-Probe.
+- **N2** Approval rows read by task; group header reads "Approvals". *proven by:* child-label test.
+  *strategy:* Fully-Automated.
+- **N3** Every nav gate is equal to or narrower than its route's server guard; the 14
+  `needs-guard-alignment` routes are recorded in a backlog stub. *proven by:* parity test + the
+  guard table in this plan. *strategy:* Fully-Automated.
+- **N4** No role gains a destination; MANAGER's set is unchanged. *proven by:* MANAGER href
+  snapshot + EMPLOYEE test. *strategy:* Fully-Automated.
+- **N5** Sign-off-only roles see `/payroll` once, inside Approvals. *proven by:* VERIFIER test.
+  *strategy:* Fully-Automated. **Known limit:** a role holding BOTH `MANAGE_PAYROLL` and a
+  sign-off capability (CEO, SUPER_ADMIN) still sees `/payroll` twice — top-level "Payroll" plus
+  the "Payroll runs" child. That duplication is pre-existing and is NOT removed this phase
+  (removing it edits a nav gate for two admin roles, outside the stated single capability delta).
+  Pin it with an explicit CEO test so it is on record, not accidental. VALIDATE C-4.
+- **N6** Active state is one expression; `/performance` and `/performance/templates` never both
+  highlight. *proven by:* `isNavItemActive` tests. *strategy:* Fully-Automated.
+- **N7** Approvals group shows a numeric count pill (not a dot), `<nav aria-label="Main">` exists,
+  the active link carries `aria-current="page"`, and no two nav entries share the clipboard glyph
+  (Approvals → inbox, Eval Templates → no icon, `My Requests` keeps clipboard). *proven by:* role-matrix probe + DOM assertions in it. *strategy:* Agent-Probe.
+- **N8** `Punch`, `Stores`, and the `Team`/`Branches` label stay tenant-conditional.
+  *proven by:* food-service context test. *strategy:* Fully-Automated.
+- **N9** No existing e2e locator breaks. *proven by:* `settings-visibility.spec.ts` + the step-12
+  grep. *strategy:* Hybrid.
+
+### Exit criteria
+
+1. Full CI gate set green, in CI's order: `pnpm format:check` → `pnpm lint` → `pnpm check` →
+   `pnpm test`. (CI runs format first and skips the rest on failure — a green `pnpm check` alone
+   proves nothing.)
+2. `impeccable` audit pass on the changed sidebar.
+3. Role-matrix live check passed for HR_ADMIN / MANAGER / EMPLOYEE / CEO with screenshots attached
+   to the phase report.
+4. Backlog stub for the guard-alignment gap exists.
+
+## Test Infra Improvement Notes
+
+(none identified yet)
+
+---
+
+## Risks and Mitigations
+
+| Risk | Mitigation |
+|---|---|
+| A compile error in `+layout.svelte` takes down every authenticated page | `pnpm check` plus a real browser load of `/dashboard` before calling done |
+| `{@const}` moved outside a block tag → compile error | Step 8 states the constraint; it is a known repo trap |
+| An e2e locator matched a renamed string | Step 12 grep, plus the `settings-visibility` run |
+| Longest-prefix matching accidentally deactivates a legitimate row | Explicit unit cases for `/performance`, `/performance/templates`, `/payroll`, `/requests`, `/dashboard` |
+| Nav narrower than guard is read as "MANAGER lost access" | It has not: no server file changes. Documented in the backlog stub. |
+
+## Rollback
+
+Single commit, two files plus one test file, no schema and no server change. `git revert` of the
+phase commit restores the previous sidebar with zero data or migration impact.
+
+## Dependencies
+
+- Depends on: **Phase 01 DOES edit `(app)/+layout.svelte`** (its Touchpoints row 2: `~244`,
+  `~585-614` — a `reportsChildren` derived list plus an
+  `{:else if item.href === '/reports' && reportsChildren.length > 0}` arm inside the very
+  `{#each navItems}` loop this phase rewrites). Phase 02 rebases on that shape and carries the
+  audit-log child forward; it must not delete it. Re-read the file at phase entry with
+  `git log -1 --stat -- "src/routes/(app)/+layout.svelte"` and re-read the arm before step 6.
+  The umbrella's shared-file ordering list (02, 06, 07) omits phase 01 — corrected here.
+- Blocks: Phase 06 (dashboard aggregator reads `pendingApprovals` shape unchanged here) and
+  Phase 07 (settings/payroll sub-nav sits inside the Organization / Pay sections this phase creates).
+
+---
+
+## Phase Completion Rules
+
+- `CODE DONE` = checklist steps 1–14 applied and `pnpm check` green. Not `VERIFIED`.
+- `VERIFIED` requires ALL of: the full CI gate set green in CI's order, the role-matrix live check
+  passed for all four roles with screenshots in the phase report, the `impeccable` audit pass, the
+  backlog stub written, and a validate-contract recorded for this phase.
+- The Known-Gap row (sidebar collapse / mobile focus trap) keeps its gate CONDITIONAL and is
+  carried to phase 08; it may never be used to declare this phase's nav behaviour proven.
+- If any regression appears in `settings-visibility.spec.ts` or a live page fails to load, the
+  phase stays on itself — do not advance.
+
+## Validate Contract
+
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: parallel-subagents
+Rationale: 5/7 signals (S2 auth-adjacent surface, S3 4 scrutiny directions, S4 phase program, S6 permission/trust-boundary class named, S7 blast radius + 20 read-only guard files). Read-only fan-out, no cross-agent talk needed.
+
+Test gates:
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| N1 | six sections, correct order, no empty header | Fully-Automated | `pnpm test tests/unit/nav-sections.test.ts` — section-label/order case | B |
+| N2 | approval child labels read by task | Fully-Automated | same suite — child-label case | B |
+| N3 | every nav gate equal-or-narrower than its route guard | Fully-Automated | same suite — `ROUTE_GUARDS` parity case **+ the fixture staleness canary** (`readFileSync` each `+page.server.ts`, assert the capability string is present) | B |
+| N3 | the 14 needs-guard-alignment routes are on record | Fully-Automated | `test -f process/features/ui-ux-overhaul/backlog/manager-admin-nav-gate-alignment_NOTE_03-09-26.md` | B |
+| N4 | no role gains a destination; MANAGER set unchanged | Fully-Automated | same suite — MANAGER href-snapshot + EMPLOYEE case | B |
+| N5 | canSignOff-only role gets no top-level `/payroll` | Fully-Automated | same suite — VERIFIER case | B |
+| N5 | CEO/SUPER_ADMIN duplicate `/payroll` is pinned, not accidental | Fully-Automated | same suite — CEO case asserting BOTH rows present | B |
+| N6 | longest-prefix active matching; no double highlight | Fully-Automated | same suite — `isNavItemActive` cases for `/performance`, `/performance/reviews`, `/performance/templates`, `/payroll`, `/requests`, `/reports/audit-log` | B |
+| N8 | tenant conditionals preserved (`/punch`, `/branches`, Team/Branches label) | Fully-Automated | same suite — food-service / non-food-service context cases | B |
+| C-1 | phase 01's audit-log sidebar child survives the loop rewrite | Fully-Automated | `grep -q reportsChildren "src/routes/(app)/+layout.svelte"` after step 7, plus a nav test asserting `/reports/audit-log` is reachable for `isAdmin` | B |
+| N9 | no existing e2e locator breaks | Hybrid | `pnpm test:e2e tests/e2e/settings-visibility.spec.ts` — precondition: seeded DB + built preview per `all-tests.md`. Owner starts servers. | A/B |
+| N9 | rename grep finds no broken locator | Fully-Automated | `grep -rn "Requests/Approvals\|name: 'Requests'\|name: 'Timesheets'" tests/` — VALIDATE ran it: 1 hit, `timesheet-create-for-employee.spec.ts:166`, an `<h1>` heading not a sidebar link. Expected result stands at zero sidebar breaks. | A |
+| N1/N4/N7 | role-matrix live sidebar check | Agent-Probe | `POST /api/v1/_dev/login-as` as HR_ADMIN, MANAGER, EMPLOYEE, CEO; per role assert section headers present, zero empty headers, exactly one `aria-current="page"`, count pill renders a number, audit-log child present for HR_ADMIN and absent for EMPLOYEE (negative control) | B |
+| — | layout compiles and renders | Agent-Probe | live load of `/dashboard`, `/performance/reviews`, `/reports/audit-log` after the change | B |
+| — | sidebar collapse control, mobile drawer focus trap | — (residual) | not developed this phase; carried to phase 08 | D |
+
+gap-resolution legend: A proven now · B gate added by this plan's checklist · C deferred to a named phase · D backlog residual.
+
+Legacy line form:
+- nav module (`src/lib/nav.ts`): Fully-automated: `pnpm test tests/unit/nav-sections.test.ts`
+- nav/guard parity: Fully-automated: same suite, `ROUTE_GUARDS` case + fs staleness canary
+- rendered sidebar: Agent-probe: role-matrix live check across HR_ADMIN / MANAGER / EMPLOYEE / CEO
+- e2e locators: Hybrid: `pnpm test:e2e tests/e2e/settings-visibility.spec.ts` (precondition: seeded DB + built preview; owner starts servers)
+- sidebar collapse / mobile focus trap: known-gap: documented, owned by phase 08
+
+Dimension findings:
+- Infra fit: PASS — no server, schema, dep, port or runtime surface touched. `vitest.config.ts` is `environment: 'node'` with `include: tests/unit/**` and the `sveltekit()` plugin, so `$lib` aliases resolve in unit tests (`tests/unit/back-target.test.ts` already imports `$lib/utils/back`). A pure `src/lib/nav.ts` importing `canAny` from `$lib/rbac` and `type Role` from `@prisma/client` is testable exactly as planned — the parity gate IS writable.
+- Test coverage: CONCERN — the `ROUTE_GUARDS` fixture is hand-written, so the parity test proves nav ⊆ fixture, never nav ⊆ reality. Fixed in plan: a staleness canary that reads each `+page.server.ts` off disk was added to the Verification Evidence table.
+- Breaking changes: CONCERN — no API/route/load/action contract changes, but the rendered-DOM contract does change. VALIDATE ran the locator grep: one hit, `tests/e2e/timesheet-create-for-employee.spec.ts:166`, and it targets an `<h1>` heading, not a sidebar link. No spec asserts a renamed string.
+- Security surface: PASS — nav visibility only. `src/lib/rbac.ts` is read-only, no `requireAnyCapability` call site moves, no guard changes. Net capability delta is exactly one narrowing (`/payroll` top-level `isPayroll || canSignOff` → `isPayroll`) and the destination survives inside Approvals. MANAGER gains nothing. The D2 decision to flip zero items is correct and is the safe call: flipping nav to `ADMINISTER_HR_ORGWIDE` while 14 routes still admit `MANAGE_HR` would leave MANAGER with server access to pages the sidebar denies.
+- Section — guard verification table (D2): PASS — all 18 rows spot-verified against source on 03-09-26, line numbers included: employees `:18` VIEW_TEAM / `:69` MANAGE_HR, departments `:18`, branches `:18-19` (+ `requireFoodServiceOrg`), separations `:10`, recruitment `:17`, benefits `:16`, inventory `:17`, settings `:6`, company `:9`, pay-codes `:15`, salary-grades `:15`, org `:17`, schedules `:20`, holidays `:9`, roles `:14-16`, team `:10`, reports `:14-16`, performance/templates `:28`, payroll `+layout.server.ts:15-18`. Zero discrepancies. No nav change in this plan diverges nav visibility from a server guard.
+- Section — nav reorganization tables: PASS after fix — item-count reconciles exactly (21 before, 21 after, none lost, none gained). One FAIL was found and fixed in plan: the section-1 `/requests` row gated on `NOT canApprove` would have deleted the Approvals group for every approver, because the group renders from the `{#if item.href === '/requests' && canApprove}` branch keyed on that very item (VALIDATE C-2).
+- Section — `src/lib/nav.ts` extraction: CONCERN — the shape fits how `(app)/+layout.svelte` actually consumes nav state. Tenant conditionals are already plain values at the call site (`hasBranches = isFoodServiceOrg(data.org?.id)`, layout `:30`), badges come off `data.pendingApprovals` / `data.waitingInquiries`, and the two collapsibles (Approvals, Settings) keep their own state in the layout. The residual concern is `allNavHrefs`: it is built from section items only, so group children (`/requests/timesheets`, `/requests/approvals`, `/requests/proposals`, `/settings/*`) are absent from it. That is correct for `aria-current` (children match exactly) but must not be read as a full href inventory.
+- Section — implementation checklist: CONCERN — step 4's icon instruction contradicted itself (replace the Eval Templates path vs. render children without icons). Fixed in plan: Eval Templates renders with no icon and its clipboard path is deleted, which is what un-shares the glyph.
+- Section — phase dependency: FAIL, fixed in plan — see C-1 below.
+
+Open gaps:
+- Sidebar collapse control and mobile drawer focus trap: known-gap, owned by phase 08. Named residual; never usable to declare this phase's nav behaviour proven.
+- CEO / SUPER_ADMIN still see `/payroll` twice (top-level + "Payroll runs" child). Pre-existing, deliberately not fixed here; pinned by a CEO test so it is on record.
+- `ROUTE_GUARDS` covers load-function guards only. Action-level guards (e.g. `employees:69`) are out of the parity fixture's scope; nav gates no page's actions.
+
+What this coverage does NOT prove:
+- `pnpm test tests/unit/nav-sections.test.ts` proves `buildNavSections` returns the right data. It does NOT prove `+layout.svelte` renders that data, compiles, or that the sidebar is visually correct — the module is pure and the component is never mounted (vitest env is `node`, no svelte-testing-library in this repo). Only `pnpm check` plus the live role-matrix probe cover the render.
+- The parity case + staleness canary prove the recorded capability string appears in the named guard file. They do NOT prove the guard actually runs, that it is in the load and not a dead branch, or that the route has no second guard elsewhere.
+- `settings-visibility.spec.ts` covers the settings cards and the `Holidays` child only. It does NOT cover the six new section headers, the renamed Approvals children, the count pill, or `aria-current`.
+- The role-matrix probe covers four roles (HR_ADMIN, MANAGER, EMPLOYEE, CEO). It does NOT cover VERIFIER, APPROVER, PAYROLL_OFFICER or FINANCE sidebars live — those are unit-tested only.
+- Nothing here proves the food-service tenant path live; `hasBranches` is unit-tested via injected context, not by logging into a food-service org.
+- No gate proves phase 06 and phase 07 can still rebase on the shape this phase lands.
+
+Gate: CONDITIONAL (2 FAIL-grade defects found and repaired in the plan file; 4 CONCERNs, all with gates added; 1 named residual carried to phase 08)
+Accepted by: session (autonomous, /goal execution) — accepted concerns: ROUTE_GUARDS fixture drift (mitigated by the staleness canary), rendered-DOM contract change (grep run, 0 sidebar breaks), `allNavHrefs` is not a full href inventory, CEO/SUPER_ADMIN duplicate `/payroll` row (pinned by test). Residual: sidebar collapse + mobile focus trap → phase 08.
+
+### Execute-agent instructions (binding)
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | Before step 6, `git log -1 --stat -- "src/routes/(app)/+layout.svelte"` AND re-read the current `{#each navItems}` loop. Phase 01 has added `reportsChildren` and a `{:else if item.href === '/reports' ...}` arm. Rebase on that shape. | phase entry |
+| E2 | After step 7, run `grep -c reportsChildren "src/routes/(app)/+layout.svelte"`. A zero result means phase 01's P0-2 fix was deleted — restore it before continuing. | step 7 exit |
+| E3 | `buildNavSections` MUST emit the `/requests` item for approvers too; it is the anchor the Approvals group branch keys on. Filtering it out deletes the group. | step 3 |
+| E4 | Write the parity fixture staleness canary with `readFileSync` (vitest env is `node`). Do not settle for a fixture-only parity assertion. | step 13 |
+| E5 | Do not add the document-check SVG path. Eval Templates renders as a child with no icon. | step 4 |
+| E6 | If any finding proposes editing a file outside this plan's Touchpoints — in particular `src/lib/rbac.ts`, any `+page.server.ts`, `ConfirmButton.svelte`, or `src/lib/settings-destinations.ts` — reject and route it: rbac/guards → the backlog OWNER-DECISION; ConfirmButton → phase 04; settings children → phase 07; summed badge → phase 06. | any |
+
+### OWNER-DECISION gates
+
+| # | Decision | Effect if unanswered | Status |
+|---|---|---|---|
+| O1 | MANAGER / `ADMINISTER_HR_ORGWIDE` guard alignment across the 14 `needs-guard-alignment` routes. It is a paired **server-guard** change needing its own SPEC and tests. | Phase 02 ships the nav regroup with zero gate flips (the plan's stated position). Not blocking. | already in the umbrella's open-decision registry; backlog stub is checklist step 14 |
+| O2 | Stores / Branches noun ruling — the umbrella says phase 02 must rule before phase 08 runs S2. This plan preserves the current `Stores` + tenant-conditional `Branches` split (#182) but does not state that as the ruling. | **Blocks phase 08 section S2**, not phase 02. | OPEN — surface to the owner before phase 08 |
+
+### Umbrella correction required (not applied — different file, orchestrator owns it)
+
+The umbrella's `## Pre-PVL Conflict Resolution` → "Shared-file ordering" lists phases 02, 06 and 07 as the touchers of `src/routes/(app)/+layout.svelte`. **Phase 01 touches it too** (its Touchpoints row 2). The list should read 01 → 02 → 06 → 07. REJECTED-ROUTED to the orchestrator/umbrella owner; phase 02's own Dependencies section has been corrected in place.
+
+## Resume and Execution Handoff
+
+1. **Selected plan file:** `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-02-nav-ia_PLAN_03-09-26.md`
+2. **Last completed step:** none — plan written, execution not started.
+3. **Validate-contract status:** pending (PVL has not run).
+4. **Context files loaded:** `process/context/all-context.md`, `process/context/planning/all-planning.md`,
+   `process/context/uxui/all-uxui.md`, `process/context/tests/all-tests.md`,
+   `docs/ui-ux-audit-2026-09-03.md` §T1 + §4, `src/routes/(app)/+layout.svelte`, `src/lib/rbac.ts`,
+   and the 20 `+page.server.ts` guards listed in the guard table.
+5. **Next step for a fresh agent:** run PVL on this plan; then start at checklist step 13
+   (write the failing tests) before step 1.

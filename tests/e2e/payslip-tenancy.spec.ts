@@ -21,6 +21,8 @@ const OWN_PERIOD = { start: new Date('2025-03-01'), end: new Date('2025-03-15') 
 
 let foreignEntryId: string
 let ownEntryId: string
+/** Same org, same run, but NOT the manager's report — the #249 case. */
+let strangerEntryId: string
 
 test.beforeAll(async () => {
 	const db = new PrismaClient()
@@ -36,7 +38,7 @@ test.beforeAll(async () => {
 				organizationId: org.id,
 				email: `${FOREIGN}@rival.test`,
 				passwordHash: 'not-a-real-hash',
-				role: 'EMPLOYEE'
+				roles: ['EMPLOYEE']
 			}
 		})
 		const employee = await db.employee.create({
@@ -117,6 +119,51 @@ test.beforeAll(async () => {
 			}
 		})
 		ownEntryId = ownEntry.id
+
+		// #249: `own` above is the manager's DIRECT report (seed-core.ts:764,777), which is why the
+		// old "a manager reads it" test passed identically whether MANAGER was org-wide or scoped to
+		// their line — it proved nothing for months. Both properties are asserted below rather than
+		// assumed, so seed drift breaks the test instead of quietly hollowing it out.
+		const ownReportsTo = await db.employee.findUniqueOrThrow({
+			where: { id: own.id },
+			select: { reportsToId: true }
+		})
+		const manager = await db.employee.findFirstOrThrow({
+			where: { user: { email: 'manager@veent.ph' } },
+			select: { id: true }
+		})
+		if (ownReportsTo.reportsToId !== manager.id) {
+			throw new Error('seed drift: employee@veent.ph no longer reports to manager@veent.ph')
+		}
+
+		// Hannah HR: same org, reports to nobody. The same target manager-org-wide-timesheets.spec.ts
+		// picks, for the same reason.
+		const stranger = await db.employee.findFirstOrThrow({
+			where: { user: { email: 'hr@veent.ph' } },
+			select: { id: true, reportsToId: true }
+		})
+		if (stranger.reportsToId !== null) {
+			throw new Error('seed drift: hr@veent.ph gained a manager and is no longer a stranger')
+		}
+		const strangerEntry = await db.payrollEntry.create({
+			data: {
+				payrollRunId: ownRun.id,
+				employeeId: stranger.id,
+				hoursWorked: 80,
+				basicPay: 45000,
+				grossPay: 45000,
+				sssEe: 0,
+				sssEr: 0,
+				philhealthEe: 0,
+				philhealthEr: 0,
+				pagibigEe: 0,
+				pagibigEr: 0,
+				withholdingTax: 0,
+				totalDeductions: 0,
+				netPay: 45000
+			}
+		})
+		strangerEntryId = strangerEntry.id
 	} finally {
 		await db.$disconnect()
 	}
@@ -203,14 +250,44 @@ test('the owning employee can still read their own payslip', async ({ page }) =>
 	expect(response.status()).toBe(200)
 })
 
-test('a manager reads it — on-branch HR holds the payroll-report capability (#133)', async ({
-	page
-}) => {
-	// Asserted deliberately rather than left implicit: #123 was filed when MANAGER held no
-	// payroll capability and describes this as the leak. #133 then made MANAGER on-branch HR
-	// for the JoJo/Sweetleaf branches and added it to VIEW_PAYROLL_REPORTS, so access here is
-	// now intended. If MANAGER is ever narrowed again, this test should fail and be revisited.
+test('a manager reads a DIRECT REPORT’s payslip (#249)', async ({ page }) => {
+	// employee@veent.ph reports to manager@veent.ph (seed-core.ts:764,777), asserted in beforeAll.
+	// A manager reviewing their own team's pay is the access #133 intended; what it must not carry
+	// is the rest of the org, which the next test pins.
 	await login(page, USERS.manager)
 	const response = await page.request.get(`/api/v1/payroll/payslips/${ownEntryId}`)
 	expect(response.status()).toBe(200)
+})
+
+test('a manager cannot read a NON-report’s payslip (#249)', async ({ page }) => {
+	// The titular case of #123, left open when #133 added MANAGER to VIEW_PAYROLL_REPORTS and the
+	// capability alone became the gate. The message matters: the visibility gate on this same route
+	// also answers 403, so a status-only assertion would pass with the access check deleted.
+	await login(page, USERS.manager)
+	const response = await page.request.get(`/api/v1/payroll/payslips/${strangerEntryId}`)
+	expect(response.status()).toBe(403)
+	expect((await response.json()).error).toBe('Access denied')
+
+	const body = await response.text()
+	expect(body).not.toContain('45000')
+	expect(body).not.toContain('grossPay')
+	expect(body).not.toContain('Hannah')
+})
+
+test('a manager cannot pull a NON-report’s payslip PDF either (#249)', async ({ page }) => {
+	// The PDF is a separate handler through a separate service. It had NO manager coverage at all,
+	// and its comment claimed managers were blocked while the code let them through — so this is the
+	// case that makes "one shared rule, no door is a way around another" actually true.
+	await login(page, USERS.manager)
+	const response = await page.request.get(`/api/v1/payroll/payslips/${strangerEntryId}/pdf`)
+	expect(response.status()).toBe(403)
+	expect((await response.json()).error).toBe('Access denied')
+})
+
+test('a manager CAN pull a direct report’s payslip PDF (#249)', async ({ page }) => {
+	// The counterweight: this fails if the PDF door is narrowed past the reporting line.
+	await login(page, USERS.manager)
+	const response = await page.request.get(`/api/v1/payroll/payslips/${ownEntryId}/pdf`)
+	expect(response.status()).toBe(200)
+	expect(response.headers()['content-type']).toContain('application/pdf')
 })

@@ -1,5 +1,5 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit'
-import { can, requireCapability, requireMinRole } from '$lib/server/rbac'
+import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import {
 	countTimesheets,
 	listTimesheets,
@@ -21,10 +21,23 @@ import { db } from '$lib/server/db'
 import { z } from 'zod'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
+/**
+ * #6 — the caller's OWN employee row, scoped to the ACTIVE org. A cross-org account (the CEO,
+ * #224) carries a profile in its home tenant only, so an unscoped `userId` lookup resolves that
+ * home-tenant employee whichever org the session is currently in. Same shape as
+ * `findSelfEmployee` in punch/+page.server.ts. Only `id` is ever read off the row.
+ */
+function findSelfEmployee(user: { id: string; organizationId: string }) {
+	return db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
+}
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
-	const isManager = can(user.role, 'VIEW_TEAM')
-	const isHrAdmin = can(user.role, 'MANAGE_HR')
+	const isManager = canAny(user.roles, 'VIEW_TEAM')
+	const isHrAdmin = canAny(user.roles, 'MANAGE_HR')
 	// #165: /timesheets is view-only for the Employee role — they read their own sheets,
 	// but creating/submitting/deleting is the manager ladder's (HR aggregates from punches
 	// and submits drafts on their behalf). Mirrors the `requireModify` gate on the actions.
@@ -36,7 +49,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const status = url.searchParams.get('status') ?? undefined
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	const myEmployee = await findSelfEmployee(user)
 
 	// #64: "mine" and "team" are separate server queries with independent page
 	// params (myPage / teamPage), one count + one page query each. The row
@@ -53,7 +66,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// A non-manager without an employee record owns no timesheets — empty rather
 	// than an undefined employeeId (which would list the whole org).
 	const teamParams = isManager
-		? { organizationId: user.organizationId, excludeEmployeeId: myEmployee?.id, status }
+		? // #6: for a cross-org actor `myEmployee` is now null and this self-exclusion goes
+			// undefined, which services/timesheets.ts drops from the where clause. Safe: dropping a
+			// NEGATIVE self-exclusion re-admits only the actor's own rows, and those are already
+			// outside `organizationId`. Dropping a POSITIVE restriction is what widens a query.
+			{ organizationId: user.organizationId, excludeEmployeeId: myEmployee?.id, status }
 		: null
 	const teamTotal = teamParams ? await countTimesheets(teamParams) : 0
 	const teamPagination = paginate(url, teamTotal, { param: 'teamPage' })
@@ -65,7 +82,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// which pick an employee from this list.
 	const employees = isHrAdmin
 		? await db.employee.findMany({
-				where: { user: { organizationId: user.organizationId }, employmentStatus: 'ACTIVE' },
+				where: { organizationId: user.organizationId, employmentStatus: 'ACTIVE' },
 				select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 				orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 			})
@@ -87,7 +104,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 /** #165: every mutating action on this page is closed to the Employee role. */
 function requireModify(event: RequestEvent) {
-	requireCapability(event.locals.user!.role, 'VIEW_TEAM')
+	requireAnyCapability(event.locals.user!.roles, 'VIEW_TEAM')
 }
 
 function ctxOf(event: RequestEvent) {
@@ -95,7 +112,7 @@ function ctxOf(event: RequestEvent) {
 	return {
 		organizationId: u.organizationId,
 		actorId: u.id,
-		actorRole: u.role,
+		actorRoles: u.roles,
 		ipAddress: event.getClientAddress()
 	}
 }
@@ -170,7 +187,7 @@ function toEntryInputs(rows: z.infer<typeof entriesSchema>) {
 export const actions: Actions = {
 	// HR only — non-destructive preview of a week's punch aggregation (no DB writes).
 	previewAggregate: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const org = event.locals.user!.organizationId
 		const parsed = aggregateSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Pick an employee and a week.' })
@@ -189,7 +206,7 @@ export const actions: Actions = {
 
 	// HR only — commit the week's punches into a DRAFT timesheet (idempotent for drafts).
 	aggregate: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const org = event.locals.user!.organizationId
 		const parsed = aggregateSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Pick an employee and a week.' })
@@ -215,7 +232,7 @@ export const actions: Actions = {
 	// HR only — submit an aggregated draft on the employee's behalf. Approval itself
 	// happens exclusively in the review queue (/requests/timesheets).
 	submitDraft: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const id = (await event.request.formData()).get('id')
 		if (typeof id !== 'string' || !id) return fail(400, { error: 'Missing timesheet id' })
 		try {
@@ -237,7 +254,7 @@ export const actions: Actions = {
 	create: async (event) => {
 		requireModify(event)
 		const user = event.locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const parsed = createSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success)
@@ -300,7 +317,7 @@ export const actions: Actions = {
 	submit: async (event) => {
 		requireModify(event)
 		const user = event.locals.user!
-		const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found' })
 
 		const id = (await event.request.formData()).get('id') as string
@@ -314,7 +331,7 @@ export const actions: Actions = {
 
 	// HR review edit: replace the timesheet's entries and recompute its total.
 	saveEntries: async (event) => {
-		requireMinRole(event.locals.user!.role, 'MANAGER')
+		requireAnyCapability(event.locals.user!.roles, 'VIEW_TEAM')
 		const data = await event.request.formData()
 		const id = data.get('id') as string
 		let parsed
@@ -353,10 +370,7 @@ export const actions: Actions = {
 	submitMany: async (event) => {
 		requireModify(event)
 		const user = event.locals.user!
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
-			select: { id: true }
-		})
+		const myEmployee = await findSelfEmployee(user)
 		if (!myEmployee) return fail(400, { error: 'No employee profile found' })
 		const ids = String((await event.request.formData()).get('ids') ?? '')
 			.split(',')

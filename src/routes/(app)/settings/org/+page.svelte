@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -34,23 +35,11 @@
 </svelte:head>
 
 <div class="space-y-8">
-	<BackButton fallback="/settings" label="Settings" preferFallback />
-
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Organization Structure</h1>
-		<div class="flex gap-2">
-			<a
-				href="/settings/org-chart"
-				class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">View Org Chart</a
-			>
-			<button
-				onclick={() => (showCreate = !showCreate)}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-			>
-				Add Position
-			</button>
-		</div>
-	</div>
+	<PageHeader title="Organization Structure">
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div
@@ -106,7 +95,23 @@
 
 	<!-- Positions catalog -->
 	<section class="space-y-3">
-		<h2 class="text-lg font-semibold">Positions</h2>
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<h2 class="text-lg font-semibold">Positions</h2>
+			<div
+				class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+			>
+				<a
+					href="/settings/org-chart"
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">View Org Chart</a
+				>
+				<button
+					onclick={() => (showCreate = !showCreate)}
+					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+				>
+					Add Position
+				</button>
+			</div>
+		</div>
 		<div class="overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">

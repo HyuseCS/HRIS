@@ -1,33 +1,48 @@
-import { can } from '$lib/server/rbac'
+import { canAny } from '$lib/server/rbac'
 import { fail } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { paginate } from '$lib/server/pagination'
 import { getLeaveBalances } from '$lib/server/services/leave'
 import { countRequests, listRequests, deleteRequest } from '$lib/server/services/requests'
+import { listVisibleEmployeeIds } from '$lib/server/services/employee-access'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
 // Read-only leave view. Leave filing/approval now flows through the unified
 // Requests/Approvals page; this page lists leave (Request type=LEAVE) + balances.
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
-	const isManager = can(user.role, 'VIEW_TEAM')
+	const isManager = canAny(user.roles, 'VIEW_TEAM')
 	// #150: HR/admin/CEO have no balances of their own (often no employee record at all), so
 	// this panel was simply blank for them. They get a route to the org-wide view instead —
 	// the balances themselves live on /leave/balances rather than being duplicated here,
 	// which would mean rendering every employee in the org on a self-service page.
-	const canViewOrgBalances = can(user.role, 'MANAGE_HR')
+	const canViewOrgBalances = canAny(user.roles, 'MANAGE_HR')
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId }
+	})
 	const year = new Date().getFullYear()
 
 	// Non-managers without an employee record have no leave to show — return an empty
 	// list rather than passing an undefined employeeId (which would leak org-wide rows).
 	const canListLeave = isManager || Boolean(myEmployee)
 
+	// #275: the page twin of `GET /api/v1/requests`. `isManager` said WHAT the actor may do, never
+	// WHOSE rows — so an undefined employeeId dropped the filter and this page listed the whole
+	// organization's leave. The roster helper, NOT `listVisiblePayEmployeeIds`: the pay helper's only
+	// difference is that it opens up for VIEW_PAY_ORGWIDE, which here would WIDEN the page for
+	// PAYROLL_OFFICER and FINANCE. `null` means unrestricted (ADMINISTER_HR_ORGWIDE) — no filter at
+	// all; `[]` for a caller with no employee record, since an undefined filter leaks the org.
+	const visibleEmployeeIds = isManager
+		? await listVisibleEmployeeIds(user)
+		: myEmployee
+			? [myEmployee.id]
+			: []
+
 	// #64: paginate the requests table only; balances/types stay whole.
 	const listParams = {
 		organizationId: user.organizationId,
-		employeeId: isManager ? undefined : myEmployee?.id,
+		employeeIds: visibleEmployeeIds ?? undefined,
 		type: 'LEAVE' as const
 	}
 	const total = canListLeave ? await countRequests(listParams) : 0
@@ -61,7 +76,10 @@ function ctxOf(event: RequestEvent) {
 	return {
 		organizationId: u.organizationId,
 		actorId: u.id,
-		actorRole: u.role,
+		// #279: `deleteRequest` decides privilege from the FULL role set — judging a multi-role
+		// deleter on their primary role alone refuses a deletion their secondary role permits
+		// (the #247 defect).
+		actorRoles: u.roles,
 		ipAddress: event.getClientAddress()
 	}
 }

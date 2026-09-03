@@ -70,14 +70,17 @@ export const actions: Actions = {
 
 		if (!validPassword || !isMember) {
 			recordFailure(rateKey)
+			// #5: deliberately NOT transactional — `db`, not a `tx`. No mutation happens on a failed
+			// login, so there is nothing to roll back with; the audit row IS the event.
 			await writeAuditLog(
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: ip
 				},
-				{ action: 'LOGIN_FAILED', entityType: 'User', entityId: user.id }
+				{ action: 'LOGIN_FAILED', entityType: 'User', entityId: user.id },
+				db
 			)
 			return fail(401, { error: 'Invalid email or password' })
 		}
@@ -94,16 +97,20 @@ export const actions: Actions = {
 			...sessionCookie.attributes
 		})
 
+		// #5: deliberately NOT transactional — `db`, not a `tx`. The session cookie is already set
+		// above, so the login has happened; pairing this with `lastLoginAt` in one transaction would
+		// let a bookkeeping write failure erase the record of a session that exists.
 		await Promise.all([
 			db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
 			writeAuditLog(
 				{
 					organizationId: selectedOrg,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: ip
 				},
-				{ action: 'LOGIN', entityType: 'User', entityId: user.id }
+				{ action: 'LOGIN', entityType: 'User', entityId: user.id },
+				db
 			)
 		])
 

@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit'
-import { requireCapability, requirePayrollManage } from '$lib/server/rbac'
+import { requireAnyCapability, requirePayrollManage } from '$lib/server/rbac'
 import { apiError, badRequest, forbidden } from '$lib/server/api-error'
 import {
 	importAttendance,
@@ -19,8 +19,8 @@ export const POST: RequestHandler = async ({ locals, params, request, url, getCl
 	const action = url.searchParams.get('action')
 
 	try {
-		if (action === 'void') requireCapability(locals.user.role, 'ADMINISTER_SYSTEM')
-		else requirePayrollManage(locals.user.role)
+		if (action === 'void') requireAnyCapability(locals.user.roles, 'OVERRIDE_FINALIZED')
+		else requirePayrollManage(locals.user.roles)
 	} catch {
 		return forbidden()
 	}
@@ -29,7 +29,7 @@ export const POST: RequestHandler = async ({ locals, params, request, url, getCl
 	const ctx = {
 		organizationId: org,
 		actorId: locals.user.id,
-		actorRole: locals.user.role,
+		actorRoles: locals.user.roles,
 		ipAddress: getClientAddress()
 	}
 

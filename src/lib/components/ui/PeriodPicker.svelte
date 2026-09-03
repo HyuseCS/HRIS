@@ -1,6 +1,8 @@
 <script lang="ts">
 	import {
 		periodOf,
+		periodShareOf,
+		customRangeError,
 		formatPeriodPreview,
 		toPeriodInputValue,
 		type PeriodKind
@@ -12,6 +14,11 @@
 	// periodStart/periodEnd, overridable for forms that post start/end), so the surrounding
 	// <form> submits exactly the same field names it did with the old date inputs — the
 	// service layer still validates, this just constrains what a user can pick.
+	//
+	// #163 adds a fourth segment, `Custom range`, which reveals two native date inputs. #3 lets
+	// that range cross a month boundary, capped at one month of pay. It feeds the SAME two hidden
+	// inputs, so no consumer changes shape, and it is never pre-selected — the 15-day cutoff stays
+	// the path of least resistance.
 	let {
 		startName = 'periodStart',
 		endName = 'periodEnd',
@@ -23,7 +30,7 @@
 		endName?: string
 		year?: number
 		month0?: number
-		kind?: PeriodKind
+		kind?: PeriodKind | 'CUSTOM'
 	} = $props()
 
 	// Default to the current PHT month when the parent didn't seed a value.
@@ -48,16 +55,82 @@
 	// A small window around the current year covers routine runs and back-dated corrections.
 	const YEARS = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
 
-	const KIND_OPTIONS: { value: PeriodKind; label: string }[] = [
+	const KIND_OPTIONS: { value: PeriodKind | 'CUSTOM'; label: string }[] = [
 		{ value: 'FIRST_HALF', label: 'First half (1–15)' },
 		{ value: 'SECOND_HALF', label: 'Second half (16–EOM)' },
-		{ value: 'WHOLE_MONTH', label: 'Whole month' }
+		{ value: 'WHOLE_MONTH', label: 'Whole month' },
+		{ value: 'CUSTOM', label: 'Custom range' }
 	]
 
+	// YYYY-MM-DD, the `<input type="date">` convention — `new Date(v)` parses it to the same
+	// UTC midnight the rest of pay-periods.ts works in.
+	let customStart = $state('')
+	let customEnd = $state('')
+
+	const isCustom = $derived(kind === 'CUSTOM')
+
+	/** The two custom dates once BOTH are filled in and parseable; otherwise null. */
+	const customRange = $derived.by(() => {
+		if (!isCustom || !customStart || !customEnd) return null
+		const s = new Date(customStart)
+		const e = new Date(customEnd)
+		if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null
+		return { s, e }
+	})
+
+	// Literally the same function the three service gates refuse with, so the inline message and
+	// the 400 the service would return can never disagree.
+	const customError = $derived(customRange ? customRangeError(customRange.s, customRange.e) : null)
+
+	const validCustom = $derived(customRange && !customError ? customRange : null)
+
+	// #3: the size cap expressed as native `min`/`max` on the date inputs, so the browser's own
+	// calendar greys out the unreachable days instead of letting a user pick one and only then
+	// reading an error. The inline message and the server gate both stay — this is the cheap first
+	// line, not the guard.
+	//
+	// ponytail: linear probe, ceiling ~40 iterations per keystroke. The cap is one month of pay,
+	// so no acceptable range can be longer than 31 days and the loop always breaks early. Upgrade
+	// path if it ever gets hot: a closed-form bound from daysInMonth, which would be a second
+	// expression of the cap rule and is exactly what D-B says not to write until it is needed.
+	function capBound(anchor: string, step: 1 | -1): string | undefined {
+		if (!anchor) return undefined
+		const a = new Date(anchor)
+		if (Number.isNaN(a.getTime())) return undefined
+		let best = a
+		for (let i = 1; i <= 40; i++) {
+			const candidate = new Date(
+				Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate() + step * i)
+			)
+			const start = step === 1 ? a : candidate
+			const end = step === 1 ? candidate : a
+			if (customRangeError(start, end) !== null) break
+			best = candidate
+		}
+		return toPeriodInputValue(best)
+	}
+
+	/** Latest end date the cap allows for the chosen start, and the earliest start for an end. */
+	const capBoundEnd = $derived(capBound(customStart, 1))
+	const capBoundStart = $derived(capBound(customEnd, -1))
+
 	const period = $derived(periodOf(kind as PeriodKind, year as number, month0 as number))
-	const startValue = $derived(toPeriodInputValue(period.periodStart))
-	const endValue = $derived(toPeriodInputValue(period.periodEnd))
-	const preview = $derived(formatPeriodPreview(period.periodStart, period.periodEnd))
+
+	// An incomplete or invalid custom range emits empty strings, so the server never receives
+	// half a range — the actions' `z.coerce.date()` refuses '' and returns a clean 400.
+	const startValue = $derived(
+		isCustom ? (validCustom ? customStart : '') : toPeriodInputValue(period.periodStart)
+	)
+	const endValue = $derived(
+		isCustom ? (validCustom ? customEnd : '') : toPeriodInputValue(period.periodEnd)
+	)
+
+	const preview = $derived.by(() => {
+		if (!isCustom) return formatPeriodPreview(period.periodStart, period.periodEnd)
+		if (!validCustom) return 'Pick a start and end date'
+		const share = Math.round(periodShareOf(validCustom.s, validCustom.e) * 100)
+		return `${formatPeriodPreview(validCustom.s, validCustom.e)} · statutory and loans prorated to ${share}% of a month`
+	})
 
 	const selectClass =
 		'h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -68,42 +141,88 @@
 <input type="hidden" name={endName} value={endValue} />
 
 <div class="space-y-3">
-	<div class="grid gap-3 sm:grid-cols-2">
-		<div class="space-y-1.5">
-			<label for="pp-month" class="text-sm font-medium">Month</label>
+	<!-- Month, Year and Period share one line. The two selects are sized to their content
+	     rather than stretched to half the panel each, which leaves Period enough room to keep
+	     all four buttons on a single row (they need ~545px once the webfont has loaded). -->
+	<div class="flex flex-wrap items-start gap-3">
+		<div class="w-40 space-y-1.5">
+			<label for="pp-month" class="block text-sm font-medium">Month</label>
 			<select id="pp-month" bind:value={month0} class={selectClass}>
 				{#each MONTHS as name, i (name)}
 					<option value={i}>{name}</option>
 				{/each}
 			</select>
 		</div>
-		<div class="space-y-1.5">
-			<label for="pp-year" class="text-sm font-medium">Year</label>
+		<div class="w-24 space-y-1.5">
+			<label for="pp-year" class="block text-sm font-medium">Year</label>
 			<select id="pp-year" bind:value={year} class={selectClass}>
 				{#each YEARS as y (y)}
 					<option value={y}>{y}</option>
 				{/each}
 			</select>
 		</div>
-	</div>
 
-	<div class="space-y-1.5">
-		<span class="text-sm font-medium">Period</span>
-		<div class="inline-flex flex-wrap gap-1 rounded-md border bg-muted/40 p-1" role="group">
-			{#each KIND_OPTIONS as opt (opt.value)}
-				<button
-					type="button"
-					onclick={() => (kind = opt.value)}
-					aria-pressed={kind === opt.value}
-					class="rounded px-3 py-1.5 text-sm font-medium transition-colors {kind === opt.value
-						? 'bg-primary text-primary-foreground'
-						: 'hover:bg-accent'}"
-				>
-					{opt.label}
-				</button>
-			{/each}
+		<div class="min-w-0 flex-1 space-y-1.5">
+			<span class="block text-sm font-medium">Period</span>
+			<div
+				class="inline-flex h-9 items-center gap-1 rounded-md border bg-muted/40 px-1"
+				role="group"
+			>
+				{#each KIND_OPTIONS as opt (opt.value)}
+					<button
+						type="button"
+						onclick={() => (kind = opt.value)}
+						aria-pressed={kind === opt.value}
+						class="flex h-7 items-center rounded px-3 text-sm font-medium transition-colors {kind ===
+						opt.value
+							? 'bg-primary text-primary-foreground'
+							: 'hover:bg-accent'}"
+					>
+						{opt.label}
+					</button>
+				{/each}
+			</div>
 		</div>
 	</div>
 
-	<p class="text-sm text-muted-foreground">{preview}</p>
+	<!-- Revealed below the buttons, so the block only ever grows downward. -->
+	{#if isCustom}
+		<div class="space-y-1.5">
+			<!-- Sized like Month rather than stretched across the panel, so the revealed row
+			     lines up with the controls above it. -->
+			<div class="flex flex-wrap gap-3">
+				<div class="w-40 space-y-1.5">
+					<label for="pp-custom-start" class="block text-sm font-medium">Start date</label>
+					<input
+						id="pp-custom-start"
+						type="date"
+						bind:value={customStart}
+						min={capBoundStart}
+						max={customEnd || undefined}
+						class={selectClass}
+						aria-invalid={customError ? 'true' : undefined}
+						aria-describedby={customError ? 'pp-custom-error' : undefined}
+					/>
+				</div>
+				<div class="w-40 space-y-1.5">
+					<label for="pp-custom-end" class="block text-sm font-medium">End date</label>
+					<input
+						id="pp-custom-end"
+						type="date"
+						bind:value={customEnd}
+						min={customStart || undefined}
+						max={capBoundEnd}
+						class={selectClass}
+						aria-invalid={customError ? 'true' : undefined}
+						aria-describedby={customError ? 'pp-custom-error' : undefined}
+					/>
+				</div>
+			</div>
+			{#if customError}
+				<p id="pp-custom-error" class="text-sm text-destructive">{customError}</p>
+			{/if}
+		</div>
+	{/if}
+
+	<p class="text-sm text-muted-foreground" aria-live="polite">{preview}</p>
 </div>

@@ -200,6 +200,15 @@ enum AuditAction {
   LOGIN_FAILED
   PAYROLL_OVERRIDE
   LEAVE_OVERRIDE
+  // #298: a payroll void used to log as a plain UPDATE, indistinguishable from every other edit
+  // in the audit filter. Its own action makes it findable from the action dropdown without
+  // revealing any payload — the #242 mask blanks oldValue/newValue on that page.
+  PAYROLL_VOID
+  // #304: an undo of a finalized separation. Same argument PAYROLL_VOID made — a generic UPDATE is
+  // unfindable in the audit action filter, and a break-glass door that reverses money, offboarding
+  // and a login must be findable from the dropdown. Adding an enum value is `db push`-safe; only a
+  // RENAME drops and recreates the type, which is what would have needed a scripts/migrate-*.ts.
+  SEPARATION_UNDO
 }
 
 // ─── Time Tracking Enums ─────────────────────────────────────────────────────
@@ -245,16 +254,10 @@ enum ReviewCycleStatus {
 enum ReviewStatus {
   PENDING
   SELF_ASSESSMENT
-  MANAGER_REVIEW
+  SCORED
+  SIGNING
   COMPLETED
   ACKNOWLEDGED
-}
-
-enum GoalStatus {
-  DRAFT
-  ACTIVE
-  COMPLETED
-  CANCELLED
 }
 
 // ─── Attendance Enums ────────────────────────────────────────────────────────
@@ -279,53 +282,63 @@ enum DayType {
 // ─── Organization ─────────────────────────────────────────────────────────────
 
 model Organization {
-  id           String   @id @default(cuid())
-  name         String   @db.VarChar(200)
-  logoUrl      String?
+  id                   String   @id @default(cuid())
+  name                 String   @db.VarChar(200)
+  logoUrl              String?
   // Per-tenant brand colour as a raw HSL triple ("H S% L%", e.g. "142 71% 42%") so it can
   // be injected straight into the `--primary`/`--ring` CSS variables. Null → default palette.
-  themePrimary String?
-  address      String?
+  themePrimary         String?
+  address              String?
   // Company Discord server invite link (#186). When set, onboarding emails new hires an
   // invitation; null (most tenants) skips it. Only Veent has adopted Discord so far.
-  discordInviteUrl String?
+  discordInviteUrl     String?
   // Prefix for generated employee numbers ("EMP" → EMP-015). Per-org because the branches
   // number their staff separately: JoJo Potato uses JJ, Sweetleaf SL. The default backfills
   // existing rows and keeps Veent on EMP.
-  employeeNumberPrefix String @default("EMP") @db.VarChar(8)
+  employeeNumberPrefix String   @default("EMP") @db.VarChar(8)
   // Master switch for schedule-based tardiness (#190). Off → no employee is ever marked LATE,
   // company-wide; ANDs with each WorkSchedule.trackTardiness. Default keeps current behavior.
-  trackTardiness Boolean @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  trackTardiness       Boolean  @default(true)
+  // Smallest gap between two work blocks that counts as the AM/PM boundary, in minutes (#162).
+  // NULL → use the built-in default (DEFAULT_AM_PM_MIN_GAP_MINUTES in attendance/derive.ts).
+  // Only read when the org is food-service (isFoodServiceOrg) — it is a tuning knob, never a
+  // gate. Bounded 5–240 at every writer; a value outside that range cannot be stored.
+  amPmMinGapMinutes    Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  departments              Department[]
-  users                    User[]
-  memberships              UserOrganization[]
-  leaveTypes               LeaveType[]
-  payrollConfig            PayrollConfig?
-  payrollRuns              PayrollRun[]
-  jobPostings              JobPosting[]
-  publicHolidays           PublicHoliday[]
-  auditLogs                AuditLog[]
-  benefitPlans             BenefitPlan[]
-  reviewCycles             ReviewCycle[]
-  positions                Position[]
-  payrollPeriods           PayrollPeriod[]
-  earningTypes             EarningType[]
-  deductionTypes           DeductionType[]
-  payRateRule              PayRateRule?
-  statutoryRateConfig      StatutoryRateConfig?
-  statutoryRateProposals   StatutoryRateProposal[]
-  workSchedules            WorkSchedule[]
-  salaryGrades             SalaryGrade[]
-  announcements            Announcement[]
-  onboardingChecklistItems OnboardingChecklistItem[]
+  departments               Department[]
+  users                     User[]
+  memberships               UserOrganization[]
+  leaveTypes                LeaveType[]
+  payrollConfig             PayrollConfig?
+  payrollRuns               PayrollRun[]
+  jobPostings               JobPosting[]
+  publicHolidays            PublicHoliday[]
+  auditLogs                 AuditLog[]
+  benefitPlans              BenefitPlan[]
+  reviewCycles              ReviewCycle[]
+  positions                 Position[]
+  payrollPeriods            PayrollPeriod[]
+  earningTypes              EarningType[]
+  deductionTypes            DeductionType[]
+  payRateRule               PayRateRule?
+  statutoryRateConfig       StatutoryRateConfig?
+  statutoryRateProposals    StatutoryRateProposal[]
+  actionProposals           ActionProposal[]
+  workSchedules             WorkSchedule[]
+  salaryGrades              SalaryGrade[]
+  announcements             Announcement[]
+  onboardingChecklistItems  OnboardingChecklistItem[]
   offboardingChecklistItems OffboardingChecklistItem[]
-  postingApprovers         PostingApprover[]
-  jobBoards                JobBoard[]
-  inventoryItems           InventoryItem[]
-  branches                 Branch[]
+  postingApprovers          PostingApprover[]
+  jobBoards                 JobBoard[]
+  inventoryItems            InventoryItem[]
+  branches                  Branch[]
+  backupConfig              BackupConfig?
+  backupRuns                BackupRun[]
+  performanceTemplates      PerformanceTemplate[]
+  performanceConfig         PerformanceConfig?
 
   @@map("organizations")
 }
@@ -357,10 +370,20 @@ model Department {
   organizationId     String
   name               String   @db.VarChar(200)
   parentDepartmentId String?
+  // #178: who attests the DEPARTMENT_HEAD signatory slot. Postgres cannot express
+  // "head.departmentId == this department", so the service layer verifies it on write —
+  // the same rule Employee.reportsToId and Employee.branchId already carry.
+  //
+  // WHY THIS COLUMN EXISTS AT ALL: the paper forms require a Department Head signature and
+  // this schema had no way to name one. Without it, EVERY review under either seeded template
+  // would be permanently stalled and the "resolving the gap unblocks it" case would be
+  // untestable.
+  headEmployeeId     String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   organization     Organization @relation(fields: [organizationId], references: [id])
+  head             Employee?    @relation("DepartmentHead", fields: [headEmployeeId], references: [id])
   parentDepartment Department?  @relation("DeptHierarchy", fields: [parentDepartmentId], references: [id])
   subDepartments   Department[] @relation("DeptHierarchy")
   employees        Employee[]
@@ -379,26 +402,28 @@ model User {
   organizationId String
   email          String    @unique
   passwordHash   String
-  // `role` is the primary label; `roles` is the full set for multi-role users (#133),
-  // e.g. [MANAGER, VERIFIER]. Capability checks match ANY role in the set. Backfilled
-  // to [role] for every existing user so single-role behaviour is unchanged.
-  role           Role      @default(EMPLOYEE)
+  // `roles` is the user's whole role set, e.g. [MANAGER, VERIFIER]. Capability checks
+  // match ANY role in it. There is no primary role — the scalar `role` was dropped in
+  // #282, and every guard resolves authority from the set alone.
   roles          Role[]    @default([])
   isActive       Boolean   @default(true)
   lastLoginAt    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization             Organization       @relation(fields: [organizationId], references: [id])
+  organization             Organization         @relation(fields: [organizationId], references: [id])
   memberships              UserOrganization[]
   sessions                 Session[]
   employee                 Employee?
   auditLogs                AuditLog[]
   approvalSteps            ApprovalStep[]
-  uploadedDocuments        EmployeeDocument[] @relation("DocumentUploader")
-  verifiedRequestDocuments RequestDocument[]  @relation("RequestDocumentVerifier")
+  uploadedDocuments        EmployeeDocument[]   @relation("DocumentUploader")
+  verifiedRequestDocuments RequestDocument[]    @relation("RequestDocumentVerifier")
   notifications            Notification[]
-  announcements            Announcement[]     @relation("AnnouncementAuthor")
+  announcements            Announcement[]       @relation("AnnouncementAuthor")
+  complaintsOpened         HrComplaint[]        @relation("ComplaintOpenedBy")
+  complaintMessages        HrComplaintMessage[] @relation("ComplaintMessageAuthor")
+  reviewSignoffs           ReviewSignoff[]
 
   @@map("users")
 }
@@ -426,6 +451,8 @@ model Employee {
   companyEmail             String?
   startDate                DateTime
   endDate                  DateTime?
+  // Primary manager. Postgres cannot express "reportsTo.organizationId == this employee's", so
+  // every service-layer writer verifies it (#235) — `assertManagerInOrg` in services/employees.ts.
   reportsToId              String?
   positionId               String?
   workScheduleId           String?
@@ -451,14 +478,18 @@ model Employee {
   bankAccountName          String?
   bankAccountNumber        String?
   gcashNumber              String?
+  // #178: the template this employee is evaluated with. EXPLICIT and HR-set — never inferred
+  // from department, position, or role. Nullable: an unassigned employee lands on the HR
+  // "cannot be reviewed" list with a reason, rather than silently getting a default form.
+  assignedTemplateId       String?
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 
-  user                  User                   @relation(fields: [userId], references: [id])
-  department            Department             @relation(fields: [departmentId], references: [id])
-  position              Position?              @relation(fields: [positionId], references: [id])
-  reportsTo             Employee?              @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
-  directReports         Employee[]             @relation("EmployeeHierarchy")
+  user                  User                      @relation(fields: [userId], references: [id])
+  department            Department                @relation(fields: [departmentId], references: [id])
+  position              Position?                 @relation(fields: [positionId], references: [id])
+  reportsTo             Employee?                 @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
+  directReports         Employee[]                @relation("EmployeeHierarchy")
   timesheets            Timesheet[]
   timeLogs              TimeLog[]
   leaveBalances         LeaveBalance[]
@@ -466,11 +497,10 @@ model Employee {
   requests              Request[]
   documents             EmployeeDocument[]
   payrollEntries        PayrollEntry[]
-  convertedApplicant    Applicant?             @relation("ConvertedEmployee")
+  convertedApplicant    Applicant?                @relation("ConvertedEmployee")
   benefitEnrollments    BenefitEnrollment[]
-  performanceReviews    PerformanceReview[]    @relation("ReviewSubject")
-  reviewsGiven          PerformanceReview[]    @relation("Reviewer")
-  goals                 Goal[]
+  performanceReviews    PerformanceReview[]       @relation("ReviewSubject")
+  reviewsGiven          PerformanceReview[]       @relation("Reviewer")
   loans                 Loan[]
   cashAdvances          CashAdvance[]
   recurringEarnings     EmployeeEarning[]
@@ -478,14 +508,19 @@ model Employee {
   statutoryConfig       EmployeeStatutoryConfig[]
   compensationHistory   EmployeeCompensation[]
   employmentTypeHistory EmployeeEmploymentType[]
-  workSchedule          WorkSchedule?          @relation(fields: [workScheduleId], references: [id])
+  actionProposals       ActionProposal[]
+  workSchedule          WorkSchedule?             @relation(fields: [workScheduleId], references: [id])
   attendanceDays        AttendanceDay[]
   separations           SeparationRecord[]
   emergencyContacts     EmergencyContact[]
+  complaints            HrComplaint[]
   onboardingCompletions OnboardingCompletion[]
   assignedInventory     InventoryItem[]
-  branch                Branch?                @relation("BranchRoster", fields: [branchId], references: [id], onDelete: SetNull)
-  managedBranches       Branch[]               @relation("BranchManager")
+  branch                Branch?                   @relation("BranchRoster", fields: [branchId], references: [id], onDelete: SetNull)
+  managedBranches       Branch[]                  @relation("BranchManager")
+  assignedTemplate      PerformanceTemplate?      @relation("AssignedTemplate", fields: [assignedTemplateId], references: [id])
+  releasedReviews       PerformanceReview[]       @relation("ReviewReleasedBy")
+  headedDepartments     Department[]              @relation("DepartmentHead")
 
   @@unique([organizationId, employeeNumber])
   @@index([organizationId, branchId])
@@ -586,18 +621,18 @@ enum StatutoryAllocation {
 }
 
 model EmployeeStatutoryConfig {
-  id           String                @id @default(cuid())
-  employeeId   String
-  contribution StatutoryContribution
-  exempt       Boolean               @default(false)
+  id                          String                @id @default(cuid())
+  employeeId                  String
+  contribution                StatutoryContribution
+  exempt                      Boolean               @default(false)
   // #173 (Feature C): employer share is remitted elsewhere (e.g. primary employer / dual
   // employment) — zero the ER share only; the EE share is still deducted. Independent of `exempt`.
-  employerSharePaidExternally Boolean @default(false)
+  employerSharePaidExternally Boolean               @default(false)
   // #173 (Feature E): per-employee EE-share cutoff choice. Default EVEN = today's behaviour.
-  allocation   StatutoryAllocation   @default(EVEN)
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-  employee     Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  allocation                  StatutoryAllocation   @default(EVEN)
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
+  employee                    Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, contribution])
   @@map("employee_statutory_config")
@@ -753,14 +788,16 @@ model Award {
 }
 
 model OffboardingChecklistItem {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
   label          String
-  department     String
+  area           ClearanceArea
+  // Plain nullable column, deliberately off the relation graph (cf. PostingApprover).
+  departmentId   String?
   order          Int
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -853,6 +890,27 @@ model ApprovalStep {
 // as EmployeeDocument, T162) and are served only through an authenticated download
 // route. `verifiedById`/`verifiedAt` record an approver signing off on the document
 // as part of the review flow (issue #51).
+//
+// #283/D11: the two columns do NOT mean the same thing. `verifiedAt` means currently verified;
+// `verifiedById` is the durable record of who last signed off and SURVIVES clearing, because the
+// F3 separation-of-duties bar keys on it. Nulling both on an un-verify reopens a one-click bypass.
+//
+// #299: rows here are NEVER deleted. Removing a document sets `deletedAt` (a tombstone) and keeps
+// every fact about it — including `verifiedById` — forever, because a hard delete erased the column
+// the F3 bar reads and let the un-verify -> delete -> re-upload sequence launder a signature away.
+// Only the BYTES may go: `storageKey` is nulled once evicted. Readers are split DELIBERATELY —
+// EIGHT must INCLUDE tombstones (decide()'s F3 read, the pending-queue SoD, actBlockedReason, the
+// Removed-documents history panel, the request-delete sweep, both storage scripts, and #164's
+// backup collector) and four must EXCLUDE them (download list, upload cap, approvals chip,
+// detail-page live list). A uniform `where: { deletedAt: null }` reopens the bypass with every
+// test green. See
+// process/general-plans/.../soft-delete-request-documents-299_PLAN_12-08-26.md for the reader table.
+//
+// #164: the backup collector INCLUDES tombstones on purpose. A tombstoned row whose bytes are
+// still on disk still owns a file that must be backed up — the same reasoning that keeps
+// sweep-orphan-uploads.ts unfiltered (#299/AC-7). A tombstoned row whose `storageKey` is already
+// NULL has no bytes to copy, and is recorded in the manifest's `skipped` list rather than dropped,
+// so a restorer can see the row existed and why nothing was saved for it.
 model RequestDocument {
   id           String    @id @default(cuid())
   requestId    String
@@ -860,15 +918,22 @@ model RequestDocument {
   fileName     String // original upload filename
   mimeType     String
   size         Int // bytes
-  storageKey   String // path relative to UPLOAD_DIR
+  storageKey   String? // path relative to UPLOAD_DIR; null once the bytes are evicted (#299/D-4)
   uploadedAt   DateTime  @default(now())
   verifiedById String?
   verifiedAt   DateTime?
+  // #299: BOTH the tombstone flag and the FIFO ordering key. The row is never deleted; eviction
+  // walks tombstones oldest-`deletedAt`-first, which is not the same order as `uploadedAt` once
+  // documents are swapped out of upload order.
+  deletedAt    DateTime?
 
   request    Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
   verifiedBy User?   @relation("RequestDocumentVerifier", fields: [verifiedById], references: [id])
 
   @@index([requestId])
+  // #299: tombstones are kept forever and are unbounded, so every eviction pass filters and sorts
+  // on deletedAt. Also the greppable declaration that deletedAt IS a query dimension here.
+  @@index([requestId, deletedAt])
   @@map("request_documents")
 }
 
@@ -905,6 +970,96 @@ model EmployeeDocument {
   @@map("employee_documents")
 }
 
+// ─── Document backup (#164) ──────────────────────────────────────────────────
+// Document BYTES live only on local disk under UPLOAD_DIR — never in Postgres — so a
+// pg_dump backs up every document ROW and none of the files. These two models drive a
+// nightly cron script (scripts/backup-documents.ts) that copies the files to a second
+// location and writes a manifest describing them.
+//
+// Config is per-organization, not global, for two reasons: the settings page that edits it
+// is already tenant-scoped (a singleton could not be edited there without letting one
+// tenant set another's schedule), and the backup tree is partitioned by organizationId so
+// "restore one tenant" is a directory, not a filter someone has to remember to apply.
+//
+// CREDENTIALS ARE NOT HERE AND MUST NEVER BE. Endpoint, region, bucket, access key and
+// secret come from the environment (BACKUP_S3_*). What is stored is only the KIND of
+// destination. A database dump therefore cannot leak the bucket, and the settings page has
+// no secret to render.
+
+enum BackupDestinationKind {
+  LOCAL
+  S3
+}
+
+enum BackupRunStatus {
+  // Written before the first byte. A row left in this state means the process died — the
+  // stale-run sweep at the start of the next run flips it to FAILED, unless the destination
+  // already holds a manifest.json, in which case only the status write was lost (#164/E-08).
+  RUNNING
+  SUCCESS
+  // Some files could not be read or written. Deliberately NOT a failure state: the backup
+  // that was taken is real and worth keeping, and a silent SUCCESS over unreadable files is
+  // exactly the lie this model exists to prevent.
+  PARTIAL
+  FAILED
+}
+
+model BackupConfig {
+  id              String                @id @default(cuid())
+  organizationId  String                @unique
+  // Master switch. Off → the nightly script skips this org entirely and records nothing.
+  enabled         Boolean               @default(false)
+  // "Every # days" from #164. 1 = every night. Measured from the last COMPLETED run
+  // (SUCCESS or PARTIAL), not from the last attempt — a failed run must not push the next
+  // one a full interval away. Bounded 1–90 at every writer.
+  intervalDays    Int                   @default(1)
+  // How many completed runs to keep. Pruning happens AFTER a run completes, never before,
+  // so a crash mid-run cannot cost the newest good backup. Bounded 1–30 at every writer.
+  retentionCount  Int                   @default(7)
+  destinationKind BackupDestinationKind @default(LOCAL)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("backup_configs")
+}
+
+model BackupRun {
+  id              String                @id @default(cuid())
+  organizationId  String
+  // Directory / key prefix name, e.g. "2026-08-22T023000Z-a1b2". Also the ONLY thing the
+  // settings page shows about location — never an absolute path, never a bucket name.
+  runId           String
+  status          BackupRunStatus
+  destinationKind BackupDestinationKind
+  startedAt       DateTime              @default(now())
+  finishedAt      DateTime?
+  // Counts, not lists: the per-file detail lives in the backup's own manifest.json, which
+  // is the artifact a restorer actually has. Storing filenames here would put document
+  // names (which are user-supplied and sometimes sensitive) in a second place for no gain.
+  fileCount       Int                   @default(0)
+  skippedCount    Int                   @default(0)
+  failedCount     Int                   @default(0)
+  // The only BigInt in this schema. src/hooks.ts transports Decimal, not BigInt, so the
+  // settings service MUST convert this to a plain number before it reaches a load()
+  // — mixing a BigInt with a number in client-side formatting throws (#164/E-15).
+  totalBytes      BigInt                @default(0)
+  // sha256 of the serialized manifest. Lets an operator confirm the manifest on the
+  // destination is the one this run wrote.
+  manifestSha256  String?
+  // Operator-facing reason for FAILED/PARTIAL. SANITIZED before storage: never an absolute
+  // path, never a bucket/endpoint, never a credential — this string is rendered in the UI.
+  error           String?               @db.VarChar(500)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The history table reads newest-first per org; retention pruning reads completed runs
+  // per org in the same order. Both are covered by this one index.
+  @@index([organizationId, startedAt])
+  @@map("backup_runs")
+}
+
 // ─── Separation / Offboarding (FR-072 / T180) ────────────────────────────────
 // A resignation/termination case: records the reason, drives a clearance
 // checklist, and snapshots the computed final pay before the employee is set to
@@ -927,6 +1082,16 @@ enum ClearanceStatus {
   CLEARED
 }
 
+// Who signs a clearance step off (#306). A closed vocabulary: free text made items
+// unroutable on a typo, and "Immediate Supervisor" is not a department at all.
+enum ClearanceArea {
+  IT
+  HR
+  ADMIN
+  FINANCE
+  IMMEDIATE_SUPERVISOR
+}
+
 model SeparationRecord {
   id                String           @id @default(cuid())
   organizationId    String
@@ -940,6 +1105,10 @@ model SeparationRecord {
   finalPayBreakdown Json?
   finalizedAt       DateTime?
   finalizedById     String?
+  // Everything finalize is about to overwrite, captured inside finalize's transaction so #304's
+  // undo can put it back. NULL = finalized before #304 shipped ⇒ the money cannot be restored
+  // (D-4, "partially restored").
+  preFinalizeState  Json?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -952,14 +1121,21 @@ model SeparationRecord {
 }
 
 model ClearanceItem {
-  id           String          @id @default(cuid())
-  separationId String
-  label        String
-  department   String
-  status       ClearanceStatus @default(PENDING)
-  clearedById  String?
-  clearedAt    DateTime?
-  notes        String?
+  id                    String          @id @default(cuid())
+  separationId          String
+  label                 String
+  area                  ClearanceArea
+  // Plain nullable column, deliberately off the relation graph (cf. PostingApprover).
+  departmentId          String?
+  status                ClearanceStatus @default(PENDING)
+  clearedById           String?
+  // #304/B-2: the #297 separation-of-duties bar, parked where the ordinary un-clear path cannot
+  // reach it. WRITTEN ONLY by undoSeparation's re-open branch. setClearanceItem must never write
+  // or clear this field — that is the entire point: clearedById is NULLable by any MANAGE_HR
+  // holder, this is not.
+  previouslyClearedById String?
+  clearedAt             DateTime?
+  notes                 String?
 
   separation SeparationRecord @relation(fields: [separationId], references: [id], onDelete: Cascade)
 
@@ -994,6 +1170,7 @@ enum NotificationKind {
   PAYSLIP
   REQUEST
   RECRUITMENT
+  PERFORMANCE
 }
 
 // Per-user in-app notification. Surfaced as a toast on next load; readAt set once seen.
@@ -1030,17 +1207,17 @@ model PublicHoliday {
 // ─── Payroll ──────────────────────────────────────────────────────────────────
 
 model PayrollConfig {
-  id                String       @id @default(cuid())
-  organizationId    String       @unique
-  payFrequency      PayFrequency @default(SEMI_MONTHLY)
-  firstCutoff       Int?
-  secondCutoff      Int?
-  sssTable          Json
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  payFrequency   PayFrequency @default(SEMI_MONTHLY)
+  firstCutoff    Int?
+  secondCutoff   Int?
+  sssTable       Json
   // #220: statutory RATE fields removed — StatutoryRateConfig is now the authoritative,
   // seeded source of PhilHealth/Pag-IBIG/SSS/BIR figures. This config keeps only frequency,
   // cutoffs, and the (legacy, unused-by-engine) sssTable/birTaxTable placeholders.
-  birTaxTable       Json
-  updatedAt         DateTime     @updatedAt
+  birTaxTable    Json
+  updatedAt      DateTime     @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -1059,6 +1236,12 @@ model PayrollRun {
   totalNet        Decimal          @default(0) @db.Decimal(14, 2)
   hasOverride     Boolean          @default(false)
   overrideNote    String?
+  // LANDMINE (#298): before #298 THREE call sites wrote this field — the finance approver
+  // (`services/approvals.ts` `decidePayrollRun`), `approvePayroll` in `services/payroll/index.ts`,
+  // and *also* whoever LOCKED the period (`services/payroll/periods.ts` `lock`). A row written
+  // before #298 therefore means "approver OR locker, whichever wrote last", and those rows were
+  // deliberately NOT backfilled. From #298 the lock no longer writes it and the field means the
+  // approver only; the lock actor lives on `PayrollPeriod.lockedById`.
   approvedById    String?
   approvedAt      DateTime?
   createdAt       DateTime         @default(now())
@@ -1103,22 +1286,22 @@ model PayrollEntry {
 // ─── Recruitment ──────────────────────────────────────────────────────────────
 
 model JobPosting {
-  id             String           @id @default(cuid())
-  organizationId String
-  departmentId   String
-  title          String
-  description    String           @db.Text
-  status         JobPostingStatus @default(DRAFT)
-  postedAt       DateTime?
-  closedAt       DateTime?
-  createdById    String
+  id              String           @id @default(cuid())
+  organizationId  String
+  departmentId    String
+  title           String
+  description     String           @db.Text
+  status          JobPostingStatus @default(DRAFT)
+  postedAt        DateTime?
+  closedAt        DateTime?
+  createdById     String
   // Approval trail (#195): who submitted for approval, who approved, and the reason a
   // posting was sent back to draft. All null on a fresh draft.
-  submittedById  String?
-  approvedById   String?
+  submittedById   String?
+  approvedById    String?
   rejectionReason String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   department   Department          @relation(fields: [departmentId], references: [id])
@@ -1354,7 +1537,10 @@ model AuditLog {
   id             String      @id @default(cuid())
   organizationId String
   actorId        String
-  actorRole      Role
+  // `actorRoles` records the actor's whole role set as held at the time of the action —
+  // unlike the `actor` relation, which always shows today's roles. It replaced the scalar
+  // `actorRole` in #282.
+  actorRoles     Role[]      @default([])
   action         AuditAction
   entityType     String
   entityId       String
@@ -1376,20 +1562,46 @@ model AuditLog {
 // by the aggregation service. A punch is linked to a Timesheet once aggregated.
 
 model TimeLog {
-  id               String      @id @default(cuid())
-  employeeId       String
-  punchType        PunchType
-  source           PunchSource @default(DISCORD)
-  timestamp        DateTime    @db.Timestamptz(3)
-  discordMessageId String?
-  note             String?
-  timesheetId      String?
-  createdAt        DateTime    @default(now())
+  id                 String      @id @default(cuid())
+  employeeId         String
+  punchType          PunchType
+  source             PunchSource @default(DISCORD)
+  timestamp          DateTime    @db.Timestamptz(3)
+  discordMessageId   String?
+  // #200 — deterministic idempotency key for punches that have no Discord message to key on.
+  // `backlog:<employeeNumber>:<YYYY-MM-DD>:<slot>` for a CSV backlog import row. Null for every
+  // Discord punch, which keeps using discordMessageId. Same two-layer defence as #99: an
+  // app-level bulk pre-check for a clean message, plus the unique constraint below to close the
+  // concurrent race. Postgres treats NULL as distinct in a unique index, so the existing
+  // null-keyed rows do not collide — the same property @@unique([discordMessageId, employeeId])
+  // already relies on.
+  dedupKey           String?
+  // #177 — captured from navigator.geolocation at the moment of a WEB punch, and only there.
+  // Null for every DISCORD and MANUAL punch by construction: `recordPunch` writes these four
+  // only when its caller passes a `location`, and the Discord route and the backlog importer
+  // never do. Sensitive personal data — readable only through
+  // GET /api/v1/timesheets/:employeeId/punches (gated by `canTouchEmployee`: owner, their
+  // manager, branch manager, org HR) and the employee's own /punch page. Never in the audit
+  // log (#242), never in the attendance CSV export. Retention follows the TimeLog row itself —
+  // no separate purge window.
+  //
+  // Float (double precision), never Decimal: these are not money and are never summed, so the
+  // Decimal transport hook in src/hooks.ts stays out of the picture entirely.
+  latitude           Float?
+  longitude          Float?
+  locationAccuracyM  Float?
+  // Timestamptz like `timestamp` above, not a naive `timestamp(3)`: two time columns on one
+  // punch row must not disagree about what a time means when the whole app runs in Manila time.
+  locationCapturedAt DateTime?   @db.Timestamptz(3)
+  note               String?
+  timesheetId        String?
+  createdAt          DateTime    @default(now())
 
   employee  Employee   @relation(fields: [employeeId], references: [id])
   timesheet Timesheet? @relation(fields: [timesheetId], references: [id])
 
   @@unique([discordMessageId, employeeId])
+  @@unique([dedupKey, employeeId])
   @@index([employeeId, timestamp])
   @@index([timesheetId])
   @@map("time_logs")
@@ -1449,55 +1661,167 @@ model ReviewCycle {
   organization Organization        @relation(fields: [organizationId], references: [id])
   reviews      PerformanceReview[]
 
+  // #178: the generator is offered a run by cron and decides for itself whether one is due.
+  // A double-create is prevented at the DATABASE, not by the script's own care — the cheapest
+  // correct option, and the same shape PayrollRun already uses. Column names are deliberately
+  // left as startDate/endDate rather than renamed to periodStart/periodEnd: a rename would
+  // touch every existing reader and both surviving unit tests for no gain.
+  @@unique([organizationId, startDate, endDate])
+  @@index([organizationId, status])
   @@map("review_cycles")
 }
 
 model PerformanceReview {
-  id              String       @id @default(cuid())
-  cycleId         String
-  employeeId      String
-  reviewerId      String
-  status          ReviewStatus @default(PENDING)
-  selfAssessment  String?      @db.Text
-  managerComments String?      @db.Text
-  overallRating   Int?
-  submittedAt     DateTime?
-  completedAt     DateTime?
-  acknowledgedAt  DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                   String       @id @default(cuid())
+  cycleId              String
+  employeeId           String
+  reviewerId           String
+  status               ReviewStatus @default(PENDING)
+  selfAssessment       String?      @db.Text
+  managerComments      String?      @db.Text
+  overallRating        Int?
+  submittedAt          DateTime?
+  completedAt          DateTime?
+  acknowledgedAt       DateTime?
+  // #178: the template's `structure`, copied verbatim inside the SAME transaction that creates
+  // this review, and NEVER re-read from PerformanceTemplate afterwards. Editing a template, or
+  // reassigning the employee, must not change what a resolved review shows. Precedent:
+  // SeparationRecord.preFinalizeState, also captured inside its own transaction.
+  templateSnapshot     Json?
+  // Kept alongside the snapshot for provenance/reporting only. NEVER read to render the form —
+  // reading it would defeat the snapshot.
+  templateId           String?
+  // Everything the EVALUATOR types or picks, keyed by the snapshot's criterion/section/band ids.
+  // Every value here is stored verbatim; none is derived. Nulled wholesale by the redaction gate
+  // — which is exactly why no employee-authored content may ever live in here.
+  answers              Json?
+  // Employee-authored, its OWN column, never inside `answers`. This is the paper form's
+  // "Employee Comments" field and it is ALWAYS visible to the employee. Distinct from
+  // `selfAssessment`, which is the app-only pre-scoring stage.
+  employeeComments     String?      @db.Text
+  // The explicit HR RELEASE. Null = the employee's view is redacted. Set = released.
+  // Attribution is on the row so the audit trail and the gate cannot disagree.
+  //
+  // The attribution is the releasing HR user's EMPLOYEE row, not their User row — the FK below
+  // points at `employees(id)`. It is an Employee because the UI renders "Released by
+  // {firstName} {lastName}" through the `releasedBy` relation, and `User` carries no name
+  // fields. Callers pass a User id and MUST resolve it to that user's employee row first
+  // (see `releaseReview` in src/lib/server/services/performance.ts). An HR user with no
+  // employee record releases with null attribution; the audit row still names the actor.
+  releasedAt           DateTime?
+  releasedByEmployeeId String?
+  // Reminder de-duplication. The reminder job runs several times a day; without these it would
+  // send the same nudge every run.
+  lastReminderAt       DateTime?
+  lastReminderKind     String?      @db.VarChar(40)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  cycle    ReviewCycle @relation(fields: [cycleId], references: [id])
-  employee Employee    @relation("ReviewSubject", fields: [employeeId], references: [id])
-  reviewer Employee    @relation("Reviewer", fields: [reviewerId], references: [id])
+  cycle      ReviewCycle     @relation(fields: [cycleId], references: [id])
+  employee   Employee        @relation("ReviewSubject", fields: [employeeId], references: [id])
+  reviewer   Employee        @relation("Reviewer", fields: [reviewerId], references: [id])
+  releasedBy Employee?       @relation("ReviewReleasedBy", fields: [releasedByEmployeeId], references: [id])
+  signoffs   ReviewSignoff[]
 
   @@unique([cycleId, employeeId])
+  @@index([employeeId])
+  @@index([reviewerId])
+  @@index([status])
   @@map("performance_reviews")
 }
 
-model Goal {
-  id          String     @id @default(cuid())
-  employeeId  String
-  cycleId     String?
-  title       String
-  description String?    @db.Text
-  category    String?
-  status      GoalStatus @default(ACTIVE)
-  progress    Int        @default(0)
-  targetDate  DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+// ─── Performance Evaluation Templates (#178) ─────────────────────────────────
 
-  employee Employee @relation(fields: [employeeId], references: [id])
+// An HR-authored evaluation form, stored as one JSON document.
+//
+// JSON rather than a Template→Section→Criterion relational tree because the whole document
+// is read and written as a unit, is never queried by its interior, and must be snapshotted
+// verbatim onto a review. Precedent in this schema: StatutoryRateConfig.sssTable /
+// birTaxTable. The cost accepted in exchange: Postgres enforces NOTHING about
+// `structure`, so EVERY writer must go through the shared zod schema in
+// src/lib/server/performance/schemas.ts. A missed validation here is silent corruption with
+// no database backstop.
+//
+// NOTHING in `structure` is a calculation input. Section weights, section maxima and band
+// ranges are what the form PRINTS. `maximum` and `totalCeiling` are additionally read by the
+// range VALIDATOR (accept/reject only). No code sums, weights, or derives anything. See #178
+// SPEC acceptance criterion 4.
+model PerformanceTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String   @db.VarChar(200)
+  isActive       Boolean  @default(true)
+  structure      Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@index([employeeId])
-  @@map("goals")
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  assignedEmployees Employee[]   @relation("AssignedTemplate")
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("performance_templates")
+}
+
+// One signatory's attestation on one review. THE ONLY relational exception in this feature's
+// data model.
+//
+// Everything else about a review is one-writer-at-a-time and lives in JSON. Sign-off is not:
+// four different actors race to attest on the same review, and the sequential rule must be
+// enforced against a value two of them may be reading at the same instant. A JSON array on
+// PerformanceReview would need read-modify-write, which loses one of two concurrent
+// attestations. @@unique([reviewId, slotId]) makes the race a P2002 the service can report,
+// not a silently dropped signature.
+model ReviewSignoff {
+  id               String   @id @default(cuid())
+  reviewId         String
+  // Matches templateSnapshot.signatoryOrder[].id — NOT a foreign key, because the slot lives
+  // inside the snapshot JSON. The snapshot is immutable, so the id is stable for this review's
+  // whole life.
+  slotId           String
+  // Denormalized from the snapshot so a signature renders without re-reading the snapshot.
+  roleLabel        String   @db.VarChar(120)
+  // Position in the snapshot's signatoryOrder at attest time. Stored for rendering and for
+  // ordering the signature block; the turn CHECK still derives from the snapshot, never from
+  // this column.
+  order            Int
+  attestedByUserId String
+  typedName        String   @db.VarChar(200)
+  attestedAt       DateTime @default(now())
+
+  review     PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  attestedBy User              @relation(fields: [attestedByUserId], references: [id])
+
+  @@unique([reviewId, slotId])
+  @@index([reviewId])
+  @@map("review_signoffs")
+}
+
+// Per-organization review cadence. Mirrors BackupConfig: a row is created lazily
+// by the settings page, and its absence means "use the defaults", so the cron never creates
+// configuration as a side effect of running.
+model PerformanceConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  // Master switch. Off → the generator skips this org entirely.
+  enabled        Boolean  @default(true)
+  // "Every # months". Default 2 = the bi-monthly cadence #178 asks for. Bounded 1-24 at every
+  // writer. Changing it NEVER rewrites an existing ReviewCycle row.
+  intervalMonths Int      @default(2)
+  // Days after a review opens before it counts as overdue. Drives the reminder job only.
+  dueDays        Int      @default(14)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("performance_configs")
 }
 
 // ─── Org Structure (Positions) ────────────────────────────────────────────────
 // Lightweight job/role catalog backing org charts. Org hierarchy otherwise
 // reuses Department.parentDepartmentId and Employee.reportsToId; role management
-// edits User.role (audited) — no dedicated RBAC table.
+// edits User.roles (audited) — no dedicated RBAC table.
 
 model Position {
   id             String   @id @default(cuid())
@@ -1554,6 +1878,12 @@ model PayrollPeriod {
   status         PayrollPeriodStatus @default(OPEN)
   lockedAt       DateTime?
   releasedAt     DateTime?
+  // #298: who locked / who released. Nullable because these record only what happened after
+  // #298 — NULL means the period predates the column, never "nobody locked it". Bare ids, not
+  // a `User` relation, so the column add stays metadata-only on a populated database (no FK to
+  // validate, no back-relation on User). `AuditLog.actorId` is the precedent.
+  lockedById     String?
+  releasedById   String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -1713,6 +2043,44 @@ model StatutoryRateProposal {
   @@map("statutory_rate_proposals")
 }
 
+// ─── Action Proposals (#224 Part 2 / #243) ────────────────────────────────────
+// Separation of duties for pay writes that must not be unilateral: the initiator files a PENDING
+// proposal and a *different* qualified user applies it. Generalizes StatutoryRateProposal, which
+// models only two parties (proposer, decider) — here the TARGET is a third, because the same table
+// carries both a CEO proposing for themselves (#224) and a manager proposing for a report (#243).
+// Who may confirm is derived from that distinction, not stored: see `confirmerCapabilityFor`.
+model ActionProposal {
+  id               String               @id @default(cuid())
+  organizationId   String
+  initiatorId      String // User.id who filed it
+  targetEmployeeId String // Employee.id the change lands on
+  domain           ProposalDomain
+  payload          Json // the writer's own input object, re-validated at apply time
+  status           ActionProposalStatus @default(PENDING)
+  decidedById      String?
+  decidedAt        DateTime?
+  decisionNote     String? // required on reject, so the initiator knows what to fix
+  createdAt        DateTime             @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  target       Employee     @relation(fields: [targetEmployeeId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([targetEmployeeId])
+  @@map("action_proposals")
+}
+
+enum ProposalDomain {
+  COMPENSATION
+  PROMOTION
+}
+
+enum ActionProposalStatus {
+  PENDING
+  APPLIED
+  REJECTED
+}
+
 model Loan {
   id          String     @id @default(cuid())
   employeeId  String
@@ -1759,10 +2127,31 @@ model CashAdvance {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  employee Employee @relation(fields: [employeeId], references: [id])
+  employee Employee             @relation(fields: [employeeId], references: [id])
+  payments CashAdvancePayment[]
 
   @@index([employeeId])
   @@map("cash_advances")
+}
+
+// #309: the mirror of LoanPayment. Without it a void credited back the frozen deduction
+// line instead of what lock actually took, so a capped payment came back over-credited —
+// measured live at ₱300 returned against ₱100 collected.
+model CashAdvancePayment {
+  id             String   @id @default(cuid())
+  cashAdvanceId  String
+  payrollEntryId String?
+  amount         Decimal  @db.Decimal(12, 2)
+  paidAt         DateTime @default(now())
+
+  cashAdvance CashAdvance @relation(fields: [cashAdvanceId], references: [id], onDelete: Cascade)
+
+  // Idempotency key for the amortization committed at period lock: one payment per
+  // (advance, payroll entry). NULL payrollEntryId stays distinct in Postgres, so manual
+  // off-payroll payments are unaffected.
+  @@unique([cashAdvanceId, payrollEntryId])
+  @@index([cashAdvanceId])
+  @@map("cash_advance_payments")
 }
 
 // Recurring monthly earning HR assigns to an employee (allowance or incentive).
@@ -1836,6 +2225,16 @@ model AttendanceDay {
   timeIn     DateTime?
   timeOut    DateTime?
 
+  // #162 — food-service tenants only (isFoodServiceOrg). The AM/PM pair is a DISPLAY split of
+  // the same punches `timeIn`/`timeOut` already bracket: amTimeIn === timeIn and
+  // pmTimeOut === timeOut whenever a PM block exists. Never read by payroll, reports, or the
+  // payslip — those keep reading timeIn/timeOut (first punch / last punch of the day). Null on
+  // every non-food-service row and on any day with no second work block.
+  amTimeIn  DateTime?
+  amTimeOut DateTime?
+  pmTimeIn  DateTime?
+  pmTimeOut DateTime?
+
   workedHours           Decimal @default(0) @db.Decimal(5, 2)
   regularHours          Decimal @default(0) @db.Decimal(5, 2)
   overtimeHours         Decimal @default(0) @db.Decimal(5, 2)
@@ -1863,4 +2262,58 @@ model AttendanceDay {
   @@unique([employeeId, date])
   @@index([employeeId, date])
   @@map("attendance_days")
+}
+
+// ─── HR Complaints / Inquiries (#112) ────────────────────────────────────────
+// A two-way thread HR opens against an employee to ask about an issue (e.g. a
+// classification query). HR opens it, the employee responds, HR can reply again,
+// and HR marks it resolved. Separate from the approval-based Requests flow.
+
+enum ComplaintStatus {
+  OPEN // awaiting the employee's response (freshly opened, or HR replied)
+  RESPONDED // the employee has replied; awaiting HR
+  RESOLVED // HR closed the thread
+}
+
+enum ComplaintCategory {
+  CLASSIFICATION // employment classification (hourly/daily/part-time) — a first-class case (#112)
+  ATTENDANCE
+  CONDUCT
+  PERFORMANCE
+  OTHER
+}
+
+model HrComplaint {
+  id             String            @id @default(cuid())
+  organizationId String
+  employeeId     String // the employee being asked
+  openedById     String // the HR user who opened the inquiry
+  subject        String
+  category       ComplaintCategory @default(OTHER)
+  status         ComplaintStatus   @default(OPEN)
+  resolvedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  employee Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  openedBy User                 @relation("ComplaintOpenedBy", fields: [openedById], references: [id])
+  messages HrComplaintMessage[]
+
+  @@index([organizationId, status])
+  @@index([employeeId, status])
+  @@map("hr_complaints")
+}
+
+model HrComplaintMessage {
+  id          String   @id @default(cuid())
+  complaintId String
+  authorId    String // the User who wrote this message (HR or the employee)
+  body        String
+  createdAt   DateTime @default(now())
+
+  complaint HrComplaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  author    User        @relation("ComplaintMessageAuthor", fields: [authorId], references: [id])
+
+  @@index([complaintId, createdAt])
+  @@map("hr_complaint_messages")
 }

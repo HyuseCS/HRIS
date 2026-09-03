@@ -76,11 +76,22 @@ test.describe('Leave balances', () => {
 	test('the 201 file shows the employee leave ledger', async ({ page }) => {
 		await login(page, USERS.admin)
 		await page.goto('/leave/balances?search=EMP-004', { waitUntil: 'domcontentloaded' })
-		await page.locator('tbody tr[data-employee="EMP-004"]').click()
+		// #287. The row is a `role="link"` <tr> whose navigation is an `onclick` -> `goto`, with no
+		// <a href> underneath — so a click that lands before hydration is silently DROPPED and the
+		// wait below then hangs for the full 120s. That is what made this spec fail only under a
+		// loaded parallel run. Retry the click until the URL actually moves; same idiom as
+		// `selectTenant` in helpers.ts.
 		// domcontentloaded, not waitForURL's default 'load': helpers.ts documents that external
 		// font requests never settle in a sandboxed runner, so 'load' times out on a navigation
-		// that already happened. Passes in isolation, hangs under a loaded parallel run.
-		await page.waitForURL(/\/employees\/[^/]+$/, { waitUntil: 'domcontentloaded' })
+		// that already happened.
+		const row = page.locator('tbody tr[data-employee="EMP-004"]')
+		await expect(async () => {
+			await row.click()
+			await page.waitForURL(/\/employees\/[^/]+$/, {
+				waitUntil: 'domcontentloaded',
+				timeout: 2000
+			})
+		}).toPass({ timeout: 30_000 })
 
 		const panel = page.locator('section', { hasText: 'Leave Balances' }).first()
 		await expect(panel).toBeVisible()

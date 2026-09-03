@@ -1,6 +1,6 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import {
 	getApplicant,
@@ -16,7 +16,7 @@ import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const user = locals.user!
-	requireCapability(user.role, 'MANAGE_HR')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const [applicant, departments] = await Promise.all([
 		getApplicant(params.applicantId, user.organizationId),
@@ -47,7 +47,7 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }
@@ -82,7 +82,7 @@ const offerSchema = z.object({
 
 export const actions: Actions = {
 	scheduleInterview: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = interviewSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success)
 			return fail(400, { error: 'Date, time, mode, and interviewer are required.' })
@@ -108,7 +108,7 @@ export const actions: Actions = {
 	},
 
 	recordFeedback: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const interviewId = data.get('interviewId') as string
 		const feedback = ((data.get('feedback') as string) ?? '').trim()
@@ -128,7 +128,7 @@ export const actions: Actions = {
 	},
 
 	deleteInterview: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const interviewId = (await request.formData()).get('interviewId') as string
 		if (!interviewId) return fail(400, { error: 'Missing interview id.' })
 		try {
@@ -145,7 +145,7 @@ export const actions: Actions = {
 	},
 
 	issueOffer: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = offerSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success)
 			return fail(400, { error: 'Job title, salary, and start date are required.' })
@@ -164,7 +164,7 @@ export const actions: Actions = {
 	},
 
 	respondOffer: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const offerId = data.get('offerId') as string
 		const accepted = data.get('accepted') === 'true'
@@ -184,7 +184,7 @@ export const actions: Actions = {
 	},
 
 	deleteOffer: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const offerId = (await request.formData()).get('offerId') as string
 		if (!offerId) return fail(400, { error: 'Missing offer id.' })
 		try {
@@ -197,7 +197,7 @@ export const actions: Actions = {
 	},
 
 	convert: async ({ locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		let employee
 		try {
 			employee = await convertApplicantToEmployee(

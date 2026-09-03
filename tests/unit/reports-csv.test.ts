@@ -44,3 +44,26 @@ describe('exportToCSV — formula-injection defense', () => {
 		expect(csv).toBe('Note\r\n"a ""b"", c"')
 	})
 })
+
+// #162 (contract instruction E2): the header list comes from `rows[0]` alone, so a conditional
+// key must be spread onto EVERY row or the file silently loses columns. The attendance export's
+// `amPmCols()` helper is the first conditional key set in the app; this pins the rule it obeys,
+// and `tests/unit/attendance-export-am-pm.test.ts` pins the route that applies it.
+describe('exportToCSV — the header set comes from the first row only', () => {
+	it('drops a key that only later rows carry', () => {
+		const csv = exportToCSV([{ A: '1' }, { A: '2', 'AM In': '08:00' }])
+		expect(csv.split('\r\n')[0]).toBe('A')
+		expect(csv).not.toContain('08:00')
+	})
+
+	it('keeps every line at the same field count when the key set is uniform', () => {
+		const uniform = [
+			{ A: '1', 'AM In': '' },
+			{ A: '2', 'AM In': '08:00' },
+			{ A: '3', 'AM In': '' }
+		]
+		const out = exportToCSV(uniform).split('\r\n')
+		expect(out[0]).toBe('A,AM In')
+		expect(new Set(out.map((l) => l.split(',').length)).size).toBe(1)
+	})
+})

@@ -1,16 +1,19 @@
 import { error, fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requirePayrollManage } from '$lib/server/rbac'
+import { requireAnyCapability, requirePayrollManage } from '$lib/server/rbac'
 import { canAny } from '$lib/rbac'
+import { listVisiblePayEmployeeIds } from '$lib/server/services/employee-access'
 import {
 	getPayrollRun,
 	overridePayrollEntry,
 	computePayroll
 } from '$lib/server/services/payroll/index'
+import { isPayslipVisible } from '$lib/server/services/payroll/runs'
 import {
 	livePayrollStage,
 	decidePayrollRun,
-	canActOnPayrollStage
+	canActOnPayrollStage,
+	decidedActorIds
 } from '$lib/server/services/approvals'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -19,47 +22,85 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: user.organizationId,
 		actorId: user.id,
-		actorRole: user.role,
 		actorRoles: user.roles,
 		ipAddress: ip
 	}
 }
 
-function rolesOf(user: App.Locals['user']) {
-	return user!.roles?.length ? user!.roles : [user!.role]
-}
-
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const user = locals.user!
-	const roles = rolesOf(user)
+	const roles = user.roles
 	// Payroll managers run/override; the sign-off roles (Verifier/Approver) need to see
 	// the run to check its numbers and act on their stage (#134). Everyone else is out.
 	const canManagePayroll = canAny(roles, 'MANAGE_PAYROLL')
 	const canSignOff = canAny(roles, 'VERIFY_REQUESTS') || canAny(roles, 'APPROVE_FINANCE')
 	if (!canManagePayroll && !canSignOff) error(403, 'Insufficient permissions')
 
+	// #249: a run carries every employee's gross, itemized statutory deductions and net, and
+	// MANAGE_PAYROLL holds MANAGER — so without this a branch manager reads the whole org's pay
+	// here, the same leak the payslip doors were narrowed to close. `null` = unrestricted.
+	const visibleEmployeeIds = await listVisiblePayEmployeeIds({
+		id: user.id,
+		roles,
+		organizationId: user.organizationId
+	})
+
 	// Finance approvers reach any tenant's run to sign it off (#174); managers/verifiers
 	// stay in their own org.
-	const run = await getPayrollRun(params.id, user.organizationId, roles)
+	const run = await getPayrollRun(params.id, user.organizationId, roles, visibleEmployeeIds)
 
 	// Managing (override/recompute) is only ever your own org's payroll — a finance approver
 	// reviewing another tenant's run gets a read-only view plus the sign-off action.
 	const canManage = canManagePayroll && run.organizationId === user.organizationId
 
 	// Whether the current user can act on the run's live maker-checker stage: only when
-	// the run is COMPUTED, a stage is open, they hold that stage's capability, and they
-	// aren't the maker of the live attempt (separation of duties).
+	// the run is COMPUTED, a stage is open, they hold that stage's capability, and they took no
+	// earlier decision on the live attempt (separation of duties).
+	//
+	// #283/B-2: this passes the REAL sod, never a permissive stub. This boolean decides whether the
+	// sign-off control renders as actionable, so a stub here ships a page that offers an action the
+	// service then 403s. The standalone `makeActorId !== user.id` clause that stood here is gone —
+	// the MAKE step is decided and carries an actorId, so decidedActorIds already contains the maker.
 	const live = run.status === 'COMPUTED' ? livePayrollStage(run.approvalSteps) : null
-	const makeActorId = live
-		? run.approvalSteps.find((s) => s.attempt === live.attempt && s.stage === 'MAKE')?.actorId
-		: null
 	const canAct = Boolean(
 		live?.currentStep &&
-		canActOnPayrollStage(live.currentStep.stage, roles) &&
-		makeActorId !== user.id
+		canActOnPayrollStage(live.currentStep.stage, roles, {
+			actorId: user.id,
+			decidedActorIds: decidedActorIds(run.approvalSteps, live.attempt),
+			verifiedDocActorIds: []
+		})
 	)
 
-	return { run, liveStage: live?.currentStep?.stage ?? null, canAct, canManage }
+	// #283/D12: a barred approver must be told WHY, not shown a vanished control — this is a detail
+	// page they navigated to on purpose, so silence reads as a bug. Two branches, because the guard
+	// above fires on two different people and the service keeps a distinct message for each: telling
+	// the preparer they "recorded a decision" would be false.
+	const makeStep = live
+		? run.approvalSteps.find((s) => s.attempt === live.attempt && s.stage === 'MAKE')
+		: null
+	const actBlockedReason =
+		canAct || !live?.currentStep
+			? null
+			: makeStep?.actorId === user.id
+				? 'You prepared this payroll run — another finance approver must sign it off.'
+				: decidedActorIds(run.approvalSteps, live.attempt).includes(user.id)
+					? 'You already recorded a decision on this run — another finance approver must sign it off.'
+					: null
+
+	// Tells the page its table is a slice, not the run — the totals above it were recomputed to
+	// match, so without this the view is honest but indistinguishable from the full run.
+	return {
+		run,
+		liveStage: live?.currentStep?.stage ?? null,
+		canAct,
+		actBlockedReason,
+		canManage,
+		scopedToTeam: visibleEmployeeIds != null,
+		// #278: every payslip door 403s until the run is filed, so the table must not offer a link
+		// that is a guaranteed dead end. Decided here rather than in the component: the rule already
+		// lives in one place, and a fourth copy of it is the defect #278 is about.
+		payslipVisible: isPayslipVisible(run)
+	}
 }
 
 // `finite()` matters as much as `min(0)`: z.coerce.number() turns "" into 0 and
@@ -79,7 +120,7 @@ const decideSchema = z.object({
 export const actions: Actions = {
 	override: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requirePayrollManage(user.role)
+		requirePayrollManage(user.roles)
 
 		const data = await request.formData()
 
@@ -108,7 +149,7 @@ export const actions: Actions = {
 	// deductions) — allowed until the run is approved.
 	compute: async ({ params, locals, getClientAddress }) => {
 		const user = locals.user!
-		requirePayrollManage(user.role)
+		requirePayrollManage(user.roles)
 
 		try {
 			await computePayroll(params.id, user.organizationId, ctxOf(locals, getClientAddress()))
@@ -124,8 +165,7 @@ export const actions: Actions = {
 	// return needs a reason.
 	decide: async ({ request, locals, params, getClientAddress }) => {
 		const user = locals.user!
-		const roles = user.roles?.length ? user.roles : [user.role]
-		if (!canAny(roles, 'APPROVE_REQUESTS')) error(403, 'Insufficient permissions')
+		requireAnyCapability(user.roles, 'APPROVE_REQUESTS')
 
 		const parsed = decideSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid decision' })

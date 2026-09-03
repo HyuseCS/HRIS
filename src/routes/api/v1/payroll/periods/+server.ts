@@ -15,7 +15,7 @@ const openSchema = z.object({
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) return apiError(401, 'Unauthorized')
 	try {
-		requirePayrollManage(locals.user.role)
+		requirePayrollManage(locals.user.roles)
 	} catch {
 		return forbidden()
 	}
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!locals.user) return apiError(401, 'Unauthorized')
 	try {
-		requirePayrollManage(locals.user.role)
+		requirePayrollManage(locals.user.roles)
 	} catch {
 		return forbidden()
 	}
@@ -42,7 +42,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	const ctx = {
 		organizationId: locals.user.organizationId,
 		actorId: locals.user.id,
-		actorRole: locals.user.role,
+		actorRoles: locals.user.roles,
 		ipAddress: getClientAddress()
 	}
 	try {

@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { updateBenefitPlan } from '$lib/server/services/benefits'
 import { z } from 'zod'
 import type { RequestHandler } from './$types'
@@ -17,7 +17,7 @@ const patchSchema = z.object({
 export const PATCH: RequestHandler = async ({ locals, request, params, getClientAddress }) => {
 	if (!locals.user) error(401, 'Unauthorized')
 	const user = locals.user
-	requireCapability(user.role, 'MANAGE_HR')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const parsed = patchSchema.safeParse(await request.json())
 	if (!parsed.success) error(422, parsed.error.errors[0]?.message ?? 'Invalid plan update')
@@ -25,7 +25,7 @@ export const PATCH: RequestHandler = async ({ locals, request, params, getClient
 	const plan = await updateBenefitPlan(params.id, user.organizationId, parsed.data, {
 		organizationId: user.organizationId,
 		actorId: user.id,
-		actorRole: user.role,
+		actorRoles: user.roles,
 		ipAddress: getClientAddress()
 	})
 	return json({ plan })

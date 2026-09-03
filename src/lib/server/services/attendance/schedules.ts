@@ -2,6 +2,7 @@ import { db } from '$lib/server/db'
 import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import { Prisma } from '@prisma/client'
+import { AM_PM_MIN_GAP_CEILING, AM_PM_MIN_GAP_FLOOR, isValidAmPmMinGap } from './derive'
 import type { AuditContext } from '../types'
 
 /**
@@ -35,10 +36,13 @@ export async function createSchedule(
 	if (data.endMinutes <= data.startMinutes) error(400, 'End time must be after start time')
 	if (data.weekdays.length === 0) error(400, 'Select at least one working day')
 
-	const schedule = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+	// #324: the audit row joins the transaction that creates the schedule. It used to sit outside,
+	// so a failed audit write left a new schedule — possibly one that had just demoted the org
+	// default — standing with no record of who added it.
+	return await db.$transaction(async (tx: Prisma.TransactionClient) => {
 		if (data.isDefault)
 			await tx.workSchedule.updateMany({ where: { organizationId }, data: { isDefault: false } })
-		return tx.workSchedule.create({
+		const schedule = await tx.workSchedule.create({
 			data: {
 				organizationId,
 				name: data.name,
@@ -54,33 +58,83 @@ export async function createSchedule(
 				}
 			}
 		})
-	})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'WorkSchedule',
-		entityId: schedule.id,
-		newValue: {
-			name: data.name,
-			weekdays: data.weekdays,
-			startMinutes: data.startMinutes,
-			endMinutes: data.endMinutes
-		}
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'WorkSchedule',
+				entityId: schedule.id,
+				newValue: {
+					name: data.name,
+					weekdays: data.weekdays,
+					startMinutes: data.startMinutes,
+					endMinutes: data.endMinutes
+				}
+			},
+			tx
+		)
+		return schedule
 	})
-	return schedule
 }
 
 /** Toggle the org-wide tardiness master switch (#190). ANDs with each schedule's own flag. */
 export async function setOrgTardiness(organizationId: string, enabled: boolean, ctx: AuditContext) {
-	await db.organization.update({
-		where: { id: organizationId },
-		data: { trackTardiness: enabled }
+	// #324: the toggle and its audit row commit together — an org-wide tardiness switch flipped
+	// with no record of who flipped it is exactly the change someone needs to find later.
+	await db.$transaction(async (tx) => {
+		await tx.organization.update({
+			where: { id: organizationId },
+			data: { trackTardiness: enabled }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Organization',
+				entityId: organizationId,
+				newValue: { trackTardiness: enabled }
+			},
+			tx
+		)
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Organization',
-		entityId: organizationId,
-		newValue: { trackTardiness: enabled }
+}
+
+/**
+ * Set (or clear, with null) the org's AM/PM boundary threshold in minutes (#162). Null restores
+ * the built-in default. Bounds are enforced here as well as at the action, because this is the
+ * only writer and a bad value silently re-splits every day in the tenant. `organizationId` is
+ * always the session's own org, so the update is org-scoped by construction — never accept an
+ * organization id from a form.
+ */
+export async function setOrgAmPmMinGap(
+	organizationId: string,
+	minutes: number | null,
+	ctx: AuditContext
+) {
+	if (minutes !== null && !isValidAmPmMinGap(minutes))
+		error(
+			400,
+			`The AM/PM gap must be a whole number of minutes between ${AM_PM_MIN_GAP_FLOOR} and ${AM_PM_MIN_GAP_CEILING}.`
+		)
+
+	// #324: the threshold change and its audit row commit together — this value re-splits every
+	// day in the tenant, so it must not be able to move unrecorded.
+	await db.$transaction(async (tx) => {
+		await tx.organization.update({
+			where: { id: organizationId },
+			data: { amPmMinGapMinutes: minutes }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Organization',
+				entityId: organizationId,
+				newValue: { amPmMinGapMinutes: minutes }
+			},
+			tx
+		)
 	})
 }
 
@@ -91,17 +145,26 @@ export async function setScheduleTardiness(
 	enabled: boolean,
 	ctx: AuditContext
 ) {
-	const res = await db.workSchedule.updateMany({
-		where: { id, organizationId },
-		data: { trackTardiness: enabled }
-	})
-	if (res.count === 0) error(404, 'Schedule not found')
+	// #324: the toggle and its audit row commit together. The 404 stays inside — `updateMany`
+	// wrote nothing when the count is zero, so the rollback is a no-op and the status still
+	// propagates (Prisma rethrows the original error object).
+	await db.$transaction(async (tx) => {
+		const res = await tx.workSchedule.updateMany({
+			where: { id, organizationId },
+			data: { trackTardiness: enabled }
+		})
+		if (res.count === 0) error(404, 'Schedule not found')
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'WorkSchedule',
-		entityId: id,
-		newValue: { trackTardiness: enabled }
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'WorkSchedule',
+				entityId: id,
+				newValue: { trackTardiness: enabled }
+			},
+			tx
+		)
 	})
 }
 
@@ -113,7 +176,7 @@ export async function assignSchedule(
 	ctx: AuditContext
 ) {
 	const emp = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true }
 	})
 	if (!emp) error(404, 'Employee not found')
@@ -124,11 +187,19 @@ export async function assignSchedule(
 		})
 		if (!s) error(404, 'Work schedule not found')
 	}
-	await db.employee.update({ where: { id: employeeId }, data: { workScheduleId: scheduleId } })
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Employee',
-		entityId: employeeId,
-		newValue: { workScheduleId: scheduleId }
+	// #324: the assignment and its audit row commit together. The two org-scope guards above stay
+	// outside — they are reads, and holding a transaction open across them buys nothing.
+	await db.$transaction(async (tx) => {
+		await tx.employee.update({ where: { id: employeeId }, data: { workScheduleId: scheduleId } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Employee',
+				entityId: employeeId,
+				newValue: { workScheduleId: scheduleId }
+			},
+			tx
+		)
 	})
 }

@@ -6,6 +6,7 @@ import { computePagibig, computePhilhealth, computeSSS } from './ph-statutory'
 import { getStatutoryRateConfig, statutoryRatesFromConfig } from './statutory-rates'
 import { monthlyBasisOf } from './types'
 import { q2 } from './money'
+import { assertNotSelf } from '../employee-access'
 import type { AuditContext } from '../types'
 
 /**
@@ -19,8 +20,8 @@ const CONTRIBUTIONS = ['SSS', 'PHILHEALTH', 'PAGIBIG'] as const satisfies Statut
 
 async function requireEmployee(employeeId: string, organizationId: string) {
 	const e = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
-		select: { id: true, basicMonthlySalary: true, rateType: true }
+		where: { id: employeeId, organizationId },
+		select: { id: true, userId: true, basicMonthlySalary: true, rateType: true }
 	})
 	if (!e) error(404, 'Employee not found')
 	return e
@@ -113,19 +114,27 @@ export async function setStatutoryExemption(
 	exempt: boolean,
 	ctx: AuditContext
 ) {
-	await requireEmployee(employeeId, organizationId)
-	const row = await db.employeeStatutoryConfig.upsert({
-		where: { employeeId_contribution: { employeeId, contribution } },
-		create: { employeeId, contribution, exempt },
-		update: { exempt }
+	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
+	// One transaction: a failed audit write must not leave an exemption standing unrecorded —
+	// it zeroes both shares of a statutory contribution on every run.
+	return await db.$transaction(async (tx) => {
+		const row = await tx.employeeStatutoryConfig.upsert({
+			where: { employeeId_contribution: { employeeId, contribution } },
+			create: { employeeId, contribution, exempt },
+			update: { exempt }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'EmployeeStatutoryConfig',
+				entityId: row.id,
+				newValue: { contribution, exempt }
+			},
+			tx
+		)
+		return row
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'EmployeeStatutoryConfig',
-		entityId: row.id,
-		newValue: { contribution, exempt }
-	})
-	return row
 }
 
 /**
@@ -140,19 +149,27 @@ export async function setEmployerShareExternal(
 	external: boolean,
 	ctx: AuditContext
 ) {
-	await requireEmployee(employeeId, organizationId)
-	const row = await db.employeeStatutoryConfig.upsert({
-		where: { employeeId_contribution: { employeeId, contribution } },
-		create: { employeeId, contribution, employerSharePaidExternally: external },
-		update: { employerSharePaidExternally: external }
+	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
+	// One transaction: a failed audit write must not leave the flag standing unrecorded — it
+	// moves the employer share off every future payslip.
+	return await db.$transaction(async (tx) => {
+		const row = await tx.employeeStatutoryConfig.upsert({
+			where: { employeeId_contribution: { employeeId, contribution } },
+			create: { employeeId, contribution, employerSharePaidExternally: external },
+			update: { employerSharePaidExternally: external }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'EmployeeStatutoryConfig',
+				entityId: row.id,
+				newValue: { contribution, employerSharePaidExternally: external }
+			},
+			tx
+		)
+		return row
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'EmployeeStatutoryConfig',
-		entityId: row.id,
-		newValue: { contribution, employerSharePaidExternally: external }
-	})
-	return row
 }
 
 /**
@@ -167,17 +184,25 @@ export async function setStatutoryAllocation(
 	allocation: StatutoryAllocation,
 	ctx: AuditContext
 ) {
-	await requireEmployee(employeeId, organizationId)
-	const row = await db.employeeStatutoryConfig.upsert({
-		where: { employeeId_contribution: { employeeId, contribution } },
-		create: { employeeId, contribution, allocation },
-		update: { allocation }
+	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
+	// One transaction: a failed audit write must not leave the cutoff allocation standing
+	// unrecorded — it changes which payslip carries the EE share.
+	return await db.$transaction(async (tx) => {
+		const row = await tx.employeeStatutoryConfig.upsert({
+			where: { employeeId_contribution: { employeeId, contribution } },
+			create: { employeeId, contribution, allocation },
+			update: { allocation }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'EmployeeStatutoryConfig',
+				entityId: row.id,
+				newValue: { contribution, allocation }
+			},
+			tx
+		)
+		return row
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'EmployeeStatutoryConfig',
-		entityId: row.id,
-		newValue: { contribution, allocation }
-	})
-	return row
 }

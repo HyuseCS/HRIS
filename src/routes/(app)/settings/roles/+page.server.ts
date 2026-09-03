@@ -1,7 +1,9 @@
-import { fail, isHttpError, error } from '@sveltejs/kit'
+import { fail, error } from '@sveltejs/kit'
 import { z } from 'zod'
-import { can, requireCapability } from '$lib/server/rbac'
-import { listOrgUsers, setUserRole, setUserActive } from '$lib/server/services/settings/org'
+import { ASSIGNABLE_ROLES } from '$lib/rbac'
+import { canAny, requireAnyCapability } from '$lib/server/rbac'
+import { failFromError } from '$lib/server/form-fail'
+import { listOrgUsers, setUserRoles, setUserActive } from '$lib/server/services/settings/org'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -9,8 +11,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Role-change is CEO-only (#132); account activation stays with Super Admin. The
 	// page serves both, so it opens for either capability and the UI shows only the
 	// controls each caller may use.
-	const canManageRoles = can(user.role, 'MANAGE_USER_ROLES')
-	const canManageActive = can(user.role, 'ADMINISTER_SYSTEM')
+	const canManageRoles = canAny(user.roles, 'MANAGE_USER_ROLES')
+	const canManageActive = canAny(user.roles, 'ADMINISTER_SYSTEM')
 	if (!canManageRoles && !canManageActive) error(403, 'Insufficient permissions')
 
 	const users = await listOrgUsers(user.organizationId)
@@ -18,9 +20,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return { users, canManageRoles, canManageActive }
 }
 
-const roleSchema = z.object({
+const rolesSchema = z.object({
 	userId: z.string().min(1, 'User ID is required'),
-	role: z.enum(['EMPLOYEE', 'MANAGER', 'HR_ADMIN', 'SUPER_ADMIN', 'PAYROLL_OFFICER', 'FINANCE'])
+	// D4: the empty set is refused here as well as in the service, so the form surfaces a field
+	// error instead of a 400 error page.
+	roles: z.array(z.enum(ASSIGNABLE_ROLES)).nonempty('A user must keep at least one role.')
 })
 
 const activeSchema = z.object({
@@ -31,10 +35,17 @@ const activeSchema = z.object({
 export const actions: Actions = {
 	setRole: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_USER_ROLES')
+		requireAnyCapability(user.roles, 'MANAGE_USER_ROLES')
 
-		const raw = Object.fromEntries(await request.formData())
-		const parsed = roleSchema.safeParse(raw)
+		// A multi-select posts `roles` once per selected option, and Object.fromEntries collapses
+		// repeated keys to the LAST one — which would silently turn a three-role save into a
+		// one-role save with no error anywhere. getAll is the only correct read here. The sibling
+		// setActive action posts no repeated key and is right as it stands.
+		const formData = await request.formData()
+		const parsed = rolesSchema.safeParse({
+			userId: formData.get('userId'),
+			roles: formData.getAll('roles')
+		})
 
 		if (!parsed.success) {
 			return fail(400, {
@@ -43,30 +54,25 @@ export const actions: Actions = {
 			})
 		}
 
-		// GUARDRAIL: a SUPER_ADMIN cannot change their own role.
-		if (parsed.data.userId === user.id) {
-			return fail(400, { error: 'You cannot change your own role.' })
-		}
-
 		const ctx = {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		}
 
 		try {
-			await setUserRole(parsed.data.userId, user.organizationId, parsed.data.role, ctx)
+			await setUserRoles(parsed.data.userId, user.organizationId, parsed.data.roles, ctx)
 		} catch (err) {
-			// Surface the last-super-admin guardrail as an inline error, not a 409 page.
-			if (isHttpError(err) && err.status === 409) return fail(409, { error: err.body.message })
-			throw err
+			// Surface the service's guardrails — last super admin / last CEO (409) and
+			// self-role-change (403) — as inline errors rather than error pages.
+			return failFromError(err)
 		}
 	},
 
 	setActive: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'ADMINISTER_SYSTEM')
+		requireAnyCapability(user.roles, 'ADMINISTER_SYSTEM')
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = activeSchema.safeParse(raw)
@@ -75,15 +81,10 @@ export const actions: Actions = {
 			return fail(400, { error: 'Invalid input. Please check the form fields.' })
 		}
 
-		// GUARDRAIL: a SUPER_ADMIN cannot deactivate their own account.
-		if (parsed.data.userId === user.id) {
-			return fail(400, { error: 'You cannot deactivate your own account.' })
-		}
-
 		const ctx = {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		}
 
@@ -95,8 +96,7 @@ export const actions: Actions = {
 				ctx
 			)
 		} catch (err) {
-			if (isHttpError(err) && err.status === 409) return fail(409, { error: err.body.message })
-			throw err
+			return failFromError(err)
 		}
 	}
 }

@@ -71,6 +71,12 @@
 			label: 'Separation',
 			desc: 'Offboarding cases, clearance & final pay',
 			payroll: false
+		},
+		{
+			href: '/reports/recruitment',
+			label: 'Recruitment',
+			desc: 'Job postings, applicant funnel & days open',
+			payroll: false
 		}
 	]
 	const reportCards = $derived(

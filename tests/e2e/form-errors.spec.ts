@@ -3,11 +3,12 @@ import { login, USERS } from './helpers'
 
 // #106: both pages returned fail(..., { error }) from their actions, but neither
 // rendered it — benefits never destructured `form` at all, and performance nested the
-// banner inside the collapsible create-goal form. Every validation failure was silent:
-// the user saw the form do nothing.
+// banner inside a collapsible form. Every validation failure was silent: the user saw
+// the form do nothing.
 //
-// Each test clears a required field (removing the attribute so the browser lets the
-// submit through) and asserts the server's complaint reaches the screen.
+// Each test forces one input the server will reject — stripping the HTML attribute that
+// would otherwise make the browser block the submit — and asserts the server's complaint
+// reaches the screen as readable text.
 
 test('benefits surfaces a failed plan creation instead of silently doing nothing', async ({
 	page
@@ -34,27 +35,37 @@ test('benefits surfaces a failed plan creation instead of silently doing nothing
 	await expect(page.getByRole('alert')).not.toContainText('[object Object]')
 })
 
-test('performance surfaces cycle errors without the goal form being open', async ({ page }) => {
+test('the review schedule surfaces a rejected cadence in the page-level banner', async ({
+	page
+}) => {
 	await login(page, USERS.admin)
-	await page.goto('/performance', { waitUntil: 'domcontentloaded' })
+	await page.goto('/settings/performance', { waitUntil: 'domcontentloaded' })
 
-	// Deliberately do NOT open Create Goal — that is the point. The banner used to live
-	// inside it, so a cycle error was invisible unless that form happened to be open.
-	const form = page.locator('form[action*="createCycle"]')
+	// The original guard sat on /performance's cycle form, which Phase 5 deleted along with every
+	// action on that page. The banner it protected now lives at settings/performance/+page.svelte,
+	// so the guard moves here rather than being dropped.
+	const form = page.locator('form[action*="saveConfig"]')
 	await expect(form).toBeVisible()
 
-	// Retried as a whole: the date inputs use `bind:value`, so filling them before
-	// hydration lands gets undone when Svelte syncs state back, leaving them empty and
-	// `required` — the browser then blocks submission and the server is never reached.
-	// The dates must be valid; only `name` is left blank, which is what the action rejects.
-	await expect(async () => {
-		await form.locator('input[name="startDate"]').fill('2026-09-01')
-		await form.locator('input[name="endDate"]').fill('2026-09-30')
-		await form.locator('input[name="name"]').evaluate((el: HTMLInputElement) => {
-			el.removeAttribute('required')
-			el.value = ''
-		})
-		await form.getByRole('button', { name: 'Create cycle' }).click()
-		await expect(page.getByRole('alert')).toBeVisible({ timeout: 2000 })
-	}).toPass({ timeout: 20000 })
+	// `max="24"` makes the browser refuse to submit 99 at all, so the server would never see it
+	// and the click would hang — same reason the benefits case above strips `required`.
+	await form.locator('input[name="intervalMonths"]').evaluate((el: HTMLInputElement) => {
+		el.removeAttribute('max')
+		el.value = '99'
+	})
+	await form.getByRole('button', { name: 'Save schedule' }).click()
+
+	// The banner must appear at all — before #106 nothing rendered.
+	await expect(page.getByRole('alert')).toBeVisible()
+	// ...and it must be readable: returning the raw zod fieldErrors object here renders as
+	// "[object Object]", which is the defect #106 actually was.
+	await expect(page.getByRole('alert')).not.toContainText('[object Object]')
+})
+
+// #178 AC17: the Goals REST route is deleted, not merely unlinked. A source grep proves the
+// file is gone; only a real request proves the URL no longer answers. Positive assertion on
+// the status code — "the page looks empty" would pass against a live route returning [].
+test('the removed Goals API route is gone', async ({ request }) => {
+	const res = await request.get('/api/v1/performance/goals')
+	expect(res.status()).toBe(404)
 })

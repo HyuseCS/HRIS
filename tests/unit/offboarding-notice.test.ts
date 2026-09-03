@@ -9,8 +9,8 @@ describe('buildOffboardingNotice (#185)', () => {
 		employeeName: 'Robin Santos',
 		effectiveDate: new Date('2026-08-31T00:00:00Z'),
 		checklist: [
-			{ label: 'Return company equipment', department: 'IT' },
-			{ label: 'Settle outstanding loans', department: 'Finance' }
+			{ label: 'Return company equipment', area: 'IT' as const },
+			{ label: 'Settle outstanding loans', area: 'FINANCE' as const }
 		]
 	}
 
@@ -21,7 +21,9 @@ describe('buildOffboardingNotice (#185)', () => {
 		expect(body).toContain('effective August 31, 2026')
 	})
 
-	it('lists every clearance item with its department', () => {
+	// The fixture carries the raw enum values; the assertions below are the display labels —
+	// so this also proves the CLEARANCE_AREA_LABELS round-trip (#306).
+	it('lists every clearance item with its clearance area', () => {
 		const { body } = buildOffboardingNotice(base)
 		expect(body).toContain('Return company equipment (IT)')
 		expect(body).toContain('Settle outstanding loans (Finance)')

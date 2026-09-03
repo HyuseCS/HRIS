@@ -1,46 +1,18 @@
 <script lang="ts">
-	import { enhance } from '$app/forms'
-	import { advanceTo } from '$lib/actions/dateRange'
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { formatShortDate } from '$lib/utils/format'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
-	import type { PageData, ActionData } from './$types'
+	import type { PageData } from './$types'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
-	let showGoal = $state(false)
-	let cycleStart = $state('')
-	let cycleEnd = $state('')
-
-	// #108: a double-click would create a duplicate goal / cycle, or re-run a status transition.
-	const createGoal = createSubmitGuard()
-	const createCycle = createSubmitGuard()
-
-	// Forms inside {#each} need one guard per row — a single shared guard would disable every
-	// row's button at once. Keyed lazily so each row keeps its own stable instance.
-	const rowGuards = new Map<string, ReturnType<typeof createSubmitGuard>>()
-	function rowGuard(key: string) {
-		let g = rowGuards.get(key)
-		if (!g) {
-			g = createSubmitGuard()
-			rowGuards.set(key, g)
-		}
-		return g
-	}
-
-	const goalStatusClass = (status: string) =>
-		status === 'COMPLETED'
-			? 'bg-green-500/15 text-green-400'
-			: status === 'CANCELLED'
-				? 'bg-red-500/15 text-red-400'
-				: status === 'DRAFT'
-					? 'bg-gray-500/15 text-gray-400'
-					: 'bg-blue-500/15 text-blue-400'
+	let { data }: { data: PageData } = $props()
 
 	const reviewStatusClass = (status: string) =>
 		status === 'COMPLETED' || status === 'ACKNOWLEDGED'
 			? 'bg-green-500/15 text-green-400'
 			: status === 'PENDING'
 				? 'bg-yellow-500/15 text-yellow-400'
-				: 'bg-blue-500/15 text-blue-400'
+				: status === 'SCORED' || status === 'SIGNING'
+					? 'bg-purple-500/15 text-purple-400'
+					: 'bg-blue-500/15 text-blue-400'
 </script>
 
 <svelte:head>
@@ -50,303 +22,111 @@
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold tracking-tight">Performance</h1>
-		<button
-			onclick={() => (showGoal = !showGoal)}
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			New Goal
-		</button>
 	</div>
 
-	<!-- Create goal form -->
-	<!-- Top level: this banner used to sit inside the create-goal form, so failures from
-	     updateGoal / createCycle / setCycleStatus / openReviews — all submitted from
-	     elsewhere on the page — were only visible if that form happened to be open. -->
-	{#if form?.error}
-		<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-			{form.error}
-		</div>
+	<!-- #178 readiness note. Informational, never a gate: it disables nothing and blocks no
+	     action. The count is 0 for anyone without ADMINISTER_HR_ORGWIDE (see the load), so the
+	     capability check is the server's and `> 0` is the whole client-side condition. -->
+	{#if data.templateBackfill > 0}
+		<p class="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm">
+			{data.templateBackfill} active
+			{data.templateBackfill === 1 ? 'employee has' : 'employees have'} no assigned template. This is
+			a readiness note, not a blocker.
+		</p>
 	{/if}
 
-	{#if showGoal}
-		<form
-			method="POST"
-			action="?/createGoal"
-			use:enhance={createGoal.enhance}
-			class="rounded-lg border p-4 space-y-4"
-		>
-			<h2 class="font-semibold">Create Goal</h2>
-			<div class="grid gap-3 sm:grid-cols-2">
-				<div class="sm:col-span-2">
-					<label for="title" class="text-sm font-medium">Title</label>
-					<input
-						id="title"
-						name="title"
-						required
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-				<div class="sm:col-span-2">
-					<label for="description" class="text-sm font-medium">Description (optional)</label>
-					<textarea
-						id="description"
-						name="description"
-						rows="2"
-						class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					></textarea>
-				</div>
-				<div>
-					<label for="category" class="text-sm font-medium">Category (optional)</label>
-					<input
-						id="category"
-						name="category"
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-				<div>
-					<label for="targetDate" class="text-sm font-medium">Target Date (optional)</label>
-					<input
-						id="targetDate"
-						name="targetDate"
-						type="date"
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-			</div>
-			<div class="flex gap-2 justify-end">
-				<button
-					type="button"
-					onclick={() => (showGoal = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-				<button
-					type="submit"
-					disabled={createGoal.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{createGoal.busy ? 'Saving…' : 'Save Goal'}</button
-				>
-			</div>
-		</form>
-	{/if}
-
-	<!-- My Goals -->
-	<section class="space-y-3">
-		<h2 class="text-lg font-semibold">My Goals</h2>
-		{#if data.myGoals.length > 0}
-			<div class="grid gap-3 sm:grid-cols-2">
-				{#each data.myGoals as goal (goal.id)}
-					{@const updateGoal = rowGuard('goal-' + goal.id)}
-					<div class="rounded-lg border bg-card p-4 space-y-3">
-						<div class="flex items-start justify-between gap-2">
-							<div>
-								<p class="font-medium">{goal.title}</p>
-								{#if goal.category}
-									<p class="text-xs text-muted-foreground">{goal.category}</p>
-								{/if}
-							</div>
-							<span
-								class="rounded-full px-2 py-0.5 text-xs font-medium {goalStatusClass(goal.status)}"
-							>
-								{goal.status}
-							</span>
-						</div>
-						{#if goal.description}
-							<p class="text-sm text-muted-foreground">{goal.description}</p>
-						{/if}
-						<div>
-							<div class="flex items-center justify-between text-xs text-muted-foreground">
-								<span>Progress</span>
-								<span>{goal.progress}%</span>
-							</div>
-							<div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
-								<div class="h-full rounded-full bg-primary" style="width: {goal.progress}%"></div>
-							</div>
-						</div>
-						{#if goal.targetDate}
-							<p class="text-xs text-muted-foreground">
-								Target: {formatShortDate(goal.targetDate)}
-							</p>
-						{/if}
-						<form
-							method="POST"
-							action="?/updateGoal"
-							use:enhance={updateGoal.enhance}
-							class="flex items-end gap-2 border-t pt-3"
-						>
-							<input type="hidden" name="id" value={goal.id} />
-							<div class="flex-1">
-								<label for={'progress-' + goal.id} class="text-xs font-medium text-muted-foreground"
-									>Progress</label
-								>
-								<input
-									id={'progress-' + goal.id}
-									name="progress"
-									type="number"
-									min="0"
-									max="100"
-									value={goal.progress}
-									class="mt-1 flex h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								/>
-							</div>
-							<div class="flex-1">
-								<label for={'status-' + goal.id} class="text-xs font-medium text-muted-foreground"
-									>Status</label
-								>
-								<select
-									id={'status-' + goal.id}
-									name="status"
-									class="mt-1 flex h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									{#each ['DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as s (s)}
-										<option value={s} selected={s === goal.status}>{s}</option>
-									{/each}
-								</select>
-							</div>
-							<button
-								type="submit"
-								disabled={updateGoal.busy}
-								class="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-								>{updateGoal.busy ? 'Updating…' : 'Update'}</button
-							>
-						</form>
-					</div>
-				{/each}
-			</div>
-		{:else}
-			<div class="rounded-lg border p-8 text-center text-sm text-muted-foreground">
-				No goals yet
-			</div>
-		{/if}
-	</section>
-
-	<!-- Review Cycles (HR) -->
-	{#if data.isAdmin}
+	<!-- Review Cycles (HR) — read-only. #178: cycles are generated by the nightly cron, so there
+	     is no create form and no hand-run status transition; this is the record of what it made. -->
+	{#if data.isAdmin && data.cycles.length}
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Review Cycles</h2>
-			<form
-				method="POST"
-				action="?/createCycle"
-				use:enhance={createCycle.enhance}
-				class="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-4"
-			>
-				<input
-					name="name"
-					aria-label="Cycle name"
-					placeholder="e.g. 2026 Mid-Year"
-					required
-					class="h-9 w-44 rounded-md border border-input bg-background px-2 text-sm"
-				/>
-				<input
-					name="startDate"
-					type="date"
-					aria-label="Cycle start date"
-					required
-					bind:value={cycleStart}
-					max={cycleEnd || undefined}
-					use:advanceTo={'endDate'}
-					class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-				/>
-				<input
-					name="endDate"
-					type="date"
-					aria-label="Cycle end date"
-					required
-					bind:value={cycleEnd}
-					min={cycleStart || undefined}
-					class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-				/>
-				<button
-					disabled={createCycle.busy}
-					class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{createCycle.busy ? 'Creating…' : 'Create cycle'}</button
+			<div class="overflow-x-auto rounded-lg border">
+				<table class="w-full text-sm">
+					<thead class="border-b bg-muted/50">
+						<tr>
+							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
+							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
+							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y">
+						{#each data.cycles as c (c.id)}
+							<tr class="hover:bg-muted/30">
+								<td class="px-4 py-3 font-medium">{c.name}</td>
+								<td class="px-4 py-3 text-muted-foreground"
+									>{formatShortDate(c.startDate)} – {formatShortDate(c.endDate)}</td
+								>
+								<td class="px-4 py-3"
+									><span
+										class="rounded-full px-2 py-0.5 text-xs font-medium {reviewStatusClass(
+											c.status
+										)}">{c.status}</span
+									></td
+								>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	{/if}
+
+	<!-- Stalled Sign-offs (HR) — #178 item 145 / SPEC AC12. A DIFFERENT LIST from the
+	     unreviewable one on purpose: unreviewable means the review was never created; stalled
+	     means it exists, is part-way signed, and its next signatory resolves to nobody. They need
+	     different fixes, so they must not be merged into one section.
+
+	     `canHrOrgwide` comes from the load, which is where the capability is really checked. The
+	     flag exists so this section is never rendered for someone who would only get a 403 — and
+	     so an empty list still shows HR the good, all-clear state. -->
+	{#if data.canHrOrgwide}
+		<section class="space-y-3">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-lg font-semibold">Stalled Sign-offs</h2>
+				<a href="/departments" class="text-sm font-medium text-primary hover:underline"
+					>Assign department heads</a
 				>
-			</form>
-			{#if data.cycles.length}
+			</div>
+			<p class="text-sm text-muted-foreground">
+				Reviews that are already under way but cannot move: the next person to sign is not assigned.
+				This is not the same as a review that was never created.
+			</p>
+			{#if data.stalledSignoffs.length}
 				<div class="overflow-x-auto rounded-lg border">
 					<table class="w-full text-sm">
 						<thead class="border-b bg-muted/50">
 							<tr>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-								<th class="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Waiting on</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y">
-							{#each data.cycles as c (c.id)}
-								{@const activateCycle = rowGuard('activate-' + c.id)}
-								{@const openReviews = rowGuard('open-' + c.id)}
-								{@const closeCycle = rowGuard('close-' + c.id)}
+							{#each data.stalledSignoffs as s (s.reviewId)}
 								<tr class="hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">{c.name}</td>
-									<td class="px-4 py-3 text-muted-foreground"
-										>{formatShortDate(c.startDate)} – {formatShortDate(c.endDate)}</td
-									>
 									<td class="px-4 py-3"
-										><span
-											class="rounded-full px-2 py-0.5 text-xs font-medium {reviewStatusClass(
-												c.status
-											)}">{c.status}</span
+										><a
+											href="/performance/reviews/{s.reviewId}"
+											class="font-medium text-primary hover:underline">{s.employeeName}</a
 										></td
 									>
-									<td class="px-4 py-3">
-										<div class="flex items-center justify-end gap-2">
-											{#if c.status === 'DRAFT'}
-												<form
-													method="POST"
-													action="?/setCycleStatus"
-													use:enhance={activateCycle.enhance}
-												>
-													<input type="hidden" name="id" value={c.id} /><input
-														type="hidden"
-														name="status"
-														value="ACTIVE"
-													/><button
-														disabled={activateCycle.busy}
-														class="rounded-md border border-green-500/20 px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-500/10 disabled:pointer-events-none disabled:opacity-50"
-														>{activateCycle.busy ? 'Activating…' : 'Activate'}</button
-													>
-												</form>
-											{/if}
-											{#if c.status === 'ACTIVE'}
-												<form
-													method="POST"
-													action="?/openReviews"
-													use:enhance={openReviews.enhance}
-												>
-													<input type="hidden" name="id" value={c.id} /><button
-														disabled={openReviews.busy}
-														class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
-														>{openReviews.busy ? 'Opening…' : 'Open reviews'}</button
-													>
-												</form>
-												<form
-													method="POST"
-													action="?/setCycleStatus"
-													use:enhance={closeCycle.enhance}
-												>
-													<input type="hidden" name="id" value={c.id} /><input
-														type="hidden"
-														name="status"
-														value="CLOSED"
-													/><button
-														disabled={closeCycle.busy}
-														class="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-														>{closeCycle.busy ? 'Closing…' : 'Close'}</button
-													>
-												</form>
-											{/if}
-										</div>
-									</td>
+									<td class="px-4 py-3 text-muted-foreground">{s.departmentName}</td>
+									<td class="px-4 py-3 text-muted-foreground">{s.cycleName}</td>
+									<td class="px-4 py-3">{s.slot.label} — no one is assigned</td>
 								</tr>
 							{/each}
 						</tbody>
 					</table>
 				</div>
+			{:else}
+				<div class="rounded-lg border">
+					<EmptyState
+						title="No sign-off is stalled"
+						description="Every review under way has someone who can sign it next."
+					/>
+				</div>
 			{/if}
-			{#if form?.opened != null}<p class="text-xs text-green-600 dark:text-green-400">
-					Opened {form.opened} review(s).
-				</p>{/if}
 		</section>
 	{/if}
 
@@ -393,40 +173,6 @@
 			</table>
 		</div>
 	</section>
-
-	<!-- Team Goals (manager view) -->
-	{#if data.isManager && data.teamGoals.length}
-		<section class="space-y-3">
-			<h2 class="text-lg font-semibold">Team Goals</h2>
-			<div class="overflow-x-auto rounded-lg border">
-				<table class="w-full text-sm">
-					<thead class="border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Goal</th>
-							<th class="px-4 py-3 text-right font-medium text-muted-foreground">Progress</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y">
-						{#each data.teamGoals as g (g.id)}
-							<tr class="hover:bg-muted/30">
-								<td class="px-4 py-3">{g.employee.lastName}, {g.employee.firstName}</td>
-								<td class="px-4 py-3 font-medium">{g.title}</td>
-								<td class="px-4 py-3 text-right">{g.progress}%</td>
-								<td class="px-4 py-3"
-									><span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {goalStatusClass(g.status)}"
-										>{g.status}</span
-									></td
-								>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		</section>
-	{/if}
 
 	<!-- Reviews to Complete (reviewer) -->
 	{#if data.reviewsToGive.length}

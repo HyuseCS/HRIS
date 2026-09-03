@@ -3,14 +3,39 @@
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { addToast } from '$lib/stores/toast.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
 
 	// #108: a double-submit here creates a duplicate payroll run for the same period.
-	const create = createSubmitGuard()
+	//
+	// It also owns the success confirmation: a created run used to leave this panel open over a
+	// reset picker with nothing said, so the only way to know it worked was to spot the new row in
+	// the list below. Closing the panel and naming the period is the confirmation — the period
+	// matters because a custom range can now span two months, and the list shows many runs.
+	//
+	// Announced from the submit callback, NOT from an `$effect` watching `form`. `addToast` pushes
+	// onto a `$state` array, and `push` reads it as well as writing it — inside an effect that is a
+	// read-write cycle and Svelte 5 aborts the page with `effect_update_depth_exceeded`. Same trap,
+	// same fix as `settings/backup`.
+	const create = createSubmitGuard((input) => {
+		// Read before `update()`: a successful submit resets the form and blanks these.
+		const start = String(input.formData.get('periodStart') ?? '')
+		const end = String(input.formData.get('periodEnd') ?? '')
+		return async ({ update, result }) => {
+			await update()
+			if (result.type !== 'success') return
+			showCreate = false
+			addToast(
+				`Payroll run created for ${formatShortDate(new Date(start))} – ${formatShortDate(new Date(end))}.`,
+				{ kind: 'success' }
+			)
+		}
+	})
 
 	// #108: compute/approve live inside an {#each}, so each run needs its OWN guard — a single
 	// shared one would disable every row's button at once. Memoised by `${runId}:${action}`.
@@ -72,7 +97,9 @@
 			{#if form?.error}<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
 					{form.error}
 				</div>{/if}
-			<div class="max-w-md">
+			<!-- #163: wide enough that Month, Year and all four period buttons sit on one row
+			     and the two date fields keep their two-column grid instead of stacking. -->
+			<div class="max-w-4xl">
 				<PeriodPicker />
 			</div>
 			<div class="flex items-center gap-2">
@@ -171,6 +198,22 @@
 												>{recomputeG.busy ? 'Computing…' : 'Recompute'}</button
 											>
 										</form>
+									{/if}
+									<!-- #319: an overlapping range is refused with "void the conflicting run to
+									     proceed", so that run needs a Void control on the screen that shows the
+									     message. Confirmed, because a locked period's amortization is credited
+									     back and the run cannot be un-voided. -->
+									{#if data.canVoid && run.organizationId === data.viewerOrg && run.status !== 'VOIDED'}
+										<ConfirmButton
+											action="?/void"
+											title="Void this payroll run?"
+											message="The run is marked VOIDED and any amortization it collected is credited back. This cannot be undone, and the same exact period cannot be created again."
+											confirmText="Void run"
+											triggerLabel="Void"
+											triggerClass="btn-row text-destructive"
+										>
+											<input type="hidden" name="id" value={run.id} />
+										</ConfirmButton>
 									{/if}
 									<!-- Sign-off (verify → approve) happens through the chain on the detail page (#134). -->
 									<a href="/payroll/{run.id}" class="btn-row"

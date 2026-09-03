@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Role } from '@prisma/client'
-import { ROLE_HIERARCHY, CAPABILITIES } from '$lib/rbac'
+import { CAPABILITIES } from '$lib/rbac'
 
 /**
  * #228 — object-level scoping for employee records.
@@ -14,7 +14,7 @@ import { ROLE_HIERARCHY, CAPABILITIES } from '$lib/rbac'
 const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	dbMock: {
-		employee: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+		employee: { findFirst: vi.fn(), findMany: vi.fn() },
 		branch: { findMany: vi.fn() }
 	}
 }))
@@ -25,7 +25,12 @@ vi.mock('$lib/server/services/supervisors', () => ({ listReportIdsFor }))
 const { canTouchEmployee, assertCanTouchEmployee, listVisibleEmployeeIds } =
 	await import('$lib/server/services/employee-access')
 
-const actor = (role: Role) => ({ id: 'user1', role, organizationId: 'org1' })
+/** `roles` omitted leaves it undefined, so the fallback reproduces the single-role rule exactly. */
+const actor = (role: Role, roles?: Role[]) => ({
+	id: 'user1',
+	roles: roles ?? [role],
+	organizationId: 'org1'
+})
 /** The manager's own employee record. */
 const SELF = { id: 'mgr-emp' }
 
@@ -33,15 +38,27 @@ const SELF = { id: 'mgr-emp' }
 let branchStaff: { id: string }[] = []
 /** Ids the org filter rejects, standing in for a record in another tenant. */
 let foreignIds: string[] = []
+/** The actor's own employee row, or `null` for "no record in the ACTIVE org". */
+let selfRow: { id: string } | null = null
+/** What the closing target lookup returns, or `null` for "that row is in another tenant". */
+let targetRow: { branchId: string | null } | null = null
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	dbMock.employee.findUnique.mockResolvedValue(SELF)
 	listReportIdsFor.mockResolvedValue([])
 	dbMock.branch.findMany.mockResolvedValue([])
-	dbMock.employee.findFirst.mockResolvedValue({ branchId: null })
 	branchStaff = []
 	foreignIds = []
+	selfRow = SELF
+	targetRow = { branchId: null }
+	// #6 made the self lookup a `findFirst` too, so ONE `vi.fn()` now serves both calls: the self
+	// lookup keyed by `userId` and the closing target lookup keyed by `id`. Discriminate on the
+	// where-shape, as `findMany` below already does. A plain `mockResolvedValue` would hand the
+	// target's row to the self lookup, leaving `self.id` undefined — which turns every fail-closed
+	// case green for the wrong reason instead of failing.
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? selfRow : targetRow)
+	)
 	// Two different findMany calls: "who is in my branches" (keyed by branchId) and the closing
 	// org filter (keyed by id). Discriminate on the where-shape rather than call order, so a
 	// manager with no branches — who skips the first call entirely — still resolves correctly.
@@ -57,13 +74,15 @@ beforeEach(() => {
 })
 
 describe('the capability split this fix depends on (#228)', () => {
-	it('MANAGE_HR cannot express "real HR" — it holds MANAGER, who also clears the rank gate', () => {
-		const clearsManagerFloor = Object.entries(ROLE_HIERARCHY)
-			.filter(([, rank]) => rank >= ROLE_HIERARCHY.MANAGER)
-			.map(([role]) => role)
-			.sort()
-		// Identical sets ⇒ `requireMinRole('MANAGER')` + `!can(MANAGE_HR)` is unreachable.
-		expect([...CAPABILITIES.MANAGE_HR].sort()).toEqual(clearsManagerFloor)
+	// #282 deleted `ROLE_HIERARCHY`, which this used to derive the floor's role set from. The claim
+	// is the same one, stated directly: MANAGE_HR holds MANAGER, so it cannot express "real HR".
+	it('MANAGE_HR cannot express "real HR" — it holds MANAGER', () => {
+		expect([...CAPABILITIES.MANAGE_HR].sort()).toEqual([
+			'CEO',
+			'HR_ADMIN',
+			'MANAGER',
+			'SUPER_ADMIN'
+		])
 	})
 
 	it('ADMINISTER_HR_ORGWIDE is the one that actually excludes MANAGER', () => {
@@ -79,7 +98,7 @@ describe('the capability split this fix depends on (#228)', () => {
 describe('canTouchEmployee (#228)', () => {
 	it('lets HR_ADMIN reach anyone without even looking up a team', async () => {
 		expect(await canTouchEmployee(actor('HR_ADMIN'), 'stranger')).toBe(true)
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 
 	it('lets CEO and SUPER_ADMIN reach anyone', async () => {
@@ -102,41 +121,52 @@ describe('canTouchEmployee (#228)', () => {
 
 	it('allows a MANAGER on someone in a branch they manage', async () => {
 		dbMock.branch.findMany.mockResolvedValue([{ id: 'br1' }])
-		dbMock.employee.findFirst.mockResolvedValue({ branchId: 'br1' })
+		targetRow = { branchId: 'br1' }
 		expect(await canTouchEmployee(actor('MANAGER'), 'crew1')).toBe(true)
 	})
 
 	it('refuses a report who belongs to another organization', async () => {
-		// createEmployee takes reportsToId as given, so a cross-tenant report row is writable.
+		// Rows written before #235 can still point across tenants (every writer validates now).
 		// The relationship must not survive the org filter.
 		listReportIdsFor.mockResolvedValue(['report1'])
-		dbMock.employee.findFirst.mockResolvedValue(null)
+		targetRow = null
 		expect(await canTouchEmployee(actor('MANAGER'), 'report1')).toBe(false)
 	})
 
 	it('refuses a MANAGER on someone in a branch they do NOT manage', async () => {
 		dbMock.branch.findMany.mockResolvedValue([{ id: 'br1' }])
-		dbMock.employee.findFirst.mockResolvedValue({ branchId: 'br2' })
+		targetRow = { branchId: 'br2' }
 		expect(await canTouchEmployee(actor('MANAGER'), 'crew2')).toBe(false)
 	})
 
 	it('fails closed when the actor has no employee record of their own', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		selfRow = null
 		expect(await canTouchEmployee(actor('MANAGER'), 'anyone')).toBe(false)
+	})
+
+	// #6 — the self lookup was an unscoped `findUnique`, so a multi-org actor got their HOME-org
+	// row whichever tenant the session was in. Asserted on the query, not the result: a fixture can
+	// only show which row came back, and every row here belongs to org1, so no result-shaped
+	// assertion can see a missing filter.
+	it('scopes the self lookup to the active organization (#6)', async () => {
+		await canTouchEmployee(actor('MANAGER'), 'stranger')
+		expect(dbMock.employee.findFirst).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { userId: 'user1', organizationId: 'org1' } })
+		)
 	})
 })
 
 /**
- * #232 — the roster list. `requireMinRole('HR_ADMIN')` gated both the page and its offboard
+ * #234 — the roster list. `requireMinRole('HR_ADMIN')` gated both the page and its offboard
  * action, and MANAGER clears that floor (#133), so every manager saw the whole tenant and could
  * offboard anyone in it. Same dead-guard shape as #228, one file over.
  */
-describe('listVisibleEmployeeIds (#232)', () => {
+describe('listVisibleEmployeeIds (#234)', () => {
 	it('returns null — unrestricted — for the org-wide roles, without querying', async () => {
 		for (const role of ['HR_ADMIN', 'CEO', 'SUPER_ADMIN'] as const) {
 			expect(await listVisibleEmployeeIds(actor(role))).toBeNull()
 		}
-		expect(dbMock.employee.findUnique).not.toHaveBeenCalled()
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
 	})
 
 	it('shows a MANAGER with no team only themselves', async () => {
@@ -170,8 +200,15 @@ describe('listVisibleEmployeeIds (#232)', () => {
 		expect(await listVisibleEmployeeIds(actor('MANAGER'))).not.toContain('foreign1')
 	})
 
+	it('scopes the self lookup to the active organization (#6)', async () => {
+		await listVisibleEmployeeIds(actor('MANAGER'))
+		expect(dbMock.employee.findFirst).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { userId: 'user1', organizationId: 'org1' } })
+		)
+	})
+
 	it('returns nobody — not everybody — when the actor has no employee record', async () => {
-		dbMock.employee.findUnique.mockResolvedValue(null)
+		selfRow = null
 		// The dangerous failure would be `null`, which the callers read as "unrestricted".
 		expect(await listVisibleEmployeeIds(actor('MANAGER'))).toEqual([])
 	})
@@ -185,7 +222,7 @@ describe('listVisibleEmployeeIds (#232)', () => {
 		const visible = (await listVisibleEmployeeIds(actor('MANAGER')))!
 
 		for (const id of visible) {
-			dbMock.employee.findFirst.mockResolvedValue({ branchId: id === 'crew1' ? 'br1' : null })
+			targetRow = { branchId: id === 'crew1' ? 'br1' : null }
 			expect(await canTouchEmployee(actor('MANAGER'), id)).toBe(true)
 		}
 	})
@@ -201,5 +238,56 @@ describe('assertCanTouchEmployee (#228)', () => {
 	it('resolves quietly for an allowed pairing', async () => {
 		listReportIdsFor.mockResolvedValue(['report1'])
 		await expect(assertCanTouchEmployee(actor('MANAGER'), 'report1')).resolves.toBeUndefined()
+	})
+})
+
+/**
+ * #247 — both functions read the FULL role set, not just the primary one.
+ *
+ * `can(user.role, 'ADMINISTER_HR_ORGWIDE')` saw only the primary role, so a [MANAGER, HR_ADMIN]
+ * user — org-wide HR on their second role — was scoped to a reporting line and denied 201 files and
+ * roster rows they are entitled to. Fail-closed, so nobody gained reach; they simply lost it.
+ *
+ * This is the one fail-OPEN change in #247, which is why each case asserts BOTH halves: the
+ * single-role actor must still be refused. The trust source is unchanged — `User.roles`, the same
+ * column `auth.ts` already reads, and `MANAGE_USER_ROLES` is CEO-only, so nobody can widen
+ * themselves.
+ */
+describe('the full role set decides, not the primary role (#247)', () => {
+	it('canTouchEmployee: admits [MANAGER, HR_ADMIN] on a stranger, refuses a bare [MANAGER]', async () => {
+		expect(await canTouchEmployee(actor('MANAGER', ['MANAGER', 'HR_ADMIN']), 'stranger')).toBe(true)
+		// Admitted BY THE CAPABILITY, not by accident of the fixtures: the org-wide arm returns
+		// before any team is looked up. Asserted first, on untouched mocks — without it, a mutation
+		// returning true unconditionally would also pass.
+		expect(dbMock.employee.findFirst).not.toHaveBeenCalled()
+
+		expect(await canTouchEmployee(actor('MANAGER', ['MANAGER']), 'stranger')).toBe(false)
+	})
+
+	it('listVisibleEmployeeIds: unrestricted for [MANAGER, HR_ADMIN], scoped for a bare [MANAGER]', async () => {
+		expect(await listVisibleEmployeeIds(actor('MANAGER', ['MANAGER']))).toEqual([SELF.id])
+
+		expect(await listVisibleEmployeeIds(actor('MANAGER', ['MANAGER', 'HR_ADMIN']))).toBeNull()
+	})
+
+	/**
+	 * The lockstep invariant, which the single-role version of this test could not catch: widening
+	 * one function and not the other leaves a roster that hides people whose 201 files open fine.
+	 * `null` is the unrestricted contract, so the assertion is that contract — anyone is reachable.
+	 */
+	it('the two stay in step for a multi-role actor', async () => {
+		const multi = actor('MANAGER', ['MANAGER', 'HR_ADMIN'])
+		expect(await listVisibleEmployeeIds(multi)).toBeNull()
+		expect(await canTouchEmployee(multi, 'anyone-at-all')).toBe(true)
+	})
+
+	it('assertCanTouchEmployee surfaces it through the throwing wrapper', async () => {
+		await expect(
+			assertCanTouchEmployee(actor('MANAGER', ['MANAGER']), 'stranger')
+		).rejects.toMatchObject({ status: 403 })
+
+		await expect(
+			assertCanTouchEmployee(actor('MANAGER', ['MANAGER', 'HR_ADMIN']), 'stranger')
+		).resolves.toBeUndefined()
 	})
 })

@@ -8,7 +8,19 @@ import globals from 'globals'
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-	{ ignores: ['build/', '.svelte-kit/', 'node_modules/', 'dist/'] },
+	// The `.claude/` + `.agents/` entries are the vendored vc-pro-max harness: third-party
+	// scripts that `vc-update` diffs against upstream, so we do not lint or reformat them.
+	{
+		ignores: [
+			'build/',
+			'.svelte-kit/',
+			'node_modules/',
+			'dist/',
+			'.claude/',
+			'.agents/',
+			'process/'
+		]
+	},
 	js.configs.recommended,
 	{
 		languageOptions: {

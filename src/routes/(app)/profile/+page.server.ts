@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
-import { can } from '$lib/server/rbac'
+import { canAny } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { getEmployee, updateEmployee } from '$lib/server/services/employees'
 import { listEmployeeDocuments } from '$lib/server/services/documents'
@@ -57,7 +57,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.reverse()
 
 	// Only HR may change employee details (#175); everyone else sees their profile read-only.
-	const canManage = can(user.role, 'MANAGE_HR')
+	const canManage = canAny(user.roles, 'MANAGE_HR')
 
 	return { employee, documents, benefits, punches, punchWindowDays: PUNCH_WINDOW_DAYS, canManage }
 }
@@ -85,7 +85,7 @@ export const actions: Actions = {
 
 		// Employee details are HR-managed (#175); block self-service edits even if the form is
 		// bypassed. HR edits any record (including their own) here or on /employees/[id].
-		if (!can(user.role, 'MANAGE_HR')) {
+		if (!canAny(user.roles, 'MANAGE_HR')) {
 			return fail(403, { error: 'Only HR can change employee details.' })
 		}
 
@@ -115,7 +115,7 @@ export const actions: Actions = {
 		const ctx = {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role
+			actorRoles: user.roles
 		}
 
 		try {

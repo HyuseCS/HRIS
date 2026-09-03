@@ -1,5 +1,5 @@
 import { fail, isHttpError } from '@sveltejs/kit'
-import { requireMinRole } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import {
 	listBenefitPlans,
 	createBenefitPlan,
@@ -13,13 +13,13 @@ import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
-	requireMinRole(user.role, 'HR_ADMIN')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const [plans, enrollments, employees] = await Promise.all([
 		listBenefitPlans(user.organizationId),
 		listAllEnrollments(user.organizationId),
 		db.employee.findMany({
-			where: { user: { organizationId: user.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: user.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: { lastName: 'asc' }
 		})
@@ -32,7 +32,7 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }
@@ -48,7 +48,7 @@ const createPlanSchema = z.object({
 
 export const actions: Actions = {
 	createPlan: async ({ request, locals, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
 		const raw = Object.fromEntries(await request.formData())
@@ -66,14 +66,14 @@ export const actions: Actions = {
 		await createBenefitPlan(user.organizationId, parsed.data, {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		})
 		return { planCreated: true }
 	},
 
 	enroll: async ({ request, locals, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const parsed = z
 			.object({
@@ -103,7 +103,7 @@ export const actions: Actions = {
 	},
 
 	setEnrollmentStatus: async ({ request, locals, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const id = data.get('id') as string
 		const status = data.get('status') as 'ACTIVE' | 'WAIVED' | 'TERMINATED'

@@ -8,7 +8,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	const result = await fetchPayslipDocument(params.id, {
 		userId: locals.user.id,
-		role: locals.user.role,
+		roles: locals.user.roles,
 		organizationId: locals.user.organizationId
 	})
 

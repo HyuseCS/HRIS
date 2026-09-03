@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { apiError } from '$lib/server/api-error'
 import { isPayslipVisible } from '$lib/server/services/payroll/runs'
-import { canAny } from '$lib/rbac'
+import { canReadPayslip } from '$lib/server/services/payroll/payslip-fetch'
 import type { RequestHandler } from './$types'
 
 export const GET: RequestHandler = async ({ locals, params }) => {
@@ -42,22 +42,17 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	if (!entry) return apiError(404, 'Payslip not found')
 
-	// Only payroll-report viewers may read someone else's payslip; everyone else is limited
-	// to their own. Previously this checked EMPLOYEE only, so any other non-owner role in the
-	// org — VERIFIER, APPROVER, a plain MANAGER — could read any employee's full payslip
-	// (gross pay, SSS, PhilHealth, …) by id. Gate on the payroll-view capability instead.
-	const roles = user.roles?.length ? user.roles : [user.role]
-	if (!canAny(roles, 'VIEW_PAYROLL_REPORTS')) {
-		const myEmployee = await db.employee.findFirst({
-			where: { userId: user.id },
-			select: { id: true }
-		})
-
-		if (!myEmployee || entry.employeeId !== myEmployee.id) {
-			return apiError(403, 'Access denied')
-		}
+	// #249: owner, or an org-wide payroll role, or a manager reaching their own reporting line.
+	// This gate used to be the payroll-view capability alone, which #133 had quietly opened to every
+	// MANAGER.
+	if (!(await canReadPayslip(user, { id: entry.employeeId, userId: entry.employee.userId }))) {
+		return apiError(403, 'Access denied')
 	}
 
+	// #278: both gates above and below are now shared verbatim with the PDF and the /payslips page,
+	// so no door is a way around another. The claim used to cover the access gate only — this door
+	// was already strict about drafts while the other two let VIEW_PAYROLL_REPORTS holders straight
+	// through, which is the bug #278 closed.
 	if (!isPayslipVisible(entry.payrollRun)) {
 		return apiError(403, 'Payslip not yet available')
 	}

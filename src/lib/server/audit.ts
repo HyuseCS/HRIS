@@ -1,10 +1,9 @@
 import type { AuditAction, Prisma, Role } from '@prisma/client'
-import { db } from './db'
 
 interface AuditContext {
 	organizationId: string
 	actorId: string
-	actorRole: Role
+	actorRoles: Role[]
 	ipAddress?: string
 	userAgent?: string
 }
@@ -17,18 +16,19 @@ interface AuditPayload {
 	newValue?: Record<string, unknown>
 }
 
-// `client` defaults to the shared db, but callers inside a $transaction can pass their tx
-// client so the audit row commits or rolls back atomically with the mutation it records.
+// `client` is required. Pass the enclosing $transaction's `tx` so the audit row commits or
+// rolls back atomically with the mutation it records. Passing the shared `db` is the
+// deliberate exception, for the few sites auditing a read or a failure with no mutation.
 export async function writeAuditLog(
 	ctx: AuditContext,
 	payload: AuditPayload,
-	client: Prisma.TransactionClient = db
+	client: Prisma.TransactionClient
 ): Promise<void> {
 	await client.auditLog.create({
 		data: {
 			organizationId: ctx.organizationId,
 			actorId: ctx.actorId,
-			actorRole: ctx.actorRole,
+			actorRoles: ctx.actorRoles,
 			action: payload.action,
 			entityType: payload.entityType,
 			entityId: payload.entityId,

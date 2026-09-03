@@ -84,24 +84,35 @@ Get full employee profile.
 
 Update employee fields.
 
-**Roles**: `HR_ADMIN`, `SUPER_ADMIN`
+**Roles**: every `MANAGE_HR` holder — `MANAGER`, `HR_ADMIN`, `CEO`, `SUPER_ADMIN` (#133). A `MANAGER`
+is additionally scoped to their own team and the branches they manage (#228).
 
-**Request body**: Any subset of employee fields (partial update).
+**Request body**: Any subset of employee fields (partial update), with three carve-outs:
+
+- `basicMonthlySalary`, `rateType`, `employmentType` — effective-dated; recorded as snapshots by the
+  promotion writer, never written onto the employee row (#170 / #222).
+- `reportsToId` — routed through the same writer, so a change filed by an actor without
+  `ADMINISTER_HR_ORGWIDE` (a bare `MANAGER`), or by anyone on their own record, needs a second
+  authorized person to confirm it (#224 / #243 / #263).
+- `employmentStatus` — **rejected with 400.** Offboarding goes through the action below, which also
+  records the end date and deactivates the login.
 
 **Response 200**: Updated employee object.
+**Response 202**: `{ "data": …, "proposalId": "uuid", "notice": "…" }` — the change was filed for
+confirmation and `data` does not yet reflect it.
 **Side effect**: AuditLog `UPDATE` entry with `oldValue` / `newValue`.
 
 ---
 
-### POST /api/v1/employees/:id/offboard
+### POST /api/v1/employees/:id?action=offboard
 
 Mark employee as offboarded.
 
-**Roles**: `HR_ADMIN`, `SUPER_ADMIN`
+**Roles**: every `MANAGE_HR` holder, scoped as above. Nobody may offboard their own record.
 
-**Request body**: `{ "endDate": "2025-12-31", "reason": "string" }`
+**Request body**: `{ "endDate": "2025-12-31" }`
 
-**Response 200**: `{ "status": "OFFBOARDED", "endDate": "..." }`
+**Response 200**: `{ "data": { "employmentStatus": "OFFBOARDED", "endDate": "..." } }`
 **Side effect**: User `isActive` set to `false`; AuditLog entry.
 
 ---

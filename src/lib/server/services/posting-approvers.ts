@@ -62,25 +62,32 @@ export async function setPostingApprover(
 	const [dept, emp] = await Promise.all([
 		db.department.findFirst({ where: { id: departmentId, organizationId }, select: { id: true } }),
 		db.employee.findFirst({
-			where: { id: approverId, user: { organizationId } },
+			where: { id: approverId, organizationId },
 			select: { id: true }
 		})
 	])
 	if (!dept) error(404, 'Department not found')
 	if (!emp) error(404, 'Approver must be an employee in this organization')
 
-	const saved = await db.postingApprover.upsert({
-		where: { organizationId_departmentId: { organizationId, departmentId } },
-		update: { approverId },
-		create: { organizationId, departmentId, approverId }
+	// Mutation + audit share a transaction so a failed audit write rolls back the mapping.
+	return await db.$transaction(async (tx) => {
+		const saved = await tx.postingApprover.upsert({
+			where: { organizationId_departmentId: { organizationId, departmentId } },
+			update: { approverId },
+			create: { organizationId, departmentId, approverId }
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'PostingApprover',
+				entityId: saved.id,
+				newValue: { departmentId, approverId }
+			},
+			tx
+		)
+		return saved
 	})
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'PostingApprover',
-		entityId: saved.id,
-		newValue: { departmentId, approverId }
-	})
-	return saved
 }
 
 export async function clearPostingApprover(
@@ -88,11 +95,17 @@ export async function clearPostingApprover(
 	departmentId: string,
 	ctx: AuditContext
 ) {
-	await db.postingApprover.deleteMany({ where: { organizationId, departmentId } })
-	await writeAuditLog(ctx, {
-		action: 'DELETE',
-		entityType: 'PostingApprover',
-		entityId: departmentId,
-		newValue: { departmentId }
+	await db.$transaction(async (tx) => {
+		await tx.postingApprover.deleteMany({ where: { organizationId, departmentId } })
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'DELETE',
+				entityType: 'PostingApprover',
+				entityId: departmentId,
+				newValue: { departmentId }
+			},
+			tx
+		)
 	})
 }

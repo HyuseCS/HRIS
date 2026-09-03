@@ -1,6 +1,6 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireMinRole } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import {
 	listPositions,
 	createPosition,
@@ -14,7 +14,7 @@ import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
-	requireMinRole(user.role, 'HR_ADMIN')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const [positions, orgChart, salaryGrades, employees] = await Promise.all([
 		listPositions(user.organizationId),
@@ -50,7 +50,7 @@ function ctxFrom(user: App.Locals['user'], ip: string) {
 	return {
 		organizationId: user!.organizationId,
 		actorId: user!.id,
-		actorRole: user!.role,
+		actorRoles: user!.roles,
 		ipAddress: ip
 	}
 }
@@ -58,7 +58,7 @@ function ctxFrom(user: App.Locals['user'], ip: string) {
 export const actions: Actions = {
 	createPosition: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireMinRole(user.role, 'HR_ADMIN')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = positionSchema.safeParse(raw)
@@ -88,7 +88,7 @@ export const actions: Actions = {
 
 	updatePosition: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireMinRole(user.role, 'HR_ADMIN')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = editSchema.safeParse(raw)
@@ -121,7 +121,7 @@ export const actions: Actions = {
 
 	assignEmployee: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireMinRole(user.role, 'HR_ADMIN')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = assignSchema.safeParse(raw)

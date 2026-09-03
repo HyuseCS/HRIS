@@ -36,7 +36,7 @@ const db = new PrismaClient()
 async function main() {
 	const systemUser = await db.user.findUnique({
 		where: { email: SYSTEM_EMAIL },
-		select: { id: true, role: true }
+		select: { id: true, roles: true }
 	})
 	if (!systemUser) {
 		console.error(
@@ -94,7 +94,7 @@ async function main() {
 		const ctx = {
 			organizationId,
 			actorId: systemUser.id,
-			actorRole: systemUser.role
+			actorRoles: systemUser.roles
 		}
 
 		const done: typeof employees = []
@@ -130,7 +130,7 @@ async function main() {
 
 		// Notify that org's HR so a status change nobody clicked is still visible to a human.
 		const hr = await db.user.findMany({
-			where: { organizationId, isActive: true, role: { in: ['HR_ADMIN', 'SUPER_ADMIN'] } },
+			where: { organizationId, isActive: true, roles: { hasSome: ['HR_ADMIN', 'SUPER_ADMIN'] } },
 			select: { id: true }
 		})
 		if (hr.length === 0) {

@@ -10,45 +10,51 @@ import { buildApprovalChain } from '$lib/server/services/requests/routing'
 import type { ApprovalDecision, ApprovalStage, Role } from '@prisma/client'
 
 // Maker-checker stage authority (#134): MAKE = MANAGE_HR, VERIFY = VERIFIER,
-// APPROVE = APPROVER. Signature: (stage, actorRoles, actorEmployeeId, ownerEmployeeId).
+// APPROVE = APPROVER. Signature: (stage, actorRoles, actorEmployeeId, ownerEmployeeId, sod).
+//
+// #283 made `sod` a required 5th parameter. These cases are about STAGE AUTHORITY, so they pass
+// the no-bar value — an actor who has decided nothing. The bar itself is covered in
+// approval-self-guard.test.ts, where the service wiring that feeds it can be exercised too.
+const NO_BAR = { actorId: null, decidedActorIds: [], verifiedDocActorIds: [] }
+
 describe('canActOnStage', () => {
 	it('MAKE requires an HR-level maker', () => {
 		for (const role of ['HR_ADMIN', 'MANAGER', 'SUPER_ADMIN', 'CEO'] as Role[]) {
-			expect(canActOnStage('MAKE', [role], 'actor', 'owner')).toBe(true)
+			expect(canActOnStage('MAKE', [role], 'actor', 'owner', NO_BAR)).toBe(true)
 		}
 		for (const role of ['EMPLOYEE', 'VERIFIER', 'APPROVER', 'FINANCE'] as Role[]) {
-			expect(canActOnStage('MAKE', [role], 'actor', 'owner')).toBe(false)
+			expect(canActOnStage('MAKE', [role], 'actor', 'owner', NO_BAR)).toBe(false)
 		}
 	})
 
 	it('VERIFY requires the Verifier role', () => {
-		expect(canActOnStage('VERIFY', ['VERIFIER'], 'actor', 'owner')).toBe(true)
+		expect(canActOnStage('VERIFY', ['VERIFIER'], 'actor', 'owner', NO_BAR)).toBe(true)
 		for (const role of ['HR_ADMIN', 'MANAGER', 'APPROVER', 'SUPER_ADMIN'] as Role[]) {
-			expect(canActOnStage('VERIFY', [role], 'actor', 'owner')).toBe(false)
+			expect(canActOnStage('VERIFY', [role], 'actor', 'owner', NO_BAR)).toBe(false)
 		}
 	})
 
 	it('APPROVE requires the Approver role', () => {
-		expect(canActOnStage('APPROVE', ['APPROVER'], 'actor', 'owner')).toBe(true)
+		expect(canActOnStage('APPROVE', ['APPROVER'], 'actor', 'owner', NO_BAR)).toBe(true)
 		for (const role of ['HR_ADMIN', 'MANAGER', 'VERIFIER', 'SUPER_ADMIN'] as Role[]) {
-			expect(canActOnStage('APPROVE', [role], 'actor', 'owner')).toBe(false)
+			expect(canActOnStage('APPROVE', [role], 'actor', 'owner', NO_BAR)).toBe(false)
 		}
 	})
 
 	// #75 — separation of duties: nobody decides their own submission, regardless of role.
 	it('blocks acting on your own submission', () => {
-		expect(canActOnStage('MAKE', ['HR_ADMIN'], 'self', 'self')).toBe(false)
-		expect(canActOnStage('VERIFY', ['VERIFIER'], 'self', 'self')).toBe(false)
-		expect(canActOnStage('APPROVE', ['APPROVER'], 'self', 'self')).toBe(false)
+		expect(canActOnStage('MAKE', ['HR_ADMIN'], 'self', 'self', NO_BAR)).toBe(false)
+		expect(canActOnStage('VERIFY', ['VERIFIER'], 'self', 'self', NO_BAR)).toBe(false)
+		expect(canActOnStage('APPROVE', ['APPROVER'], 'self', 'self', NO_BAR)).toBe(false)
 	})
 
 	// Multi-role (#133/#134): one person carrying both roles can make AND verify —
 	// though never on the same request (the own-submission guard still applies).
 	it('a [MANAGER, VERIFIER] user can act on both MAKE and VERIFY', () => {
 		const roles: Role[] = ['MANAGER', 'VERIFIER']
-		expect(canActOnStage('MAKE', roles, 'actor', 'owner')).toBe(true)
-		expect(canActOnStage('VERIFY', roles, 'actor', 'owner')).toBe(true)
-		expect(canActOnStage('APPROVE', roles, 'actor', 'owner')).toBe(false)
+		expect(canActOnStage('MAKE', roles, 'actor', 'owner', NO_BAR)).toBe(true)
+		expect(canActOnStage('VERIFY', roles, 'actor', 'owner', NO_BAR)).toBe(true)
+		expect(canActOnStage('APPROVE', roles, 'actor', 'owner', NO_BAR)).toBe(false)
 	})
 })
 
@@ -57,24 +63,24 @@ describe('canActOnStage', () => {
 describe('canActOnPayrollStage (#174)', () => {
 	it('APPROVE requires a finance approver — CEO or Super Admin only', () => {
 		for (const role of ['CEO', 'SUPER_ADMIN'] as Role[]) {
-			expect(canActOnPayrollStage('APPROVE', [role])).toBe(true)
+			expect(canActOnPayrollStage('APPROVE', [role], NO_BAR)).toBe(true)
 		}
 		// The generic Approver signs off HR requests but never payroll.
 		for (const role of ['APPROVER', 'VERIFIER', 'HR_ADMIN', 'MANAGER', 'FINANCE'] as Role[]) {
-			expect(canActOnPayrollStage('APPROVE', [role])).toBe(false)
+			expect(canActOnPayrollStage('APPROVE', [role], NO_BAR)).toBe(false)
 		}
 	})
 
 	it('VERIFY is still the Verifier', () => {
-		expect(canActOnPayrollStage('VERIFY', ['VERIFIER'])).toBe(true)
+		expect(canActOnPayrollStage('VERIFY', ['VERIFIER'], NO_BAR)).toBe(true)
 		for (const role of ['CEO', 'SUPER_ADMIN', 'APPROVER'] as Role[]) {
-			expect(canActOnPayrollStage('VERIFY', [role])).toBe(false)
+			expect(canActOnPayrollStage('VERIFY', [role], NO_BAR)).toBe(false)
 		}
 	})
 
 	it('leaves the generic request chain untouched — Approver still signs off requests', () => {
-		expect(canActOnStage('APPROVE', ['APPROVER'], 'actor', 'owner')).toBe(true)
-		expect(canActOnStage('APPROVE', ['CEO'], 'actor', 'owner')).toBe(false)
+		expect(canActOnStage('APPROVE', ['APPROVER'], 'actor', 'owner', NO_BAR)).toBe(true)
+		expect(canActOnStage('APPROVE', ['CEO'], 'actor', 'owner', NO_BAR)).toBe(false)
 	})
 })
 

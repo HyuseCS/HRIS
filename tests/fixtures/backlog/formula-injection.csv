@@ -1,0 +1,4 @@
+employeeNumber,date,amIn,amOut,pmIn,pmOut
+JJ-001,2026-08-10,08:00,11:00,13:00,17:00
+"=HYPERLINK(""http://x"")",2026-08-10,08:00,11:00,,
+"	=cmd|'/c calc'!A1",2026-08-10,08:00,11:00,,

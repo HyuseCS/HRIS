@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -25,14 +26,14 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Salary Grades</h1>
-		<p class="text-sm text-muted-foreground">
-			Pay bands assignable to positions. Employees inherit their band via their position; HR is
-			warned when a basic salary falls outside it.
-		</p>
-	</div>
+	<PageHeader
+		title="Salary Grades"
+		description="Pay bands assignable to positions. Employees inherit their band via their position; HR is warned when a basic salary falls outside it."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div

@@ -1,9 +1,8 @@
 import { error } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { isPayslipVisible } from '$lib/server/services/payroll/runs'
+import { canReadPayslip } from '$lib/server/services/payroll/payslip-fetch'
 import type { PageServerLoad } from './$types'
-
-const PRIVILEGED = new Set(['SUPER_ADMIN', 'HR_ADMIN', 'PAYROLL_OFFICER', 'FINANCE'])
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const user = locals.user!
@@ -40,15 +39,16 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		error(404, 'Payslip not found')
 	}
 
-	// Employees + managers can only see their own; privileged roles can see any.
-	if (!PRIVILEGED.has(user.role)) {
-		const myEmployee = await db.employee.findFirst({ where: { userId: user.id } })
-		if (!myEmployee || entry.employeeId !== myEmployee.id) {
-			error(403, 'Access denied')
-		}
-		if (!isPayslipVisible(entry.payrollRun)) {
-			error(403, 'Payslip not yet available')
-		}
+	// #249: the same shared rule as the JSON and PDF doors. This was a hardcoded role set that
+	// omitted CEO, so the "Payslip" link the run-detail page renders 403'd for them, and it could
+	// only ever drift from the capability table — the anti-pattern `rbac.ts` exists to retire.
+	if (!(await canReadPayslip(user, { id: entry.employeeId, userId: entry.employee.userId }))) {
+		error(403, 'Access denied')
+	}
+	// #278: the same strict rule as the JSON and PDF doors — no capability opens a payslip whose run
+	// is still a draft.
+	if (!isPayslipVisible(entry.payrollRun)) {
+		error(403, 'Payslip not yet available')
 	}
 
 	return {

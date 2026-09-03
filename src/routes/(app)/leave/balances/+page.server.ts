@@ -1,12 +1,12 @@
 import { db } from '$lib/server/db'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { listOrgLeaveBalances } from '$lib/server/services/leave'
 import type { PageServerLoad } from './$types'
 
 // HR-facing org-wide leave balances (#137, and the fix for #150 — privileged roles had no
 // way to see anyone's balances but their own, which for HR/CEO meant an empty panel).
 export const load: PageServerLoad = async ({ locals, url }) => {
-	requireCapability(locals.user!.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 
 	const organizationId = locals.user!.organizationId
 	const year = Number(url.searchParams.get('year')) || new Date().getFullYear()

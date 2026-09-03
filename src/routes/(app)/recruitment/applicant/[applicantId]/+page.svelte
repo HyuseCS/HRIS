@@ -80,15 +80,21 @@
 
 <div class="mx-auto max-w-4xl space-y-6">
 	<!-- Header -->
-	<div class="flex flex-wrap items-center gap-3">
-		<BackButton
-			fallback={'/recruitment/' + applicant.jobPosting.id}
-			label={applicant.jobPosting.title}
-		/>
-		<h1 class="text-2xl font-bold">{applicant.firstName} {applicant.lastName}</h1>
-		<span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-			{STAGE_LABELS[applicant.currentStage] ?? applicant.currentStage}
-		</span>
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+			<h1 class="text-2xl font-bold">{applicant.firstName} {applicant.lastName}</h1>
+			<span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+				{STAGE_LABELS[applicant.currentStage] ?? applicant.currentStage}
+			</span>
+		</div>
+		<div
+			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+		>
+			<BackButton
+				fallback={'/recruitment/' + applicant.jobPosting.id}
+				label={applicant.jobPosting.title}
+			/>
+		</div>
 	</div>
 
 	{#if form?.error}

@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 import {
 	normalizeGovId,
 	isValidGovId,
 	govIdError,
+	govIdSchema,
 	GOV_ID_FORMATS,
 	type GovIdField
 } from '../../src/lib/utils/gov-ids'
@@ -96,5 +98,27 @@ describe('govIdError', () => {
 	it('names the field, the rule and an example', () => {
 		expect(govIdError('sssNumber')).toBe('SSS must be 10 digits (e.g. 34-1234567-8)')
 		expect(govIdError('tinNumber')).toBe('TIN must be 9 or 12 digits (e.g. 123-456-789-000)')
+	})
+})
+
+describe('govIdSchema — absent, empty and value are three different things (#267)', () => {
+	const S = z.object({ sssNumber: govIdSchema('sssNumber') })
+
+	it('leaves an absent key absent — it is not part of the request', () => {
+		expect('sssNumber' in S.parse({})).toBe(false)
+	})
+
+	it('maps an explicit empty string to null — that is the "clear it" instruction', () => {
+		expect(S.parse({ sssNumber: '' }).sssNumber).toBeNull()
+	})
+
+	it('still canonicalises a value', () => {
+		expect(S.parse({ sssNumber: '3412345678' }).sssNumber).toBe('34-1234567-8')
+	})
+
+	it('still rejects a malformed value', () => {
+		const result = S.safeParse({ sssNumber: '1234' })
+		expect(result.success).toBe(false)
+		expect(result.error?.issues[0].message).toBe(govIdError('sssNumber'))
 	})
 })

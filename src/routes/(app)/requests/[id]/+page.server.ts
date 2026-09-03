@@ -7,7 +7,7 @@ import {
 	deleteRequestDocument,
 	setRequestDocumentVerified
 } from '$lib/server/services/requests/documents'
-import { APPROVER_ROLES } from '$lib/server/services/approvals'
+import { canAny } from '$lib/server/rbac'
 import { getLeaveBalances } from '$lib/server/services/leave'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -19,12 +19,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	// Owner, or any approver (managers/HR/super-admin plus payroll officers) who can see
 	// others' requests — the same set allowed in the approvals queue, so a reviewer can open
 	// the detail of a request they're able to act on.
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
-		select: { id: true }
-	})
-	const isOwner = myEmployee?.id === req.employeeId
-	const canReview = APPROVER_ROLES.includes(user.role)
+	const isOwner = (await myEmployeeId(user)) === req.employeeId
+	const canReview = canAny(user.roles, 'APPROVE_REQUESTS')
 	if (!isOwner && !canReview) error(403, 'Insufficient permissions')
 
 	// LEAVE requests store their leaveTypeId in the JSON payload (no relation); resolve it to a
@@ -73,7 +69,30 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			)
 	}
 
-	return { request: req, isOwner, canReview, leaveTypeName, leaveBalances }
+	// #283/D12: this page is where an approver comes to ask "why can't I act on this?" — the
+	// approvals QUEUE deliberately omits barred items (AC-15/AC-21/US-8), so without this the
+	// answer is nowhere. There is no decide control on this page to disable (the actions here are
+	// uploadDocs / deleteDoc / verifyDoc only), so D12's "explain why" half lands as a read-only
+	// line. Same inputs as the service guard, so the two cannot drift.
+	//
+	// Both comparisons are User ids on both sides: steps.actorId and documents.verifiedById are
+	// User ids, as is user.id. Compare either against an Employee id and this silently never fires.
+	const attempt = Math.max(1, ...req.steps.map((s) => s.attempt))
+	const actBlockedReason = !canReview
+		? null
+		: req.steps.some((s) => s.attempt === attempt && s.decision != null && s.actorId === user.id)
+			? 'You already decided an earlier stage of this attempt — another verifier or approver must act.'
+			: // #299/C-5: documentHistory, NOT documents. This line is the F3 mirror and must give the
+				// same answer as decide()'s bar, which reads tombstoned signers too. On the live list it
+				// would go quiet the moment the requester removed the document — the approvals queue
+				// would keep barring this actor (correctly) while the page they came to for "why can't
+				// I act on this?" told them nothing was wrong.
+				req.documentHistory.some((d) => d.verifiedById === user.id) &&
+				  !canAny(user.roles, 'ADMINISTER_SYSTEM')
+				? 'You signed off a supporting document on this request — another approver must decide it.'
+				: null
+
+	return { request: req, isOwner, canReview, leaveTypeName, leaveBalances, actBlockedReason }
 }
 
 function ctxOf(locals: App.Locals, ip: string) {
@@ -81,13 +100,22 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: user.organizationId,
 		actorId: user.id,
-		actorRole: user.role,
+		actorRoles: user.roles,
 		ipAddress: ip
 	}
 }
 
-async function myEmployeeId(userId: string) {
-	const me = await db.employee.findUnique({ where: { userId }, select: { id: true } })
+/**
+ * #6 — the caller's OWN employee id, scoped to the ACTIVE org. Takes the user rather than a
+ * bare `userId` because the org is not derivable from the id alone: without it a cross-org
+ * account's home-tenant profile resolves here whichever org the session is in. Matches
+ * `findSelfEmployee(user)` at punch/+page.server.ts.
+ */
+async function myEmployeeId(user: { id: string; organizationId: string }) {
+	const me = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
 	return me?.id ?? null
 }
 
@@ -96,7 +124,7 @@ export const actions: Actions = {
 	// (e.g. a request was returned with "please attach the receipt").
 	uploadDocs: async ({ request, locals, params, getClientAddress }) => {
 		const user = locals.user!
-		const employeeId = await myEmployeeId(user.id)
+		const employeeId = await myEmployeeId(user)
 		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 
 		const data = await request.formData()
@@ -120,7 +148,7 @@ export const actions: Actions = {
 
 	deleteDoc: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const employeeId = await myEmployeeId(user.id)
+		const employeeId = await myEmployeeId(user)
 		if (!employeeId) return fail(400, { error: 'No employee profile found.' })
 
 		const docId = (await request.formData()).get('docId') as string
@@ -144,7 +172,7 @@ export const actions: Actions = {
 	// Approver signs off on a document (or clears the sign-off).
 	verifyDoc: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		if (!APPROVER_ROLES.includes(user.role)) {
+		if (!canAny(user.roles, 'APPROVE_REQUESTS')) {
 			return fail(403, { error: 'Insufficient permissions' })
 		}
 

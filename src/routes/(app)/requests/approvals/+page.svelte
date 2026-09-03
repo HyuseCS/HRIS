@@ -321,11 +321,16 @@
 							<p class="line-clamp-2 text-xs text-muted-foreground">{req.reason}</p>
 						{/if}
 
-						{#if req.documents.length}
-							{@const unverified = unverifiedCount(req.documents)}
+						<!-- #299/AC-8: liveDocuments, not documents. The server splits the two (P-5) because
+						`documents` still carries tombstones for the F3 bar; this chip counts what the
+						approver can actually open. -->
+						{#if req.liveDocuments.length}
+							{@const unverified = unverifiedCount(req.liveDocuments)}
 							<p class="text-xs">
 								<span class="text-muted-foreground"
-									>📎 {req.documents.length} document{req.documents.length === 1 ? '' : 's'}</span
+									>📎 {req.liveDocuments.length} document{req.liveDocuments.length === 1
+										? ''
+										: 's'}</span
 								>
 								{#if unverified}
 									<span

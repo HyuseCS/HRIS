@@ -1,12 +1,12 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { getCompanyInfo, updateCompanyInfo } from '$lib/server/services/settings/master'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
-	requireCapability(user.role, 'MANAGE_HR')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 	const company = await getCompanyInfo(user.organizationId)
 	return { company }
 }
@@ -26,7 +26,7 @@ const schema = z.object({
 export const actions: Actions = {
 	save: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const parsed = schema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success)
@@ -44,7 +44,7 @@ export const actions: Actions = {
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: getClientAddress()
 				}
 			)

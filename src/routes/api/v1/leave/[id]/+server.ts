@@ -1,11 +1,11 @@
 import { json } from '@sveltejs/kit'
-import { requireMinRole } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { reviewLeaveRequest } from '$lib/server/services/leave'
 import { apiError } from '$lib/server/api-error'
 import type { RequestHandler } from './$types'
 
-// PATCH: body = { action: 'approve' | 'reject' | 'override-approve', rejectionReason?: string, note?: string }
-// requireMinRole MANAGER
+// PATCH: body = { action: 'approve' | 'reject', rejectionReason?: string }
+// requireAnyCapability VIEW_TEAM
 // call reviewLeaveRequest
 // return json(result)
 export const PATCH: RequestHandler = async ({ params, request, locals, getClientAddress }) => {
@@ -14,12 +14,12 @@ export const PATCH: RequestHandler = async ({ params, request, locals, getClient
 	const user = locals.user
 
 	try {
-		requireMinRole(user.role, 'MANAGER')
+		requireAnyCapability(user.roles, 'VIEW_TEAM')
 	} catch {
 		return apiError(403, 'Insufficient permissions')
 	}
 
-	let body: { action?: string; rejectionReason?: string; note?: string }
+	let body: { action?: string; rejectionReason?: string }
 	try {
 		body = await request.json()
 	} catch {
@@ -28,20 +28,15 @@ export const PATCH: RequestHandler = async ({ params, request, locals, getClient
 
 	const { action, rejectionReason } = body
 
-	if (action !== 'approve' && action !== 'reject' && action !== 'override-approve') {
-		return apiError(400, 'action must be "approve", "reject", or "override-approve"')
+	if (action !== 'approve' && action !== 'reject') {
+		return apiError(400, 'action must be "approve" or "reject"')
 	}
 
-	// override-approve requires HR_ADMIN or higher
-	if (action === 'override-approve') {
-		try {
-			requireMinRole(user.role, 'HR_ADMIN')
-		} catch {
-			return apiError(403, 'override-approve requires HR_ADMIN or higher')
-		}
-	}
-
-	const approved = action === 'approve' || action === 'override-approve'
+	// #295: there was a third action, `override-approve`, gated on ADMINISTER_HR_ORGWIDE. It
+	// overrode nothing — it collapsed into this same boolean and took the identical path through
+	// `reviewLeaveRequest` → `decide`, skipping no stage and bypassing no approver. A real
+	// escape hatch for a stuck chain is a `decide()` change, not another action string here.
+	const approved = action === 'approve'
 
 	if (!approved && !rejectionReason) {
 		return apiError(400, 'rejectionReason is required when rejecting')
@@ -56,7 +51,9 @@ export const PATCH: RequestHandler = async ({ params, request, locals, getClient
 			{
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				// #247: `reviewLeaveRequest` delegates to `decide`, which resolves stage authority
+				// from the full set.
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			}
 		)

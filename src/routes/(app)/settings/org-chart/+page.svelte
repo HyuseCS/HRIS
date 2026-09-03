@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
@@ -92,51 +93,60 @@
 {/snippet}
 
 <div class="space-y-6">
-	<BackButton fallback="/settings" label="Settings" preferFallback />
+	<PageHeader
+		title="Org Chart"
+		description="Reporting hierarchy built from each employee's manager."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Org Chart</h1>
-			<p class="text-sm text-muted-foreground">
-				Reporting hierarchy built from each employee's manager.
-			</p>
+	<section class="space-y-3">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<h2 class="text-lg font-semibold">Employees</h2>
+			<div
+				class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+			>
+				<a
+					href="/settings/org"
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+					>Manage Positions</a
+				>
+			</div>
 		</div>
-		<a href="/settings/org" class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-			>Manage Positions</a
-		>
-	</div>
+		<input
+			bind:value={query}
+			placeholder="Search people…"
+			class="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		/>
 
-	<input
-		bind:value={query}
-		placeholder="Search people…"
-		class="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-	/>
-
-	{#if query.trim()}
-		<div class="rounded-lg border">
-			<ul class="divide-y">
-				{#each matches as m (m.id)}
-					<li class="px-4 py-2">
-						<p class="text-sm font-medium">{m.name}</p>
-						<p class="text-xs text-muted-foreground">
-							{m.positionTitle ?? m.jobTitle}{#if m.departmentName}
-								· {m.departmentName}{/if}
-						</p>
-					</li>
-				{:else}
-					<li class="px-4 py-8 text-center text-sm text-muted-foreground">No matches</li>
-				{/each}
-			</ul>
-		</div>
-	{:else if roots.length}
-		<div class="rounded-lg border p-4">
-			<ul class="space-y-1">
-				{#each roots as root (root.id)}
-					{@render nodeRow(root, [])}
-				{/each}
-			</ul>
-		</div>
-	{:else}
-		<p class="text-sm text-muted-foreground">No employees to chart yet.</p>
-	{/if}
+		{#if query.trim()}
+			<div class="rounded-lg border">
+				<ul class="divide-y">
+					{#each matches as m (m.id)}
+						<li class="px-4 py-2">
+							<p class="text-sm font-medium">{m.name}</p>
+							<p class="text-xs text-muted-foreground">
+								{m.positionTitle ?? m.jobTitle}{#if m.departmentName}
+									· {m.departmentName}{/if}
+							</p>
+						</li>
+					{:else}
+						<li class="px-4 py-8 text-center text-sm text-muted-foreground">No matches</li>
+					{/each}
+				</ul>
+			</div>
+		{:else if roots.length}
+			<div class="rounded-lg border p-4">
+				<ul class="space-y-1">
+					{#each roots as root (root.id)}
+						{@render nodeRow(root, [])}
+					{/each}
+				</ul>
+			</div>
+		{:else}
+			<p class="text-sm text-muted-foreground">No employees to chart yet.</p>
+		{/if}
+	</section>
 </div>

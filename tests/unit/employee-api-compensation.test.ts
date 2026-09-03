@@ -32,10 +32,22 @@ const { dbMock, txMock } = vi.hoisted(() => {
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('bcrypt', () => ({ default: { hash: vi.fn().mockResolvedValue('hashed') } }))
+vi.mock('$lib/server/services/action-proposals', () => ({
+	createProposal: vi.fn().mockResolvedValue({ id: 'prop-1' }),
+	// Imported by employees.ts for the audited reveal. Unused here, but a factory mock replaces the
+	// whole module, so omitting it makes the import undefined rather than absent.
+	assertMayConfirmProposal: vi.fn()
+}))
 
 const { PATCH } = await import('../../src/routes/api/v1/employees/[id]/+server')
+const { AWAITING_CONFIRMATION } = await import('$lib/server/services/employees')
+const { createProposal } = await import('$lib/server/services/action-proposals')
 
-const HR_USER = { id: 'u1', organizationId: 'org1', role: 'HR_ADMIN' as Role }
+const HR_USER = {
+	id: 'u1',
+	organizationId: 'org1',
+	roles: ['HR_ADMIN'] as Role[]
+}
 
 const EMP = {
 	id: 'emp1',
@@ -125,5 +137,46 @@ describe('PATCH /api/v1/employees/[id] — pay routes through the history writer
 			})
 		})
 		assertNoBarePayWrite()
+	})
+})
+
+/**
+ * #224 Part 2 / #243 — a pay change the actor may not make alone is FILED, not applied. The PATCH
+ * still re-fetches and returns the record, so without a distinct status the caller would read their
+ * own unchanged salary back under a 200 and conclude the raise landed. 202 says "accepted, not yet
+ * applied", which is exactly the state of the row.
+ */
+describe('PATCH /api/v1/employees/[id] — a routed pay change answers 202', () => {
+	beforeEach(() => dbMock.employee.findFirst.mockResolvedValue({ ...EMP, userId: HR_USER.id }))
+
+	it('files a proposal and reports it instead of claiming success', async () => {
+		const res = await patch({ basicMonthlySalary: 50000 }) // HR admin, own record → self-action
+
+		expect(res.status).toBe(202)
+		const payload = await res.json()
+		expect(payload.notice).toBe(AWAITING_CONFIRMATION)
+		expect(payload.proposalId).toBe('prop-1')
+		// Nothing was written: the returned record is the pre-change one, which is why the status
+		// must not be 200.
+		expect(txMock.employeeCompensation.create).not.toHaveBeenCalled()
+		assertNoBarePayWrite()
+	})
+
+	/**
+	 * The pay writer runs BEFORE the non-pay one. It can now refuse for reasons the value pre-check
+	 * cannot see — a 409 when nobody in the org could confirm the proposal, a 403 from the
+	 * object-level guard — and the two writers are separate transactions. In the old order those
+	 * rejections left the non-pay fields of the same PATCH committed: a half-applied request that
+	 * answered with an error.
+	 */
+	it('leaves non-pay fields untouched when the pay half is refused', async () => {
+		vi.mocked(createProposal).mockRejectedValueOnce(
+			Object.assign(new Error('no confirmer'), { status: 409, body: { message: 'no confirmer' } })
+		)
+
+		const res = await patch({ basicMonthlySalary: 50000, jobTitle: 'Team Lead' })
+
+		expect(res.status).toBe(409)
+		expect(dbMock.employee.update).not.toHaveBeenCalled()
 	})
 })

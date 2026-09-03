@@ -2,11 +2,17 @@ import { expect, type Browser, type Page } from '@playwright/test'
 
 export const USERS = {
 	admin: { email: 'admin@veent.ph', password: 'Admin@1234' },
+	// HR-level authority without system administration — the role #237 locked out of the
+	// Settings cards. Seeded by seedProd; see prisma/seed-core.ts.
+	hr: { email: 'hr@veent.ph', password: 'Hr@1234' },
 	manager: { email: 'manager@veent.ph', password: 'Manager@1234' },
 	employee: { email: 'employee@veent.ph', password: 'Employee@1234' },
 	// Maker-checker sign-off accounts (#134).
 	verifier: { email: 'verifier@veent.ph', password: 'Verifier@1234' },
 	approver: { email: 'approver@veent.ph', password: 'Approver@1234' },
+	// The one two-hat account in the seed (#283): VERIFIER + APPROVER, for the
+	// separation-of-duties specs. Seeded by seedE2E; see prisma/seed-core.ts.
+	twoHat: { email: 'verifier.approver@veent.ph', password: 'TwoHat@1234' },
 	// Cross-org CEO (#131/#132): member of Veent + JoJo Potato + Sweetleaf.
 	ceo: { email: 'ceo@veent.ph', password: 'Ceo@1234' },
 	// Food-service tenant HR (#140) — Branches is gated to those orgs, so its spec logs in

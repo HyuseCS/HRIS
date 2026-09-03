@@ -1,6 +1,6 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
 import { db } from '$lib/server/db'
 import { advanceApplicant, convertApplicantToEmployee } from '$lib/server/services/recruitment'
@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	// Recruitment is HR-only (the list page and every action on this page already require
 	// it); the load was missing the gate, so any signed-in employee could read a posting's
 	// applicant pipeline by id. Match the actions' capability.
-	requireCapability(user.role, 'MANAGE_HR')
+	requireAnyCapability(user.roles, 'MANAGE_HR')
 
 	const posting = await db.jobPosting.findFirst({
 		where: { id: params.id, organizationId: user.organizationId },
@@ -48,7 +48,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	return {
 		posting,
 		applicants,
-		userRole: user.role,
+		userRoles: user.roles,
 		boards,
 		postedCount: boards.filter((b) => b.live).length,
 		boardCount: boards.length,
@@ -70,7 +70,7 @@ const advanceStageSchema = z.object({
 export const actions: Actions = {
 	advanceStage: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = advanceStageSchema.safeParse(raw)
@@ -81,7 +81,7 @@ export const actions: Actions = {
 		const ctx = {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		}
 
@@ -100,7 +100,7 @@ export const actions: Actions = {
 
 	updateStatus: async ({ request, locals, params }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const data = await request.formData()
 		const status = data.get('status') as string
@@ -134,7 +134,7 @@ export const actions: Actions = {
 
 	setChannel: async ({ request, locals, params, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const data = await request.formData()
 		const boardId = data.get('boardId') as string
@@ -159,7 +159,7 @@ export const actions: Actions = {
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: getClientAddress()
 				}
 			)
@@ -172,7 +172,7 @@ export const actions: Actions = {
 
 	convert: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const data = await request.formData()
 		const applicantId = data.get('applicantId') as string
@@ -185,7 +185,7 @@ export const actions: Actions = {
 			newEmployee = await convertApplicantToEmployee(applicantId, user.organizationId, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {

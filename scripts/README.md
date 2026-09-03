@@ -207,7 +207,7 @@ promotion would (so it shows in the 201 file's Employment History), and notifies
 Since #222 it goes through `promoteEmployee`, effective on the day probation actually ended —
 so a cron that missed a few nights backdates correctly instead of dating the change to the sweep.
 
-```
+```text
 0 1 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/promote-probationary.ts >> /var/log/veent-regularize.log 2>&1
 ```
 
@@ -223,3 +223,246 @@ docker compose run --rm app pnpm exec tsx scripts/promote-probationary.ts --dry-
 Idempotent — the query only matches `PROBATIONARY`, so re-running the same night is a no-op.
 It requires the seeded `system@veent.ph` user (`AuditLog.actorId` is a non-nullable FK, so an
 automated actor is mandatory); the script exits 1 with a clear message if it is missing.
+
+## Automatic document backup — `backup-documents.ts`
+
+Document **bytes** live only on local disk under `UPLOAD_DIR` — never in Postgres — so
+`pg_dump` backs up every document row and none of the files (#164). This copies every
+`EmployeeDocument` and `RequestDocument` file to a second destination, writes a
+`manifest.json` describing each one (employee, category, label, original filename, MIME,
+size, upload date, SHA-256), records the outcome as a `BackupRun`, prunes to the org's
+retention setting, and notifies that org's `ADMINISTER_SYSTEM` holders when a run is not
+clean.
+
+Schedule and retention are per organization and edited in the app at **Settings → Document
+Backup**. This cron entry only _offers_ the script a chance to run each night; the script
+exits doing nothing when the org's interval has not elapsed.
+
+```text
+30 2 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/backup-documents.ts >> /var/log/veent-backup.log 2>&1
+```
+
+Runs 02:30 droplet time — after the 01:00 regularization sweep, so the two never contend for
+the 512MB box. `docker compose run --rm` costs no idle RAM.
+
+**`BACKUP_DIR` and `UPLOAD_DIR` must both be mounted volumes** (see `docker-compose.yml`).
+A `--rm` container's own filesystem is discarded when it exits, so a backup written to an
+unmounted path is deleted the moment the script finishes.
+
+Dry run first when testing (lists what _would_ be copied, writes nothing anywhere):
+
+```bash
+docker compose run --rm app pnpm exec tsx scripts/backup-documents.ts --dry-run
+```
+
+Force a run outside the configured interval (still honours the lock and retention):
+
+```bash
+docker compose run --rm app pnpm exec tsx scripts/backup-documents.ts --force
+```
+
+Locally, in **fish** — `VAR=value cmd` is bash-only syntax and fails in fish, so prefix with
+`env`. `dotenv-cli` does not override an already-set variable, so the `env` prefix wins over
+any `BACKUP_DIR` line in `.env.dev`:
+
+```
+env BACKUP_DIR=$PWD/backups pnpm exec dotenv -e .env.dev -- tsx scripts/backup-documents.ts --dry-run
+```
+
+Concurrency-safe: each org is held under a session-level advisory lock for the duration, so a
+run that overruns into the next night makes the next invocation skip that org rather than copy
+the same files twice. The lock uses the two-argument form
+`pg_try_advisory_lock(164, hashtext(key))`, which is a **different namespace** from the
+single-`bigint` form `timesheets.ts` and `payroll/index.ts` block on — sharing it would let a
+minutes-long backup stall a payroll write on a hash collision.
+
+Refuses to start at all if `BACKUP_DIR` is inside `UPLOAD_DIR` (or vice versa) — that
+configuration makes each night's backup include the previous night's. The refusal happens
+before the first organization is touched, so a misconfigured box writes nothing at all.
+
+It warns when `BACKUP_DIR` and `UPLOAD_DIR` share a filesystem. On the droplet `pgdata`,
+`uploads` and `backups` are all named volumes on one disk, so an unpruned backup tree can fill
+the disk Postgres writes to. Keep `retentionCount` low until backups live on separate storage.
+
+Unlike `promote-probationary.ts`, this writes **no** `AuditLog` entry and therefore does **not**
+need the seeded `system@veent.ph` user. The `BackupRun` row is the durable record and is richer
+than an audit entry (counts, bytes, manifest checksum, sanitized reason). Editing the backup
+config in the app _is_ audited, with the real actor.
+
+Exits 1 if any org's run failed, so a failure is visible in `/var/log/veent-backup.log` and in
+cron mail even before anyone opens the app.
+
+**Restore is not implemented** (out of scope for #164). Until it is, restoring means: copy
+`files/` back under `UPLOAD_DIR` preserving relative paths, and reconcile the rows using
+`manifest.json`, whose `path` field is always `files/` + the row's `storageKey`.
+
+## Automatic review cycles — `generate-review-cycles.ts`
+
+Performance evaluation runs on a per-organization cadence (#178). There is no manual "create
+cycle" screen any more — this script creates the next `ReviewCycle` as `ACTIVE`, opens a
+`PerformanceReview` for every active employee that has both an assigned template and a
+manager, snapshots that template onto each review, and notifies each employee with a link to
+their review.
+
+Cadence (interval in months, due days, on/off) is per organization and edited in the app at
+**Settings → Performance**. This cron entry only _offers_ the script a chance to generate each
+night; the script exits doing nothing when the org's interval has not elapsed. An org with no
+config row uses the defaults and is never written to by this script.
+
+```text
+0 2 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/generate-review-cycles.ts >> /var/log/veent-review-cycles.log 2>&1
+```
+
+> **`deploy.yml` does NOT create this crontab entry.** As stated for this file as a whole, the
+> deploy does `git reset --hard origin/main` and never touches the droplet's crontab. This
+> line must be installed once, by hand, with `crontab -e`. If it is missing, no review cycle
+> is ever generated and nothing in the app complains — the only symptom is an empty cycle list.
+
+Runs 02:00 droplet time, **daily** even though a cycle is due only every couple of months, so
+a cadence boundary is never missed by more than a day. It sits between the 01:00 regularization
+sweep and the 02:30 document backup, so the three never contend for the 512MB box.
+
+Dry run first when testing (lists the cycle and reviews it _would_ create, writes nothing):
+
+```bash
+docker compose run --rm app pnpm exec tsx scripts/generate-review-cycles.ts --dry-run
+```
+
+Force a run outside the configured cadence:
+
+```bash
+docker compose run --rm app pnpm exec tsx scripts/generate-review-cycles.ts --force
+```
+
+Idempotent at the **database**, not by the script's own care:
+`ReviewCycle @@unique([organizationId, startDate, endDate])` makes a second create for the same
+period raise `P2002`, which the script reports as "already generated — skipped" rather than as
+a failure. There is deliberately **no advisory lock** — generation fires at most once every
+`intervalMonths` from one crontab line, and the unique constraint plus a single transaction
+turns any genuine overlap into that caught `P2002` instead of a duplicate row. A lock would add
+the connection-pinning trap `backup-documents.ts` has to live with, for a race that cannot
+produce a bad row.
+
+All month arithmetic lives in `src/lib/server/performance/cycle-plan.ts`, never in the script:
+"is a cycle due?" is answered on a **Manila** basis (a wall-clock business question) and "what
+are the period's dates?" on a **UTC month-stepping** basis (the day-of-month must survive the
+step). The two disagree on purpose — see the file's header.
+
+Like `promote-probationary.ts` and unlike `backup-documents.ts`, it writes an `AuditLog` entry
+and therefore requires the seeded `system@veent.ph` user (`AuditLog.actorId` is a non-nullable
+FK); the script exits 1 with a clear message if it is missing. A cycle appearing in HR's list
+with no actor would be unexplainable.
+
+Employees who get no review are **reported, never silent**: the run prints each one with its
+reasons (`no-template-assigned`, `no-manager`, `template-invalid`), and the same list is
+recomputed on demand in the app.
+
+Exits 1 if any org failed, so a failure is visible in `/var/log/veent-review-cycles.log` and in
+cron mail before anyone opens the app.
+
+## Review reminders — `send-review-reminders.ts`
+
+Nudges the people who still owe something on an open performance review (#178). It never
+creates a cycle — `generate-review-cycles.ts` does that — it only looks at reviews that are
+already open and asks the pure planner
+(`src/lib/server/performance/reminder-plan.ts`) which of four kinds applies:
+
+| Kind           | When                                            | Who is nudged              | Channels           |
+| -------------- | ----------------------------------------------- | -------------------------- | ------------------ |
+| `opened`       | the review is open and not yet near its due day | employee                   | in-app + **email** |
+| `due-soon`     | within 3 days of the due day                    | evaluator                  | in-app only        |
+| `overdue`      | past the due day                                | employee **and** evaluator | in-app + **email** |
+| `awaiting-ack` | completed, employee has not acknowledged        | employee                   | in-app only        |
+
+The due day is the org's `dueDays` (Settings → Performance, default 14) counted from the day
+the review opened, compared on the **Manila** calendar — a wall-clock business question, so a
+UTC comparison would be up to 8 hours wrong. All of that lives in the planner; the script
+itself does no date arithmetic.
+
+**At most one reminder per review per run**, the most urgent, and never the same kind twice in
+a row: `PerformanceReview.lastReminderKind` is compared before sending. Escalation still
+fires — `due-soon` followed by `overdue` is a different kind.
+
+```text
+0 */6 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/send-review-reminders.ts >> /var/log/veent-review-reminders.log 2>&1
+```
+
+> **`deploy.yml` does NOT create this crontab entry.** As stated for this file as a whole, the
+> deploy does `git reset --hard origin/main` and never touches the droplet's crontab. This
+> line must be installed once, by hand, with `crontab -e`. If it is missing, no reminder is
+> ever sent and nothing in the app complains — the only symptom is a review nobody chases.
+
+Runs every six hours, unlike the once-nightly jobs: "due soon" and "overdue" are questions
+about real time, so the answer changes during the day.
+
+Dry run first when testing (prints every reminder it _would_ send, writes nothing and sends
+nothing):
+
+```bash
+docker compose run --rm app pnpm exec tsx scripts/send-review-reminders.ts --dry-run
+```
+
+Locally:
+
+```bash
+pnpm exec dotenv -e .env.dev -- tsx scripts/send-review-reminders.ts --dry-run
+```
+
+Unlike `promote-probationary.ts` and `generate-review-cycles.ts`, it writes **no** `AuditLog`
+entry and therefore does **not** need the seeded `system@veent.ph` user. A reminder is not a
+domain mutation, and the `lastReminderAt` / `lastReminderKind` columns are the durable record.
+
+There is deliberately **no advisory lock**. Overlap needs two runs alive at once, and the
+de-duplication columns turn a genuine overlap into at worst one duplicate notification —
+harmless, versus the connection-pinning trap a session lock would add
+(`src/lib/server/backup/plan.ts`). Revisit if the job ever runs longer than a minute.
+
+Exits 1 if any org failed, so a failure is visible in `/var/log/veent-review-reminders.log`
+and in cron mail before anyone opens the app.
+
+## Outbound email — the six `SMTP_*` variables
+
+Every `send*` in `src/lib/server/notifications.ts` — welcome, Discord invite, timesheet
+status, leave status, interview scheduled, offboarding notice, review reminder — delivers
+through the single seam in `src/lib/server/mailer.ts`.
+
+| Variable      | Default     | Meaning                                                        |
+| ------------- | ----------- | -------------------------------------------------------------- |
+| `SMTP_HOST`   | _none_      | Mail host. **Absent = unconfigured**; nothing else is read.    |
+| `SMTP_PORT`   | `587`       | `587` = STARTTLS, `465` = implicit TLS.                        |
+| `SMTP_SECURE` | `false`     | Set `true` only with port 465.                                 |
+| `SMTP_USER`   | _none_      | Auth user. Omit with `SMTP_PASS` for an unauthenticated relay. |
+| `SMTP_PASS`   | _none_      | Auth password. **Never commit a real value.**                  |
+| `SMTP_FROM`   | `SMTP_USER` | Envelope/From address.                                         |
+
+Locally they live in `.env.dev` (**there is no `.env`**), which is git-ignored; the committed
+placeholders are in `.env.dev.example` and `.env.prod.example`. On the droplet they go in the
+production env file the compose stack reads.
+
+**Unconfigured is the normal case, not an error.** With no `SMTP_HOST` every send logs
+
+```text
+[NOTIFY] (no SMTP_HOST — not sent) <so***@example.com>: Performance review open — Aug–Sep 2026
+```
+
+and returns. The recipient's local part is masked; the domain and the subject are kept, because
+those are the diagnostic. `deliver` is a synchronous `void` function and **never throws**:
+delivery is fire-and-forget, so a mail outage can never fail the HTTP request that triggered it.
+A real send that fails is logged as `[NOTIFY] delivery failed: <reason>` and nothing else
+happens.
+
+### Type-checking scripts
+
+`pnpm check` does **not** cover `scripts/**` or `prisma/**` — one site has already shipped
+broken on that assumption (#282). Nothing in this directory is typechecked by the standard
+gate. To check it by hand:
+
+```bash
+printf '%s' '{"extends":"./.svelte-kit/tsconfig.json","compilerOptions":{"allowJs":true,"checkJs":true,"esModuleInterop":true,"resolveJsonModule":true,"skipLibCheck":true,"strict":true,"moduleResolution":"bundler"},"include":["scripts/**/*.ts","src/**/*.ts"]}' > tsconfig.scripts.json
+pnpm exec svelte-kit sync && pnpm exec tsc --noEmit -p tsconfig.scripts.json
+rm tsconfig.scripts.json
+```
+
+`pnpm exec tsc --noEmit scripts/<file>.ts` on its own does **not** work: passing a file
+directly makes tsc ignore `tsconfig.json`, so every `$lib/...` import fails to resolve and the
+errors are noise. The config above is required.

@@ -37,7 +37,8 @@ function baseInput(overrides: Partial<HydrateInput> = {}): HydrateInput {
 		run: {
 			periodStart: new Date('2022-05-11T00:00:00Z'),
 			periodEnd: new Date('2022-05-25T00:00:00Z'),
-			approvedAt: new Date('2022-05-30T00:00:00Z')
+			approvedAt: new Date('2022-05-30T00:00:00Z'),
+			releasedAt: new Date('2022-06-02T00:00:00Z')
 		},
 		attendance: {
 			daysOfWork: 13,
@@ -222,7 +223,42 @@ describe('assemblePayslipDocument', () => {
 	it('formats the period label like the template (M/D/YY to M/D/YY)', () => {
 		const doc = assemblePayslipDocument(baseInput())
 		expect(doc.period.periodLabel).toBe('5/11/22 to  5/25/22')
-		expect(doc.period.payDate).toBe('5/30/22')
+		// PAYDATE is the RELEASE date (6/2), not the approval date (5/30). HR's rule, 18-08-26.
+		expect(doc.period.payDate).toBe('6/2/22')
+	})
+
+	// The approval date must not leak back in: it was written both by an approval and by a
+	// period lock, so it meant two different things (#298 D2). Release means one thing.
+	it('payDate ignores approvedAt entirely, even when the two differ', () => {
+		const doc = assemblePayslipDocument(
+			baseInput({
+				run: {
+					periodStart: new Date('2022-05-11T00:00:00Z'),
+					periodEnd: new Date('2022-05-25T00:00:00Z'),
+					approvedAt: new Date('2022-05-30T00:00:00Z'),
+					releasedAt: new Date('2022-06-02T00:00:00Z')
+				}
+			})
+		)
+		expect(doc.period.payDate).toBe('6/2/22')
+		expect(doc.period.payDate).not.toBe('5/30/22')
+	})
+
+	// A legacy APPROVED run has no period and therefore no release date. The owner chose a blank
+	// PAYDATE over inventing one (runs.ts:17 — a payslip is visible when the run is APPROVED *or*
+	// its period is RELEASED).
+	it('payDate is blank when the run never went through a release', () => {
+		const doc = assemblePayslipDocument(
+			baseInput({
+				run: {
+					periodStart: new Date('2022-05-11T00:00:00Z'),
+					periodEnd: new Date('2022-05-25T00:00:00Z'),
+					approvedAt: new Date('2022-05-30T00:00:00Z'),
+					releasedAt: null
+				}
+			})
+		)
+		expect(doc.period.payDate).toBe('')
 	})
 
 	// #139: the itemized detail lists every persisted line verbatim — no bucketing —

@@ -38,6 +38,14 @@
 				'M22 11h-6'
 			]
 		},
+		PERFORMANCE: {
+			tint: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
+			paths: [
+				'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
+				'M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z',
+				'm9 14 2 2 4-4'
+			]
+		},
 		GENERAL: {
 			tint: 'bg-muted text-muted-foreground',
 			paths: ['M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9', 'M10.3 21a1.9 1.9 0 0 0 3.4 0']

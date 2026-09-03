@@ -1,9 +1,9 @@
 # Handoff — Veent HRIS
 
-**Branch**: `staging` · **Last updated**: 2026-07-28 (through PR #216)
+**Branch**: `staging` · **Last updated**: 2026-07-31 (through PR #233)
 
-> This file was rebuilt from the actual `staging` state and the merged-PR history. The prior
-> version was frozen at `dev/attendance` / 2026-07-14 and had drifted ~30 PRs out of date.
+> This file is rebuilt from the actual `staging` state and the merged-PR history. Keep it that way:
+> when it drifts more than a few PRs it stops being trusted and starts being re-derived from scratch.
 
 ## ⚠️ Environment note (read first)
 
@@ -69,7 +69,30 @@ Leave/Requests (three-stage maker-checker), Recruitment (posting approvals → a
 offer → convert), Onboarding & Separation (editable checklists + emails), Benefits, Performance
 reviews, Reports, Org chart, RBAC, Audit log, Inventory, and a rebuilt Dashboard.
 
-### Landed since the last handoff (merged into `staging`, #144–#216)
+### Landed since the last handoff (merged into `staging`, #219–#233)
+
+- **🚀 Shipped to production (#230, 2026-07-31)** — `staging` → `main`, 109 commits / 251 files, and
+  auto-deployed to the droplet. Everything below and everything in the #144–#216 list is live.
+- **Sensitive-data masking (#111, PR #219)** — salary, government IDs and disbursement details are
+  masked in the service layer, with an explicit **audited reveal** action. Reaching sensitive data is
+  itself a logged event; see #242 for the one path that still isn't.
+- **Payroll edge cases (#173/#220, PR #221)** — statutory rate tables with an HR-proposes /
+  CEO-confirms flow (`StatutoryRateProposal`). The propose→confirm shape here is the reference
+  pattern for any future two-person control.
+- **Mid-period changes (#170/#171, PR #223)** — effective-dated `EmployeeCompensation` history.
+  The record is the source of truth, `Employee.basicMonthlySalary` is a cache healed on read.
+- **Special working holidays (#199, PR #225)**, **loan types (#183, PR #226)**.
+- **Promotions (#222, PR #227)** — effective-dated `EmployeeEmploymentType`, same
+  record-is-truth/column-is-cache shape as compensation, applied in one transaction with pay.
+- **Object-level access control (#228, PR #229; roster #234, PR #233)** — a MANAGER is scoped to
+  their own team and managed branches. The bug this fixed is worth knowing: `MANAGER` holds
+  `MANAGE_HR` **and** ranks level with `HR_ADMIN`, so guards written as
+  `requireMinRole('MANAGER') + if (!can(role,'MANAGE_HR'))` describe an **empty set** and never ran.
+  Use `ADMINISTER_HR_ORGWIDE` — never `MANAGE_HR` — to mean "may reach any employee".
+- **Deploy fix (PR #231)** — the enum-rename migration now runs inside the container's start command
+  ahead of `db push`. Without it the #172 rename would have crash-looped production on green CI (#236).
+
+### Landed earlier (merged into `staging`, #144–#216)
 
 - **Security**: authz holes closed — recruitment authz + payslip IDOR (#213), loan IDOR / temp-password
   logging / CSV injection (#128), data-exposure/replay/tenancy audit batches (#125/#126), upload
@@ -92,10 +115,41 @@ reviews, Reports, Org chart, RBAC, Audit log, Inventory, and a rebuilt Dashboard
 
 ### Tests / CI
 
-`format:check` ✅ · `lint` ✅ · `check` (typecheck) ✅ · **~54 unit test files + ~26 e2e specs** —
-including the timesheet/attendance e2e flows that the old handoff listed as "none yet"
-(`timesheet-punch`, `timesheet-approval`, `timesheet-create-for-employee`, `manager-org-wide-timesheets`).
-Run `pnpm test` for the live pass count before relying on a number.
+`format:check` ✅ · `lint` ✅ (0 errors, 1 known a11y warning in `CalculatorWindow.svelte`) ·
+`check` (typecheck) ✅ · **67 unit test files / 777 tests on `staging`** at 2026-07-31, plus ~26 e2e
+specs. Run `pnpm test` for the live pass count before relying on a number.
+
+Two conventions worth keeping when adding tests for a guard:
+
+- **Mutation-check it.** Delete or neuter the guard and confirm the test actually fails. A test that
+  passes either way is not coverage. This has caught real gaps — see the note under #224 Stage C.
+- **Assert the message, not just the status.** Where two layers can both reject with `403`, a
+  status-only assertion passes with the guard removed and pins nothing.
+
+## 🚧 In flight
+
+**#224 — CEO RBAC + separation of duties.** Built on `feat/ceo-rbac-224`, **PR #238 open into
+`staging`**. Four pieces merged onto that branch, each verified live before commit:
+
+|         | What                                                                                                                            | PR   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| Part 1  | `OVERRIDE_FINALIZED` capability (Super-Admin-only: void run/period, reopen locked attendance); CEO added to `ADMINISTER_SYSTEM` | —    |
+| Stage A | Self-guards on every pay/employment writer (`assertNotSelf`)                                                                    | #239 |
+| Stage B | Role/account self-checks lifted from the routes into `setUserRole` / `setUserActive`                                            | #240 |
+| Stage C | Regression tests pinning the approval-chain guards                                                                              | #241 |
+
+Design notes that outlived the work:
+
+- **Guards go in the service, not the route.** Every form action has a v1 API twin; enforcing in the
+  writer covers both with one check and covers callers that don't exist yet. `offboardEmployee` set
+  this precedent (#158); Stages A and B follow it.
+- **Scope and self-dealing are different questions.** `canTouchEmployee` answers "is this record in
+  my scope" and deliberately says _yes_ to your own file. It was never a separation-of-duties check,
+  which is why every pay writer was reachable against oneself until Stage A.
+- **`updateEmployee` is field-scoped, not blanket-blocked** — `/profile` routes through it for the
+  signed-in user, so contact details stay self-serviceable while employment terms do not.
+- **Stage D (propose/confirm) is on hold**, and its stored design needs revising before it starts:
+  it assumed `initiatorId == targetId`, which #243 makes false.
 
 ## ⏳ Not done yet / deferred
 
@@ -103,13 +157,27 @@ Run `pnpm test` for the live pass count before relying on a number.
    (T175, FR-065); publishing postings to external job boards (T179, FR-070). The internal `JobBoard`
    tracking model exists; the outbound push does not.
 2. **Doc reconciliation** — `specs/001-hris-platform/tasks*.md` checkboxes are still stale (many
-   `[ ]` items are shipped, e.g. T130/T137/T138/T157–160). This file has been rebuilt; the tasks
-   files have not.
-3. **Promote `staging` → `main`** — `main` is frozen at #152 (2026-07-21), ~49 commits behind
-   `staging`. All the work above lives on `staging`.
+   `[ ]` items are shipped, e.g. T130/T137/T138/T157–160). This file is current; the tasks files
+   are not.
+3. **Post-deploy backfills** — four idempotent scripts not yet run in production:
+   `migrate-employee-compensation-baseline`, `migrate-employee-employment-type-baseline`,
+   `migrate-notification-kind`, `migrate-pagibig-cap-200`. Not urgent: the payroll resolver falls
+   back to the employee's current cache when history is absent (`payroll/index.ts`), reproducing
+   pre-#170 numbers exactly.
+4. **Branch protection on `main`** — not set, and `main` auto-deploys, so a red merge reaches
+   production. Requires the repo owner; the usual working account has push+triage but not admin.
+5. **Open security issues** — #242 (audit-log detail reads leave no trace), #243 (a MANAGER can
+   unilaterally set their team's pay — decided: route through propose/confirm, blocked on Stage D),
+   #235 (`createEmployee` accepts a cross-tenant `reportsToId`), #236 (CI only pushes schema to an
+   empty DB, so a destructive migration passes green).
 
 ## Known gotchas
 
+- **`requireMinRole('HR_ADMIN')` admits MANAGER.** `ROLE_HIERARCHY` puts `MANAGER`, `HR_ADMIN` and
+  `CEO` all at rank **2** (only `SUPER_ADMIN` is 3), so a rank gate cannot separate them — the extra
+  authority CEO/HR_ADMIN hold over MANAGER lives in the **capability table**, not in rank. This has
+  caused two real bugs (#228, #243) and one misleading comment. If you mean "not a manager", name a
+  capability MANAGER lacks (`ADMINISTER_HR_ORGWIDE`); never a `requireMinRole` floor.
 - **Attendance-driven payroll**: no punches = ₱0 pay; monthly-salaried staff must be marked present
   before lock. Unassigned employees derive against the org default schedule (#148).
 - **Unpaid meal break IS deducted now (#83)**: per Labor Code Art. 85, a 12:00–13:00 lunch is netted

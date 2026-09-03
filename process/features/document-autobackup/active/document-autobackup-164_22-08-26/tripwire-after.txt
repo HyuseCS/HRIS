@@ -1,0 +1,179 @@
+=== HEAD ===
+55b6016c6cf72de192e16ea7e7cd08645b2d6360
+=== TABLES ===
+
+--------+----------------------------------+-------+-------
+(71 rows)
+                      List of tables
+ public | action_proposals                 | table | veent
+ public | announcements                    | table | veent
+ public | applicants                       | table | veent
+ public | applicant_stage_history          | table | veent
+ public | approval_steps                   | table | veent
+ public | attendance_days                  | table | veent
+ public | audit_logs                       | table | veent
+ public | awards                           | table | veent
+ public | backup_configs                   | table | veent
+ public | backup_runs                      | table | veent
+ public | benefit_enrollments              | table | veent
+ public | benefit_plans                    | table | veent
+ public | branches                         | table | veent
+ public | cash_advance_payments            | table | veent
+ public | cash_advances                    | table | veent
+ public | clearance_items                  | table | veent
+ public | deduction_types                  | table | veent
+ public | departments                      | table | veent
+ public | earning_types                    | table | veent
+ public | emergency_contacts               | table | veent
+ public | employee_compensation_history    | table | veent
+ public | employee_deductions              | table | veent
+ public | employee_documents               | table | veent
+ public | employee_earnings                | table | veent
+ public | employee_employment_type_history | table | veent
+ public | employees                        | table | veent
+ public | employee_statutory_config        | table | veent
+ public | employee_supervisors             | table | veent
+ public | goals                            | table | veent
+ public | interviews                       | table | veent
+ public | inventory_items                  | table | veent
+ public | job_boards                       | table | veent
+ public | job_posting_channels             | table | veent
+ public | job_postings                     | table | veent
+ public | leave_balances                   | table | veent
+ public | leave_requests                   | table | veent
+ public | leave_types                      | table | veent
+ public | loan_payments                    | table | veent
+ public | loans                            | table | veent
+ public | notifications                    | table | veent
+ public | offboarding_checklist_items      | table | veent
+ public | offers                           | table | veent
+ public | onboarding_checklist_items       | table | veent
+ public | onboarding_completions           | table | veent
+ public | organizations                    | table | veent
+ public | pay_rate_rules                   | table | veent
+ public | payroll_configs                  | table | veent
+ public | payroll_deductions               | table | veent
+ public | payroll_earnings                 | table | veent
+ public | payroll_entries                  | table | veent
+ public | payroll_periods                  | table | veent
+ public | payroll_runs                     | table | veent
+ public | performance_reviews              | table | veent
+ public | positions                        | table | veent
+ public | posting_approvers                | table | veent
+ public | public_holidays                  | table | veent
+ public | request_documents                | table | veent
+ public | requests                         | table | veent
+ public | review_cycles                    | table | veent
+ public | salary_grades                    | table | veent
+ public | separation_records               | table | veent
+ public | sessions                         | table | veent
+ public | statutory_rate_configs           | table | veent
+ public | statutory_rate_proposals         | table | veent
+ public | time_logs                        | table | veent
+ public | timesheet_entries                | table | veent
+ public | timesheets                       | table | veent
+ public | user_organizations               | table | veent
+ public | users                            | table | veent
+ public | work_schedule_days               | table | veent
+ public | work_schedules                   | table | veent
+ Schema |               Name               | Type  | Owner 
+=== UPLOAD BYTES ===
+0e089d9f0a0c077d42924cbab713fcaca221759525662fd3b70a3e8b2b0bcb52  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/117077f2-28fa-453b-b8ee-c96c06f767c9.pdf
+12de3aeeb2648c35202979fa799b18f27104c25bf7176999ac2986dd9df04fa8  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/d3c032bc-14e5-49ef-b50d-dd2abf6312bc.pdf
+12de3aeeb2648c35202979fa799b18f27104c25bf7176999ac2986dd9df04fa8  uploads/requests/cmsvu0bba0036poix1lxz2mny/84032fda-a3e6-4cbc-823d-4208e22215be.pdf
+14d0445d34f72559c7137343b37a976a0ce31b6d6281dd32ee4ed255ed82e829  uploads/requests/cmsvtikh20003poixpino23mi/6ad2a9c9-137a-4b17-aa46-59d11b55161a.pdf
+2e0610aad4ad4e7eb75b393b028520bd557d7056b79c817f239679947874cea9  uploads/requests/cmsvu0ijv003xpoixrbuhmajv/a6bee3b2-664c-4f86-8f72-1df12116707a.pdf
+2e0610aad4ad4e7eb75b393b028520bd557d7056b79c817f239679947874cea9  uploads/requests/cmsvu0sjk004kpoix3lq3vsf5/f0f1c711-faed-460b-a03f-962c7437fd4f.pdf
+2e0610aad4ad4e7eb75b393b028520bd557d7056b79c817f239679947874cea9  uploads/requests/cmsvu10hp0056poixmt9h6m4s/7b4bc0ec-9ffa-4181-aa94-47d0d1c85f1a.pdf
+2e0610aad4ad4e7eb75b393b028520bd557d7056b79c817f239679947874cea9  uploads/requests/cmsvu3ffo0065poix8njtkjm0/b5a84bfe-3ae6-47a6-ad4d-0a3fb26ddacb.pdf
+39115b951ea36365dcad14ad8772a28ada9d0e4bd055982b707609e2c2d64787  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/ba565fcb-a31a-40ba-947c-50937320ef03.pdf
+7138773e1169e220b65f24e4471dd8903d92c158d790e577699dd320c93b6ab5  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/5f9038f7-f878-435e-9d7c-d103b60b9986.pdf
+7138773e1169e220b65f24e4471dd8903d92c158d790e577699dd320c93b6ab5  uploads/requests/cmsvu0bba0036poix1lxz2mny/1f5b2967-2efc-4723-bd19-bc761e6609b2.pdf
+a6aeb1ebbc79d0033e81939447ce056442eefffe9f190220a04e203fa724dc8b  uploads/requests/cmsvtxiv80013poixqxrk43nc/cc73e5ef-a3f8-4a4c-9f81-4e7233d4a492.pdf
+a6aeb1ebbc79d0033e81939447ce056442eefffe9f190220a04e203fa724dc8b  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/22919c4f-b7e9-4fa4-8554-4aa5d93f15e1.pdf
+ac183ce4d967dc40c7aecee5074f1b153658bf3a7fa815288490200088d58be2  uploads/requests/cmsvu17qr005ppoixoj6kkw8f/7f2ddbe9-65b7-4480-990c-5d3bf89483e4.pdf
+ac183ce4d967dc40c7aecee5074f1b153658bf3a7fa815288490200088d58be2  uploads/requests/cmsvu3shj006zpoixysw7ed9j/2a42ef9d-7c48-49fb-adc7-612aef6f4aa1.pdf
+ac183ce4d967dc40c7aecee5074f1b153658bf3a7fa815288490200088d58be2  uploads/requests/cmsvu42d2007ipoix0ji7syl8/2d8929a3-71ad-4880-ad83-e7301f3c17f5.pdf
+b9c7c6ae3a2d00e13c3c0184e00b03303450d76701888c41937a115db636bd87  uploads/requests/cmspvfcbi00014jlvu2ba6xja/cd211ae0-8b51-4e80-abc1-31627b6af096.pdf
+b9c7c6ae3a2d00e13c3c0184e00b03303450d76701888c41937a115db636bd87  uploads/requests/cmsvtxiv80013poixqxrk43nc/d316efa7-b3da-445d-9fe1-12aab6fdb5cd.pdf
+b9c7c6ae3a2d00e13c3c0184e00b03303450d76701888c41937a115db636bd87  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/906d12d2-4b36-447c-b6be-1d94ec40c174.pdf
+be0471ec55b284f08e576da102f9c525dfae529ca338f7d9083c5f59b1e7ef60  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/c1b82b39-7185-4c15-8e58-c4427c60f056.pdf
+be0471ec55b284f08e576da102f9c525dfae529ca338f7d9083c5f59b1e7ef60  uploads/requests/cmsvu0bba0036poix1lxz2mny/84e15f10-00ab-4e8c-99a4-2280089a8d8c.pdf
+c4c5d477063f28d29322b85e6acf5174d1090de802940045dcdf0a58b87d89c4  uploads/requests/cmsvtikh20003poixpino23mi/aabd1d0f-5d8a-4475-bc56-e1e7ef3b0c57.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmspv8vp90021ma99uwhxzoig/adbe62af-b697-4bb8-b44b-ca1f8a4dc2c4.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmspv8vp90021ma99uwhxzoig/ea5fd8d9-0385-4864-8a6a-9a633c3dd759.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszm57kb00n6g1co246hcjib/1c8974ce-3ff2-4231-9edc-da0638e61b11.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszm57kb00n6g1co246hcjib/b44a62d6-30d1-4958-a93f-12e8f371bd81.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszmbng500dv13460lazze81/0c3bb639-9f1c-4733-bb65-c2c27a2161ba.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszmbng500dv13460lazze81/861a91b3-9fe8-4263-8190-2ba8faa15a23.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszmkrtm00nffz2dwjvttulo/7112740d-7388-49b7-bdc6-a5fa1e63fa86.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszmkrtm00nffz2dwjvttulo/741c1fc4-aef0-477b-9a3c-10de0bc528d6.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszmnsmg00oyf96hor8h8aqa/94b9cfab-204c-4e52-867e-3a58a596f782.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszmnsmg00oyf96hor8h8aqa/97014b92-132b-4ea6-825e-3d92204b2da1.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszp9cwh00rwba8xdc1foish/b7e20844-f04d-4a9f-9cd4-bf8fea357aff.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmszp9cwh00rwba8xdc1foish/bedd7eae-66fe-48da-9b41-2af034be5261.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0vl36u010xzu9l4pcstz1w/a8460f0c-c8d0-42ac-8350-b2d901a44435.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0vl36u010xzu9l4pcstz1w/dba6af65-2036-48f7-8bd2-7218bcb3e0a6.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0vv8ds013fhb32uagoyjat/3bac9ca0-87d4-42e2-837a-330cbe27c195.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0vv8ds013fhb32uagoyjat/3e9fe832-9d90-41c7-adf3-2755729d9bea.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0vx6tr01e714a7fgr9c4ll/04423032-bc68-4b39-9a77-1eb8801119b2.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0vx6tr01e714a7fgr9c4ll/a6b2f8ec-0ac9-49e7-863b-9da0700569ea.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0w3yp801i4h1ldxetw5m3b/00a7a067-bc89-4a32-baf1-747358e99a13.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0w3yp801i4h1ldxetw5m3b/3c7b8387-4e8e-40fd-b48a-3ab84aa97717.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0yg9d801mg9h7lfx1kip80/4296e435-3e2c-43d0-84b8-fc724acc4933.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0yg9d801mg9h7lfx1kip80/cb9619a8-3643-4d6a-a459-b74facf78fce.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0z6fyv01pxzuso4rh239vh/0f4fab0a-66ee-468f-8eaf-36048a383d7f.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt0z6fyv01pxzuso4rh239vh/77d15580-9a8f-47a8-a3f2-264d3a59b8fe.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt10idom01uj7rwpb02ha0si/c68d7ad6-a150-4509-ba50-ba2af90fbf18.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt10idom01uj7rwpb02ha0si/df5c87f9-4ac3-440e-8522-a74192125c55.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt10lgzh01ya5zcxmxh61ctw/2e87d171-2e19-41d2-9a5e-935c41a8cdc6.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt10lgzh01ya5zcxmxh61ctw/b32d2043-497a-4fe7-98a3-5e2fe5c14725.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt1176il0226qmdqxaz7s59a/3a27b185-e95d-407b-8d00-1a9ebf5ccf1c.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt1176il0226qmdqxaz7s59a/e73530ea-8f7c-42f6-8170-1c8773695c84.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt11bbn202vpwzygf7x2m8pa/53485e05-4284-4d4b-b71a-75455d11d333.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt11bbn202vpwzygf7x2m8pa/902964ac-f42d-437c-b53e-3e9b2cb7eae9.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt13e5l2031b8gkxetx6enon/3a3c5c22-f486-48e9-9388-3d3c5cc09dba.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt13e5l2031b8gkxetx6enon/e43b120c-f776-411d-b49b-92b4c1627c49.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt13hc7a036vngw8d05aoup9/32edd1d6-9fba-4325-a014-979e32d99a87.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt13hc7a036vngw8d05aoup9/cfe022ab-d390-4080-9c0d-6c295ac255db.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt13jacv03cgm18j5a1xjgmb/5a45147b-1bb0-426f-a795-6e9741985785.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt13jacv03cgm18j5a1xjgmb/63f534b1-2fd0-4c26-a1b7-80f68ee077bb.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt44yux703ifwcvwlgr6bgbp/d8bc1327-6a6d-4fb8-8b97-ba524c379ec7.pdf
+d7dd0115be8b79ae057b3f6ca0fcee578085ba6919dcb70e8643a2aff537d9b5  uploads/requests/cmt44yux703ifwcvwlgr6bgbp/f00f1abb-9335-4ba1-be92-4bf9e7ee3c75.pdf
+e543f519066843f0b70346ceae0ccf9fd81c3902d779a2a0d5e3d1f77d3811aa  uploads/requests/cmsvu0bba0036poix1lxz2mny/44cb46d8-4557-4e98-b625-2b5aea6e3720.pdf
+e71ea1f6906752eed2d439eb98892457920707de3750db6a8d2e85a968701c33  uploads/requests/cmsvtzrkn001rpoix4xmnhspz/c6fc5b2e-6ea4-4292-a9ac-589500cb7ec3.pdf
+e71ea1f6906752eed2d439eb98892457920707de3750db6a8d2e85a968701c33  uploads/requests/cmsvu0ijv003xpoixrbuhmajv/ab4130fc-c8a5-4e6f-95cd-50b922691e2c.pdf
+
+=== TRIPWIRE COMPARISON vs tripwire-before.txt ===
+
+TABLES: exactly two added — `backup_configs`, `backup_runs`. Nothing removed or renamed. PASS.
+
+UPLOAD BYTES: 63 of 63 pre-existing files are byte-identical, hash for hash. PASS for the
+control this tripwire exists to enforce (ST6 / S2: a backup run must never write, rename or
+unlink anything under UPLOAD_DIR).
+
+TWO EXTRA FILES appeared, and they are NOT a tripwire failure. Both are:
+  uploads/requests/cmt44yux703ifwcvwlgr6bgbp/{d8bc1327-…,f00f1abb-…}.pdf
+They were created by the full e2e suite run (137 specs), which files requests with
+supporting documents. Their request row and document rows are gone (`select count(*) from
+request_documents where "requestId"='cmt44yux703ifwcvwlgr6bgbp'` → 0), so the suite deleted
+the rows and left the bytes — the same class as the known `posting-approver-sod.spec.ts`
+housekeeping leak already on the backlog.
+
+Why this is not the backup writing into UPLOAD_DIR:
+  1. Their path shape is `requests/<requestId>/<uuid>.pdf` — exactly what `saveFile()` emits
+     for a request upload, and nothing like the backup tree (`<orgId>/<runId>/files/…`).
+  2. No backup ran during the e2e suite; backups only run from `scripts/backup-documents.ts`,
+     which e2e never invokes.
+  3. Every destination write goes through `resolveWithin(dest.root, …)`, and `BACKUP_DIR`
+     is refused outright if it is inside UPLOAD_DIR (`assertDestinationSafe`).
+
+ORPHAN SWEEP: reports 63, unchanged. The two new files are inside the sweep's 60-minute
+grace window, which is why they are not counted yet. Expect 65 after that window.
+
+E-01 (backup output must never be committable) PROVEN, not assumed:
+  `/backups/` in .gitignore + `backups` in .dockerignore. Creating a real
+  backups/org_seed/testrun/manifest.json left `git status` completely clean.
+  Note `git check-ignore backups` exits 1 while `git check-ignore backups/x/manifest.json`
+  exits 0 — a trailing-slash pattern only matches a directory, so the bare-path check is a
+  false negative. Test with a path INSIDE the directory.

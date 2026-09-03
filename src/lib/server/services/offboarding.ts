@@ -1,6 +1,8 @@
 import { db } from '$lib/server/db'
 import { error } from '@sveltejs/kit'
+import type { ClearanceArea } from '@prisma/client'
 import { writeAuditLog } from '$lib/server/audit'
+import { CLEARANCE_AREAS } from '$lib/utils/clearance-area'
 import type { AuditContext } from './types'
 
 // ─── Offboarding checklist (#192) ─────────────────────────────────────────────
@@ -10,13 +12,13 @@ import type { AuditContext } from './types'
 // rows, and the transition-notice email (#185) lists them. An org that has never
 // configured a checklist falls back to these built-in defaults, so separations behave
 // exactly as they did before the template existed.
-export const DEFAULT_OFFBOARDING_ITEMS: { label: string; department: string }[] = [
-	{ label: 'Return company equipment (laptop, phone, peripherals)', department: 'IT' },
-	{ label: 'Revoke systems & email access', department: 'IT' },
-	{ label: 'Settle outstanding loans & cash advances', department: 'Finance' },
-	{ label: 'Return ID, access cards & keys', department: 'Admin' },
-	{ label: 'Knowledge transfer & handover complete', department: 'Immediate Supervisor' },
-	{ label: '201 file & exit documents complete', department: 'HR' }
+export const DEFAULT_OFFBOARDING_ITEMS: { label: string; area: ClearanceArea }[] = [
+	{ label: 'Return company equipment (laptop, phone, peripherals)', area: 'IT' },
+	{ label: 'Revoke systems & email access', area: 'IT' },
+	{ label: 'Settle outstanding loans & cash advances', area: 'FINANCE' },
+	{ label: 'Return ID, access cards & keys', area: 'ADMIN' },
+	{ label: 'Knowledge transfer & handover complete', area: 'IMMEDIATE_SUPERVISOR' },
+	{ label: '201 file & exit documents complete', area: 'HR' }
 ]
 
 export async function listOffboardingItems(organizationId: string) {
@@ -29,15 +31,15 @@ export async function listOffboardingItems(organizationId: string) {
 /**
  * The clearance tasks a new separation seeds and the transition notice lists: the org's
  * active items in order, or the built-in defaults when none are configured. Returned as
- * plain {label, department} so both the separation seed and the email reuse one source.
+ * plain {label, area} so both the separation seed and the email reuse one source.
  */
 export async function clearanceTemplateForOrg(
 	organizationId: string
-): Promise<{ label: string; department: string }[]> {
+): Promise<{ label: string; area: ClearanceArea; departmentId?: string | null }[]> {
 	const items = await db.offboardingChecklistItem.findMany({
 		where: { organizationId, isActive: true },
 		orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-		select: { label: true, department: true }
+		select: { label: true, area: true, departmentId: true }
 	})
 	return items.length ? items : DEFAULT_OFFBOARDING_ITEMS
 }
@@ -53,7 +55,7 @@ export async function ensureSeeded(organizationId: string) {
 		data: DEFAULT_OFFBOARDING_ITEMS.map((it, i) => ({
 			organizationId,
 			label: it.label,
-			department: it.department,
+			area: it.area,
 			order: i,
 			isActive: true
 		}))
@@ -62,7 +64,26 @@ export async function ensureSeeded(organizationId: string) {
 
 export interface OffboardingItemInput {
 	label: string
-	department: string
+	area: ClearanceArea
+	departmentId?: string | null
+}
+
+// `departmentId` arrives straight off a form field, so it is checked against the caller's own
+// org before it is stored — otherwise one tenant can plant another tenant's department id.
+// IMMEDIATE_SUPERVISOR is a relationship, not a department, so it never carries a pointer (#306);
+// the rule lives here rather than in each caller so the two write paths cannot drift apart.
+async function resolveDepartmentId(
+	organizationId: string,
+	area: ClearanceArea,
+	departmentId?: string | null
+) {
+	if (area === 'IMMEDIATE_SUPERVISOR' || !departmentId) return null
+	const dept = await db.department.findFirst({
+		where: { id: departmentId, organizationId },
+		select: { id: true }
+	})
+	if (!dept) error(400, 'Unknown department')
+	return dept.id
 }
 
 export async function addItem(
@@ -71,9 +92,10 @@ export async function addItem(
 	ctx: AuditContext
 ) {
 	const label = input.label.trim()
-	const department = input.department.trim()
+	const area = input.area
 	if (!label) error(400, 'Label is required')
-	if (!department) error(400, 'Department is required')
+	if (!CLEARANCE_AREAS.includes(area)) error(400, 'A valid clearance area is required')
+	const departmentId = await resolveDepartmentId(organizationId, area, input.departmentId)
 	const max = await db.offboardingChecklistItem.aggregate({
 		where: { organizationId },
 		_max: { order: true }
@@ -81,7 +103,7 @@ export async function addItem(
 	const order = (max._max.order ?? -1) + 1
 	return db.$transaction(async (tx) => {
 		const created = await tx.offboardingChecklistItem.create({
-			data: { organizationId, label, department, order }
+			data: { organizationId, label, area, departmentId, order }
 		})
 		await writeAuditLog(
 			ctx,
@@ -89,7 +111,7 @@ export async function addItem(
 				action: 'CREATE',
 				entityType: 'OffboardingChecklistItem',
 				entityId: created.id,
-				newValue: { label, department }
+				newValue: { label, area, departmentId }
 			},
 			tx
 		)
@@ -109,13 +131,14 @@ export async function updateItem(
 	})
 	if (!existing) error(404, 'Checklist item not found')
 	const label = input.label.trim()
-	const department = input.department.trim()
+	const area = input.area
 	if (!label) error(400, 'Label is required')
-	if (!department) error(400, 'Department is required')
+	if (!CLEARANCE_AREAS.includes(area)) error(400, 'A valid clearance area is required')
+	const departmentId = await resolveDepartmentId(organizationId, area, input.departmentId)
 	return db.$transaction(async (tx) => {
 		const updated = await tx.offboardingChecklistItem.update({
 			where: { id },
-			data: { label, department }
+			data: { label, area, departmentId }
 		})
 		await writeAuditLog(
 			ctx,
@@ -123,7 +146,7 @@ export async function updateItem(
 				action: 'UPDATE',
 				entityType: 'OffboardingChecklistItem',
 				entityId: id,
-				newValue: { label, department }
+				newValue: { label, area, departmentId }
 			},
 			tx
 		)
@@ -185,16 +208,24 @@ export async function reorderItems(
 	const owned = new Set(items.map((i) => i.id))
 	if (orderedIds.length !== owned.size || !orderedIds.every((id) => owned.has(id)))
 		error(400, 'Invalid reorder payload')
-	await db.$transaction(
-		orderedIds.map((id, i) =>
-			db.offboardingChecklistItem.update({ where: { id }, data: { order: i } })
+	// One transaction: a failed audit write must not leave a reordering standing unrecorded.
+	// Sequential updates rather than the batched array form, which has no `tx` to hand the
+	// audit — the list is one org's checklist, so the count is small.
+	await db.$transaction(async (tx) => {
+		for (const [i, id] of orderedIds.entries()) {
+			await tx.offboardingChecklistItem.update({ where: { id }, data: { order: i } })
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'OffboardingChecklistItem',
+				entityId: 'reorder',
+				newValue: { order: orderedIds }
+			},
+			tx
 		)
-	)
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'OffboardingChecklistItem',
-		entityId: 'reorder',
-		newValue: { order: orderedIds }
 	})
 }
 

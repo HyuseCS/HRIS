@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { applyToPosting, advanceApplicant } from '$lib/server/services/recruitment'
 import { apiError, badRequest, forbidden, notFound } from '$lib/server/api-error'
@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	const user = locals.user
 
 	try {
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 	} catch {
 		return forbidden()
 	}
@@ -103,7 +103,7 @@ export const PATCH: RequestHandler = async ({ request, locals, getClientAddress 
 	const user = locals.user
 
 	try {
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 	} catch {
 		return forbidden()
 	}
@@ -123,7 +123,7 @@ export const PATCH: RequestHandler = async ({ request, locals, getClientAddress 
 	const ctx = {
 		organizationId: user.organizationId,
 		actorId: user.id,
-		actorRole: user.role,
+		actorRoles: user.roles,
 		ipAddress: getClientAddress()
 	}
 

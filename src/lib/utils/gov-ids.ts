@@ -127,8 +127,15 @@ export function govIdError(field: GovIdField): string {
 }
 
 /**
- * Zod field for a government ID / credential: trims, treats empty as "no value" (null), and
- * otherwise requires a well-formed value, storing it canonically.
+ * Zod field for a government ID / credential: trims, requires a well-formed value, and stores it
+ * canonically. Three-way by design — absent stays `undefined` ("not part of this request"), an
+ * explicit empty string becomes `null` ("clear it"), anything else is validated and canonicalised.
+ *
+ * #267: absent used to collapse to `null`. `.optional()` does not short-circuit a downstream
+ * transform — it runs on `undefined` and its output is written back — so the key survived parsing
+ * on every request, and a partial PATCH that never mentioned these fields wiped all four. Callers
+ * that treat `null` as "leave unchanged" (the edit form) decide that themselves; the schema must
+ * not decide it for them, or the API loses its only way to clear a stored ID.
  *
  * Lives here rather than in a server schema module so the create form, the edit form and the
  * API all validate through the same definition as the UI hints.
@@ -138,7 +145,7 @@ export function govIdSchema(field: GovIdField) {
 		.string()
 		.trim()
 		.optional()
-		.transform((v) => (v ? v : null))
-		.refine((v) => v === null || normalizeGovId(field, v) !== null, { message: govIdError(field) })
-		.transform((v) => (v === null ? null : (normalizeGovId(field, v) as string)))
+		.transform((v) => (v === undefined ? undefined : v || null))
+		.refine((v) => v == null || normalizeGovId(field, v) !== null, { message: govIdError(field) })
+		.transform((v) => (v == null ? v : (normalizeGovId(field, v) as string)))
 }

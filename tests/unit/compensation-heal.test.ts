@@ -14,7 +14,7 @@ const DAY = 24 * 60 * 60 * 1000
 
 const { dbMock, txMock } = vi.hoisted(() => {
 	const txMock = {
-		employeeCompensation: { create: vi.fn(), findFirst: vi.fn() },
+		employeeCompensation: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
 		employee: { update: vi.fn() }
 	}
 	return {
@@ -34,14 +34,21 @@ vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(u
 vi.mock('bcrypt', () => ({ default: { hash: vi.fn().mockResolvedValue('hashed') } }))
 
 const { getEmployee, recordCompensationChange } = await import('$lib/server/services/employees')
+const { writeAuditLog } = await import('$lib/server/audit')
 
-const CTX = { organizationId: 'org1', actorId: 'u1', actorRole: 'HR_ADMIN' as Role, ipAddress: 't' }
+const CTX = {
+	organizationId: 'org1',
+	actorId: 'u1',
+	actorRoles: ['HR_ADMIN'] as Role[],
+	ipAddress: 't'
+}
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => unknown) => fn(txMock))
 	dbMock.payrollRun.findFirst.mockResolvedValue(null)
 	dbMock.employeeCompensation.findMany.mockResolvedValue([])
+	txMock.employeeCompensation.findMany.mockResolvedValue([])
 	dbMock.employeeEmploymentType.findMany.mockResolvedValue([])
 })
 
@@ -128,5 +135,59 @@ describe('recordCompensationChange — future effective date (#170 Stage 1.5)', 
 		// …and the cache is synced to the unchanged current figure, not the future 50000.
 		const updateArg = txMock.employee.update.mock.calls[0][0]
 		expect(Number(updateArg.data.basicMonthlySalary)).toBe(30000)
+	})
+})
+
+describe('recordCompensationChange — the audit\'s "before" is read inside the transaction (#5)', () => {
+	// The pre-transaction read is for validation only. If the audit reuses it, two concurrent changes
+	// to the same employee both log the same prior pay — one of them a figure it never replaced.
+	it('logs the prior pay from the tx-scoped history, not the one read before the transaction', async () => {
+		dbMock.employee.findFirst.mockResolvedValue({
+			id: 'emp1',
+			basicMonthlySalary: 30000,
+			rateType: 'MONTHLY',
+			employmentType: 'REGULAR',
+			startDate: new Date('2024-01-01')
+		})
+		// Read before the transaction opens: still shows 30000.
+		dbMock.employeeCompensation.findMany.mockResolvedValue([
+			{
+				basicMonthlySalary: 30000,
+				rateType: 'MONTHLY',
+				effectiveDate: new Date('2024-01-01'),
+				changedAt: new Date('2024-01-01')
+			}
+		])
+		// Inside the transaction: a concurrent raise to 40000 has already committed.
+		txMock.employeeCompensation.findMany.mockResolvedValue([
+			{
+				basicMonthlySalary: 30000,
+				rateType: 'MONTHLY',
+				effectiveDate: new Date('2024-01-01'),
+				changedAt: new Date('2024-01-01')
+			},
+			{
+				basicMonthlySalary: 40000,
+				rateType: 'MONTHLY',
+				effectiveDate: new Date('2024-06-01'),
+				changedAt: new Date('2024-06-01')
+			}
+		])
+		txMock.employeeCompensation.findFirst.mockResolvedValue({
+			basicMonthlySalary: 50000,
+			rateType: 'MONTHLY'
+		})
+
+		await recordCompensationChange(
+			'emp1',
+			'org1',
+			{ basicMonthlySalary: 50000, effectiveDate: new Date() },
+			CTX
+		)
+
+		const [, payload] = vi.mocked(writeAuditLog).mock.calls[0]
+		expect(payload.oldValue).toEqual({ basicMonthlySalary: 40000, rateType: 'MONTHLY' })
+		// The history read that fed it ran on the transaction client, never on `db`.
+		expect(txMock.employeeCompensation.findMany).toHaveBeenCalled()
 	})
 })

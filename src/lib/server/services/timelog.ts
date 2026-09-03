@@ -19,27 +19,61 @@ function round2(n: number): number {
 // ─── Raw punches ─────────────────────────────────────────────────────────────
 
 /**
- * Record a single IN/OUT punch for the employee linked to `discordId`.
- * Called from the (unauthenticated, HMAC-verified) /api/v1/timesheets/log endpoint,
- * so it derives its own audit context from the resolved employee.
+ * Record a single IN/OUT punch.
+ *
+ * Two callers, two ways in:
+ *  - the (unauthenticated, HMAC-verified) /api/v1/timesheets/log endpoint passes `discordId`;
+ *  - the session-authenticated /punch page (#177) passes `employeeId`, already resolved from
+ *    `locals.user` and scoped to the active org. It never comes from a form.
+ *
+ * Only employee resolution and the idempotency key differ between them — everything below the
+ * resolution is one path, so the two can never drift.
+ *
+ * Either way this derives its own audit context from the RESOLVED employee, never from the
+ * caller, so a caller cannot attribute a punch to somebody else.
  */
 export async function recordPunch(
 	input: {
-		discordId: string
+		/** Exactly one of `discordId` / `employeeId`. Enforced at runtime immediately below. */
+		discordId?: string
+		employeeId?: string
 		punchType: 'IN' | 'OUT'
 		timestamp: Date
 		discordMessageId?: string
+		/** #200/#177 idempotency key for punches with no Discord message. See TimeLog.dedupKey. */
+		dedupKey?: string
 		source?: PunchSource
+		/** #177 — WEB punches only. Null/absent writes no location columns at all. */
+		location?: { latitude: number; longitude: number; accuracyM?: number } | null
 	},
 	meta?: { ipAddress?: string }
 ) {
-	const employee = await db.employee.findUnique({
-		where: { discordId: input.discordId },
-		include: { user: { select: { id: true, role: true, isActive: true } } }
-	})
+	// #177 — exactly one of the two resolvers. Without this, both-absent would reach Prisma as
+	// `findUnique({ where: { discordId: undefined } })`, which is a validation error (a 500 the
+	// caller cannot act on) rather than a clear refusal; both-present would silently pick one.
+	// A 400 is right for both: the CALLER is malformed, the employee is not missing.
+	if (!input.discordId === !input.employeeId) {
+		error(400, 'recordPunch requires exactly one of discordId or employeeId')
+	}
+
+	const employee = input.employeeId
+		? await db.employee.findUnique({
+				where: { id: input.employeeId },
+				include: { user: { select: { id: true, roles: true, isActive: true } } }
+			})
+		: await db.employee.findUnique({
+				// Non-null by the exactly-one guard above.
+				where: { discordId: input.discordId! },
+				include: { user: { select: { id: true, roles: true, isActive: true } } }
+			})
 
 	if (!employee || !employee.user.isActive || employee.employmentStatus !== 'ACTIVE') {
-		error(404, 'No active employee is linked to this Discord account')
+		error(
+			404,
+			input.employeeId
+				? 'No active employee record is linked to this account'
+				: 'No active employee is linked to this Discord account'
+		)
 	}
 
 	// The most recent punch — reported back so the caller can tell the user their new state.
@@ -56,9 +90,16 @@ export async function recordPunch(
 	// message may produce exactly one punch. Checked here for a clean 409, and
 	// again via the unique constraint below, which is what actually closes the
 	// race between two concurrent replays (and holds if this check is skipped).
-	if (input.discordMessageId) {
+	// #177 extends the same two-layer shape to `dedupKey`, which is how a double-tapped
+	// web punch collapses to one row. A caller passes one key or the other, never both.
+	if (input.discordMessageId || input.dedupKey) {
 		const duplicate = await db.timeLog.findFirst({
-			where: { employeeId: employee.id, discordMessageId: input.discordMessageId },
+			where: {
+				employeeId: employee.id,
+				...(input.discordMessageId
+					? { discordMessageId: input.discordMessageId }
+					: { dedupKey: input.dedupKey })
+			},
 			select: { id: true }
 		})
 		if (duplicate) error(409, 'This punch has already been recorded')
@@ -66,38 +107,77 @@ export async function recordPunch(
 
 	let timeLog
 	try {
-		timeLog = await db.timeLog.create({
-			data: {
-				employeeId: employee.id,
-				punchType: resolvedType,
-				source: input.source ?? 'DISCORD',
-				timestamp: input.timestamp,
-				discordMessageId: input.discordMessageId
-			}
+		// #324: the punch and its audit row commit together — a failed audit write must not leave a
+		// punch standing unrecorded.
+		//
+		// The try/catch stays OUTSIDE the transaction, deliberately. Prisma's interactive
+		// transaction awaits the rollback and then rethrows the ORIGINAL error object unchanged, so
+		// the P2002 test below still matches from out here; and `AuditLog` carries no unique
+		// constraint, so the audit insert cannot raise a P2002 of its own that this catch would
+		// mislabel as a duplicate punch. A 409 stays a 409.
+		timeLog = await db.$transaction(async (tx) => {
+			const created = await tx.timeLog.create({
+				data: {
+					employeeId: employee.id,
+					punchType: resolvedType,
+					source: input.source ?? 'DISCORD',
+					timestamp: input.timestamp,
+					discordMessageId: input.discordMessageId,
+					dedupKey: input.dedupKey,
+					// #177 — spread, not four `?? null`s: a punch with no reading must leave the four
+					// columns ABSENT from the write, so a DISCORD or MANUAL punch can never be the
+					// thing that introduced a location value.
+					...(input.location
+						? {
+								latitude: input.location.latitude,
+								longitude: input.location.longitude,
+								locationAccuracyM: input.location.accuracyM ?? null,
+								locationCapturedAt: new Date()
+							}
+						: {})
+				}
+			})
+
+			await writeAuditLog(
+				{
+					organizationId: employee.organizationId,
+					actorId: employee.user.id,
+					actorRoles: employee.user.roles,
+					ipAddress: meta?.ipAddress
+				},
+				{
+					action: 'CREATE',
+					entityType: 'TimeLog',
+					entityId: created.id,
+					newValue: {
+						punchType: resolvedType,
+						timestamp: input.timestamp.toISOString(),
+						// #177 — NEVER the coordinates themselves. The audit log has a different read gate
+						// than the punches API, and #242 is the case on this repo where the audit log
+						// bypassed a masking rule; `hasLocation` is enough to open an investigation with,
+						// and the punch row is where the coordinates are read from under their own gate.
+						//
+						// Added ONLY when a reading exists (plan correction P6). Emitting
+						// `hasLocation: false` unconditionally would change the audit payload of every
+						// Discord punch — a behaviour change in a flow whose route file has a zero-line
+						// diff, which is exactly the kind of drift nobody would notice. An absent key and
+						// `false` carry the same meaning here, and absent is the one that changes nothing.
+						...(input.location ? { hasLocation: true } : {})
+					}
+				},
+				tx
+			)
+			return created
 		})
 	} catch (e) {
-		// P2002 = unique violation on (discordMessageId, employeeId): a replay that
-		// raced past the check above. Same outcome, no duplicate punch written.
+		// P2002 = unique violation on (discordMessageId | dedupKey, employeeId): a replay
+		// or a double-submit that raced past the check above. Same outcome, no duplicate
+		// punch written.
 		if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
 			error(409, 'This punch has already been recorded')
 		}
 		throw e
 	}
-
-	await writeAuditLog(
-		{
-			organizationId: employee.organizationId,
-			actorId: employee.user.id,
-			actorRole: employee.user.role,
-			ipAddress: meta?.ipAddress
-		},
-		{
-			action: 'CREATE',
-			entityType: 'TimeLog',
-			entityId: timeLog.id,
-			newValue: { punchType: resolvedType, timestamp: input.timestamp.toISOString() }
-		}
-	)
 
 	return {
 		timeLog,
@@ -300,19 +380,26 @@ export async function aggregateTimeLogsToTimesheet(
 			data: { timesheetId: ts.id }
 		})
 
-		return ts
-	})
+		// #324: the audit row joins the transaction that upserts the timesheet, rewrites its entries
+		// and re-links the source punches — a failed audit write must not leave that aggregate
+		// standing unrecorded.
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'Timesheet',
+				entityId: ts.id,
+				newValue: {
+					source: 'timelog_aggregation',
+					totalHours,
+					daysWithHours: Object.keys(hoursByDay).length,
+					warnings: warnings.length
+				}
+			},
+			tx
+		)
 
-	await writeAuditLog(ctx, {
-		action: 'UPDATE',
-		entityType: 'Timesheet',
-		entityId: timesheet.id,
-		newValue: {
-			source: 'timelog_aggregation',
-			totalHours,
-			daysWithHours: Object.keys(hoursByDay).length,
-			warnings: warnings.length
-		}
+		return ts
 	})
 
 	return { timesheet, hoursByDay, totalHours, warnings }

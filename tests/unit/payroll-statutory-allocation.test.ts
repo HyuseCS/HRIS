@@ -144,10 +144,13 @@ describe('computeEmployeeResult — EE-share allocation (#173, Feature E)', () =
 
 // ─── Service: setStatutoryAllocation ───────────────────────────────────────────
 
-const { dbMock } = vi.hoisted(() => ({
+const { dbMock, tx } = vi.hoisted(() => ({
+	// #324: the setters now upsert on the transaction client, so the upsert mock lives on `tx`.
+	tx: { employeeStatutoryConfig: { upsert: vi.fn() } },
 	dbMock: {
+		$transaction: vi.fn(),
 		employee: { findFirst: vi.fn() },
-		employeeStatutoryConfig: { upsert: vi.fn(), findMany: vi.fn() }
+		employeeStatutoryConfig: { findMany: vi.fn() }
 	}
 }))
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
@@ -158,7 +161,7 @@ const { setStatutoryAllocation } = await import('$lib/server/services/payroll/em
 const ctx = {
 	organizationId: 'org1',
 	actorId: 'user1',
-	actorRole: 'HR_ADMIN' as Role,
+	actorRoles: ['HR_ADMIN'] as Role[],
 	ipAddress: 'test'
 }
 
@@ -170,7 +173,8 @@ describe('setStatutoryAllocation (#173, Feature E)', () => {
 			basicMonthlySalary: 30000,
 			rateType: 'MONTHLY'
 		})
-		dbMock.employeeStatutoryConfig.upsert.mockResolvedValue({ id: 'cfg1' })
+		tx.employeeStatutoryConfig.upsert.mockResolvedValue({ id: 'cfg1' })
+		dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 	})
 
 	it('upserts only the allocation (preserving exempt + external) and audits it', async () => {
@@ -179,7 +183,7 @@ describe('setStatutoryAllocation (#173, Feature E)', () => {
 
 		// Neither create nor update mentions `exempt`/`employerSharePaidExternally` — the shared row's
 		// other flags are preserved (create defaults them to false; update leaves them as-is).
-		expect(dbMock.employeeStatutoryConfig.upsert).toHaveBeenCalledWith({
+		expect(tx.employeeStatutoryConfig.upsert).toHaveBeenCalledWith({
 			where: { employeeId_contribution: { employeeId: 'emp1', contribution: 'SSS' } },
 			create: { employeeId: 'emp1', contribution: 'SSS', allocation: 'FIRST' },
 			update: { allocation: 'FIRST' }
@@ -190,7 +194,9 @@ describe('setStatutoryAllocation (#173, Feature E)', () => {
 				entityType: 'EmployeeStatutoryConfig',
 				entityId: 'cfg1',
 				newValue: { contribution: 'SSS', allocation: 'FIRST' }
-			})
+			}),
+			// #324: the audit write shares the transaction.
+			tx
 		)
 	})
 
@@ -199,6 +205,6 @@ describe('setStatutoryAllocation (#173, Feature E)', () => {
 		await expect(
 			setStatutoryAllocation('emp1', 'org1', 'SSS', 'SECOND', ctx)
 		).rejects.toMatchObject({ status: 404 })
-		expect(dbMock.employeeStatutoryConfig.upsert).not.toHaveBeenCalled()
+		expect(tx.employeeStatutoryConfig.upsert).not.toHaveBeenCalled()
 	})
 })

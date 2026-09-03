@@ -13,16 +13,24 @@ const { dbMock } = vi.hoisted(() => ({
 		attendanceDay: { findFirst: vi.fn(), update: vi.fn() },
 		request: { findMany: vi.fn() },
 		workSchedule: { findFirst: vi.fn() },
-		organization: { findUnique: vi.fn() }
+		organization: { findUnique: vi.fn() },
+		$transaction: vi.fn()
 	}
 }))
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
-vi.mock('$lib/server/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+const writeAuditLog = vi.fn().mockResolvedValue(undefined)
+vi.mock('$lib/server/audit', () => ({
+	writeAuditLog: (...args: unknown[]) => writeAuditLog(...args)
+}))
+
+// #324: the write and the audit share one transaction, so the correction lands on `tx`, not on
+// the bare client. A distinct object makes a regression to `db.` visible instead of silent.
+const tx = { attendanceDay: { findUniqueOrThrow: vi.fn(), update: vi.fn() } }
 
 const { correctDay } = await import('$lib/server/services/attendance')
 
-const CTX: AuditContext = { organizationId: 'org1', actorId: 'u1', actorRole: 'HR_ADMIN' }
+const CTX: AuditContext = { organizationId: 'org1', actorId: 'u1', actorRoles: ['HR_ADMIN'] }
 
 // Midnight-UTC key of a PHT day (that's how AttendanceDay.date is stored).
 const DATE = new Date('2026-07-20')
@@ -49,7 +57,14 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	dbMock.request.findMany.mockResolvedValue([]) // no approved OT
 	dbMock.organization.findUnique.mockResolvedValue({ trackTardiness: true }) // #190 master on
-	dbMock.attendanceDay.update.mockImplementation(async (args: { data: unknown }) => args.data)
+	tx.attendanceDay.update.mockImplementation(async (args: { data: unknown }) => args.data)
+	// The audit's before-image is re-read inside the transaction, not carried from the outer read.
+	tx.attendanceDay.findUniqueOrThrow.mockResolvedValue({
+		regularHours: 0,
+		overtimeHours: 0,
+		status: 'ABSENT'
+	})
+	dbMock.$transaction.mockImplementation((fn: (client: typeof tx) => Promise<unknown>) => fn(tx))
 })
 
 const at = (hhmm: string) => new Date(`2026-07-20T${hhmm}:00+08:00`)
@@ -59,19 +74,21 @@ describe('correctDay re-derives from entered times (#attendance)', () => {
 		mockDay()
 		await correctDay('ad1', 'org1', { timeIn: at('08:00'), timeOut: at('18:00') }, CTX)
 
-		const data = dbMock.attendanceDay.update.mock.calls[0][0].data
+		const data = tx.attendanceDay.update.mock.calls[0][0].data
 		expect(data.status).toBe('PRESENT') // not the stale 'ABSENT'
 		expect(data.regularHours).toBe(8) // 10h gross − 1h break = 9h net, capped at 8h threshold
 		expect(data.overtimeHours).toBe(0) // 1h raw OT, but no approved OT → gated to 0
 		expect(data.nightDiffHours).toBe(0) // ends 18:00, before the 22:00 window
 		expect(data.manuallyEdited).toBe(true)
+		// #324: the audit write shares the transaction.
+		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
 	})
 
 	it('computes night differential for hours inside the 22:00–06:00 window', async () => {
 		mockDay({ dayType: 'REST_DAY' }) // rest day → no schedule, no "late", clean night check
 		await correctDay('ad1', 'org1', { timeIn: at('20:00'), timeOut: at('23:00') }, CTX)
 
-		const data = dbMock.attendanceDay.update.mock.calls[0][0].data
+		const data = tx.attendanceDay.update.mock.calls[0][0].data
 		expect(data.nightDiffHours).toBe(1) // only 22:00–23:00 falls in the window
 		expect(data.restDayHours).toBeGreaterThan(0)
 	})
@@ -85,7 +102,7 @@ describe('correctDay re-derives from entered times (#attendance)', () => {
 			CTX
 		)
 
-		const data = dbMock.attendanceDay.update.mock.calls[0][0].data
+		const data = tx.attendanceDay.update.mock.calls[0][0].data
 		expect(data.status).toBe('ON_LEAVE') // HR's explicit pick wins over derived PRESENT
 	})
 
@@ -98,7 +115,7 @@ describe('correctDay re-derives from entered times (#attendance)', () => {
 			CTX
 		)
 
-		const data = dbMock.attendanceDay.update.mock.calls[0][0].data
+		const data = tx.attendanceDay.update.mock.calls[0][0].data
 		expect(data.status).toBe('LATE') // 09:30 start is past the 08:00 schedule → derived LATE wins
 		expect(data.lateMinutes).toBe(90)
 	})

@@ -1,4 +1,4 @@
-import { requireMinRole } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
 import { paginate } from '$lib/server/pagination'
 import { countEmployees, listEmployees, offboardEmployee } from '$lib/server/services/employees'
@@ -11,11 +11,11 @@ import { isFoodServiceOrg } from '$lib/orgs'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	// #232: MANAGER ranks level with HR_ADMIN (#133), so the `requireMinRole('HR_ADMIN')` that
+	// #234: MANAGER ranks level with HR_ADMIN (#133), so the `requireMinRole('HR_ADMIN')` that
 	// used to stand here admitted every manager to the WHOLE roster — the same dead-guard shape
-	// #228 fixed on the 201 page. The floor now only keeps EMPLOYEE and the off-ladder roles out;
-	// who a manager actually sees is decided by the id filter below, not by rank.
-	requireMinRole(locals.user!.role, 'MANAGER')
+	// #228 fixed on the 201 page. This check only keeps EMPLOYEE and the off-ladder roles out;
+	// who a manager actually sees is decided by the id filter below.
+	requireAnyCapability(locals.user!.roles, 'VIEW_TEAM')
 
 	const organizationId = locals.user!.organizationId
 	const search = url.searchParams.get('search') ?? undefined
@@ -66,14 +66,14 @@ export const actions: Actions = {
 	// Onboarding lives on the dedicated /employees/new page (full form + Discord ID); this
 	// list page only carries the offboard action for the table rows.
 	offboard: async ({ request, locals, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'MANAGER')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
 		const data = await request.formData()
 		const id = data.get('id') as string
 		const endDate = new Date(data.get('endDate') as string)
 
-		// #232: the scoped load hides rows, but a form action is reachable by direct POST whatever
+		// #234: the scoped load hides rows, but a form action is reachable by direct POST whatever
 		// the page rendered — so the id has to be checked here, not just filtered upstream. This is
 		// the destructive half of the hole: offboarding was open to any manager, on anyone.
 		await assertCanTouchEmployee(user, id)
@@ -82,7 +82,7 @@ export const actions: Actions = {
 			await offboardEmployee(id, user.organizationId, endDate, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e) {

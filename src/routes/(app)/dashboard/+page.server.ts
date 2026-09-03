@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
 import { manilaDayKey } from '$lib/utils/dates'
-import { can, requireCapability } from '$lib/server/rbac'
+import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { listRecentAnnouncements, createAnnouncement } from '$lib/server/services/announcements'
 import { countPendingApprovals } from '$lib/server/services/approvals'
 import { listRecent } from '$lib/server/services/notifications'
@@ -20,12 +20,12 @@ import type { Actions, PageServerLoad } from './$types'
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
 	const orgId = user.organizationId
-	const canPost = can(user.role, 'MANAGE_HR')
+	const canPost = canAny(user.roles, 'MANAGE_HR')
 	// The "Last Payroll" tile is payroll-report data, not general dashboard info (#132).
-	const canViewPayroll = can(user.role, 'VIEW_PAYROLL_REPORTS')
+	const canViewPayroll = canAny(user.roles, 'VIEW_PAYROLL_REPORTS')
 	// Since #165 employees don't create timesheets, so the quick action would only send them
 	// to a 403. Same capability the /timesheets create action enforces.
-	const canCreateTimesheet = can(user.role, 'MANAGE_HR')
+	const canCreateTimesheet = canAny(user.roles, 'MANAGE_HR')
 
 	// Today's PHT day, stored as the UTC-midnight date key used by AttendanceDay.
 	const todayKey = manilaDayKey(new Date())
@@ -33,12 +33,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const [headcount, onLeaveToday, pending, lastPayrollRun, attendanceGroups] = await Promise.all([
 		db.employee.count({
-			where: { user: { organizationId: orgId }, employmentStatus: 'ACTIVE' }
+			where: { organizationId: orgId, employmentStatus: 'ACTIVE' }
 		}),
 		// Employees on approved leave that spans today.
 		db.request.count({
 			where: {
-				employee: { user: { organizationId: orgId } },
+				employee: { organizationId: orgId },
 				type: 'LEAVE',
 				status: 'APPROVED',
 				dateFrom: { lte: today },
@@ -50,7 +50,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// always agree. A payroll run pending sign-off now shows here (previously missing).
 		countPendingApprovals({
 			id: user.id,
-			role: user.role,
 			roles: user.roles,
 			organizationId: orgId
 		}),
@@ -62,7 +61,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// Today's derived attendance, grouped by status.
 		db.attendanceDay.groupBy({
 			by: ['status'],
-			where: { date: today, employee: { user: { organizationId: orgId } } },
+			where: { date: today, employee: { organizationId: orgId } },
 			_count: { _all: true }
 		})
 	])
@@ -82,7 +81,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listTodaysBirthdays(orgId),
 		// The viewer's own standing for the status card (#167) — employment, leave left,
 		// what's waiting on them, and their work setup. All their own data, so ungated.
-		getMyStatus(user.id),
+		getMyStatus(user.id, orgId),
 		// Recent employee awards, announced in the feed (#180).
 		listRecentAwards(orgId),
 		// Side panel. Employment matters (probation reviews, contract ends, other people's
@@ -93,7 +92,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// HR grants awards from the dashboard — roster for the recipient picker.
 	const awardEmployees = canPost
 		? await db.employee.findMany({
-				where: { user: { organizationId: orgId }, employmentStatus: 'ACTIVE' },
+				where: { organizationId: orgId, employmentStatus: 'ACTIVE' },
 				select: { id: true, firstName: true, lastName: true },
 				orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 			})
@@ -104,12 +103,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Job postings awaiting this user's approval (#195) — the departments they're the
 	// approver for, plus HR-fallback postings. Needs the viewer's employee id.
-	const roles = user.roles?.length ? user.roles : [user.role]
-	const myEmployee = await db.employee.findUnique({
-		where: { userId: user.id },
+	const roles = user.roles
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: orgId },
 		select: { id: true }
 	})
-	const postingsToApprove = await listPostingsAwaitingApprover(orgId, myEmployee?.id ?? null, roles)
+	const postingsToApprove = await listPostingsAwaitingApprover(
+		orgId,
+		myEmployee?.id ?? null,
+		roles,
+		user.id
+	)
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the
 	// toast is gone.
@@ -150,7 +154,7 @@ const announcementSchema = z.object({
 export const actions: Actions = {
 	postAnnouncement: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 
 		const parsed = announcementSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success)
@@ -159,7 +163,7 @@ export const actions: Actions = {
 		await createAnnouncement(user.organizationId, parsed.data, {
 			organizationId: user.organizationId,
 			actorId: user.id,
-			actorRole: user.role,
+			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		})
 		return { posted: true }
@@ -168,15 +172,15 @@ export const actions: Actions = {
 	// Approve or send back a job posting from the approver's dashboard card (#195).
 	decidePosting: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		const roles = user.roles?.length ? user.roles : [user.role]
+		const roles = user.roles
 		const data = await request.formData()
 		const id = data.get('id') as string
 		const approve = data.get('action') === 'approve'
 		const note = (data.get('note') as string) || undefined
 		if (!id) return fail(400, { error: 'Missing posting id' })
 
-		const myEmployee = await db.employee.findUnique({
-			where: { userId: user.id },
+		const myEmployee = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
 			select: { id: true }
 		})
 		try {
@@ -188,7 +192,7 @@ export const actions: Actions = {
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: getClientAddress()
 				}
 			)
@@ -202,7 +206,7 @@ export const actions: Actions = {
 	// HR grants an employee award, announced on the dashboard feed (#180).
 	giveAward: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		requireCapability(user.role, 'MANAGE_HR')
+		requireAnyCapability(user.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const employeeId = data.get('employeeId') as string
 		const title = (data.get('title') as string) ?? ''
@@ -215,7 +219,7 @@ export const actions: Actions = {
 				{
 					organizationId: user.organizationId,
 					actorId: user.id,
-					actorRole: user.role,
+					actorRoles: user.roles,
 					ipAddress: getClientAddress()
 				}
 			)

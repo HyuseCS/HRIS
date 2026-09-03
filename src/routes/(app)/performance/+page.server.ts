@@ -1,190 +1,68 @@
-import { fail, isHttpError } from '@sveltejs/kit'
-import { can, ROLE_HIERARCHY, requireCapability } from '$lib/server/rbac'
+import { canAny } from '$lib/server/rbac'
 import {
-	listGoalsForEmployee,
 	listReviewsForEmployee,
 	listReviewsForReviewer,
-	redactHrAuthored,
-	createGoal,
-	updateGoalProgress,
+	redactForSubject,
 	listReviewCycles,
-	createReviewCycle,
-	updateReviewCycleStatus,
-	openReviewsForCycle,
-	listGoalsForManager
+	listStalledSignoffs
 } from '$lib/server/services/performance'
+import { countEmployeesWithoutTemplate } from '$lib/server/services/performance-templates'
 import { db } from '$lib/server/db'
-import { z } from 'zod'
-import type { Actions, PageServerLoad } from './$types'
-
-const GOAL_STATUS = ['DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const
+import type { PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
-	const isManager = ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY.MANAGER
-	const isAdmin = can(user.role, 'MANAGE_HR')
+	const isAdmin = canAny(user.roles, 'MANAGE_HR')
 
 	const cycles = isAdmin ? await listReviewCycles(user.organizationId) : []
 
-	const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
+	// #178: the template-readiness count is org-wide configuration, so it reads
+	// ADMINISTER_HR_ORGWIDE — not MANAGE_HR, which includes MANAGER (#133). A manager or an
+	// employee never runs the query, and reads 0. Informational only: nothing gates on it.
+	// #178 item 145: the stalled sign-off list is org-wide HR work, so it reads the same
+	// ADMINISTER_HR_ORGWIDE. The gate holds twice, on purpose: the query never runs for anyone
+	// without the capability, AND `canHrOrgwide` goes to the page so the section is not rendered
+	// for them. The empty list is a legitimate state for HR (nothing is stalled), so emptiness
+	// cannot double as the visibility test — the flag has to be its own answer.
+	const canHrOrgwide = canAny(user.roles, 'ADMINISTER_HR_ORGWIDE')
+
+	const templateBackfill = canHrOrgwide
+		? await countEmployeesWithoutTemplate(user.organizationId)
+		: 0
+	const stalledSignoffs = canHrOrgwide ? await listStalledSignoffs(user.organizationId) : []
+
+	// #6: the ACTIVE org, not the home tenant — a multi-org account must not see the other
+	// tenant's reviews here. Only `.id` is read below, so the select stays narrow.
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
 	if (!myEmployee) {
 		return {
-			myGoals: [],
 			myReviews: [],
 			reviewsToGive: [],
-			teamGoals: [],
-			isManager,
 			isAdmin,
-			cycles
+			cycles,
+			templateBackfill,
+			canHrOrgwide,
+			stalledSignoffs
 		}
 	}
 
-	const [myGoals, myReviews, reviewsToGive, teamGoals] = await Promise.all([
-		listGoalsForEmployee(myEmployee.id),
+	const [myReviews, reviewsToGive] = await Promise.all([
 		listReviewsForEmployee(myEmployee.id),
-		listReviewsForReviewer(myEmployee.id),
-		isManager ? listGoalsForManager(myEmployee.id) : Promise.resolve([])
+		listReviewsForReviewer(myEmployee.id)
 	])
 
 	// #179: My Reviews are the viewer's own reviews as the subject — strip the HR-authored
 	// comments and rating so the confidential review never reaches the reviewed employee.
 	return {
-		myGoals,
-		myReviews: myReviews.map(redactHrAuthored),
+		myReviews: myReviews.map(redactForSubject),
 		reviewsToGive,
-		teamGoals,
-		isManager,
 		isAdmin,
-		cycles
-	}
-}
-
-function ctxOf(locals: App.Locals, ip: string) {
-	return {
-		organizationId: locals.user!.organizationId,
-		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
-		ipAddress: ip
-	}
-}
-
-const createGoalSchema = z.object({
-	title: z.string().min(1),
-	description: z.string().optional(),
-	category: z.string().optional(),
-	targetDate: z.coerce.date().optional()
-})
-
-const updateGoalSchema = z.object({
-	id: z.string().min(1),
-	progress: z.coerce.number().min(0).max(100),
-	status: z.enum(GOAL_STATUS)
-})
-
-export const actions: Actions = {
-	createGoal: async ({ request, locals, getClientAddress }) => {
-		const user = locals.user!
-		const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
-		if (!myEmployee) return fail(400, { error: 'No employee profile found' })
-
-		const raw = Object.fromEntries(await request.formData())
-		const parsed = createGoalSchema.safeParse(raw)
-		if (!parsed.success) return fail(400, { error: 'Invalid input' })
-
-		try {
-			await createGoal(myEmployee.id, parsed.data, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRole: user.role,
-				ipAddress: getClientAddress()
-			})
-		} catch (e: unknown) {
-			if (e instanceof Error) return fail(400, { error: e.message })
-			throw e
-		}
-	},
-
-	updateGoal: async ({ request, locals, getClientAddress }) => {
-		const user = locals.user!
-		const myEmployee = await db.employee.findUnique({ where: { userId: user.id } })
-		if (!myEmployee) return fail(400, { error: 'No employee profile found' })
-
-		const raw = Object.fromEntries(await request.formData())
-		const parsed = updateGoalSchema.safeParse(raw)
-		if (!parsed.success) return fail(400, { error: 'Invalid input' })
-
-		try {
-			await updateGoalProgress(
-				parsed.data.id,
-				myEmployee.id,
-				{ progress: parsed.data.progress, status: parsed.data.status },
-				{
-					organizationId: user.organizationId,
-					actorId: user.id,
-					actorRole: user.role,
-					ipAddress: getClientAddress()
-				}
-			)
-		} catch (e: unknown) {
-			if (e instanceof Error) return fail(400, { error: e.message })
-			throw e
-		}
-	},
-
-	createCycle: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
-		const parsed = z
-			.object({ name: z.string().min(1), startDate: z.coerce.date(), endDate: z.coerce.date() })
-			.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(422, { error: 'Invalid cycle details' })
-		try {
-			await createReviewCycle(
-				locals.user!.organizationId,
-				parsed.data,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			throw e
-		}
-		return { cycleCreated: true }
-	},
-
-	setCycleStatus: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
-		const data = await request.formData()
-		const id = data.get('id') as string
-		const status = data.get('status') as 'DRAFT' | 'ACTIVE' | 'CLOSED'
-		if (!id || !['DRAFT', 'ACTIVE', 'CLOSED'].includes(status))
-			return fail(400, { error: 'Invalid status' })
-		try {
-			await updateReviewCycleStatus(
-				id,
-				locals.user!.organizationId,
-				status,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			throw e
-		}
-		return { cycleUpdated: true }
-	},
-
-	openReviews: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
-		const id = (await request.formData()).get('id') as string
-		if (!id) return fail(400, { error: 'Missing cycle id' })
-		try {
-			const res = await openReviewsForCycle(
-				id,
-				locals.user!.organizationId,
-				ctxOf(locals, getClientAddress())
-			)
-			return { opened: res.opened }
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			throw e
-		}
+		cycles,
+		templateBackfill,
+		canHrOrgwide,
+		stalledSignoffs
 	}
 }

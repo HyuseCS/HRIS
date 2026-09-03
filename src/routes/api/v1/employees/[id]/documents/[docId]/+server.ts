@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit'
 import { getEmployeeDocument } from '$lib/server/services/documents'
 import { readStoredFile } from '$lib/server/storage'
 import { db } from '$lib/server/db'
+import { canAny } from '$lib/server/rbac'
 import type { RequestHandler } from './$types'
 
 // Stream a stored employee document. Access: HR_ADMIN/SUPER_ADMIN, or the employee
@@ -13,9 +14,14 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 	const doc = await getEmployeeDocument(params.docId, user.organizationId)
 	if (doc.employeeId !== params.id) error(404, 'Document not found')
 
-	const isHr = ['HR_ADMIN', 'SUPER_ADMIN'].includes(user.role)
+	const isHr = canAny(user.roles, 'ADMINISTER_HR_RECORDS')
 	if (!isHr) {
-		const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+		// #6: the ACTIVE org, not the home tenant. `me?.id !== doc.employeeId` below already
+		// fails closed when this resolves to null.
+		const me = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
+			select: { id: true }
+		})
 		if (me?.id !== doc.employeeId) error(403, 'Insufficient permissions')
 	}
 

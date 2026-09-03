@@ -54,6 +54,12 @@
 			super: false
 		},
 		{
+			href: '/settings/performance',
+			title: 'Review Schedule',
+			desc: 'How often reviews open, and time to complete',
+			hrOrgwide: true
+		},
+		{
 			href: '/settings/posting-approvers',
 			title: 'Posting Approvers',
 			desc: 'Who approves each department’s job postings',
@@ -72,6 +78,12 @@
 			super: true
 		},
 		{
+			href: '/settings/backup',
+			title: 'Document Backup',
+			desc: 'Automatic 201-file and attachment backups',
+			super: true
+		},
+		{
 			href: '/payroll/statutory-rates',
 			title: 'Statutory Rates',
 			desc: 'SSS, PhilHealth, Pag-IBIG, BIR tax',
@@ -81,13 +93,16 @@
 			href: '/settings/holidays',
 			title: 'Holiday Calendar',
 			desc: 'Regular & special holidays',
-			super: true
+			super: false
 		},
-		{ href: '/settings/roles', title: 'Roles & Access', desc: 'User role management', super: true }
+		{ href: '/settings/roles', title: 'Roles & Access', desc: 'User role management', roles: true }
 	]
 	const visible = $derived(
 		cards.filter((c) => {
 			if ('statutory' in c && c.statutory) return data.canStatutory
+			if ('roles' in c && c.roles) return data.canRoles
+			// Narrower than this page's own MANAGE_HR guard, so it cannot ride on the default (#178).
+			if ('hrOrgwide' in c && c.hrOrgwide) return data.canHrOrgwide
 			return !('super' in c && c.super) || data.isSuperAdmin
 		})
 	)

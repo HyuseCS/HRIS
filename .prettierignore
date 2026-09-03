@@ -6,3 +6,12 @@ dist/
 coverage/
 playwright-report/
 test-results/
+
+# Vendored vc-pro-max harness — formatting these would break vc-update's diff upstream
+.claude/agents/
+.claude/hooks/
+.claude/skills/
+.agents/
+process/
+AGENTS.md
+skills-lock.json

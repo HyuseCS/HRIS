@@ -89,8 +89,7 @@
 	// Same capability table the server enforces with ($lib/rbac) — a nav item shown to
 	// a role the server would reject is its own bug, so both read one source of truth.
 	// Nav uses the full role set (#133) so a multi-role user sees every entry they hold.
-	const role = $derived(data.user.role)
-	const roles = $derived(data.user.roles ?? [data.user.role])
+	const roles = $derived(data.user.roles)
 	const isManager = $derived(canAny(roles, 'VIEW_TEAM'))
 	const isAdmin = $derived(canAny(roles, 'MANAGE_HR'))
 	const isSuperAdmin = $derived(canAny(roles, 'ADMINISTER_SYSTEM'))
@@ -105,9 +104,28 @@
 	const canSignOff = $derived(canAny(roles, 'VERIFY_REQUESTS') || canAny(roles, 'APPROVE_FINANCE'))
 	// Approvers (manager ladder + Payroll Officer + sign-off roles) get the dropdown.
 	const canApprove = $derived(canAny(roles, 'APPROVE_REQUESTS'))
+	// Pay-change confirmers (#224 Part 2 / #243) — the same two capabilities the route gates on,
+	// so a nav row is never shown to someone the server would redirect away.
+	const canConfirmPayChanges = $derived(
+		canAny(roles, 'ADMINISTER_HR_ORGWIDE') || canAny(roles, 'APPROVE_FINANCE')
+	)
 
 	const navItems = $derived(
 		[
+			{
+				href: '/punch',
+				// #177 — the web punch surface exists for the food-service tenants only. Cosmetic,
+				// exactly like Branches below: `requireFoodServiceOrg` in the route's load AND its
+				// action is the enforcement.
+				//
+				// First in the list, not fifth: for crew staff punching is the ONLY page they use,
+				// and it was previously below three pages they have no business on. `.filter` drops
+				// it entirely for a non-food-service tenant, so the reorder costs everyone else
+				// nothing.
+				label: 'Punch',
+				show: hasBranches,
+				icon: 'M10.05 4.575a1.575 1.575 0 10-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 013.15 0v1.5m-3.15 0l.075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 013.15 0V15M6.9 7.575a1.575 1.575 0 10-3.15 0v8.175a6.75 6.75 0 006.75 6.75h2.018a5.25 5.25 0 003.712-1.538l1.732-1.732a5.25 5.25 0 001.538-3.712l.003-2.024a.668.668 0 01.198-.471 1.575 1.575 0 10-2.228-2.228 3.818 3.818 0 00-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0116.35 15'
+			},
 			{
 				href: '/dashboard',
 				label: 'Dashboard',
@@ -155,6 +173,26 @@
 				label: 'Performance',
 				show: true,
 				icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941'
+			},
+			{
+				// The evaluation-form builder (#178). Org-wide configuration, so ADMINISTER_HR_ORGWIDE
+				// and not MANAGE_HR — MANAGE_HR includes MANAGER (#133), and the route's load guards on
+				// the same capability, so this row is never shown to someone the server would 403.
+				href: '/performance/templates',
+				label: 'Eval Templates',
+				show: canAny(roles, 'ADMINISTER_HR_ORGWIDE'),
+				icon: 'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z'
+			},
+			{
+				href: '/complaints',
+				label: 'Inquiries',
+				show: true,
+				// A count, not a dot: the dot on Requests/Approvals means "something is hidden inside
+				// this collapsed group", and nothing is hidden behind a flat item. Server-scoped to
+				// the same visible-employee set as the list it links to, so the number can never
+				// promise a thread the page then 403s.
+				badge: data.waitingInquiries,
+				icon: 'M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z'
 			},
 			{
 				href: '/team',
@@ -235,7 +273,7 @@
 			{ href: '/settings/org', label: 'Org Structure', show: isAdmin },
 			{ href: '/settings/schedules', label: 'Schedules', show: isAdmin },
 			{ href: '/settings/roles', label: 'Roles', show: isSuperAdmin || canManageUserRoles },
-			{ href: '/settings/holidays', label: 'Holidays', show: isSuperAdmin }
+			{ href: '/settings/holidays', label: 'Holidays', show: isAdmin }
 		].filter((i) => i.show)
 	)
 
@@ -267,6 +305,14 @@
 				label: 'Requests',
 				show: canApprove,
 				badge: data.pendingApprovals.requests
+			},
+			{
+				// Pay changes needing a second qualified person (#224 Part 2 / #243). Capability-keyed,
+				// never a rank floor — MANAGER ranks level with HR_ADMIN and must not reach this queue.
+				href: '/requests/proposals',
+				label: 'Pay changes',
+				show: canConfirmPayChanges,
+				badge: data.pendingApprovals.proposals
 			},
 			{
 				// Sign-off roles reach payroll runs to verify/approve here (#134); managers
@@ -540,7 +586,8 @@
 				{:else}
 					{@const active =
 						$page.url.pathname.startsWith(item.href) &&
-						(item.href !== '/dashboard' || $page.url.pathname === '/dashboard')}
+						(item.href !== '/dashboard' || $page.url.pathname === '/dashboard') &&
+						(item.href !== '/performance' || $page.url.pathname === '/performance')}
 					<a
 						href={item.href}
 						class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors
@@ -558,7 +605,15 @@
 						>
 							<path stroke-linecap="round" stroke-linejoin="round" d={item.icon} />
 						</svg>
-						{item.label}
+						<span class="flex-1">{item.label}</span>
+						{#if item.badge}
+							<span
+								class="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
+								aria-label="{item.badge} waiting on you"
+							>
+								{item.badge}
+							</span>
+						{/if}
 					</a>
 				{/if}
 			{/each}
@@ -632,7 +687,10 @@
 				</div>
 				<div class="min-w-0 flex-1">
 					<p class="truncate text-xs font-medium text-foreground">{data.user.email}</p>
-					<p class="text-[10px] text-muted-foreground">{roleLabel[role] ?? role}</p>
+					<!-- The whole set, never "the highest" — there is no role ranking (#282). -->
+					<p class="text-[10px] text-muted-foreground">
+						{roles.map((r) => roleLabel[r] ?? r).join(', ')}
+					</p>
 				</div>
 				<!-- Theme toggle -->
 				<button

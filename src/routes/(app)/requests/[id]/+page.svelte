@@ -123,13 +123,18 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<BackButton fallback="/requests" label="Requests" />
-
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">{typeLabels[req.type] ?? req.type}</h1>
-		<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(req.status)}"
-			>{req.status}</span
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<h1 class="min-w-0 flex-1 text-2xl font-bold tracking-tight">
+			{typeLabels[req.type] ?? req.type}
+		</h1>
+		<div
+			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
 		>
+			<BackButton fallback="/requests" label="Requests" />
+			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(req.status)}"
+				>{req.status}</span
+			>
+		</div>
 	</div>
 
 	<div class="rounded-lg border bg-card p-4">
@@ -305,11 +310,61 @@
 				</p>
 			</form>
 		{/if}
+
+		<!-- #299/AC-5: the audit view. Removed documents are never deleted — the row, its filename
+		     and above all its signer are kept forever, because that signer is what the #283/F3 bar
+		     reads. Read-only by construction: no Remove and no Verify control here, and the download
+		     link exists only while the bytes survive the FIFO cap (D-3/D-4). -->
+		{#if req.documentHistory.some((d) => d.deletedAt)}
+			<div class="space-y-2">
+				<h3 class="text-sm font-semibold text-muted-foreground">Removed documents</h3>
+				<ul class="space-y-2">
+					{#each req.documentHistory.filter((d): d is typeof d & { deletedAt: Date } => d.deletedAt !== null) as doc (doc.id)}
+						<li
+							class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-3 opacity-80"
+						>
+							<div class="min-w-0 flex-1">
+								<p class="break-words text-sm font-medium text-muted-foreground">{doc.label}</p>
+								<p class="text-xs text-muted-foreground">
+									uploaded {formatShortDate(doc.uploadedAt)} · removed {formatShortDate(
+										doc.deletedAt
+									)}
+								</p>
+								{#if doc.verifiedBy}
+									<p class="text-xs text-muted-foreground">
+										Signed off by {doc.verifiedBy.email}
+									</p>
+								{/if}
+							</div>
+							<!-- No download CONTROL here, by AC-5: this panel is an audit record, not a file
+							     list. That is a UI choice and deliberately NOT a route rule — the v1 download
+							     URL still serves a tombstone while its bytes survive (D-3), because the bytes
+							     and the row are separate facts. Once the FIFO cap evicts them, say so plainly
+							     rather than leaving a blank. -->
+							<div class="shrink-0 text-xs text-muted-foreground">
+								{#if !doc.storageKey}File removed{/if}
+							</div>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 	</div>
 
 	<div class="space-y-3">
 		<h2 class="text-lg font-semibold">Approval chain</h2>
 		<p class="text-xs text-muted-foreground">Requester → HR → Verifier → Approver</p>
+
+		<!-- #283/D12: an approver barred by separation of duties finds this request missing from
+		     their queue by design (AC-15/AC-21/US-8). This page is where they come to ask why, and
+		     it has no decide control to disable, so the explanation stands on its own. -->
+		{#if data.actBlockedReason}
+			<p
+				class="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400"
+			>
+				{data.actBlockedReason}
+			</p>
+		{/if}
 
 		<!-- Origin: the employee's own submission, so "HR pending" doesn't read as if
 		     nothing has happened yet. -->

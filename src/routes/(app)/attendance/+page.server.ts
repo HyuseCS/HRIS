@@ -1,7 +1,7 @@
-import { fail } from '@sveltejs/kit'
+import { error, fail } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
-import { can, requireMinRole, requireCapability } from '$lib/server/rbac'
+import { canAny, requireAnyCapability, requireFoodServiceOrg } from '$lib/server/rbac'
 import {
 	countAttendanceDays,
 	listAttendanceDays,
@@ -14,7 +14,13 @@ import {
 	resetDayToDerived,
 	createTimesheetFromAttendance
 } from '$lib/server/services/attendance'
+import {
+	importBacklogCsv,
+	MAX_IMPORT_BYTES,
+	MAX_IMPORT_ROWS
+} from '$lib/server/services/attendance/import'
 import { paginate } from '$lib/server/pagination'
+import { isFoodServiceOrg } from '$lib/orgs'
 import { manilaDayKey } from '$lib/utils/dates'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
@@ -33,8 +39,8 @@ function clampRange(fromKey: string, toKey: string) {
 
 export const load: PageServerLoad = async ({ locals, url, getClientAddress }) => {
 	const user = locals.user!
-	const canManage = can(user.role, 'MANAGE_HR')
-	const canUnlock = can(user.role, 'ADMINISTER_SYSTEM') // reopening locked days is privileged
+	const canManage = canAny(user.roles, 'MANAGE_HR')
+	const canUnlock = canAny(user.roles, 'OVERRIDE_FINALIZED') // reopening locked days is privileged
 
 	const today = manilaDayKey(new Date())
 	const rawFrom = url.searchParams.get('from') ?? manilaDayKey(new Date(Date.now() - 13 * DAY_MS))
@@ -51,13 +57,16 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 
 	if (canManage) {
 		employees = await db.employee.findMany({
-			where: { user: { organizationId: user.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: user.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		})
 		selectedEmployeeId = url.searchParams.get('employeeId') ?? employees[0]?.id ?? null
 	} else {
-		const me = await db.employee.findUnique({ where: { userId: user.id }, select: { id: true } })
+		const me = await db.employee.findFirst({
+			where: { userId: user.id, organizationId: user.organizationId },
+			select: { id: true }
+		})
 		selectedEmployeeId = me?.id ?? null
 	}
 
@@ -67,7 +76,7 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	const ctx = {
 		organizationId: user.organizationId,
 		actorId: user.id,
-		actorRole: user.role,
+		actorRoles: user.roles,
 		ipAddress: getClientAddress()
 	}
 	if (view === 'employee' && selectedEmployeeId) {
@@ -114,7 +123,14 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		days,
 		team,
 		pagination,
-		maxRangeDays: MAX_RANGE_DAYS
+		maxRangeDays: MAX_RANGE_DAYS,
+		// #200: the import card states its own limits, so an operator learns them before a 413
+		// rather than from one. They come from the service that enforces them — a literal in the
+		// markup would drift the moment either cap moved.
+		maxImportBytes: MAX_IMPORT_BYTES,
+		maxImportRows: MAX_IMPORT_ROWS,
+		// #162: the AM/PM columns render for food-service tenants only.
+		showAmPm: isFoodServiceOrg(user.organizationId)
 	}
 }
 
@@ -123,15 +139,17 @@ function ctxOf(event: RequestEvent) {
 	return {
 		organizationId: u.organizationId,
 		actorId: u.id,
-		actorRole: u.role,
+		actorRoles: u.roles,
 		ipAddress: event.getClientAddress()
 	}
 }
 
-function toFail(e: unknown) {
+function toFail(e: unknown, extra?: { importError: true }) {
 	const err = e as { status?: number; body?: { message?: string } }
-	if (err?.status && [400, 404, 409].includes(err.status))
-		return fail(err.status, { error: err.body?.message ?? 'Action failed' })
+	// #200 added 413/415: the backlog import's size and type refusals must reach the operator as a
+	// form message, not as a 500.
+	if (err?.status && [400, 404, 409, 413, 415].includes(err.status))
+		return fail(err.status, { error: err.body?.message ?? 'Action failed', ...extra })
 	throw e
 }
 
@@ -163,7 +181,7 @@ const correctSchema = z.object({
 
 export const actions: Actions = {
 	derive: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid range' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
@@ -180,7 +198,7 @@ export const actions: Actions = {
 	},
 
 	correct: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = correctSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid correction' })
 		const { id, date, timeIn, timeOut, ...rest } = parsed.data
@@ -199,7 +217,7 @@ export const actions: Actions = {
 
 	// Discard a manual override on a day and re-derive it from punches.
 	resetDay: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const id = (await event.request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing day id' })
 		try {
@@ -210,7 +228,7 @@ export const actions: Actions = {
 	},
 
 	lock: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid range' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
@@ -226,9 +244,9 @@ export const actions: Actions = {
 		}
 	},
 
-	// Reopening locked days is privileged (super admin only).
+	// Reopening locked days overrides a finalized record — Super Admin only, not the CEO (#224).
 	unlock: async (event) => {
-		requireCapability(event.locals.user!.role, 'ADMINISTER_SYSTEM')
+		requireAnyCapability(event.locals.user!.roles, 'OVERRIDE_FINALIZED')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid range' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
@@ -245,7 +263,7 @@ export const actions: Actions = {
 	},
 
 	unlockTeam: async (event) => {
-		requireCapability(event.locals.user!.role, 'ADMINISTER_SYSTEM')
+		requireAnyCapability(event.locals.user!.roles, 'OVERRIDE_FINALIZED')
 		const parsed = teamDaySchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid date' })
 		try {
@@ -261,7 +279,7 @@ export const actions: Actions = {
 
 	// Persist the selected employee's range as a Timesheet record (per-employee tab only).
 	saveTimesheet: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = rangeSchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid range' })
 		if (spanExceeded(parsed.data.from, parsed.data.to))
@@ -284,7 +302,7 @@ export const actions: Actions = {
 
 	// Whole-team single-day variants for the team view: no employeeId → all active employees.
 	deriveTeam: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = teamDaySchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid date' })
 		try {
@@ -298,8 +316,36 @@ export const actions: Actions = {
 		}
 	},
 
+	// #200 — CSV backlog upload. Same actor boundary as every other attendance write on this page
+	// (MANAGE_HR), plus the food-service gate: for a non-food-service tenant the feature genuinely
+	// does not exist. The `{#if}` around the upload form is cosmetic; this is the enforcement.
+	importBacklog: async (event) => {
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
+		requireFoodServiceOrg(event.locals.user!.organizationId)
+		const file = (await event.request.formData()).get('backlog')
+		if (!(file instanceof File) || file.size === 0)
+			return fail(400, { error: 'Choose a CSV file to upload.', importError: true })
+		try {
+			// Both caps are checked BEFORE the body is read: an oversize upload must cost a size
+			// comparison, not a 2 MB+ decode into memory. The service repeats them as a second layer
+			// for any future caller that does not come through this action.
+			if (file.size > MAX_IMPORT_BYTES) error(413, 'Backlog file exceeds the 2 MB limit')
+			if (!file.name.toLowerCase().endsWith('.csv')) error(415, 'Only .csv files are accepted')
+			const imported = await importBacklogCsv(
+				event.locals.user!.organizationId,
+				{ name: file.name, size: file.size, text: await file.text() },
+				ctxOf(event)
+			)
+			return { imported }
+		} catch (e) {
+			// M-9: flagged so the import card can echo its OWN failure without also echoing every
+			// other action's. `error` alone is set by all thirteen actions on this page.
+			return toFail(e, { importError: true })
+		}
+	},
+
 	lockTeam: async (event) => {
-		requireMinRole(event.locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const parsed = teamDaySchema.safeParse(Object.fromEntries(await event.request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid date' })
 		try {

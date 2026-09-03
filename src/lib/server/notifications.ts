@@ -1,11 +1,29 @@
-// Stub notification functions — log to console in v1.
+// Outbound email. `build*` assembles subject/body and is the unit-tested part; `send*`
+// hands that to `deliver`, the single delivery point in $lib/server/mailer (#178 item 162).
+// Every `send*` here is deliberately a synchronous `void` function called WITHOUT `await`:
+// delivery is fire-and-forget and can never fail the request that triggered it.
 //
-// Passwords never appear in logs (#96): even a "development-only" console line
-// ends up in log aggregators and container stdout captures. The parameter is
-// kept so callers still hand the credential through the seam, but it must be
-// delivered out-of-band once a real notifier is wired in.
+// Passwords never appear in logs OR IN AN EMAIL BODY (#96): even a "development-only"
+// console line ends up in log aggregators and container stdout captures, and the text now
+// leaves the process entirely, so the constraint is stricter than before, not looser. The
+// parameter is kept so callers still hand the credential through the seam, but it must be
+// delivered out-of-band.
+import { deliver } from './mailer'
+
 export function sendWelcomeEmail(email: string, _tempPassword: string): void {
-	console.log('[NOTIFY] Welcome email queued for', email)
+	// `_tempPassword` is INTENTIONALLY not interpolated anywhere below. Do not "improve" this.
+	deliver(
+		email,
+		'Your Veent HRIS account is ready',
+		[
+			'Hello,',
+			'',
+			'Your Veent HRIS account has been created.',
+			'Your temporary password is provided separately by your HR contact — it is never sent by email.',
+			'',
+			'Please sign in and change it as soon as you can.'
+		].join('\n')
+	)
 }
 
 // ─── Onboarding Discord invitation (#186) ─────────────────────────────────────
@@ -33,20 +51,27 @@ export function sendDiscordInviteEmail(
 	recipient: string,
 	details: { firstName: string; orgName: string; inviteUrl: string }
 ): void {
-	const { subject } = buildDiscordInvite(details)
-	console.log(`[NOTIFY] Discord invitation queued for <${recipient}>: ${subject}`)
+	const { subject, body } = buildDiscordInvite(details)
+	deliver(recipient, subject, body)
 }
 
 export function sendTimesheetStatusEmail(email: string, status: string): void {
-	console.log('[NOTIFY] Timesheet', status, 'for', email)
+	deliver(email, `Timesheet ${status}`, `Your timesheet has been ${status}.`)
 }
 
 export function sendLeaveStatusEmail(email: string, status: string, reason?: string): void {
-	console.log('[NOTIFY] Leave', status, 'for', email, reason ?? '')
+	deliver(
+		email,
+		`Leave request ${status}`,
+		[`Your leave request has been ${status}.`, ...(reason ? ['', `Reason: ${reason}`] : [])].join(
+			'\n'
+		)
+	)
 }
 
 import { manilaDateTime, formatDateDisplay } from '$lib/utils/dates'
-import type { InterviewMode } from '@prisma/client'
+import { CLEARANCE_AREA_LABELS } from '$lib/utils/clearance-area'
+import type { ClearanceArea, InterviewMode } from '@prisma/client'
 
 // ─── Interview scheduling (#196) ──────────────────────────────────────────────
 // When an interview is booked, both the applicant and HR get an email with the
@@ -124,8 +149,8 @@ export function buildInterviewEmail(
 export interface OffboardingNoticeDetails {
 	employeeName: string
 	effectiveDate: Date
-	/** Clearance tasks the employee must complete, each with the owning department. */
-	checklist: { label: string; department: string }[]
+	/** Clearance tasks the employee must complete, each with the owning clearance area. */
+	checklist: { label: string; area: ClearanceArea }[]
 }
 
 /** Build the subject and body for the transition-period due-diligence notice. */
@@ -135,7 +160,7 @@ export function buildOffboardingNotice(d: OffboardingNoticeDetails): {
 } {
 	const when = formatDateDisplay(d.effectiveDate)
 	const tasks = d.checklist.length
-		? d.checklist.map((c) => `  • ${c.label} (${c.department})`)
+		? d.checklist.map((c) => `  • ${c.label} (${CLEARANCE_AREA_LABELS[c.area]})`)
 		: ['  • (No clearance items configured — HR will advise.)']
 	return {
 		subject: `Transition & clearance details — effective ${when}`,
@@ -157,14 +182,66 @@ export function sendInterviewScheduledEmail(
 	audience: 'applicant' | 'hr',
 	details: InterviewEmailDetails
 ): void {
-	const { subject } = buildInterviewEmail(audience, details)
-	console.log(`[NOTIFY] Interview email queued for ${audience} <${recipient}>: ${subject}`)
+	const { subject, body } = buildInterviewEmail(audience, details)
+	deliver(recipient, subject, body)
 }
 
 export function sendOffboardingNoticeEmail(
 	recipient: string,
 	details: OffboardingNoticeDetails
 ): void {
-	const { subject } = buildOffboardingNotice(details)
-	console.log(`[NOTIFY] Offboarding transition notice queued for <${recipient}>: ${subject}`)
+	const { subject, body } = buildOffboardingNotice(details)
+	deliver(recipient, subject, body)
+}
+
+// ─── Performance review reminders (#178, plan item 163) ───────────────────────
+// Only the two email-carrying reminder kinds have a message here. `due-soon` and
+// `awaiting-ack` are in-app only by design — see `remindersDue` in
+// src/lib/server/performance/reminder-plan.ts, which owns that channel split.
+export type ReviewNoticeKind = 'opened' | 'overdue'
+
+export interface ReviewNoticeDetails {
+	recipientName: string
+	/** The review cycle's generated label, e.g. "Aug–Sep 2026". */
+	cycleName: string
+	/** Absolute or app-relative link to the review. */
+	reviewUrl: string
+}
+
+/** Build the subject and body for a review reminder. Wording is unit-tested. */
+export function buildReviewNotice(
+	kind: ReviewNoticeKind,
+	d: ReviewNoticeDetails
+): { subject: string; body: string } {
+	if (kind === 'overdue') {
+		return {
+			subject: `Overdue: performance review for ${d.cycleName}`,
+			body: [
+				`Hi ${d.recipientName},`,
+				'',
+				`The performance review for ${d.cycleName} is now overdue.`,
+				'Please complete it as soon as you can:',
+				d.reviewUrl
+			].join('\n')
+		}
+	}
+	return {
+		subject: `Performance review open — ${d.cycleName}`,
+		body: [
+			`Hi ${d.recipientName},`,
+			'',
+			`The performance review for ${d.cycleName} is open.`,
+			'You can open it here:',
+			d.reviewUrl
+		].join('\n')
+	}
+}
+
+export function sendReviewNoticeEmail(
+	recipient: string,
+	kind: ReviewNoticeKind,
+	details: ReviewNoticeDetails
+): void {
+	const { subject, body } = buildReviewNotice(kind, details)
+	deliver(recipient, subject, body)
 }

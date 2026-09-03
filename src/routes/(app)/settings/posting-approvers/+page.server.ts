@@ -1,5 +1,5 @@
 import { fail, isHttpError } from '@sveltejs/kit'
-import { requireCapability } from '$lib/server/rbac'
+import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import {
 	listPostingApprovers,
@@ -9,11 +9,11 @@ import {
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals }) => {
-	requireCapability(locals.user!.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 	const [rows, employees] = await Promise.all([
 		listPostingApprovers(locals.user!.organizationId),
 		db.employee.findMany({
-			where: { user: { organizationId: locals.user!.organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId: locals.user!.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, jobTitle: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		})
@@ -25,14 +25,14 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }
 
 export const actions: Actions = {
 	set: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const departmentId = data.get('departmentId') as string
 		const approverId = data.get('approverId') as string

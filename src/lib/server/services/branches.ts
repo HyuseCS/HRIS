@@ -237,14 +237,17 @@ export async function updateBranch(
  * store) but deliberately leaves the roster alone — its crew stay on record.
  */
 export async function toggleBranchStatus(organizationId: string, id: string, ctx: AuditContext) {
-	const existing = await db.branch.findFirst({
-		where: { id, organizationId },
-		select: { id: true, status: true }
-	})
-	if (!existing) error(404, 'Branch not found')
-
-	const status: BranchStatus = existing.status === 'OPEN' ? 'CLOSED' : 'OPEN'
 	return db.$transaction(async (tx) => {
+		// Read inside the transaction: this row is both the 404 guard and the `oldValue`, so
+		// reading it outside lets two concurrent toggles log the same prior status. A 404 thrown
+		// here rolls the (still empty) transaction back and rethrows unchanged.
+		const existing = await tx.branch.findFirst({
+			where: { id, organizationId },
+			select: { id: true, status: true }
+		})
+		if (!existing) error(404, 'Branch not found')
+
+		const status: BranchStatus = existing.status === 'OPEN' ? 'CLOSED' : 'OPEN'
 		const updated = await tx.branch.update({
 			where: { id },
 			data: { status, ...(status === 'CLOSED' && { managerId: null }) }

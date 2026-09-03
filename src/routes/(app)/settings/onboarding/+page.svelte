@@ -24,16 +24,22 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Onboarding Checklist</h1>
-		<p class="text-sm text-muted-foreground">
-			The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps
-			tick themselves off from the employee record (position, salary, government IDs, contract…);
-			you can reorder, rename, or hide them but not delete them.
-			<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
-			are ticked off by HR per employee.
-		</p>
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1 space-y-1">
+			<h1 class="text-2xl font-bold tracking-tight">Onboarding Checklist</h1>
+			<p class="max-w-2xl text-sm text-muted-foreground">
+				The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps
+				tick themselves off from the employee record (position, salary, government IDs, contract…);
+				you can reorder, rename, or hide them but not delete them.
+				<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
+				are ticked off by HR per employee.
+			</p>
+		</div>
+		<div
+			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+		>
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		</div>
 	</div>
 
 	{#if form?.error}

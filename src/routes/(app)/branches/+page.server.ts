@@ -1,6 +1,6 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { z } from 'zod'
-import { requireCapability, requireFoodServiceOrg } from '$lib/server/rbac'
+import { requireAnyCapability, requireFoodServiceOrg } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import {
 	listBranches,
@@ -15,7 +15,7 @@ import type { Actions, PageServerLoad } from './$types'
 
 /** Both guards, in this order, on the load and on every action. */
 function guard(locals: App.Locals) {
-	requireCapability(locals.user!.role, 'MANAGE_HR')
+	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 	requireFoodServiceOrg(locals.user!.organizationId)
 }
 
@@ -72,7 +72,7 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }

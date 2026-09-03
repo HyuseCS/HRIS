@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit'
-import { canAny } from '$lib/server/rbac'
+import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { DEFAULT_STATUTORY_RATE_CONFIG } from '$lib/server/services/payroll/ph-statutory'
 import {
@@ -173,7 +173,7 @@ function parseRates(fd: FormData) {
 const ctxOf = (user: App.Locals['user'], getClientAddress: () => string) => ({
 	organizationId: user!.organizationId,
 	actorId: user!.id,
-	actorRole: user!.role,
+	actorRoles: user!.roles,
 	ipAddress: getClientAddress()
 })
 
@@ -181,7 +181,7 @@ export const actions: Actions = {
 	// CEO / Super Admin edit directly — applies immediately (client confirms first).
 	saveStatutoryRates: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		if (!canAny(user.roles, 'MANAGE_STATUTORY_RATES')) error(403, 'Insufficient permissions')
+		requireAnyCapability(user.roles, 'MANAGE_STATUTORY_RATES')
 
 		const parsed = parseRates(await request.formData())
 		if (!parsed.success)
@@ -189,14 +189,24 @@ export const actions: Actions = {
 				error: `Invalid statutory rates: ${parsed.error.issues[0]?.message ?? 'validation failed'}`
 			})
 
-		await updateStatutoryRateConfig(user.organizationId, parsed.data, ctxOf(user, getClientAddress))
+		// #5 / D12: `updateStatutoryRateConfig` no longer defaults its client to `db`, so this caller
+		// opens the transaction — the tax-table upsert and its audit row now commit or roll back together.
+		await db.$transaction((tx) =>
+			updateStatutoryRateConfig(
+				user.organizationId,
+				parsed.data,
+				ctxOf(user, getClientAddress),
+				undefined,
+				tx
+			)
+		)
 		return { success: 'Statutory rates saved.' }
 	},
 
 	// HR_ADMIN proposes — live rates unchanged until a CEO/Super Admin confirms.
 	proposeStatutoryRates: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		if (!canAny(user.roles, 'PROPOSE_STATUTORY_RATES')) error(403, 'Insufficient permissions')
+		requireAnyCapability(user.roles, 'PROPOSE_STATUTORY_RATES')
 
 		const parsed = parseRates(await request.formData())
 		if (!parsed.success)
@@ -210,7 +220,7 @@ export const actions: Actions = {
 
 	confirmProposal: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		if (!canAny(user.roles, 'MANAGE_STATUTORY_RATES')) error(403, 'Insufficient permissions')
+		requireAnyCapability(user.roles, 'MANAGE_STATUTORY_RATES')
 
 		const id = String((await request.formData()).get('proposalId') ?? '')
 		if (!id) return fail(400, { error: 'Missing proposal id.' })
@@ -221,7 +231,7 @@ export const actions: Actions = {
 
 	rejectProposal: async ({ request, locals, getClientAddress }) => {
 		const user = locals.user!
-		if (!canAny(user.roles, 'MANAGE_STATUTORY_RATES')) error(403, 'Insufficient permissions')
+		requireAnyCapability(user.roles, 'MANAGE_STATUTORY_RATES')
 
 		const id = String((await request.formData()).get('proposalId') ?? '')
 		if (!id) return fail(400, { error: 'Missing proposal id.' })

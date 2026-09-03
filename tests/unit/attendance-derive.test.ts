@@ -367,3 +367,67 @@ describe('deriveAttendanceDay — empty / edge states', () => {
 		expect(r.workedHours).toBe(0)
 	})
 })
+
+/**
+ * A break the employee has ALREADY taken is not deducted again.
+ *
+ * `punchedBreakMs` only sees BREAK_* punches landing inside a work segment. Time between two
+ * work segments — clocked out, not yet back in — is invisible to it, and was never part of
+ * `punchedNetMs` either. The scheduled meal break was therefore subtracted on top of it, and any
+ * two-segment day paid up to a full break short. It predates the AM/PM work; #162 only made split
+ * shifts common enough to notice.
+ *
+ * The rule is a shortfall, not a replacement: a break shorter than the scheduled one still gets
+ * topped up to it, and a longer one is never topped back down.
+ */
+describe('the scheduled break is only deducted to the extent it has not been taken', () => {
+	it('pays a split shift for every hour on the clock', () => {
+		// 08:00–12:00 and 13:00–17:00 = 8h worked, 1h already unpaid between the blocks.
+		const r = derive(
+			[p('IN', T('08:00')), p('OUT', T('12:00')), p('IN', T('13:00')), p('OUT', T('17:00'))],
+			{ schedule: SCHED_8_5 }
+		)
+		expect(r.workedHours).toBeCloseTo(8, 2)
+		expect(r.breakMinutes).toBe(60)
+		expect(r.overtimeHours).toBeCloseTo(0, 2)
+	})
+
+	it('tops a short gap up to the scheduled break, rather than accepting it', () => {
+		// Only 20 minutes off the clock against a 60-minute scheduled break: 40 minutes are still
+		// owed. Guards the opposite error — treating any gap at all as the whole meal break.
+		const r = derive(
+			[p('IN', T('08:00')), p('OUT', T('11:50')), p('IN', T('12:10')), p('OUT', T('17:00'))],
+			{ schedule: SCHED_8_5 }
+		)
+		expect(r.workedHours).toBeCloseTo(8, 2) // 8h40m on the clock − 40m shortfall
+		expect(r.breakMinutes).toBe(60)
+	})
+
+	it('does not top a longer break back down', () => {
+		// Three hours between blocks. The employee is paid for the six they worked, not seven.
+		const r = derive(
+			[p('IN', T('08:00')), p('OUT', T('11:00')), p('IN', T('14:00')), p('OUT', T('17:00'))],
+			{ schedule: SCHED_8_5 }
+		)
+		expect(r.workedHours).toBeCloseTo(6, 2)
+		expect(r.breakMinutes).toBe(180)
+	})
+
+	it('leaves the ordinary single-block day exactly where it was', () => {
+		// The regression guard: 09:00–18:00 with no gap must still lose its scheduled hour.
+		const r = derive([p('IN', T('09:00')), p('OUT', T('18:00'))])
+		expect(r.workedHours).toBeCloseTo(8, 2)
+		expect(r.breakMinutes).toBe(60)
+	})
+
+	it('leaves a punched break exactly where it was', () => {
+		const r = derive([
+			p('IN', T('09:00')),
+			p('BREAK_START', T('12:00')),
+			p('BREAK_END', T('13:00')),
+			p('OUT', T('18:00'))
+		])
+		expect(r.workedHours).toBeCloseTo(8, 2)
+		expect(r.breakMinutes).toBe(60)
+	})
+})

@@ -107,7 +107,7 @@ async function resolveActor(organizationId: string, forbiddenUserId?: string) {
 	if (!actorEmail) die(`--actor=<email> is required with --execute.\n${USAGE}`)
 	const actor = await db.user.findUnique({
 		where: { email: actorEmail },
-		select: { id: true, role: true, organizationId: true, isActive: true }
+		select: { id: true, roles: true, organizationId: true, isActive: true }
 	})
 	if (!actor) die(`No user with email ${actorEmail}.`)
 	if (actor.id === forbiddenUserId)
@@ -178,7 +178,14 @@ async function deleteEmployee(employeeId: string) {
 			select: { storageKey: true }
 		})
 	])
-	const storageKeys = [...employeeDocs, ...requestDocs].map((d) => d.storageKey)
+	// #299/AC-9: the requestDocument query above stays UNFILTERED — every byte of a purged employee
+	// must go, tombstoned or not. The null filter is NOT cosmetic here: removeFiles() is typed
+	// `string[]` and the private deleteStoredFile above calls path.resolve(UPLOAD_DIR, storageKey),
+	// which throws `TypeError: The "path" argument must be of type string` on a null — mid-purge, on
+	// the droplet. `pnpm check` does not read scripts/, so nothing in the pipeline would flag it.
+	const storageKeys = [...employeeDocs, ...requestDocs]
+		.map((d) => d.storageKey)
+		.filter((k): k is string => k !== null)
 
 	const [
 		timesheetEntries,
@@ -190,7 +197,6 @@ async function deleteEmployee(employeeId: string) {
 		benefitEnrollments,
 		reviewsAbout,
 		reviewsGiven,
-		goals,
 		cashAdvances,
 		loanPayments,
 		emergencyContacts,
@@ -213,7 +219,6 @@ async function deleteEmployee(employeeId: string) {
 		db.benefitEnrollment.count({ where: { employeeId } }),
 		db.performanceReview.count({ where: { employeeId } }),
 		db.performanceReview.count({ where: { reviewerId: employeeId } }),
-		db.goal.count({ where: { employeeId } }),
 		db.cashAdvance.count({ where: { employeeId } }),
 		db.loanPayment.count({ where: { loanId: { in: loanIds } } }),
 		db.emergencyContact.count({ where: { employeeId } }),
@@ -255,7 +260,6 @@ async function deleteEmployee(employeeId: string) {
 		emergency_contacts: emergencyContacts,
 		benefit_enrollments: benefitEnrollments,
 		performance_reviews: reviewsAbout + reviewsGiven,
-		goals,
 		audit_logs: auditLogs,
 		sessions,
 		notifications,
@@ -303,7 +307,7 @@ async function deleteEmployee(employeeId: string) {
 				data: {
 					organizationId: employee.organizationId,
 					actorId: actor.id,
-					actorRole: actor.role,
+					actorRoles: actor.roles,
 					action: 'DELETE',
 					entityType: 'Employee',
 					entityId: employee.id,
@@ -325,7 +329,6 @@ async function deleteEmployee(employeeId: string) {
 			await tx.payrollEntry.deleteMany({ where: { employeeId } })
 			await tx.loan.deleteMany({ where: { employeeId } })
 			await tx.cashAdvance.deleteMany({ where: { employeeId } })
-			await tx.goal.deleteMany({ where: { employeeId } })
 			await tx.performanceReview.deleteMany({
 				where: { OR: [{ employeeId }, { reviewerId: employeeId }] }
 			})
@@ -420,7 +423,7 @@ async function deletePayrollRun(runId: string) {
 				data: {
 					organizationId: run.organizationId,
 					actorId: actor.id,
-					actorRole: actor.role,
+					actorRoles: actor.roles,
 					action: 'DELETE',
 					entityType: 'PayrollRun',
 					entityId: run.id,

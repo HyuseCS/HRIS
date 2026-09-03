@@ -7,12 +7,12 @@ import { DEFAULT_STATUTORY_RATE_CONFIG } from '../src/lib/server/services/payrol
 // Playwright suite logs in as on top. Neither runs on import — the thin runners in
 // seed.ts / seed-e2e.ts instantiate the client and invoke these.
 
-// Cross-org memberships (#131) + multi-role set (#133): every user gets one membership
-// mirroring their primary org, and `roles` seeded to [role]. Idempotent; safe to re-run
-// after adding more users (e.g. seedE2E calls it again once the demo roster exists).
-async function backfillMembershipsAndRoles(db: PrismaClient) {
+// Cross-org memberships (#131): every user gets one membership mirroring their primary org.
+// Idempotent; safe to re-run after adding more users (e.g. seedE2E calls it again once the
+// demo roster exists). The `roles` half is gone — every writer now seeds `roles` directly (#282).
+async function backfillMemberships(db: PrismaClient) {
 	const allUsers = await db.user.findMany({
-		select: { id: true, organizationId: true, role: true, roles: true }
+		select: { id: true, organizationId: true }
 	})
 	for (const u of allUsers) {
 		await db.userOrganization.upsert({
@@ -20,9 +20,6 @@ async function backfillMembershipsAndRoles(db: PrismaClient) {
 			update: {},
 			create: { userId: u.id, organizationId: u.organizationId }
 		})
-		if (u.roles.length === 0) {
-			await db.user.update({ where: { id: u.id }, data: { roles: [u.role] } })
-		}
 	}
 }
 
@@ -205,12 +202,12 @@ async function seedFoodServiceOrg(
 	const mgrHash = await bcrypt.hash('Manager@1234', 12)
 	const mgrUser = await db.user.upsert({
 		where: { email: `manager@${tenant.slug}.ph` },
-		update: { role: 'MANAGER' },
+		update: { roles: ['MANAGER'] },
 		create: {
 			organizationId: tenant.id,
 			email: `manager@${tenant.slug}.ph`,
 			passwordHash: mgrHash,
-			role: 'MANAGER'
+			roles: ['MANAGER']
 		}
 	})
 	const mgrEmployee = await db.employee.upsert({
@@ -242,8 +239,8 @@ async function seedFoodServiceOrg(
 		const h = await bcrypt.hash(pw, 12)
 		const signoffUser = await db.user.upsert({
 			where: { email },
-			update: { role },
-			create: { organizationId: tenant.id, email, passwordHash: h, role }
+			update: { roles: [role] },
+			create: { organizationId: tenant.id, email, passwordHash: h, roles: [role] }
 		})
 		await ensureEmployeeProfile(db, signoffUser, {
 			firstName: first,
@@ -261,7 +258,7 @@ async function seedFoodServiceOrg(
 		const u = await db.user.upsert({
 			where: { email },
 			update: {},
-			create: { organizationId: tenant.id, email, passwordHash: uHash, role: 'EMPLOYEE' }
+			create: { organizationId: tenant.id, email, passwordHash: uHash, roles: ['EMPLOYEE'] }
 		})
 		await db.employee.upsert({
 			where: { userId: u.id },
@@ -443,7 +440,7 @@ export async function seedProd(db: PrismaClient) {
 			organizationId: org.id,
 			email: 'admin@veent.ph',
 			passwordHash: adminHash,
-			role: 'SUPER_ADMIN'
+			roles: ['SUPER_ADMIN']
 		}
 	})
 	await db.employee.upsert({
@@ -464,17 +461,17 @@ export async function seedProd(db: PrismaClient) {
 		}
 	})
 
-	// CEO (#132): the exclusive role-changer, member of all three tenants. Executive
-	// access account — no Employee record; its authority is cross-org via memberships.
+	// CEO (#132): the exclusive role-changer, member of all three tenants. Its authority is
+	// cross-org via memberships; it also gets an Employee profile below (#6).
 	const ceoHash = await bcrypt.hash('Ceo@1234', 12)
 	const ceo = await db.user.upsert({
 		where: { email: 'ceo@veent.ph' },
-		update: { role: 'CEO' },
+		update: { roles: ['CEO'] },
 		create: {
 			organizationId: org.id,
 			email: 'ceo@veent.ph',
 			passwordHash: ceoHash,
-			role: 'CEO'
+			roles: ['CEO']
 		}
 	})
 	for (const orgId of ['org_seed', 'org_jojo', 'org_sweetleaf']) {
@@ -497,7 +494,7 @@ export async function seedProd(db: PrismaClient) {
 	})
 
 	// --- System actor (#136) ---
-	// AuditLog.actorId is a non-nullable FK to User and actorRole is a required Role, so an
+	// AuditLog.actorId is a non-nullable FK to User, so an
 	// automated job (the nightly regularization sweep) cannot write its audit row without a
 	// real user. This is that user — and it must never be able to log in:
 	//   • the password hash is of a random secret nobody holds, so bcrypt can never match, and
@@ -507,12 +504,12 @@ export async function seedProd(db: PrismaClient) {
 	const systemHash = await bcrypt.hash(`system-no-login-${crypto.randomUUID()}`, 12)
 	await db.user.upsert({
 		where: { email: 'system@veent.ph' },
-		update: { role: 'HR_ADMIN', isActive: false },
+		update: { roles: ['HR_ADMIN'], isActive: false },
 		create: {
 			organizationId: org.id,
 			email: 'system@veent.ph',
 			passwordHash: systemHash,
-			role: 'HR_ADMIN',
+			roles: ['HR_ADMIN'],
 			isActive: false
 		}
 	})
@@ -521,12 +518,12 @@ export async function seedProd(db: PrismaClient) {
 	const hrHash = await bcrypt.hash('Hr@1234', 12)
 	const hrUser = await db.user.upsert({
 		where: { email: 'hr@veent.ph' },
-		update: { role: 'HR_ADMIN' },
+		update: { roles: ['HR_ADMIN'] },
 		create: {
 			organizationId: org.id,
 			email: 'hr@veent.ph',
 			passwordHash: hrHash,
-			role: 'HR_ADMIN'
+			roles: ['HR_ADMIN']
 		}
 	})
 	// Next free number, not a hard-coded EMP-002: on drifted data the demo Manager already
@@ -656,7 +653,7 @@ export async function seedProd(db: PrismaClient) {
 		})
 	}
 
-	await backfillMembershipsAndRoles(db)
+	await backfillMemberships(db)
 
 	// Last, so it covers every employee this seed created. Also backfills orgs that predate
 	// #137: onboarding allocates balances now, but employees hired before it have none, and
@@ -680,23 +677,23 @@ export async function seedE2E(db: PrismaClient) {
 	const verifierHash = await bcrypt.hash('Verifier@1234', 12)
 	const verifierUser = await db.user.upsert({
 		where: { email: 'verifier@veent.ph' },
-		update: { role: 'VERIFIER' },
+		update: { roles: ['VERIFIER'] },
 		create: {
 			organizationId: org.id,
 			email: 'verifier@veent.ph',
 			passwordHash: verifierHash,
-			role: 'VERIFIER'
+			roles: ['VERIFIER']
 		}
 	})
 	const approverHash = await bcrypt.hash('Approver@1234', 12)
 	const approverUser = await db.user.upsert({
 		where: { email: 'approver@veent.ph' },
-		update: { role: 'APPROVER' },
+		update: { roles: ['APPROVER'] },
 		create: {
 			organizationId: org.id,
 			email: 'approver@veent.ph',
 			passwordHash: approverHash,
-			role: 'APPROVER'
+			roles: ['APPROVER']
 		}
 	})
 	// Profiles so the sign-off accounts can open their own Profile page (#profile). Fixed high
@@ -716,6 +713,29 @@ export async function seedE2E(db: PrismaClient) {
 		number: 'EMP-902'
 	})
 
+	// #283: the one two-hat account in the whole seed — every other row stays single-role.
+	// The separation-of-duties E2E needs a user who holds BOTH sign-off roles, and creating
+	// one through the UI as a precondition would make the SoD spec depend on the role-picker
+	// spec passing first. E2E-only on purpose: this is a deliberately over-privileged account.
+	const twoHatHash = await bcrypt.hash('TwoHat@1234', 12)
+	const twoHatUser = await db.user.upsert({
+		where: { email: 'verifier.approver@veent.ph' },
+		update: { roles: ['VERIFIER', 'APPROVER'] },
+		create: {
+			organizationId: org.id,
+			email: 'verifier.approver@veent.ph',
+			passwordHash: twoHatHash,
+			roles: ['VERIFIER', 'APPROVER']
+		}
+	})
+	await ensureEmployeeProfile(db, twoHatUser, {
+		firstName: 'Tina',
+		lastName: 'Twohat',
+		jobTitle: 'Sign-off Verifier & Approver',
+		departmentId: dept.id,
+		number: 'EMP-903'
+	})
+
 	// --- Manager (direct supervisor; approves the employee's timesheets in the E2E suite) ---
 	const managerHash = await bcrypt.hash('Manager@1234', 12)
 	const managerUser = await db.user.upsert({
@@ -725,7 +745,7 @@ export async function seedE2E(db: PrismaClient) {
 			organizationId: org.id,
 			email: 'manager@veent.ph',
 			passwordHash: managerHash,
-			role: 'MANAGER'
+			roles: ['MANAGER']
 		}
 	})
 	const managerEmployee = await db.employee.upsert({
@@ -756,7 +776,7 @@ export async function seedE2E(db: PrismaClient) {
 			organizationId: org.id,
 			email: 'employee@veent.ph',
 			passwordHash: employeeHash,
-			role: 'EMPLOYEE'
+			roles: ['EMPLOYEE']
 		}
 	})
 	await db.employee.upsert({
@@ -975,5 +995,5 @@ export async function seedE2E(db: PrismaClient) {
 	)
 
 	// Cover the demo roster just added (seedProd already ran this for the admin accounts).
-	await backfillMembershipsAndRoles(db)
+	await backfillMemberships(db)
 }

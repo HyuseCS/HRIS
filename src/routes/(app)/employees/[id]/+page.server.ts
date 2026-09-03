@@ -1,5 +1,5 @@
 import { fail, isHttpError } from '@sveltejs/kit'
-import { can, requireMinRole, requireCapability } from '$lib/server/rbac'
+import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
 import { assertCanTouchEmployee } from '$lib/server/services/employee-access'
 import {
@@ -54,6 +54,9 @@ import {
 	setAdditionalSupervisors
 } from '$lib/server/services/supervisors'
 import { db } from '$lib/server/db'
+import { writeAuditLog } from '$lib/server/audit'
+import { listTemplates } from '$lib/server/services/performance-templates'
+import { assignTemplateSchema } from '$lib/server/performance/schemas'
 import { z } from 'zod'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -70,7 +73,10 @@ function ctxOf(locals: App.Locals, ip: string) {
 	return {
 		organizationId: locals.user!.organizationId,
 		actorId: locals.user!.id,
-		actorRole: locals.user!.role,
+		// #247: `proposeIfRequired` decides whether a pay change is written directly or filed for
+		// confirmation from the FULL role set — the primary role alone scoped a [MANAGER, HR_ADMIN]
+		// user down to MANAGER and routed a change they may make straight through the queue.
+		actorRoles: locals.user!.roles,
 		ipAddress: ip
 	}
 }
@@ -81,12 +87,12 @@ function ctxOf(locals: App.Locals, ip: string) {
 // merge + per-org config lives in $lib/server/services/onboarding.
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	requireMinRole(locals.user!.role, 'MANAGER')
+	requireAnyCapability(locals.user!.roles, 'VIEW_TEAM')
 
-	const canManage = can(locals.user!.role, 'MANAGE_HR')
+	const canManage = canAny(locals.user!.roles, 'MANAGE_HR')
 
 	const employee = await getEmployee(params.id, locals.user!.organizationId, {
-		viewerRole: locals.user!.role
+		viewerRoles: locals.user!.roles
 	})
 
 	// Object-level access control (#228): a MANAGER may only open a 201 file for their own team or
@@ -162,7 +168,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	// #111: every sensitive field (gov IDs, salary, disbursement) leaves the server masked —
 	// full values are only obtainable through the audited ?/reveal action below.
-	const canReveal = can(locals.user!.role, 'MANAGE_HR')
+	const canReveal = canAny(locals.user!.roles, 'MANAGE_HR')
 
 	// Additional supervisors (#176) — shown to everyone, editable by HR. The picker offers
 	// every other active employee in the org (minus the primary manager, handled server-side).
@@ -170,7 +176,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const supervisorOptions = canManage
 		? await db.employee.findMany({
 				where: {
-					user: { organizationId: locals.user!.organizationId },
+					organizationId: locals.user!.organizationId,
 					employmentStatus: 'ACTIVE',
 					id: { not: params.id }
 				},
@@ -179,9 +185,23 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			})
 		: []
 
+	// #178 item 84 — the evaluation-template picker. `ADMINISTER_HR_ORGWIDE`, not `canManage`:
+	// MANAGE_HR holds MANAGER, and assigning a template is an org-wide HR decision (plan §6).
+	// SPEC AC2: this explicit assignment is the ONLY source of an employee's template — nothing
+	// here or anywhere else may infer one from department, position or role.
+	const canAssignTemplate = canAny(locals.user!.roles, 'ADMINISTER_HR_ORGWIDE')
+	const performanceTemplates = canAssignTemplate
+		? (await listTemplates(locals.user!.organizationId))
+				.filter((t) => t.isActive || t.id === employee.assignedTemplateId)
+				.map((t) => ({ id: t.id, name: t.isActive ? t.name : `${t.name} (inactive)` }))
+		: []
+
 	return {
 		additionalSupervisors,
 		supervisorOptions,
+		canAssignTemplate,
+		performanceTemplates,
+		assignedTemplateId: employee.assignedTemplateId,
 		// Masked by getEmployee (#111) — the full values arrive only via the audited ?/reveal action.
 		employee,
 		canReveal,
@@ -398,7 +418,7 @@ function scopedToEmployee(actions: Actions): Actions {
 export const actions: Actions = scopedToEmployee({
 	// Set the employee's additional supervisors (#176). HR-only.
 	setSupervisors: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const ids = (await request.formData()).getAll('supervisorIds').map(String).filter(Boolean)
 		try {
 			await setAdditionalSupervisors(
@@ -414,7 +434,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	update: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
 		const raw = Object.fromEntries(await request.formData())
@@ -458,7 +478,7 @@ export const actions: Actions = scopedToEmployee({
 			await updateEmployee(params.id, user.organizationId, input, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
@@ -472,11 +492,77 @@ export const actions: Actions = scopedToEmployee({
 		return { success: true }
 	},
 
-	// #170: record an effective-dated salary / pay-type change. HR_ADMIN and up (a MANAGER may edit
-	// their reports' profile but must not move pay). The service inserts the snapshot, re-derives the
-	// current cache and audits atomically; a backdate into an approved run comes back as a notice.
+	/**
+	 * #178 item 82 — HR assigns an evaluation template to this employee.
+	 *
+	 * SPEC AC2: an employee's template is THIS field and nothing else. No code path may infer a
+	 * template from department, position or role — a guess that looks done and is wrong is worse
+	 * than a visible unassigned employee (plan §10.1).
+	 *
+	 * Guard order is deliberate: capability, then whose-record, then shape.
+	 *   1. `ADMINISTER_HR_ORGWIDE` — NOT `MANAGE_HR`, which holds MANAGER (#133).
+	 *   2. `assertCanTouchEmployee` — capabilities say WHAT, never WHOSE. `ADMINISTER_HR_ORGWIDE`
+	 *      alone does not prove this employee is in the actor's organization. `scopedToEmployee`
+	 *      already runs this for every action here; it is repeated as a literal line so the action
+	 *      is correct read on its own (#290's VALIDATE round was lost to reading a handler body
+	 *      instead of the guard).
+	 *   3. only then read and parse the form body.
+	 */
+	assignTemplate: async ({ request, locals, params, getClientAddress }) => {
+		requireAnyCapability(locals.user!.roles, 'ADMINISTER_HR_ORGWIDE')
+		await assertCanTouchEmployee(locals.user!, params.id)
+
+		const action = 'assignTemplate'
+		const organizationId = locals.user!.organizationId
+		const parsed = assignTemplateSchema.safeParse(Object.fromEntries(await request.formData()))
+		if (!parsed.success) return fail(400, { action, error: 'Invalid input' })
+		const { assignedTemplateId } = parsed.data
+
+		// Trust boundary: the posted id is client input. It must name a template in THIS org, or a
+		// crafted post assigns another tenant's form. Org-scoped on the model's own
+		// `organizationId` column, never through a relation join (#323).
+		if (assignedTemplateId) {
+			const template = await db.performanceTemplate.findFirst({
+				where: { id: assignedTemplateId, organizationId },
+				select: { id: true }
+			})
+			if (!template) return fail(400, { action, error: 'That template is not available here.' })
+		}
+
+		const ctx = ctxOf(locals, getClientAddress())
+		// The org filter is on the WRITE, not only on the guard: `canTouchEmployee` short-circuits
+		// to true for `ADMINISTER_HR_ORGWIDE` without ever looking at the org.
+		// #324: the audit row is written with `tx`, so it commits or rolls back with the update.
+		const count = await db.$transaction(async (tx) => {
+			const { count } = await tx.employee.updateMany({
+				where: { id: params.id, organizationId },
+				data: { assignedTemplateId }
+			})
+			if (count === 1)
+				await writeAuditLog(
+					ctx,
+					{
+						action: 'UPDATE',
+						entityType: 'Employee',
+						entityId: params.id,
+						newValue: { assignedTemplateId }
+					},
+					tx
+				)
+			return count
+		})
+		if (count !== 1) return fail(404, { action, error: 'Employee not found' })
+
+		return { action, success: true }
+	},
+
+	// #170: record an effective-dated salary / pay-type change. Gated on MANAGE_HR, which a MANAGER
+	// holds — the control that stops a MANAGER moving pay directly is `proposeIfRequired`
+	// (`$lib/server/services/employees.ts`), which routes their change through propose→confirm (#243).
+	// The service inserts the snapshot, re-derives the current cache and audits atomically; a
+	// backdate into an approved run comes back as a notice.
 	changeCompensation: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		// Discriminator: this form shares the page's single `form` prop with every other action, so its
 		// message block gates on `form.action` to ignore a sibling form's success/error.
 		const action = 'changeCompensation'
@@ -500,9 +586,10 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	// #222: promote — position, title, reporting line, employment type and pay as ONE audited event.
-	// Same HR_ADMIN+ gate as changeCompensation: it moves pay, so a MANAGER must not reach it.
+	// Same MANAGE_HR gate as changeCompensation, and the same real control: a MANAGER reaches the
+	// action but `proposeIfRequired` (#243) turns their pay move into a proposal rather than a write.
 	promote: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const action = 'promote'
 		const parsed = promoteSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) {
@@ -526,11 +613,13 @@ export const actions: Actions = scopedToEmployee({
 	// #111: audited reveal of every masked sensitive field (gov IDs, salary, disbursement). The
 	// role check runs server-side — the UI button is cosmetic gating only (Constitution P2).
 	reveal: async ({ locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		// A self-reveal (an HR user opening their own 201 file) is exempt from the audit log —
 		// own data, decision #2. Same identity comparison as load's object-level access check.
-		const self = await db.employee.findUnique({
-			where: { userId: locals.user!.id },
+		// #6: the ACTIVE org, not the home tenant. Null here means `isSelf` is false and the
+		// reveal IS audited — the safe direction for a lookup that only suppresses the audit row.
+		const self = await db.employee.findFirst({
+			where: { userId: locals.user!.id, organizationId: locals.user!.organizationId },
 			select: { id: true }
 		})
 		const isSelf = self?.id === params.id
@@ -540,11 +629,18 @@ export const actions: Actions = scopedToEmployee({
 			ctxOf(locals, getClientAddress()),
 			{ audit: !isSelf }
 		)
-		return { revealed }
+		// #290: the Employment History panel masks its salary figures the same way, and is
+		// released by this same reveal — deliberately with NO second audit write. The single VIEW
+		// row above covers both surfaces; a second one would be byte-identical and tell an
+		// auditor nothing.
+		const history = await getEmploymentHistory(params.id, locals.user!.organizationId, {
+			unmask: true
+		})
+		return { revealed, history }
 	},
 
 	offboard: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
 		const data = await request.formData()
@@ -554,7 +650,7 @@ export const actions: Actions = scopedToEmployee({
 			await offboardEmployee(params.id, user.organizationId, endDate, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e) {
@@ -562,18 +658,20 @@ export const actions: Actions = scopedToEmployee({
 		}
 	},
 
+	// ponytail: only the two loan actions were folded into ctxOf — the rest of the inline ctx
+	// literals in this file are audit-only, and converting them would be churn.
 	addLoan: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = loanSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid loan details' })
 		try {
-			await createLoan(params.id, user.organizationId, parsed.data, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRole: user.role,
-				ipAddress: getClientAddress()
-			})
+			await createLoan(
+				params.id,
+				user.organizationId,
+				parsed.data,
+				ctxOf(locals, getClientAddress())
+			)
 		} catch (e) {
 			return failFromError(e)
 		}
@@ -581,17 +679,17 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	addCashAdvance: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = cashAdvanceSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid cash-advance details' })
 		try {
-			await createCashAdvance(params.id, user.organizationId, parsed.data, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRole: user.role,
-				ipAddress: getClientAddress()
-			})
+			await createCashAdvance(
+				params.id,
+				user.organizationId,
+				parsed.data,
+				ctxOf(locals, getClientAddress())
+			)
 		} catch (e) {
 			return failFromError(e)
 		}
@@ -599,7 +697,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	addEarning: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = earningSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid recurring earning details' })
@@ -607,7 +705,7 @@ export const actions: Actions = scopedToEmployee({
 			await createEmployeeEarning(params.id, user.organizationId, parsed.data, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e) {
@@ -617,7 +715,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	endEarning: async ({ request, locals, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const id = (await request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing earning id' })
@@ -625,7 +723,7 @@ export const actions: Actions = scopedToEmployee({
 			await endEmployeeEarning(id, user.organizationId, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
@@ -636,7 +734,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	addDeduction: async ({ request, locals, params, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = deductionSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid recurring deduction details' })
@@ -644,7 +742,7 @@ export const actions: Actions = scopedToEmployee({
 			await createEmployeeDeduction(params.id, user.organizationId, parsed.data, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
@@ -655,7 +753,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	endDeduction: async ({ request, locals, getClientAddress }) => {
-		requireMinRole(locals.user!.role, 'HR_ADMIN')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const id = (await request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing deduction id' })
@@ -663,7 +761,7 @@ export const actions: Actions = scopedToEmployee({
 			await endEmployeeDeduction(id, user.organizationId, {
 				organizationId: user.organizationId,
 				actorId: user.id,
-				actorRole: user.role,
+				actorRoles: user.roles,
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
@@ -675,7 +773,7 @@ export const actions: Actions = scopedToEmployee({
 
 	// Exempt/restore an individual employee from a statutory contribution (#173). HR-only, audited.
 	toggleStatutoryExemption: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = statutoryToggleSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid statutory toggle' })
 		try {
@@ -696,7 +794,7 @@ export const actions: Actions = scopedToEmployee({
 	// Toggle "employer share paid externally" for one contribution (#173, Feature C). Zeroes the ER
 	// share only; the EE share is still deducted. HR-only, audited.
 	toggleEmployerShareExternal: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = employerShareExternalToggleSchema.safeParse(
 			Object.fromEntries(await request.formData())
 		)
@@ -718,7 +816,7 @@ export const actions: Actions = scopedToEmployee({
 
 	// Set which semi-monthly cutoff the EE share is deducted on (#173, Feature E). HR-only, audited.
 	setStatutoryAllocation: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = statutoryAllocationSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Invalid statutory allocation' })
 		try {
@@ -737,7 +835,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	addEmergencyContact: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = emergencyContactSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) return fail(400, { error: 'Name, relationship, and phone are required.' })
 		try {
@@ -755,7 +853,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	deleteEmergencyContact: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const contactId = (await request.formData()).get('contactId') as string
 		if (!contactId) return fail(400, { error: 'Missing contact id.' })
 		try {
@@ -772,7 +870,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	uploadDocument: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 
 		const data = await request.formData()
 		const file = data.get('file')
@@ -801,7 +899,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	deleteDocument: async ({ request, locals, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const docId = (await request.formData()).get('docId') as string
 		if (!docId) return fail(400, { error: 'Missing document id.' })
 		try {
@@ -820,7 +918,7 @@ export const actions: Actions = scopedToEmployee({
 	// Tick a MANUAL onboarding step on/off for this employee (#116). Derived steps are
 	// read-only — they check themselves off from the record — so only manual items post here.
 	toggleOnboardingStep: async ({ request, locals, params, getClientAddress }) => {
-		requireCapability(locals.user!.role, 'MANAGE_HR')
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const itemId = data.get('itemId') as string
 		if (!itemId) return fail(400, { error: 'Missing item id.' })

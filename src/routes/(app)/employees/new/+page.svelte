@@ -192,6 +192,7 @@
 							name="role"
 							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						>
+							<!-- Mirrors HIRE_ROLES in $lib/rbac — the server rejects anything else (#248). -->
 							<option value="EMPLOYEE">Employee</option>
 							<option value="MANAGER">Manager</option>
 							<option value="HR_ADMIN">HR Admin</option>

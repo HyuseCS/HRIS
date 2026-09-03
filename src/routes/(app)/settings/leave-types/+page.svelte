@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -27,15 +28,14 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl space-y-6">
-	<div>
-		<BackButton fallback="/settings" label="Settings" preferFallback />
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Leave Types</h1>
-		<p class="text-sm text-muted-foreground">
-			Master data for the leave/request flow: name, whether it's paid, the default yearly
-			allocation, and carry-over policy. Deactivate a type to hide it from new requests without
-			affecting existing balances.
-		</p>
-	</div>
+	<PageHeader
+		title="Leave Types"
+		description="Master data for the leave/request flow: name, whether it's paid, the default yearly allocation, and carry-over policy. Deactivate a type to hide it from new requests without affecting existing balances."
+	>
+		{#snippet back()}
+			<BackButton fallback="/settings" label="Settings" preferFallback />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
 		<div

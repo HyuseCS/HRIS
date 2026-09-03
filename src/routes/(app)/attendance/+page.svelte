@@ -3,12 +3,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
-	import {
-		periodOf,
-		toPeriodInputValue,
-		isValidStandardPeriod,
-		type PeriodKind
-	} from '$lib/utils/pay-periods'
+	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import type { PageData, ActionData } from './$types'
 
 	// Don't reset the form on success: enhance's default form.reset() clears the cross-cell
@@ -34,6 +29,8 @@
 	const deriveTeam = createSubmitGuard()
 	const lockTeam = createSubmitGuard()
 	const unlockTeam = createSubmitGuard()
+	// #200: the backlog import writes punches for a whole file — a double-submit would re-run it.
+	const importBacklog = createSubmitGuard()
 
 	// Per-row forms live inside {#each}, so they need a guard per row — a shared one would grey out
 	// every row's button at once. Created lazily and cached by record id.
@@ -49,12 +46,9 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
-	// #129: the range stays free-form (HR browses arbitrary spans for corrections), but quick-picks
-	// snap it to a standard pay period and "Save as timesheet" only enables on a standard one — since
-	// createTimesheet now rejects non-standard shapes. from/to are YYYY-MM-DD (UTC-midnight days).
-	const rangeIsStandard = $derived(
-		!!data.from && !!data.to && isValidStandardPeriod(new Date(data.from), new Date(data.to))
-	)
+	// #163: the range stays free-form and "Save as timesheet" now accepts any same-month span —
+	// createTimesheet validates it server-side and refuses an overlap with a 409. Quick-picks still
+	// snap to a standard pay period. from/to are YYYY-MM-DD (UTC-midnight days).
 
 	// Set the From/To inputs to a range and re-run the GET filter (same path the date inputs use).
 	function applyRange(from: string, to: string) {
@@ -391,10 +385,8 @@
 				<input type="hidden" name="from" value={data.from} />
 				<input type="hidden" name="to" value={data.to} />
 				<button
-					title={rangeIsStandard
-						? 'Persist this range as a Timesheet record'
-						: 'Pick a standard pay period (1–15, 16–EOM, or whole month) to save as a timesheet'}
-					disabled={saveTimesheet.busy || !rangeIsStandard}
+					title="Persist this range as a Timesheet record"
+					disabled={saveTimesheet.busy}
 					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 					>{@render icon(IC.document)}Save as timesheet</button
 				>
@@ -447,6 +439,114 @@
 		</div>
 	{/if}
 
+	<!-- #200: CSV backlog import. Food-service tenants only; the action re-checks both gates. -->
+	{#if data.canManage && data.showAmPm}
+		<div class="space-y-3 rounded-lg border bg-card p-4">
+			<div>
+				<p class="text-sm font-medium">Import backlog CSV</p>
+				<p class="text-xs text-muted-foreground">
+					Columns: employeeNumber, date (YYYY-MM-DD), amIn, amOut, pmIn, pmOut (HH:MM, Manila time).
+					Locked and hand-corrected days are refused.
+				</p>
+				<!-- m-4: state the caps here — the operator otherwise meets them as a 413/400 that renders
+				     in the page-top banner, off-screen. `load` passes the real MAX_IMPORT_BYTES and
+				     MAX_IMPORT_ROWS through, so the copy cannot drift from the caps that enforce them. -->
+				<p class="text-xs text-muted-foreground">
+					Limits: {data.maxImportBytes / 1024 / 1024} MB per file, {data.maxImportRows.toLocaleString()}
+					rows, and a {data.maxRangeDays}-day span.
+				</p>
+			</div>
+			<form
+				method="POST"
+				action="?/importBacklog"
+				enctype="multipart/form-data"
+				use:enhance={importBacklog.enhance}
+				class="flex flex-wrap items-center gap-2"
+			>
+				<label for="backlog" class="sr-only">Backlog CSV file</label>
+				<input
+					id="backlog"
+					name="backlog"
+					type="file"
+					accept=".csv,text/csv"
+					required
+					class="text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium"
+				/>
+				<button
+					disabled={importBacklog.busy}
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{importBacklog.busy ? 'Importing…' : 'Import backlog CSV'}</button
+				>
+				<!-- m-5: this action writes punches for a whole roster. The reassurance belongs beside the
+				     button, not at the end of the column list. -->
+				<span class="text-xs text-muted-foreground"
+					>Re-uploading the same file changes nothing.</span
+				>
+			</form>
+			<!-- M-9: `fail(400/413/415)` from this action lands in `form.error`, which renders in the
+			     page-top banner — several screens above this card. Repeat it here so the operator sees
+			     why the button did nothing. The duplicate with the top banner is deliberate.
+			     Gated on `importError`, NOT on `error`: every action on this page sets `error`, so the
+			     bare check echoed a Save-as-timesheet or Derive failure under the upload heading. -->
+			{#if form?.importError}
+				<div
+					role="alert"
+					class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
+				>
+					{form.error}
+				</div>
+			{/if}
+			{#if form?.imported}
+				{@const res = form.imported}
+				<!-- M-10: a totally failed import used to look exactly like a totally successful one —
+				     same neutral box, four counts to parse. Colour and a lead sentence say the outcome
+				     first; `role="status"` makes it reach a screen reader at all. -->
+				<!-- A re-upload applies nothing and rejects nothing: every row was already here. That is
+				     the card's own promise ("re-uploading changes nothing") working, so it must not
+				     read as the failure bucket. It gets neutral wording, not red. -->
+				{@const alreadyImported =
+					res.applied === 0 && res.rejected.length === 0 && res.skippedDuplicate > 0}
+				{@const nothing = res.applied === 0 && !alreadyImported}
+				{@const partial = res.applied > 0 && res.rejected.length > 0}
+				<div
+					role="status"
+					class="rounded-md border px-3 py-2 text-sm {nothing
+						? 'border-destructive/20 bg-destructive/10 text-red-400'
+						: alreadyImported
+							? 'border-border bg-background text-muted-foreground'
+							: partial
+								? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+								: 'border-green-500/20 bg-green-500/10 text-green-600'}"
+				>
+					<p class="font-medium">
+						{#if alreadyImported}Already imported — every row in this file was here already.{:else if nothing}Nothing
+							was imported — no rows were applied.{:else if partial}Partly imported — {res.applied}
+							{res.applied === 1 ? 'row' : 'rows'} applied, {res.rejected.length} rejected.{:else}Import
+							complete — {res.applied}
+							{res.applied === 1 ? 'row' : 'rows'} applied.{/if}
+					</p>
+					<p class="mt-0.5 text-xs">
+						Applied {res.applied}
+						{res.applied === 1 ? 'row' : 'rows'} ({res.punchesWritten} punches), skipped {res.skippedDuplicate}
+						duplicates, rejected {res.rejected.length}
+						{res.rejected.length === 1 ? 'row' : 'rows'}.
+					</p>
+					{#if res.rejected.length > 0}
+						<!-- Open when nothing landed: the reasons are then the only useful content. -->
+						<details class="mt-1" open={nothing}>
+							<summary class="cursor-pointer text-xs font-medium">Why rows were rejected</summary>
+							<ul class="mt-1 space-y-0.5 text-xs">
+								{#each res.rejected as r (r.line)}
+									<li>Line {r.line} ({r.employeeNumber || '—'}, {r.date || '—'}): {r.reason}</li>
+								{/each}
+							</ul>
+						</details>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	{#if data.canManage}
 		<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
 		<div class="flex items-center justify-between gap-3">
@@ -459,6 +559,16 @@
 				>{data.view === 'team' ? teamRows.length : dayRows.length} shown</span
 			>
 		</div>
+	{/if}
+
+	{#if data.showAmPm && data.canManage}
+		<!-- m-6: the AM/PM split is read-only by design (#162). Without saying so, an HR user in edit
+		     mode clicks an AM In cell and nothing happens. Gated on canManage: an employee has no
+		     correction door, so the second sentence would be a false instruction. -->
+		<p class="text-xs text-muted-foreground">
+			AM/PM columns are worked out from the punches and cannot be typed in. Correct a day by editing
+			its In and Out.
+		</p>
 	{/if}
 
 	{#if data.view === 'team'}
@@ -474,6 +584,15 @@
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">Out</th>
 						<th class="px-3 py-3 text-right font-medium text-muted-foreground">Reg</th>
 						<th class="px-3 py-3 text-right font-medium text-muted-foreground">OT</th>
+						{#if data.showAmPm}
+							<!-- #162: read-only display split. The In/Out inputs stay the only correction door.
+							     M-15: kept AFTER Reg/OT — these four read-only columns pushed the two numbers HR
+							     reconciles off the right edge of the scroller when they sat before them. -->
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">AM In</th>
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">AM Out</th>
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM In</th>
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM Out</th>
+						{/if}
 						<th class="w-[1%] whitespace-nowrap px-3 py-3"></th>
 					</tr>
 				</thead>
@@ -553,6 +672,13 @@
 										class={CELL_NUM}
 									/>{:else}{d ? n(d.overtimeHours).toFixed(2) : '—'}{/if}</td
 							>
+							{#if data.showAmPm}
+								<!-- M-15: after Reg/OT, mirroring the header order. -->
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.amTimeIn ?? null)}</td>
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.amTimeOut ?? null)}</td>
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeIn ?? null)}</td>
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeOut ?? null)}</td>
+							{/if}
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
 									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
@@ -589,7 +715,9 @@
 						</tr>
 					{:else}
 						<tr
-							><td colspan="8" class="px-3 py-8 text-center text-muted-foreground"
+							><td
+								colspan={data.showAmPm ? 12 : 8}
+								class="px-3 py-8 text-center text-muted-foreground"
 								>{exceptionsOnly
 									? 'No exceptions — everyone is accounted for.'
 									: 'No active employees.'}</td
@@ -613,6 +741,14 @@
 						<th class="px-3 py-3 text-right font-medium text-muted-foreground">OT</th>
 						<th class="px-3 py-3 text-right font-medium text-muted-foreground">Night</th>
 						<th class="px-3 py-3 text-right font-medium text-muted-foreground">Late/UT</th>
+						{#if data.showAmPm}
+							<!-- #162: read-only display split. The In/Out inputs stay the only correction door.
+							     M-15: kept AFTER the reconciled numbers — see the team header. -->
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">AM In</th>
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">AM Out</th>
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM In</th>
+							<th class="px-3 py-3 text-left font-medium text-muted-foreground">PM Out</th>
+						{/if}
 						{#if data.canManage}<th class="w-[1%] whitespace-nowrap px-3 py-3"></th>{/if}
 					</tr>
 				</thead>
@@ -701,6 +837,13 @@
 							<td class="px-3 py-2 text-right font-mono text-muted-foreground"
 								>{d.lateMinutes}/{d.undertimeMinutes}</td
 							>
+							{#if data.showAmPm}
+								<!-- M-15: after Reg/OT/Night/Late-UT, mirroring the header order. -->
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.amTimeIn ?? null)}</td>
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.amTimeOut ?? null)}</td>
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeIn ?? null)}</td>
+								<td class="px-3 py-2 text-muted-foreground">{fmtTime(d?.pmTimeOut ?? null)}</td>
+							{/if}
 							{#if data.canManage}
 								<td class="w-[1%] whitespace-nowrap px-3 py-2">
 									{#if d.isLocked}
@@ -745,7 +888,7 @@
 					{:else}
 						<tr
 							><td
-								colspan={data.canManage ? 9 : 8}
+								colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)}
 								class="px-3 py-8 text-center text-muted-foreground"
 								>{#if exceptionsOnly}No exceptions in this range.{:else}No attendance for this range{#if data.canManage}
 										— no punches yet, or use Refresh{/if}.{/if}</td

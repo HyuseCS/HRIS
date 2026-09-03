@@ -68,12 +68,21 @@ async function main() {
 	await step('leaveBalance', () => db.leaveBalance.deleteMany({ where }))
 	await step('loan', () => db.loan.deleteMany({ where }))
 	await step('cashAdvance', () => db.cashAdvance.deleteMany({ where }))
+	// Four models grew a RESTRICT FK to Employee after this script was written, and each one
+	// blocked the delete below. The full list of restricting tables comes from
+	// information_schema.referential_constraints — re-check it when a new employee child appears.
+	await step('employeeCompensation', () => db.employeeCompensation.deleteMany({ where }))
+	await step('employeeEmploymentType', () => db.employeeEmploymentType.deleteMany({ where }))
+	await step('onboardingCompletion', () => db.onboardingCompletion.deleteMany({ where }))
+	// ActionProposal names its FK `targetEmployeeId`, not `employeeId`.
+	await step('actionProposal', () =>
+		db.actionProposal.deleteMany({ where: { targetEmployeeId: { in: employeeIds } } })
+	)
 	await step('employeeEarning', () => db.employeeEarning.deleteMany({ where }))
 	await step('employeeDeduction', () => db.employeeDeduction.deleteMany({ where }))
 	await step('employeeDocument', () => db.employeeDocument.deleteMany({ where }))
 	await step('emergencyContact', () => db.emergencyContact.deleteMany({ where }))
 	await step('benefitEnrollment', () => db.benefitEnrollment.deleteMany({ where }))
-	await step('goal', () => db.goal.deleteMany({ where }))
 	await step('separationRecord', () => db.separationRecord.deleteMany({ where }))
 	await step('performanceReview', () =>
 		db.performanceReview.deleteMany({

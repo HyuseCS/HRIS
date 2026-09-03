@@ -133,13 +133,9 @@ Leave requests awaiting current user's approval.
 
 ---
 
-### POST /api/v1/leave-requests/:id/override-approve
+### ~~POST /api/v1/leave-requests/:id/override-approve~~ — never built (#295)
 
-Approve a leave request that exceeds the employee's balance.
-
-**Roles**: `HR_ADMIN`, `SUPER_ADMIN` only
-
-**Request body**: `{ "overrideNote": "string" }` _(required)_
-
-**Response 200**: `{ "status": "APPROVED", "overrideApplied": true }`
-**Side effect**: AuditLog entry with `action: LEAVE_OVERRIDE` including `overrideNote`.
+No override endpoint exists. `PATCH /api/v1/leave/:id` briefly carried an `override-approve`
+action, but it was identical to `approve` bar a stricter capability gate — it neither exceeded a
+balance nor bypassed a stage — and was deleted in #295. Nothing writes the `LEAVE_OVERRIDE` audit
+action, though the enum value is still in the schema.

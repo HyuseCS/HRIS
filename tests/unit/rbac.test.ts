@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
+	ASSIGNABLE_ROLES,
 	CAPABILITIES,
+	HIRE_ROLES,
+	ROLE_DESCRIPTIONS,
+	ROLE_GROUPS,
 	can,
 	canAny,
-	hasMinRole,
-	hasAnyMinRole,
-	ROLE_HIERARCHY
+	type Capability
 } from '../../src/lib/rbac'
-import type { Role } from '@prisma/client'
+// Value import, not type-only: the generated enum object is the drift tripwire below.
+import { Role } from '@prisma/client'
 
 const ALL_ROLES: Role[] = [
 	'EMPLOYEE',
@@ -29,8 +32,13 @@ const EXPECTED: Record<string, Role[]> = {
 	// #228: HR authority over the whole roster. Excludes MANAGER, who is scoped to their own
 	// branch and team — the distinction MANAGE_HR cannot express.
 	ADMINISTER_HR_ORGWIDE: ['HR_ADMIN', 'SUPER_ADMIN', 'CEO'],
+	// #279: the team page's org-wide view and 201-file document reads. HR back-office only.
+	ADMINISTER_HR_RECORDS: ['HR_ADMIN', 'SUPER_ADMIN'],
 	VIEW_TEAM: ['MANAGER', 'HR_ADMIN', 'SUPER_ADMIN', 'CEO'],
-	ADMINISTER_SYSTEM: ['SUPER_ADMIN'],
+	// #224: the CEO gained system administration. The irreversible half moved out to
+	// OVERRIDE_FINALIZED rather than following it.
+	ADMINISTER_SYSTEM: ['SUPER_ADMIN', 'CEO'],
+	OVERRIDE_FINALIZED: ['SUPER_ADMIN'],
 	MANAGE_USER_ROLES: ['CEO'],
 	APPROVE_REQUESTS: [
 		'MANAGER',
@@ -47,7 +55,10 @@ const EXPECTED: Record<string, Role[]> = {
 	MANAGE_STATUTORY_RATES: ['CEO', 'SUPER_ADMIN'],
 	PROPOSE_STATUTORY_RATES: ['HR_ADMIN'],
 	MANAGE_PAYROLL: ['MANAGER', 'SUPER_ADMIN', 'HR_ADMIN', 'PAYROLL_OFFICER', 'CEO'],
-	VIEW_PAYROLL_REPORTS: ['MANAGER', 'SUPER_ADMIN', 'HR_ADMIN', 'PAYROLL_OFFICER', 'FINANCE', 'CEO']
+	VIEW_PAYROLL_REPORTS: ['MANAGER', 'SUPER_ADMIN', 'HR_ADMIN', 'PAYROLL_OFFICER', 'FINANCE', 'CEO'],
+	// #249: reads anyone's payslip. VIEW_PAYROLL_REPORTS minus MANAGER, who is scoped to their
+	// reporting line — the same distinction ADMINISTER_HR_ORGWIDE draws for employee records.
+	VIEW_PAY_ORGWIDE: ['HR_ADMIN', 'SUPER_ADMIN', 'PAYROLL_OFFICER', 'FINANCE', 'CEO']
 }
 
 // PROPOSE_STATUTORY_RATES is the MAKER leg of the statutory-rate maker-checker (#220): only
@@ -61,9 +72,21 @@ const EXPECTED: Record<string, Role[]> = {
 // own team never ran and every MANAGER could read and edit the whole roster. This capability draws
 // the line the superset invariant otherwise forbids — HR authority over the WHOLE roster, versus a
 // manager's own branch and team. It is deliberately NOT held by MANAGER.
+// VIEW_PAY_ORGWIDE is the third exception (#249), and for the same reason as the second: a
+// payslip is employee data, so MANAGER reads their reporting line and nobody else. It exists because
+// VIEW_PAYROLL_REPORTS gained MANAGER in #133 and could no longer express "a stranger's pay".
+// ADMINISTER_HR_RECORDS is the fourth exception (#279). It is not a new policy: it names the set
+// two sites already hardcoded as `['HR_ADMIN','SUPER_ADMIN'].includes(user.role)` — the team page's
+// org-wide toggle and 201-file document reads. They were hardcoded precisely BECAUSE no capability
+// could express the set: MANAGER is excluded for the same reason as the second and third exceptions
+// (employee records are not a manager's to read org-wide), and CEO is excluded as it was before,
+// like the first exception. Converting them to a capability without this entry would have silently
+// widened both to MANAGER and CEO, so the exception is what keeps #279 a no-op change.
 const HR_ADMIN_SUPERSET_EXCEPTIONS: (keyof typeof CAPABILITIES)[] = [
 	'PROPOSE_STATUTORY_RATES',
-	'ADMINISTER_HR_ORGWIDE'
+	'ADMINISTER_HR_ORGWIDE',
+	'VIEW_PAY_ORGWIDE',
+	'ADMINISTER_HR_RECORDS'
 ]
 
 describe('capability table', () => {
@@ -100,8 +123,9 @@ describe('capability table', () => {
 		}
 	})
 
-	// CEO's contract (#132): every capability HR_ADMIN holds, plus the exclusive
-	// role-changer — but NOT system administration (that stays Super Admin).
+	// CEO's contract (#132, widened by #224): every capability HR_ADMIN holds, plus the
+	// exclusive role-changer and system administration — but NOT the irreversible
+	// overrides, which stay Super Admin.
 	describe('CEO', () => {
 		it('holds every capability HR_ADMIN holds', () => {
 			for (const capability of Object.keys(CAPABILITIES) as (keyof typeof CAPABILITIES)[]) {
@@ -118,38 +142,19 @@ describe('capability table', () => {
 			}
 		})
 
-		it('does not administer the system', () => {
-			expect(can('CEO', 'ADMINISTER_SYSTEM')).toBe(false)
+		// Inverted by #224. This previously asserted `can('CEO','ADMINISTER_SYSTEM') === false`.
+		// That assertion was load-bearing for the wrong reason: while ADMINISTER_SYSTEM was Super
+		// Admin's alone it doubled as the guard on the irreversible operations (voiding a payroll
+		// run or period, reopening locked attendance days), so denying it to the CEO happened to
+		// enforce separation of duties. #224 grants the CEO the routine administration it always
+		// needed and splits the irreversible half into OVERRIDE_FINALIZED, which is what the
+		// separation actually depends on — so that is what this now pins.
+		it('administers the system but cannot override finalized records (#224)', () => {
+			expect(can('CEO', 'ADMINISTER_SYSTEM')).toBe(true)
+			expect(can('CEO', 'OVERRIDE_FINALIZED')).toBe(false)
+			expect(can('SUPER_ADMIN', 'ADMINISTER_SYSTEM')).toBe(true)
+			expect(can('SUPER_ADMIN', 'OVERRIDE_FINALIZED')).toBe(true)
 		})
-	})
-})
-
-describe('hasMinRole', () => {
-	it('ranks the HR ladder', () => {
-		expect(hasMinRole('SUPER_ADMIN', 'HR_ADMIN')).toBe(true)
-		expect(hasMinRole('HR_ADMIN', 'HR_ADMIN')).toBe(true)
-		// Manager was promoted to on-branch HR (#133) — it now clears the HR_ADMIN floor.
-		expect(hasMinRole('MANAGER', 'HR_ADMIN')).toBe(true)
-		expect(hasMinRole('EMPLOYEE', 'MANAGER')).toBe(false)
-	})
-
-	// CEO mirrors HR_ADMIN on the ladder: it clears HR_ADMIN floors but NOT the
-	// SUPER_ADMIN floor (e.g. payroll approval stays out of reach), so its extra
-	// authority comes only from the capability table.
-	it('ranks CEO level with HR_ADMIN, below SUPER_ADMIN', () => {
-		expect(ROLE_HIERARCHY.CEO).toBe(ROLE_HIERARCHY.HR_ADMIN)
-		expect(hasMinRole('CEO', 'HR_ADMIN')).toBe(true)
-		expect(hasMinRole('CEO', 'MANAGER')).toBe(true)
-		expect(hasMinRole('CEO', 'SUPER_ADMIN')).toBe(false)
-	})
-
-	// Off-ladder roles rank 0, so a minimum-role check must never let them through —
-	// this is why payroll access goes via capabilities instead.
-	it('does not let off-ladder roles clear a ladder floor', () => {
-		for (const role of ['FINANCE', 'PAYROLL_OFFICER', 'VERIFIER', 'APPROVER'] as Role[]) {
-			expect(ROLE_HIERARCHY[role]).toBe(0)
-			expect(hasMinRole(role, 'MANAGER')).toBe(false)
-		}
 	})
 })
 
@@ -188,13 +193,12 @@ describe('sign-off roles', () => {
 })
 
 // Multi-role (#133): capability checks match ANY role the user carries.
-describe('multi-role (canAny / hasAnyMinRole)', () => {
+describe('multi-role (canAny)', () => {
 	it('gives a [MANAGER, VERIFIER] user HR access AND verifier sign-off', () => {
 		const roles: Role[] = ['MANAGER', 'VERIFIER']
 		// HR-level access from the MANAGER half...
 		expect(canAny(roles, 'MANAGE_HR')).toBe(true)
 		expect(canAny(roles, 'VIEW_PAYROLL_REPORTS')).toBe(true)
-		expect(hasAnyMinRole(roles, 'HR_ADMIN')).toBe(true)
 		// ...verifier sign-off from the VERIFIER half.
 		expect(canAny(roles, 'VERIFY_REQUESTS')).toBe(true)
 		// but never a capability neither role holds.
@@ -204,8 +208,22 @@ describe('multi-role (canAny / hasAnyMinRole)', () => {
 
 	it('a lone VERIFIER gets no HR access', () => {
 		expect(canAny(['VERIFIER'], 'MANAGE_HR')).toBe(false)
-		expect(hasAnyMinRole(['VERIFIER'], 'MANAGER')).toBe(false)
 		expect(canAny(['VERIFIER'], 'VERIFY_REQUESTS')).toBe(true)
+	})
+
+	// The no-op proof for the #256 guard sweep. Converting ~190 route guards from the singular
+	// role to the full role set is only safe because every user carries exactly one role today,
+	// and on a one-element array `.some()` reduces to the singular check. Exhaustive over the
+	// whole domain rather than spot-checked: this is the evidence, so it has to be complete.
+	it('is identical to the singular check for every one-element role set', () => {
+		const capabilities = Object.keys(CAPABILITIES) as Capability[]
+		for (const role of ALL_ROLES) {
+			for (const capability of capabilities) {
+				expect(canAny([role], capability), `canAny([${role}], ${capability})`).toBe(
+					can(role, capability)
+				)
+			}
+		}
 	})
 })
 
@@ -228,6 +246,56 @@ describe('statutory rate capabilities (#220)', () => {
 		for (const role of ['MANAGER', 'EMPLOYEE'] as Role[]) {
 			expect(can(role, 'MANAGE_STATUTORY_RATES')).toBe(false)
 			expect(can(role, 'PROPOSE_STATUTORY_RATES')).toBe(false)
+		}
+	})
+})
+
+// #248: CEO, VERIFIER and APPROVER existed in the schema but no role picker offered them, so they
+// were assignable only by seeding the database. These pin both assignment lists.
+describe('role assignment lists (#248)', () => {
+	it('offers every role the schema defines', () => {
+		expect([...ASSIGNABLE_ROLES].sort()).toEqual([...ALL_ROLES].sort())
+	})
+
+	// Tripwire. A role added to the schema lands here, forcing an explicit decision about whether it
+	// may be assigned — the omission #248 fixed went unnoticed for three roles across two releases.
+	// If a future role is deliberately NOT assignable, change this assertion and say why.
+	it('keeps the picker in step with the Prisma enum', () => {
+		expect(Object.values(Role).sort()).toEqual([...ALL_ROLES].sort())
+	})
+
+	// The hire form runs under MANAGE_HR, which MANAGER holds — so every role listed there is one a
+	// MANAGER can mint outright, bypassing MANAGE_USER_ROLES (CEO-exclusive). It stays a strict
+	// subset on purpose; governance, finance and sign-off roles are granted after hire.
+	it('keeps privileged roles off the hire form', () => {
+		const hire: string[] = [...HIRE_ROLES]
+		const assignable: string[] = [...ASSIGNABLE_ROLES]
+		expect(hire).toEqual(['EMPLOYEE', 'MANAGER', 'HR_ADMIN'])
+		for (const r of hire) expect(assignable).toContain(r)
+		for (const r of ['SUPER_ADMIN', 'CEO', 'PAYROLL_OFFICER', 'FINANCE', 'VERIFIER', 'APPROVER']) {
+			expect(hire).not.toContain(r)
+		}
+	})
+
+	// Sanity: every role the hire form can mint holds strictly less than the CEO exclusives.
+	it('lets no hire-form role change other users’ roles', () => {
+		for (const r of HIRE_ROLES) expect(can(r, 'MANAGE_USER_ROLES')).toBe(false)
+	})
+})
+
+// #283: the picker renders ROLE_GROUPS, not ASSIGNABLE_ROLES. A role missing from the groups is
+// therefore a role the CEO cannot grant — assignable by the server, invisible in the only UI that
+// assigns it — and nothing else in the app would notice.
+describe('role picker copy (#283)', () => {
+	it('groups every assignable role exactly once', () => {
+		const grouped = ROLE_GROUPS.flatMap((g) => [...g.roles])
+		expect([...grouped].sort()).toEqual([...ASSIGNABLE_ROLES].sort())
+		expect(new Set(grouped).size).toBe(grouped.length)
+	})
+
+	it('describes every assignable role', () => {
+		for (const r of ASSIGNABLE_ROLES) {
+			expect(ROLE_DESCRIPTIONS[r], `no description for ${r}`).toBeTruthy()
 		}
 	})
 })

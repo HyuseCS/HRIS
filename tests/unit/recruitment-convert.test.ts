@@ -27,7 +27,7 @@ const { generateTempPassword } = await import('$lib/server/password')
 const CTX: AuditContext = {
 	organizationId: 'org1',
 	actorId: 'u1',
-	actorRole: 'HR_ADMIN',
+	actorRoles: ['HR_ADMIN'],
 	ipAddress: 'test'
 }
 const baseApplicant = {

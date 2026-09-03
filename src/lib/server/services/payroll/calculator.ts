@@ -1,5 +1,9 @@
 import { db } from '$lib/server/db'
 import { error } from '@sveltejs/kit'
+import {
+	listVisiblePayEmployeeIds,
+	type EmployeeAccessActor
+} from '$lib/server/services/employee-access'
 import { computeEarnings } from './earnings'
 import { ratesFromRule, type PayRates } from './rates'
 import { statutoryRatesFromConfig } from './statutory-rates'
@@ -134,11 +138,22 @@ export interface EmployeeComputeResult {
 }
 
 /**
- * The employee share for one contribution in this period (#173, Feature E). Outside a semi-monthly
- * cutoff (WHOLE_MONTH or a legacy/null period) allocation is moot and the monthly EE prorates by
- * `× share` exactly as before. On a cutoff: EVEN keeps the half split; FIRST loads the full monthly
- * EE onto the 1–15 cutoff (0 on the other), SECOND onto the 16–EOM cutoff. Returns a Money that the
- * caller quantizes once, exactly like the pre-existing EE line.
+ * The employee share for one contribution in this period (#173, Feature E). On a semi-monthly
+ * cutoff: EVEN keeps the half split; FIRST loads the full monthly EE onto the 1–15 cutoff (0 on the
+ * other), SECOND onto the 16–EOM cutoff. Returns a Money that the caller quantizes once, exactly
+ * like the pre-existing EE line.
+ *
+ * #163: a CUSTOM same-month range has `kind === null`, and under FIRST or SECOND it takes ZERO —
+ * the designated cutoff run still collects the whole month, so a month never exceeds 100% of the
+ * monthly EE contribution. WHOLE_MONTH and `undefined` (the preview path, which never supplies a
+ * kind) are checked FIRST and stay on `× share`, which is the guard rail: neither may ever fall
+ * into the custom-range ZERO branch. ER share and withholding tax keep `× share` regardless.
+ *
+ * #163 (review round 2): the ZERO is SAFE because a custom range can no longer overlap a
+ * designated cutoff window at all — `assertCustomRangeClearOfCutoff` (services/payroll/index.ts)
+ * refuses one with a 400 in both write paths. The cutoff run the allocation hands the month to is
+ * therefore always still creatable, so this branch can never leave a month uncollected, and the
+ * outcome no longer depends on which run was created first.
  */
 function resolveEE(
 	monthlyEE: Money,
@@ -146,10 +161,11 @@ function resolveEE(
 	kind: PeriodKind | null | undefined,
 	share: Money
 ): Money {
-	if (kind !== 'FIRST_HALF' && kind !== 'SECOND_HALF') return monthlyEE.times(share)
-	if (mode === 'FIRST') return kind === 'FIRST_HALF' ? monthlyEE : ZERO
-	if (mode === 'SECOND') return kind === 'SECOND_HALF' ? monthlyEE : ZERO
-	return monthlyEE.times(share) // EVEN — the normal half split (share is 0.5 on a cutoff)
+	if (kind === 'WHOLE_MONTH' || kind === undefined) return monthlyEE.times(share)
+	if (mode === 'FIRST' || mode === 'SECOND') {
+		return kind === (mode === 'FIRST' ? 'FIRST_HALF' : 'SECOND_HALF') ? monthlyEE : ZERO
+	}
+	return monthlyEE.times(share) // EVEN — the normal split (share is 0.5 on a cutoff)
 }
 
 export function computeEmployeeResult(
@@ -275,18 +291,33 @@ export function computeEmployeeResult(
 /**
  * Roster + recurring-earning defaults for the calculator UI (full page and the floating
  * panel on payroll pages, #72). Prefill amounts are prorated exactly like computePayroll.
+ *
+ * #275: MANAGE_PAYROLL gates the only call site and holds MANAGER (#133), so an unscoped load
+ * handed every branch manager the whole org's roster AND its per-employee allowance/incentive
+ * amounts. Scoped with the PAY helper — not the roster one — because this is compensation, so
+ * VIEW_PAY_ORGWIDE holders (FINANCE, PAYROLL_OFFICER) legitimately see org-wide; it is also the
+ * helper `api/v1/payroll/calculator` uses, which keeps the dropdown and the preview guard in step.
+ * `null` = unrestricted, so no id filter at all.
  */
-export async function loadCalculatorData(organizationId: string) {
+export async function loadCalculatorData(actor: EmployeeAccessActor) {
+	const organizationId = actor.organizationId
+	const visibleIds = await listVisiblePayEmployeeIds(actor)
+	const idFilter = visibleIds ? { id: { in: visibleIds } } : {}
+
 	const [employees, config, recurring] = await Promise.all([
 		db.employee.findMany({
-			where: { user: { organizationId }, employmentStatus: 'ACTIVE' },
+			where: { organizationId, employmentStatus: 'ACTIVE', ...idFilter },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		}),
 		db.payrollConfig.findUnique({ where: { organizationId }, select: { payFrequency: true } }),
 		db.employeeEarning.groupBy({
 			by: ['employeeId', 'kind'],
-			where: { employee: { organizationId }, isActive: true },
+			where: {
+				employee: { organizationId },
+				isActive: true,
+				...(visibleIds ? { employeeId: { in: visibleIds } } : {})
+			},
 			_sum: { monthlyAmount: true }
 		})
 	])
@@ -313,7 +344,7 @@ export async function previewPayroll(
 	input: { attendance: AttendanceInput; adjustments?: PayAdjustments }
 ) {
 	const employee = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true, firstName: true, lastName: true, basicMonthlySalary: true, rateType: true }
 	})
 	if (!employee) error(404, 'Employee not found')

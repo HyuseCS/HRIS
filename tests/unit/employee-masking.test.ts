@@ -38,7 +38,7 @@ const RAW = {
 	gcashNumber: '09170000009999'
 }
 
-const ctx: AuditContext = { organizationId: 'org', actorId: 'actor-1', actorRole: 'HR_ADMIN' }
+const ctx: AuditContext = { organizationId: 'org', actorId: 'actor-1', actorRoles: ['HR_ADMIN'] }
 
 beforeEach(() => {
 	findFirst.mockReset().mockResolvedValue({ ...RAW })
@@ -50,7 +50,7 @@ beforeEach(() => {
 
 describe('getEmployee masking (#111)', () => {
 	it('masks sensitive fields for HR — not null, not cleartext', async () => {
-		const e = await getEmployee('emp-1', 'org', { viewerRole: 'HR_ADMIN' })
+		const e = await getEmployee('emp-1', 'org', { viewerRoles: ['HR_ADMIN'] })
 		expect(e.bankAccountNumber).toBe('•••• 4321')
 		expect(e.gcashNumber).toBe('•••• 9999')
 		expect(e.sssNumber).toBe('•••• 5678')
@@ -60,17 +60,29 @@ describe('getEmployee masking (#111)', () => {
 	})
 
 	it('masks (never nulls) for self-view, regardless of the owner being a plain employee', async () => {
-		const e = await getEmployee('emp-1', 'org', { isSelf: true, viewerRole: 'EMPLOYEE' })
+		const e = await getEmployee('emp-1', 'org', { isSelf: true, viewerRoles: ['EMPLOYEE'] })
 		expect(e.bankAccountNumber).toBe('•••• 4321')
 		expect(e.basicMonthlySalary).toBe(MASKED_SALARY)
 	})
 
 	it('nulls sensitive fields for a below-HR viewer who is not the owner', async () => {
-		const e = await getEmployee('emp-1', 'org', { viewerRole: 'EMPLOYEE' })
+		const e = await getEmployee('emp-1', 'org', { viewerRoles: ['EMPLOYEE'] })
 		expect(e.basicMonthlySalary).toBeNull()
 		expect(e.sssNumber).toBeNull()
 		expect(e.bankAccountNumber).toBeNull()
 		expect(e.gcashNumber).toBeNull()
+	})
+
+	// The #279 case: judged on the primary role alone this viewer was EMPLOYEE and got nulls.
+	it('clears the HR floor on a SECONDARY role', async () => {
+		const e = await getEmployee('emp-1', 'org', { viewerRoles: ['EMPLOYEE', 'HR_ADMIN'] })
+		expect(e.basicMonthlySalary).toBe(MASKED_SALARY)
+		expect(e.sssNumber).toBe('•••• 5678')
+	})
+
+	it('masks when the role set is empty rather than falling open', async () => {
+		const e = await getEmployee('emp-1', 'org', { viewerRoles: [] })
+		expect(e.basicMonthlySalary).toBeNull()
 	})
 
 	it('returns the raw record for internal callers that pass no opts', async () => {

@@ -13,7 +13,7 @@ import type { AuditContext } from './types'
 
 async function assertEmployeeInOrg(employeeId: string, organizationId: string) {
 	const emp = await db.employee.findFirst({
-		where: { id: employeeId, user: { organizationId } },
+		where: { id: employeeId, organizationId },
 		select: { id: true }
 	})
 	if (!emp) error(404, 'Employee not found')
@@ -62,33 +62,46 @@ export async function saveEmployeeDocument(
 
 	const saved = await saveFile(input.bytes, input.mimeType, `employees/${employeeId}`)
 
-	const doc = await db.employeeDocument.create({
-		data: {
-			employeeId,
-			category: input.category,
-			label: input.label.trim() || input.fileName,
-			fileName: input.fileName,
-			mimeType: input.mimeType,
-			size: saved.size,
-			storageKey: saved.storageKey,
-			uploadedById: ctx.actorId
-		}
-	})
+	// One transaction (#5): a failed audit write must not leave a stored document unrecorded. The
+	// `saveFile` above stays outside it — the bytes are already on disk before the row exists.
+	return await db.$transaction(async (tx) => {
+		const doc = await tx.employeeDocument.create({
+			data: {
+				employeeId,
+				category: input.category,
+				label: input.label.trim() || input.fileName,
+				fileName: input.fileName,
+				mimeType: input.mimeType,
+				size: saved.size,
+				storageKey: saved.storageKey,
+				uploadedById: ctx.actorId
+			}
+		})
 
-	await writeAuditLog(ctx, {
-		action: 'CREATE',
-		entityType: 'EmployeeDocument',
-		entityId: doc.id,
-		newValue: { employeeId, category: input.category, fileName: input.fileName, size: saved.size }
-	})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'CREATE',
+				entityType: 'EmployeeDocument',
+				entityId: doc.id,
+				newValue: {
+					employeeId,
+					category: input.category,
+					fileName: input.fileName,
+					size: saved.size
+				}
+			},
+			tx
+		)
 
-	return doc
+		return doc
+	})
 }
 
 // Returns the row incl. storageKey so the download route can stream the file.
 export async function getEmployeeDocument(docId: string, organizationId: string) {
 	const doc = await db.employeeDocument.findFirst({
-		where: { id: docId, employee: { user: { organizationId } } }
+		where: { id: docId, employee: { organizationId } }
 	})
 	if (!doc) error(404, 'Document not found')
 	return doc
@@ -100,12 +113,25 @@ export async function deleteEmployeeDocument(
 	ctx: AuditContext
 ) {
 	const doc = await getEmployeeDocument(docId, organizationId)
-	await db.employeeDocument.delete({ where: { id: doc.id } })
-	await deleteStoredFile(doc.storageKey)
-	await writeAuditLog(ctx, {
-		action: 'DELETE',
-		entityType: 'EmployeeDocument',
-		entityId: doc.id,
-		oldValue: { employeeId: doc.employeeId, fileName: doc.fileName }
+
+	// One transaction (#5): a failed audit write must not leave a document deleted with no record
+	// of who deleted it.
+	await db.$transaction(async (tx) => {
+		await tx.employeeDocument.delete({ where: { id: doc.id } })
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'DELETE',
+				entityType: 'EmployeeDocument',
+				entityId: doc.id,
+				oldValue: { employeeId: doc.employeeId, fileName: doc.fileName }
+			},
+			tx
+		)
 	})
+
+	// The unlink runs AFTER the transaction commits, never inside it: a filesystem unlink is not
+	// rollback-able, so a disk error would roll back a delete whose bytes are gone either way.
+	await deleteStoredFile(doc.storageKey)
 }
