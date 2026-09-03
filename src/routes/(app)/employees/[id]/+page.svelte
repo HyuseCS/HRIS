@@ -494,13 +494,19 @@
 				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">Update Profile</h2>
-				{#if form?.success}
+				<!--
+					Gated on form.action: this is the ONLY error slot on a page with 21 actions, so
+					an ungated block painted a failed addLoan (or document delete) into this form.
+					Phase 07 gives every form its own slot; until then an untagged action reports
+					nowhere, which is the lesser harm.
+				-->
+				{#if form?.action === 'update' && form?.success}
 					<div
 						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
 					>
 						Saved.
 					</div>
-				{:else if form?.error}
+				{:else if form?.action === 'update' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
 					>
