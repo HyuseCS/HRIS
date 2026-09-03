@@ -8,6 +8,7 @@
 	import { canAny } from '$lib/rbac'
 	import { buildNavSections, isNavItemActive, APPROVALS_ICON } from '$lib/nav'
 	import { isFoodServiceOrg } from '$lib/orgs'
+	import { visibleSettings } from '$lib/settings-destinations'
 	import type { LayoutData } from './$types'
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props()
@@ -113,10 +114,6 @@
 	// Nav uses the full role set (#133) so a multi-role user sees every entry they hold.
 	const roles = $derived(data.user.roles)
 	const isAdmin = $derived(canAny(roles, 'MANAGE_HR'))
-	const isSuperAdmin = $derived(canAny(roles, 'ADMINISTER_SYSTEM'))
-	// Role assignment is CEO-only (#132); the Roles page also hosts Super Admin's
-	// account-status controls, so it shows for either capability.
-	const canManageUserRoles = $derived(canAny(roles, 'MANAGE_USER_ROLES'))
 	// Approvers (manager ladder + Payroll Officer + sign-off roles) get the dropdown.
 	const canApprove = $derived(canAny(roles, 'APPROVE_REQUESTS'))
 
@@ -135,19 +132,22 @@
 	const allNavHrefs = $derived(navSections.flatMap((s) => s.items.map((i) => i.href)))
 
 	// Settings is a collapsible group; its pages live in this dropdown, not the flat nav.
+	// Labels and capability gating come from $lib/settings-destinations — the same array the
+	// settings hub and sub-nav render, so a destination cannot end up with two names again.
+	// `inSidebar` keeps this group the curated shortlist it has always been; the outer isAdmin
+	// (MANAGE_HR) check below still gates the whole group, which is what destinations with no
+	// capabilities of their own rely on.
 	const settingsChildren = $derived(
-		[
-			// The group header is a toggle, not a link, so without this the settings index
-			// (which lists every card, including pages absent from this list) is unreachable.
-			{ href: '/settings', label: 'All settings', show: isAdmin },
-			{ href: '/settings/company', label: 'Company', show: isAdmin },
-			{ href: '/settings/pay-codes', label: 'Earnings & Deductions', show: isAdmin },
-			{ href: '/settings/salary-grades', label: 'Salary Grades', show: isAdmin },
-			{ href: '/settings/org', label: 'Org Structure', show: isAdmin },
-			{ href: '/settings/schedules', label: 'Schedules', show: isAdmin },
-			{ href: '/settings/roles', label: 'Roles', show: isSuperAdmin || canManageUserRoles },
-			{ href: '/settings/holidays', label: 'Holidays', show: isAdmin }
-		].filter((i) => i.show)
+		isAdmin
+			? [
+					// The group header is a toggle, not a link, so without this the settings index
+					// (which lists every destination, including pages absent from this list) is unreachable.
+					{ href: '/settings', label: 'All settings' },
+					...visibleSettings(roles)
+						.filter((d) => d.inSidebar)
+						.map((d) => ({ href: d.href, label: d.label }))
+				]
+			: []
 	)
 
 	const settingsIcon =
