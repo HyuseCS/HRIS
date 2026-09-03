@@ -1,11 +1,15 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -15,17 +19,6 @@
 		CONDUCT: 'Conduct',
 		PERFORMANCE: 'Performance',
 		OTHER: 'Other'
-	}
-	const STATUS_LABELS: Record<string, string> = {
-		OPEN: 'Awaiting employee',
-		RESPONDED: 'Awaiting HR',
-		RESOLVED: 'Resolved'
-	}
-
-	function statusClass(s: string) {
-		if (s === 'RESOLVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'RESPONDED') return 'bg-blue-500/15 text-blue-400'
-		return 'bg-yellow-500/15 text-yellow-400'
 	}
 
 	const open = createSubmitGuard()
@@ -53,18 +46,16 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">
-				{data.isHr ? 'HR Inquiries' : 'HR Inquiries about you'}
-			</h1>
-			<p class="mt-1 text-sm text-muted-foreground">
-				{data.isHr
-					? 'Raise a question or concern to an employee and track their response.'
-					: 'Questions HR has raised with you. Open one to reply.'}
-			</p>
-		</div>
-		{#if data.isHr}
+	<PageHeader
+		title={data.isHr ? 'HR Inquiries' : 'HR Inquiries about you'}
+		description={data.isHr
+			? 'Raise a question or concern to an employee and track their response.'
+			: 'Questions HR has raised with you. Open one to reply.'}
+	/>
+
+	<!-- The raise action sits directly above the form it opens, not on the title row. -->
+	{#if data.isHr}
+		<div class="flex justify-end">
 			<button
 				type="button"
 				onclick={() => (showForm = !showForm)}
@@ -72,15 +63,11 @@
 			>
 				{showForm ? 'Close' : 'New inquiry'}
 			</button>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	{#if form?.message}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			{form.message}
-		</div>
+		<Banner kind="success" message={form.message} />
 	{/if}
 	{#if form?.error}
 		<div
@@ -226,9 +213,7 @@
 								{CATEGORY_LABELS[c.category] ?? c.category}
 							</td>
 							<td class="px-3 py-2">
-								<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(c.status)}">
-									{STATUS_LABELS[c.status] ?? c.status}
-								</span>
+								<Badge status={c.status} domain="complaint" />
 							</td>
 							<td class="px-3 py-2 text-muted-foreground">{formatShortDate(c.updatedAt)}</td>
 							<td class="px-3 py-2 text-right">
@@ -249,10 +234,13 @@
 			<Pagination meta={data.pagination} />
 		{/if}
 	{:else}
-		<p class="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-			{data.isHr
-				? 'No inquiries yet. Open one to ask an employee about an issue.'
-				: 'No inquiries. HR has not raised anything with you.'}
-		</p>
+		<div class="rounded-md border border-dashed">
+			<EmptyState
+				title="No inquiries yet"
+				description={data.isHr
+					? 'Open one to ask an employee about an issue.'
+					: 'HR has not raised anything with you.'}
+			/>
+		</div>
 	{/if}
 </div>

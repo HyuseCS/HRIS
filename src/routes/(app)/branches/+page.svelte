@@ -1,8 +1,12 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
+	import { BRANCH_STATUS_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -12,7 +16,6 @@
 	const reopenGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
 	const reopenGuard = (id: string) => (reopenGuards[id] ??= createSubmitGuard())
 
-	const STATUS_LABEL: Record<string, string> = { OPEN: 'Open', CLOSED: 'Closed' }
 	const empName = (e: { firstName: string; lastName: string }) => `${e.lastName}, ${e.firstName}`
 
 	const inputClass =
@@ -26,20 +29,13 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Stores</h1>
-		<p class="text-sm text-muted-foreground">
-			Your physical stores — address, contact, branch manager, and who works out of each. Closing a
-			branch keeps its crew on record; it just stops accepting new assignments.
-		</p>
-	</div>
+	<PageHeader
+		title="Stores"
+		description="Your physical stores — address, contact, branch manager, and who works out of each. Closing a branch keeps its crew on record; it just stops accepting new assignments."
+	/>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<!-- Filters -->
@@ -58,7 +54,7 @@
 			<label for="f-status" class="text-xs font-medium text-muted-foreground">Status</label>
 			<select id="f-status" name="status" class="mt-1 {inputClass}">
 				<option value="">All</option>
-				{#each Object.entries(STATUS_LABEL) as [val, label] (val)}
+				{#each Object.entries(BRANCH_STATUS_LABELS) as [val, label] (val)}
 					<option value={val} selected={data.filter.status === val}>{label}</option>
 				{/each}
 			</select>
@@ -116,7 +112,7 @@
 			<div>
 				<label for="a-status" class="text-xs font-medium text-muted-foreground">Status</label>
 				<select id="a-status" name="status" class="mt-1 {inputClass}">
-					{#each Object.entries(STATUS_LABEL) as [val, label] (val)}
+					{#each Object.entries(BRANCH_STATUS_LABELS) as [val, label] (val)}
 						<option value={val}>{label}</option>
 					{/each}
 				</select>
@@ -209,11 +205,7 @@
 									<!-- Status is a badge, not an editable field: changes go through the toggle
 									     below so "closing clears the manager" can't be bypassed by a plain Save. -->
 									<input form="edit-{b.id}" type="hidden" name="status" value={b.status} />
-									<span
-										class="rounded-full px-2 py-0.5 text-[10px] font-medium {b.status === 'OPEN'
-											? 'bg-green-500/15 text-green-400'
-											: 'bg-muted text-muted-foreground'}">{STATUS_LABEL[b.status]}</span
-									>
+									<Badge status={b.status} domain="branch" />
 								</td>
 								<td class="px-3 py-2 text-right">
 									<a href="/employees?branch={b.id}" class="text-primary hover:underline"

@@ -1,7 +1,7 @@
 import { lucia } from '$lib/server/auth'
 import { redirect } from '@sveltejs/kit'
 import { isSessionBlocked } from '$lib/server/access-guard'
-import type { Handle } from '@sveltejs/kit'
+import type { Handle, HandleServerError } from '@sveltejs/kit'
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const sessionId = event.cookies.get(lucia.sessionCookieName)
@@ -46,4 +46,27 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	return resolve(event)
+}
+
+/**
+ * Last line of defence for an unexpected error (phase 04).
+ *
+ * Without this hook SvelteKit hands the client the raw thrown message, which for a Prisma failure
+ * is a multi-line invocation dump naming tables and columns. The user gets a short reference
+ * instead; the detail stays in the server log, where the same ref ties the two together.
+ */
+export const handleError: HandleServerError = ({ error, event, status, message }) => {
+	// A 404 is not a bug — "Not Found" is the honest message and needs no reference.
+	if (status === 404) return { message }
+
+	const ref = crypto.randomUUID().slice(0, 8)
+	console.error('[error]', {
+		ref,
+		message: error instanceof Error ? error.message : String(error),
+		stack: error instanceof Error ? error.stack : undefined,
+		url: event.url.pathname,
+		userId: event.locals.user?.id ?? null
+	})
+
+	return { message: `Something went wrong. (Ref: ${ref})` }
 }

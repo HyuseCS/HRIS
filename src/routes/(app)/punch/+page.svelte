@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { onMount, tick } from 'svelte'
 	import { enhance } from '$app/forms'
 	import PunchMapDialog from '$lib/components/timesheets/PunchMapDialog.svelte'
@@ -197,12 +198,7 @@
 <svelte:head><title>Punch — Veent HRIS</title></svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div>
-		<h1 class="text-2xl font-semibold">Punch</h1>
-		{#if data.linked}
-			<p class="text-sm text-muted-foreground">{data.employeeName}</p>
-		{/if}
-	</div>
+	<PageHeader title="Punch" description={data.linked ? data.employeeName : undefined} />
 
 	{#if !data.linked}
 		<!-- #177 M-7 — rendered inside the app shell, so the nav is still there. -->

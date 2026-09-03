@@ -1,9 +1,11 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -134,13 +136,10 @@
 							<td class="px-4 py-2 text-muted-foreground">{pos.salaryGrade?.name ?? '—'}</td>
 							<td class="px-4 py-2 text-muted-foreground">{pos._count.employees}</td>
 							<td class="px-4 py-2">
-								<span
-									class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {pos.isActive
-										? 'bg-green-500/15 text-green-400'
-										: 'bg-gray-500/15 text-gray-400'}"
-								>
-									{pos.isActive ? 'ACTIVE' : 'INACTIVE'}
-								</span>
+								<Badge
+									status={pos.isActive ? 'ACTIVE' : 'INACTIVE'}
+									tone={pos.isActive ? 'green' : 'gray'}
+								/>
 							</td>
 							<td class="w-[1%] whitespace-nowrap px-4 py-2 text-right">
 								<button
@@ -245,9 +244,7 @@
 						{/if}
 					{:else}
 						<tr>
-							<td colspan="7" class="px-4 py-8 text-center text-muted-foreground"
-								>No positions defined</td
-							>
+							<td colspan="7" class="p-0"><EmptyState title="No positions defined" /></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -306,9 +303,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No employees found</td
-							>
+							<td colspan="5" class="p-0"><EmptyState title="No employees found" /></td>
 						</tr>
 					{/each}
 				</tbody>

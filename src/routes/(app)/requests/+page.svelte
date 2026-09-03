@@ -1,5 +1,10 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import { page } from '$app/stores'
+	import Banner from '$lib/components/ui/Banner.svelte'
+	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import { goto } from '$app/navigation'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
@@ -7,6 +12,7 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -32,7 +38,10 @@
 	const submitted = (form as { values?: Record<string, string> } | null)?.values
 
 	let selectedType = $state(submitted?.type ?? 'LEAVE')
-	let showForm = $state(Boolean(submitted))
+	// `?new=leave` is what the retired /leave/new door now redirects to (phase 6, S2): it opens the
+	// already-existing form on the type this page already defaults to. Read once at mount, like
+	// `submitted` above.
+	let showForm = $state(Boolean(submitted) || $page.url.searchParams.get('new') === 'leave')
 
 	// Per-field validation errors returned by the create action (zod fieldErrors).
 	const fieldErrors = $derived(
@@ -71,14 +80,6 @@
 	}
 	const resubmitGuard = rowGuards()
 	const cancelGuard = rowGuards()
-
-	function statusClass(s: string) {
-		if (s === 'APPROVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'REJECTED') return 'bg-red-500/15 text-red-400'
-		if (s === 'RETURNED') return 'bg-orange-500/15 text-orange-400'
-		if (s === 'CANCELLED') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 </script>
 
 <svelte:head>
@@ -91,42 +92,32 @@
 {/snippet}
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">My Requests</h1>
-			<p class="text-sm text-muted-foreground">File and track your requests.</p>
-		</div>
-		{#if data.hasEmployee}
+	<PageHeader title="My Requests" description="File and track your requests." />
+
+	<!-- The file action sits directly above the form it opens, not on the title row. -->
+	{#if data.hasEmployee}
+		<div class="flex justify-end">
 			<button
 				onclick={() => (showForm = !showForm)}
 				class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 			>
 				{showForm ? 'Close' : 'New Request'}
 			</button>
-		{/if}
-	</div>
-
-	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
 		</div>
 	{/if}
+
+	{#if form?.error}
+		<Banner kind="error" message={form.error} />
+	{/if}
 	{#if form?.message}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
-		>
-			{form.message}
-		</div>
+		<Banner kind="success" message={form.message} />
 	{/if}
 
 	{#if !data.hasEmployee}
-		<div
-			class="rounded-md border border-yellow-500/20 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-600 dark:text-yellow-400"
-		>
-			Your account has no employee profile, so you can't file requests.
-		</div>
+		<Banner
+			kind="warning"
+			message="Your account has no employee profile, so you can't file requests."
+		/>
 	{/if}
 
 	{#if showForm && data.hasEmployee}
@@ -152,6 +143,9 @@
 			</div>
 
 			{#if selectedType === 'LEAVE'}
+				{#if data.balances.length}
+					<BalanceSummary balances={data.balances} />
+				{/if}
 				<div class="grid gap-1.5">
 					<label for="leaveTypeId" class="text-sm font-medium">Leave type {@render req()}</label>
 					<select
@@ -419,9 +413,7 @@
 							{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
 						</td>
 						<td class="px-4 py-3">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(req.status)}"
-								>{req.status}</span
-							>
+							<Badge status={req.status} domain="request" />
 						</td>
 						<td class="px-4 py-3 text-right text-muted-foreground"
 							>{formatShortDate(req.createdAt)}</td
@@ -456,11 +448,7 @@
 						</td>
 					</tr>
 				{:else}
-					<tr
-						><td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No requests yet.</td
-						></tr
-					>
+					<tr><td colspan="6" class="p-0"><EmptyState title="No requests yet" /></td></tr>
 				{/each}
 			</tbody>
 		</table>

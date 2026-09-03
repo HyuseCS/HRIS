@@ -1,11 +1,15 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showOpen = $state(false)
@@ -13,24 +17,16 @@
 	// #108: a double-submitted period open creates a duplicate payroll period.
 	const openPeriod = createSubmitGuard()
 
-	// #108: the row actions (import/generate/lock/release/void) live inside an {#each}, so each
-	// row needs its OWN guard — a single shared one would disable every row's button at once.
-	// Memoised by `${periodId}:${action}` so the identity is stable across re-renders.
+	// #108: the row actions (import/generate/lock) live inside an {#each}, so each row needs its
+	// OWN guard — a single shared one would disable every row's button at once. Memoised by
+	// `${periodId}:${action}` so the identity is stable across re-renders.
+	// Release and void are NOT here: ConfirmButton renders its own form with its own per-instance
+	// busy state, which is already a per-row single-submit guard.
 	const guards = new Map<string, ReturnType<typeof createSubmitGuard>>()
 	function guard(key: string) {
 		let g = guards.get(key)
 		if (!g) guards.set(key, (g = createSubmitGuard()))
 		return g
-	}
-
-	// Theme-aware status pills (#76) — see the .badge-* classes in app.css.
-	const badge: Record<string, string> = {
-		OPEN: 'badge-gray',
-		IMPORTED: 'badge-blue',
-		GENERATED: 'badge-blue',
-		LOCKED: 'badge-yellow',
-		RELEASED: 'badge-green',
-		VOIDED: 'badge-red'
 	}
 </script>
 
@@ -39,7 +35,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Payroll Periods">
+	<PageHeader
+		title="Payroll Periods"
+		description="A period is the pay window. Locking a period creates the payroll run that computes and approves its pay."
+	>
 		{#snippet back()}
 			<BackButton fallback="/payroll" label="Payroll" />
 		{/snippet}
@@ -51,6 +50,12 @@
 		>
 			{form.error}
 		</div>
+	{/if}
+
+	<!-- Page-level, like the error block above. Only ?/release and ?/void populate `saved` for
+	     now; open/import/generate/lock stay silent until the phase-04 feedback contract. -->
+	{#if form?.saved}
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if showOpen}
@@ -123,11 +128,11 @@
 							<td class="px-4 py-3 text-muted-foreground"
 								>{formatShortDate(p.startDate)} – {formatShortDate(p.endDate)}</td
 							>
-							<td class="px-4 py-3 text-right font-mono"
+							<td class="px-4 py-3 text-right font-mono tabular-nums"
 								>{run ? formatCurrency(Number(run.totalNet)) : '—'}</td
 							>
 							<td class="px-4 py-3">
-								<span class={badge[p.status] ?? 'badge-gray'}>{p.status}</span>
+								<Badge status={p.status} domain="payrollPeriod" />
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex flex-wrap items-center justify-end gap-2">
@@ -179,38 +184,47 @@
 										</form>
 									{/if}
 									{#if p.status === 'LOCKED'}
-										{@const releaseG = guard(`${p.id}:release`)}
-										<form method="POST" action="?/release" use:enhance={releaseG.enhance}>
+										<!-- #108: no per-row `guard()` here — ConfirmButton owns its own form and its
+										     own per-instance busy state, which disables this row's trigger while the
+										     release is in flight. That IS the double-submit guard. -->
+										<ConfirmButton
+											action="?/release"
+											title="Release this period to employees?"
+											message="Every payslip in this period becomes visible to the employee it belongs to. Releasing cannot be undone — the only way back is to void the period."
+											confirmText="Release"
+											triggerLabel="Release"
+											triggerClass="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
+										>
 											<input type="hidden" name="id" value={p.id} />
-											<button
-												disabled={releaseG.busy}
-												class="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
-												>{releaseG.busy ? 'Releasing…' : 'Release'}</button
-											>
-										</form>
+										</ConfirmButton>
 									{/if}
 									{#if run}
-										<a href="/payroll/{run.id}" class="btn-row">Detail</a>
+										<a
+											href="/payroll/{run.id}"
+											title="Opens the payroll run for this period"
+											class="btn-row">View run</a
+										>
 									{/if}
 									{#if data.canVoid && p.status !== 'VOIDED'}
-										{@const voidG = guard(`${p.id}:void`)}
-										<form method="POST" action="?/void" use:enhance={voidG.enhance}>
+										<!-- #108: same as release above — ConfirmButton's per-instance busy state is
+										     this row's double-submit guard, so no `guard()` entry is needed. -->
+										<ConfirmButton
+											action="?/void"
+											title="Void this payroll period?"
+											message="The period is marked VOIDED and any loan or cash-advance amortization it collected is credited back to the employees. This cannot be undone, and the same date range cannot be used again."
+											confirmText="Void period"
+											triggerLabel="Void"
+											triggerClass="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
+										>
 											<input type="hidden" name="id" value={p.id} />
-											<button
-												disabled={voidG.busy}
-												class="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
-												>{voidG.busy ? 'Voiding…' : 'Void'}</button
-											>
-										</form>
+										</ConfirmButton>
 									{/if}
 								</div>
 							</td>
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No payroll periods yet</td
-							>
+							<td colspan="5" class="p-0"><EmptyState title="No payroll periods yet" /></td>
 						</tr>
 					{/each}
 				</tbody>

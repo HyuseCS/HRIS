@@ -1,9 +1,12 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { manilaDateTime } from '$lib/utils/dates'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -13,16 +16,6 @@
 		CONDUCT: 'Conduct',
 		PERFORMANCE: 'Performance',
 		OTHER: 'Other'
-	}
-	const STATUS_LABELS: Record<string, string> = {
-		OPEN: 'Awaiting employee',
-		RESPONDED: 'Awaiting HR',
-		RESOLVED: 'Resolved'
-	}
-	function statusClass(s: string) {
-		if (s === 'RESOLVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'RESPONDED') return 'bg-blue-500/15 text-blue-400'
-		return 'bg-yellow-500/15 text-yellow-400'
 	}
 
 	const complaint = $derived(data.complaint)
@@ -45,34 +38,22 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div>
-		<a href="/complaints" class="text-sm text-muted-foreground hover:text-foreground"
-			>← Back to inquiries</a
-		>
-	</div>
-
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">{complaint.subject}</h1>
-			<p class="mt-1 text-sm text-muted-foreground">
-				{CATEGORY_LABELS[complaint.category] ?? complaint.category}
-				· For {complaint.employee.firstName}
-				{complaint.employee.lastName} ({complaint.employee.employeeNumber}) · Opened {formatShortDate(
-					complaint.createdAt
-				)}
-			</p>
-		</div>
-		<span class="rounded-full px-3 py-1 text-xs font-medium {statusClass(complaint.status)}">
-			{STATUS_LABELS[complaint.status] ?? complaint.status}
-		</span>
-	</div>
+	<PageHeader
+		title={complaint.subject}
+		description="{CATEGORY_LABELS[complaint.category] ?? complaint.category} · For {complaint
+			.employee.firstName} {complaint.employee.lastName} ({complaint.employee
+			.employeeNumber}) · Opened {formatShortDate(complaint.createdAt)}"
+	>
+		{#snippet back()}
+			<Badge status={complaint.status} domain="complaint" />
+			<a href="/complaints" class="text-sm text-muted-foreground hover:text-foreground"
+				>← Back to inquiries</a
+			>
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.message}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			{form.message}
-		</div>
+		<Banner kind="success" message={form.message} />
 	{/if}
 	{#if form?.error}
 		<div

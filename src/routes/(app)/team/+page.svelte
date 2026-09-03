@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
@@ -9,14 +11,37 @@
 	// svelte-ignore state_referenced_locally
 	let endValue = $state(data.endDate)
 
-	// AttendanceDay.status → cell badge (short code, colour, legend label). Order drives the legend.
+	// AttendanceDay.status → calendar cell (short code, colour, legend label). Order drives the
+	// legend. These stay one-or-two-letter cells rather than <Badge>: the grid sizes on the code,
+	// and a full label would not fit. Only the colours are theme-paired here — the `-400` step
+	// alone is below AA on the light card, which is the same defect the badge tokens had.
 	const STATUS: Record<string, { code: string; label: string; class: string }> = {
-		PRESENT: { code: 'P', label: 'Present', class: 'bg-green-500/15 text-green-400' },
-		LATE: { code: 'LT', label: 'Late', class: 'bg-amber-500/15 text-amber-400' },
-		INCOMPLETE: { code: 'IN', label: 'Incomplete', class: 'bg-orange-500/15 text-orange-400' },
-		ABSENT: { code: 'A', label: 'Absent', class: 'bg-red-500/15 text-red-400' },
-		ON_LEAVE: { code: 'LV', label: 'On Leave', class: 'bg-blue-500/15 text-blue-400' },
-		HOLIDAY: { code: 'H', label: 'Holiday', class: 'bg-purple-500/15 text-purple-400' },
+		PRESENT: {
+			code: 'P',
+			label: 'Present',
+			class: 'bg-green-500/15 text-green-800 dark:text-green-400'
+		},
+		LATE: {
+			code: 'LT',
+			label: 'Late',
+			class: 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
+		},
+		INCOMPLETE: {
+			code: 'IN',
+			label: 'Incomplete',
+			class: 'bg-orange-500/15 text-orange-800 dark:text-orange-400'
+		},
+		ABSENT: { code: 'A', label: 'Absent', class: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+		ON_LEAVE: {
+			code: 'LV',
+			label: 'On Leave',
+			class: 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+		},
+		HOLIDAY: {
+			code: 'H',
+			label: 'Holiday',
+			class: 'bg-purple-500/15 text-purple-800 dark:text-purple-400'
+		},
 		REST_DAY: { code: 'R', label: 'Rest Day', class: 'bg-muted text-muted-foreground' }
 	}
 	// The dash cell = no AttendanceDay record for that day (no punch / not yet derived).
@@ -29,22 +54,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-start justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">
-				{data.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day
-				across a date range.
-			</p>
-		</div>
-		<a
-			href="/attendance?view=team"
-			class="whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-			>Daily roster &amp; corrections →</a
-		>
-	</div>
+	<PageHeader
+		title={data.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
+		description="Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across a date range."
+	/>
 
 	<!-- Date range filter -->
 	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-md border p-4">
@@ -72,6 +85,11 @@
 				class="flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
+		<a
+			href="/attendance?view=team"
+			class="ml-auto whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+			>Daily roster &amp; corrections →</a
+		>
 	</form>
 
 	<!-- Legend -->
@@ -89,8 +107,8 @@
 
 	<!-- Attendance table -->
 	{#if data.members.length === 0}
-		<div class="rounded-md border bg-muted/50 px-6 py-12 text-center text-muted-foreground text-sm">
-			No team members found.
+		<div class="rounded-md border bg-muted/50">
+			<EmptyState title="No team members found" />
 		</div>
 	{:else}
 		<div class="overflow-x-auto rounded-md border">
