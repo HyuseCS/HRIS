@@ -46,3 +46,28 @@ the repo-wide zero-raw-enum grep gate become the real gate.
 Files outside phase 08's blast radius: `payroll/periods`, `payslips`, `benefits`, `profile`,
 `settings/backup`, `dashboard`, `recruitment/[id]`, `attendance` (render sites).
 New API surface: N/A — presentation only.
+
+## Drift correction — measured 2026-09-03 at phase 08 S1 execution
+
+The counts above were taken at `5e5cdfe`, before phases 01-07 landed. They are now stale, and the
+gap is much smaller than "~13".
+
+Phase 03 built `src/lib/labels.ts` with **all 25** enum maps, wired them into `Badge`, and adopted
+`Badge` across most list pages. Phase 08 S1 cleared the last three sites its own scope named. A
+repo-wide scan (same regex the phase 08 gate uses) now finds **four** raw enum renders left:
+
+| File | Enum |
+|---|---|
+| `benefits/+page.svelte` | benefit enrollment status |
+| `dashboard/+page.svelte` | payroll run status (last run) |
+| `payslips/+page.svelte` | payroll run status |
+| `recruitment/[id]/+page.svelte` | job posting status |
+
+`src/routes/+error.svelte` renders `{$page.status}` — an HTTP status code, not a database enum, and
+correctly rendered as a number. Not a target.
+
+Every one of the four already has a finished, exhaustively-tested map in `$lib/labels.ts`
+(`BENEFIT_ENROLLMENT_STATUS_LABELS`, `PAYROLL_RUN_STATUS_LABELS`, `JOB_POSTING_STATUS_LABELS`), so
+this is no longer "map six more enums" — it is four one-line `labelFor(...)` swaps plus widening the
+adoption scan in `tests/unit/labels.test.ts` from its eight named files to repo-wide. That is a
+small, single-commit follow-up, not the S1-sized second plan described above.
