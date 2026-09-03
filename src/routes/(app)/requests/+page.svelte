@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import { goto } from '$app/navigation'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
@@ -100,26 +101,17 @@
 	</div>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 	{#if form?.message}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
-		>
-			{form.message}
-		</div>
+		<Banner kind="success" message={form.message} />
 	{/if}
 
 	{#if !data.hasEmployee}
-		<div
-			class="rounded-md border border-yellow-500/20 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-600 dark:text-yellow-400"
-		>
-			Your account has no employee profile, so you can't file requests.
-		</div>
+		<Banner
+			kind="warning"
+			message="Your account has no employee profile, so you can't file requests."
+		/>
 	{/if}
 
 	{#if showForm && data.hasEmployee}

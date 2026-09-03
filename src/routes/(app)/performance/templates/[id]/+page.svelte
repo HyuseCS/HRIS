@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { tick } from 'svelte'
 	import { applyAction, enhance } from '$app/forms'
 	import { beforeNavigate, goto } from '$app/navigation'
@@ -261,14 +262,12 @@
 		</div>
 	{:else if draft}
 		{#if data.openReviewCount > 0}
-			<p
-				class="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-700 dark:text-yellow-300"
-			>
+			<Banner kind="warning">
 				{data.openReviewCount}
 				{data.openReviewCount === 1 ? 'review is' : 'reviews are'} already open against this template.
 				Editing it here does not change them: each review carries its own snapshot of the form it was
 				opened with.
-			</p>
+			</Banner>
 		{/if}
 
 		<!-- Segmented Editor/Preview switch — below xl only. -->

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDateRange, formatShortDate, formatDate } from '$lib/utils/format'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -192,18 +193,10 @@
 		<h2 class="text-lg font-semibold">Supporting documents</h2>
 
 		{#if form?.error}
-			<div
-				class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-			>
-				{form.error}
-			</div>
+			<Banner kind="error" message={form.error} />
 		{/if}
 		{#if form?.message}
-			<div
-				class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
-			>
-				{form.message}
-			</div>
+			<Banner kind="success" message={form.message} />
 		{/if}
 
 		{#if req.documents.length === 0}
@@ -347,11 +340,7 @@
 		     their queue by design (AC-15/AC-21/US-8). This page is where they come to ask why, and
 		     it has no decide control to disable, so the explanation stands on its own. -->
 		{#if data.actBlockedReason}
-			<p
-				class="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400"
-			>
-				{data.actBlockedReason}
-			</p>
+			<Banner kind="warning" message={data.actBlockedReason} />
 		{/if}
 
 		<!-- Origin: the employee's own submission, so "HR pending" doesn't read as if

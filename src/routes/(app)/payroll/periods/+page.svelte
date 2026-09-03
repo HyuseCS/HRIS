@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -48,11 +49,7 @@
 	<!-- Page-level, like the error block above. Only ?/release and ?/void populate `saved` for
 	     now; open/import/generate/lock stay silent until the phase-04 feedback contract. -->
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if showOpen}

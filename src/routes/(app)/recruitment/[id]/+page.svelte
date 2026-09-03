@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import ApplicantKanban from '$lib/components/recruitment/ApplicantKanban.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { canAny } from '$lib/rbac'
@@ -148,13 +149,11 @@
 
 			<!-- Close-the-loop: a CLOSED role still live somewhere needs a takedown. -->
 			{#if stillLive.length > 0}
-				<div
-					class="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-400"
-				>
+				<Banner kind="warning">
 					This posting is <span class="font-medium">closed</span> but still live on
 					{stillLive.map((b) => b.name).join(', ')}. Take it down there so a filled role stops
 					collecting applicants.
-				</div>
+				</Banner>
 			{/if}
 
 			{#if boards.length === 0}
