@@ -105,6 +105,42 @@ export async function createOrgFixture() {
 }
 
 /**
+ * A throwaway Employee under an existing fixture org, with the Department and User it requires.
+ * Only the columns the schema makes mandatory are set — everything else stays at its default.
+ *
+ * The employee reuses the org fixture's actor User rather than creating a second one:
+ * `Employee.userId` is unique, one user per employee is all the schema wants, and the actor is
+ * already the marker-carrying HR_ADMIN this suite acts as. Nothing here weakens a guard —
+ * `createTimesheet` authorizes nothing itself (the routes do), so the ctx role is only what the
+ * audit row records.
+ *
+ * `employeeNumber` carries MARKER and a timestamp so `@@unique([organizationId, employeeNumber])`
+ * cannot collide with seed data or with a stranded row from a crashed earlier run.
+ */
+export async function createEmployeeFixture(organizationId: string, actorId: string) {
+	const dept = await verifyDb.department.create({
+		data: { organizationId, name: `${MARKER} dept ${Date.now()}` },
+		select: { id: true }
+	})
+	const employee = await verifyDb.employee.create({
+		data: {
+			userId: actorId,
+			organizationId,
+			departmentId: dept.id,
+			employeeNumber: `${MARKER}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+			firstName: 'Fixture',
+			lastName: 'Employee',
+			jobTitle: 'Tester',
+			employmentType: 'REGULAR',
+			startDate: new Date('2019-01-01T00:00:00Z'),
+			basicMonthlySalary: 20000
+		},
+		select: { id: true }
+	})
+	return employee.id
+}
+
+/**
  * Delete every marker-carrying row, in foreign-key-safe order. `AuditLog` and `User` both
  * reference `Organization` WITHOUT cascade, so they must go first or the org delete throws
  * and the fixtures accumulate silently. `BackupConfig` cascades with the org.
@@ -112,6 +148,11 @@ export async function createOrgFixture() {
  * `AttendanceDay` and `TimeLog` reference `Employee`, `Employee` references `User` and
  * `Department`, and `Department` references `Organization` — all without cascade — so the
  * attendance fixtures unwind innermost-first, and Employee must go before User.
+ *
+ * `Timesheet` references `Employee` without cascade, and `ApprovalStep` and `TimeLog` both
+ * reference `Timesheet` — so timesheets go BEFORE the employee delete and AFTER the time logs,
+ * or the employee delete throws on the foreign key and every fixture from the timesheet suite
+ * accumulates silently. `TimesheetEntry` cascades with its timesheet and needs no line of its own.
  *
  * `PayrollRun` also references `Organization` without cascade, and `PayrollEntry` and
  * `ApprovalStep` reference `PayrollRun`. Added for the run-serialisation suite: without this the
@@ -136,6 +177,15 @@ export async function cleanupFixtures() {
 		const employeeId = { in: employees.map((e) => e.id) }
 		await verifyDb.attendanceDay.deleteMany({ where: { employeeId } })
 		await verifyDb.timeLog.deleteMany({ where: { employeeId } })
+		const sheets = await verifyDb.timesheet.findMany({
+			where: { employeeId },
+			select: { id: true }
+		})
+		if (sheets.length > 0) {
+			const timesheetId = { in: sheets.map((t) => t.id) }
+			await verifyDb.approvalStep.deleteMany({ where: { timesheetId } })
+			await verifyDb.timesheet.deleteMany({ where: { id: timesheetId } })
+		}
 		await verifyDb.employee.deleteMany({ where: { id: employeeId } })
 	}
 
