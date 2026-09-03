@@ -186,16 +186,15 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.postings as jp (jp.id)}
+					<!-- R1: the real link lives in the title cell; the whole-row click is a mouse
+					     convenience only. Dropping the row key handler is item 24's fix at the root —
+					     Space on the row's DRAFT checkbox toggled the box AND navigated away, losing the
+					     selection, because the checkbox cell stopped `click` but not `keydown`. -->
 					<tr
 						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
-						onclick={() => goto(`/recruitment/${jp.id}`)}
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/recruitment/${jp.id}`)
-							}
+						onclick={(e) => {
+							if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+							goto(`/recruitment/${jp.id}`)
 						}}
 					>
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
@@ -209,7 +208,11 @@
 							{/if}
 						</td>
 						<td class="px-4 py-3 font-medium">
-							{jp.title}
+							<a
+								href="/recruitment/{jp.id}"
+								class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>{jp.title}</a
+							>
 							{#if jp.status === 'DRAFT' && jp.rejectionReason}
 								<span class="block text-xs font-normal text-red-400"
 									>Sent back: {jp.rejectionReason}</span

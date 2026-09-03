@@ -154,11 +154,17 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each rows as ts (ts.id)}
+						<!-- R1 carve-out (item 22): this row opens a modal, not a URL, so there is nothing
+						     to put in an <a href>. The period cell carries a real <button> instead. Dropping
+						     the row's tabindex and key handler is also item 23's fix at the root — the old
+						     handler had no preventDefault, so Space both opened the modal and scrolled the
+						     page, and it fired for Space on the row's selection checkbox too. -->
 						<tr
-							onclick={() => openReview(ts)}
-							onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openReview(ts)}
-							tabindex="0"
-							class={`cursor-pointer hover:bg-muted/30 focus:bg-muted/40 focus:outline-none ${selectedIds.includes(ts.id) ? 'bg-primary/5' : ''}`}
+							onclick={(e) => {
+								if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+								openReview(ts)
+							}}
+							class={`cursor-pointer hover:bg-muted/30 ${selectedIds.includes(ts.id) ? 'bg-primary/5' : ''}`}
 						>
 							{#if data.canModify}
 								<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
@@ -174,9 +180,17 @@
 							{#if showEmployee}
 								<td class="truncate px-4 py-3">{ts.employee.lastName}, {ts.employee.firstName}</td>
 							{/if}
-							<td class="px-4 py-3 whitespace-nowrap"
-								>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</td
-							>
+							<td class="px-4 py-3 whitespace-nowrap">
+								<button
+									type="button"
+									onclick={() => openReview(ts)}
+									aria-label="Review timesheet for {formatShortDate(
+										ts.periodStart
+									)} to {formatShortDate(ts.periodEnd)}"
+									class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</button
+								>
+							</td>
 							<td class="px-4 py-3 text-right tabular-nums"
 								>{Number(ts.totalHours).toFixed(2)} hrs</td
 							>

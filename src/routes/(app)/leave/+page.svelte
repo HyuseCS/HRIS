@@ -142,22 +142,15 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.requests as req (req.id)}
+					<!-- R1: the real link lives in the leave-type cell; the whole-row click is a mouse
+					     convenience only, and the row carries no key handler so Space on the selection
+					     checkbox can no longer navigate away. -->
 					<tr
-						class={`cursor-pointer hover:bg-muted/30 focus:bg-muted/40 focus:outline-none ${selected.includes(req.id) ? 'bg-primary/5' : ''}`}
-						role="link"
-						tabindex="0"
-						aria-label={`Open ${leaveName(req.payload)} request`}
+						class={`cursor-pointer hover:bg-muted/30 ${selected.includes(req.id) ? 'bg-primary/5' : ''}`}
 						onclick={(e) => {
-							// Don't navigate when the click is on the row's selection checkbox.
-							if ((e.target as HTMLElement).closest('input, label')) return
+							// Don't navigate when the click is on the row's selection checkbox or its link.
+							if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
 							goto(`/requests/${req.id}`)
-						}}
-						onkeydown={(e) => {
-							if ((e.target as HTMLElement).closest('input, label')) return
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/requests/${req.id}`)
-							}
 						}}
 					>
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
@@ -172,7 +165,14 @@
 						{#if data.isManager}
 							<td class="px-4 py-3">{req.employee.lastName}, {req.employee.firstName}</td>
 						{/if}
-						<td class="px-4 py-3 font-medium">{leaveName(req.payload)}</td>
+						<td class="px-4 py-3 font-medium">
+							<a
+								href="/requests/{req.id}"
+								aria-label={`Open ${leaveName(req.payload)} request`}
+								class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>{leaveName(req.payload)}</a
+							>
+						</td>
 						<td class="px-4 py-3 text-muted-foreground">
 							{#if req.dateFrom}
 								{formatDateRange(req.dateFrom, req.dateTo)}

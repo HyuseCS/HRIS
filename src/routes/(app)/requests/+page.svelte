@@ -396,24 +396,23 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.requests as req (req.id)}
+					<!-- R1: the real link lives in the type cell; the whole-row click is a mouse
+					     convenience only. -->
 					<tr
 						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
 						onclick={(e) => {
 							// Let the row's action buttons (Resubmit/Cancel) fire without also navigating.
-							if ((e.target as HTMLElement).closest('button, a, form')) return
+							if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
 							goto(`/requests/${req.id}`)
 						}}
-						onkeydown={(e) => {
-							if ((e.target as HTMLElement).closest('button, a, form')) return
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/requests/${req.id}`)
-							}
-						}}
 					>
-						<td class="px-4 py-3 font-medium">{typeLabel(req.type)}</td>
+						<td class="px-4 py-3 font-medium">
+							<a
+								href="/requests/{req.id}"
+								class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>{typeLabel(req.type)}</a
+							>
+						</td>
 						<td class="px-4 py-3 text-muted-foreground">
 							{#if req.dateFrom}
 								{formatDateRange(req.dateFrom, req.dateTo)}

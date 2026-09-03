@@ -109,20 +109,22 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each employees as emp (emp.id)}
+						<!-- R1: the real link lives in the name cell. The whole-row click stays as a mouse
+						     convenience only — the row is not focusable and carries no key handler, so a
+						     keyboard reader gets a plain table row containing a link. -->
 						<tr
 							class="cursor-pointer hover:bg-muted/30"
-							role="link"
-							tabindex="0"
-							onclick={() => goto(`/employees/${emp.id}`)}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault()
-									goto(`/employees/${emp.id}`)
-								}
+							onclick={(e) => {
+								if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+								goto(`/employees/${emp.id}`)
 							}}
 						>
 							<td class="px-4 py-3">
-								<div class="font-medium">{emp.lastName}, {emp.firstName}</div>
+								<a
+									href="/employees/{emp.id}"
+									class="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									>{emp.lastName}, {emp.firstName}</a
+								>
 								<div class="text-xs text-muted-foreground">{emp.employeeNumber}</div>
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">{emp.department.name}</td>
