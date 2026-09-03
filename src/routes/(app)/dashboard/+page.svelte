@@ -8,6 +8,7 @@
 	import AnnouncementItem from '$lib/components/dashboard/AnnouncementItem.svelte'
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -45,6 +46,33 @@
 		leave: 'bg-sky-400'
 	}
 	const metrics = $derived(data.metrics)
+
+	// "Awaiting you" rows. SCOPING GUARANTEE: every count here comes from the single
+	// `countPendingApprovals` call already made by this page's load — the same service the sidebar
+	// badge and the four inbox pages read, whose per-domain queries ARE those pages' own queries
+	// (listPendingRequestsForApprover / countActionableTimesheets / countActionablePayrollRuns /
+	// listActionableProposals), and which short-circuits to all-zeros for anyone without
+	// APPROVE_REQUESTS (approvals.ts). This block issues NO query of its own and computes no count,
+	// so it cannot widen scope and cannot disagree with the pages it links to.
+	const awaiting = $derived(
+		[
+			{ n: metrics.pendingRequests, href: '/requests/approvals', one: 'request', many: 'requests' },
+			{
+				n: metrics.pendingTimesheets,
+				href: '/requests/timesheets',
+				one: 'timesheet',
+				many: 'timesheets'
+			},
+			{
+				n: metrics.pendingProposals,
+				href: '/requests/proposals',
+				one: 'pay change',
+				many: 'pay changes'
+			},
+			{ n: metrics.pendingPayrollRuns, href: '/payroll', one: 'payroll run', many: 'payroll runs' }
+		].filter((row) => row.n > 0)
+	)
+
 	let showPost = $state(false)
 
 	// Per-posting guards + a reject-note toggle for the approval card (#195).
@@ -689,6 +717,29 @@
 					</li>
 				{/each}
 			</ul>
+		</div>
+	{/if}
+
+	<!-- Awaiting you — one door to the four approval inboxes. Hidden entirely at zero, matching the
+	     status card's rule that "0 pending" is noise on a surface whose job is to say what needs
+	     doing. -->
+	{#if metrics.pendingApprovals > 0}
+		<div class="card space-y-3">
+			<h2 class="text-sm font-semibold text-foreground">Awaiting you</h2>
+			<div class="space-y-1">
+				{#each awaiting as row (row.href)}
+					<a
+						href={row.href}
+						class="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-sm transition-colors hover:text-primary"
+					>
+						<span class="flex items-center gap-2">
+							<Badge status="pending" tone="blue" label={String(row.n)} />
+							<span>{row.n === 1 ? row.one : row.many}</span>
+						</span>
+						<span aria-hidden="true" class="text-muted-foreground">→</span>
+					</a>
+				{/each}
+			</div>
 		</div>
 	{/if}
 

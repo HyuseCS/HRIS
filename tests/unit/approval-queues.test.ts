@@ -286,4 +286,108 @@ describe('countPendingApprovals — the sidebar badge (#283/US-8)', () => {
 		expect(counts.requests).toBe(1)
 		expect(counts.total).toBe(1)
 	})
+
+	// Phase 6 / D3. The dashboard "Awaiting you" block renders one row per domain and the nav pill
+	// renders `total`; if `total` were anything but the four domains' sum the two would disagree on
+	// the same screen. Asserted with every domain non-zero — a sum over four zeros is vacuous.
+	it('reports a total that is exactly the sum of its four domains', async () => {
+		dbMock.request.findMany.mockImplementation(async (args: never) =>
+			projectDocs([requestAt('r1', 'user-else')], args)
+		)
+		dbMock.timesheet.findMany.mockImplementation(async (args: never) =>
+			projectSteps(
+				[
+					{
+						employeeId: 'emp-someone',
+						approvalSteps: [
+							{
+								attempt: 1,
+								stageIndex: 0,
+								stage: 'VERIFY',
+								decision: 'APPROVED',
+								actorId: 'user-else'
+							},
+							{ attempt: 1, stageIndex: 1, stage: 'APPROVE', decision: null, actorId: null }
+						]
+					}
+				],
+				args
+			)
+		)
+		dbMock.payrollRun.findMany.mockImplementation(async (args: never) =>
+			projectSteps(
+				[
+					{
+						approvalSteps: [
+							{
+								id: 'm',
+								attempt: 1,
+								stageIndex: 0,
+								stage: 'MAKE',
+								decision: 'APPROVED',
+								actorId: 'user-maker'
+							},
+							{
+								id: 'v',
+								attempt: 1,
+								stageIndex: 1,
+								stage: 'VERIFY',
+								decision: 'APPROVED',
+								actorId: 'user-else'
+							},
+							{
+								id: 'a',
+								attempt: 1,
+								stageIndex: 2,
+								stage: 'APPROVE',
+								decision: null,
+								actorId: null
+							}
+						]
+					}
+				],
+				args
+			)
+		)
+		dbMock.actionProposal.findMany.mockResolvedValue([
+			{ id: 'p1', initiatorId: 'user-else', target: { id: 'emp-target', userId: 'user-target' } }
+		])
+
+		const counts = await countPendingApprovals({
+			id: VIEWER,
+			// A multi-role holder is what reaches all four queues at once: VERIFIER/APPROVER for the
+			// request and timesheet chains, CEO for APPROVE_FINANCE (runs) and ADMINISTER_HR_ORGWIDE
+			// (proposals).
+			roles: ['VERIFIER', 'APPROVER', 'CEO'],
+			organizationId: 'org1'
+		})
+
+		expect([counts.requests, counts.timesheets, counts.payrollRuns, counts.proposals]).toEqual([
+			1, 1, 1, 1
+		])
+		expect(counts.total).toBe(
+			counts.requests + counts.timesheets + counts.payrollRuns + counts.proposals
+		)
+	})
+
+	// The APPROVE_REQUESTS short-circuit. Its observable is not only the zeros — it is that NO query
+	// runs at all. Asserting the queries were never issued is what keeps this non-vacuous: delete the
+	// short-circuit and the seeded rows below would have to be filtered to zero by luck instead.
+	it('reports all zeros and issues no query for a role without APPROVE_REQUESTS', async () => {
+		dbMock.request.findMany.mockImplementation(async (args: never) =>
+			projectDocs([requestAt('r1', 'user-else')], args)
+		)
+
+		const counts = await countPendingApprovals({
+			id: VIEWER,
+			roles: ['EMPLOYEE'],
+			organizationId: 'org1'
+		})
+
+		expect(counts).toEqual({ timesheets: 0, requests: 0, payrollRuns: 0, proposals: 0, total: 0 })
+		expect(dbMock.request.findMany).not.toHaveBeenCalled()
+		expect(dbMock.timesheet.findMany).not.toHaveBeenCalled()
+		expect(dbMock.payrollRun.findMany).not.toHaveBeenCalled()
+		expect(dbMock.actionProposal.findMany).not.toHaveBeenCalled()
+	})
 })
