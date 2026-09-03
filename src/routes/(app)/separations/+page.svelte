@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showForm = $state(false)
@@ -14,11 +15,6 @@
 	// Red-border the specific field(s) the server rejected (#142).
 	const invalid = (name: string) => (fe(name) ? true : undefined)
 
-	function statusClass(s: string) {
-		if (s === 'FINALIZED') return 'bg-gray-500/15 text-gray-400'
-		if (s === 'CLEARED') return 'bg-green-500/15 text-green-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 	function clearedCount(items: { status: string }[]) {
 		return items.filter((i) => i.status === 'CLEARED').length
 	}
@@ -162,9 +158,7 @@
 							>{clearedCount(s.clearanceItems)}/{s.clearanceItems.length}</td
 						>
 						<td class="px-4 py-3">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(s.status)}"
-								>{s.status}</span
-							>
+							<Badge status={s.status} domain="separation" />
 						</td>
 						<td class="px-4 py-3 text-right">
 							<a href="/separations/{s.id}" class="btn-row">Open</a>

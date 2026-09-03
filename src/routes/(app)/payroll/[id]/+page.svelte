@@ -5,6 +5,7 @@
 	import { periodDays } from '$lib/utils/pay-periods'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const run = $derived(data.run)
@@ -88,9 +89,7 @@
 					>({periodDays(run.periodStart, run.periodEnd)} days)</span
 				>
 			</h1>
-			<span class={run.status === 'APPROVED' ? 'badge-green' : 'badge-blue'}>
-				{run.status}
-			</span>
+			<Badge status={run.status} domain="payrollRun" />
 			{#if run.hasOverride}
 				<span class="text-xs text-yellow-600 font-medium dark:text-yellow-500">Has overrides</span>
 			{/if}

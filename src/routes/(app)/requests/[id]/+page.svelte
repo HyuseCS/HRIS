@@ -4,6 +4,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const req = $derived(data.request)
@@ -47,14 +48,6 @@
 		REST_DAY_WORK: 'Work on Rest Day',
 		HOLIDAY_WORK: 'Holiday Work',
 		INFO_UPDATE: 'Info Update'
-	}
-
-	function statusClass(s: string) {
-		if (s === 'APPROVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'REJECTED') return 'bg-red-500/15 text-red-400'
-		if (s === 'RETURNED') return 'bg-orange-500/15 text-orange-400'
-		if (s === 'CANCELLED') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
 	}
 
 	// payload is Json; show only the type-specific extras. Fields already surfaced in
@@ -131,9 +124,7 @@
 			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
 		>
 			<BackButton fallback="/requests" label="Requests" />
-			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(req.status)}"
-				>{req.status}</span
-			>
+			<Badge status={req.status} domain="request" />
 		</div>
 	</div>
 
@@ -241,13 +232,10 @@
 							{/if}
 						</div>
 						<div class="flex shrink-0 items-center gap-3">
-							<span
-								class="rounded-full px-2 py-0.5 text-xs font-medium {doc.verifiedAt
-									? 'bg-green-500/15 text-green-400'
-									: 'bg-yellow-500/15 text-yellow-400'}"
-							>
-								{doc.verifiedAt ? 'Verified' : 'Unverified'}
-							</span>
+							<Badge
+								status={doc.verifiedAt ? 'Verified' : 'Unverified'}
+								tone={doc.verifiedAt ? 'green' : 'yellow'}
+							/>
 							{#if data.canReview}
 								{@const verify = verifyGuard(doc.id)}
 								<form method="POST" action="?/verifyDoc" use:enhance={verify.enhance}>
@@ -371,7 +359,7 @@
 		<ol class="space-y-2">
 			<li class="flex items-start gap-3 rounded-lg border p-3">
 				<div
-					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-xs font-medium text-green-500"
+					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-xs font-medium text-green-700 dark:text-green-400"
 				>
 					✓
 				</div>
@@ -404,11 +392,11 @@
 						<div
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium
 							{step.decision === 'APPROVED'
-								? 'bg-green-500/15 text-green-400'
+								? 'bg-green-500/15 text-green-700 dark:text-green-400'
 								: step.decision === 'REJECTED'
-									? 'bg-red-500/15 text-red-400'
+									? 'bg-red-500/15 text-red-700 dark:text-red-400'
 									: step.decision === 'RETURNED'
-										? 'bg-orange-500/15 text-orange-400'
+										? 'bg-orange-500/15 text-orange-800 dark:text-orange-400'
 										: 'bg-muted text-muted-foreground'}"
 						>
 							{i + 1}

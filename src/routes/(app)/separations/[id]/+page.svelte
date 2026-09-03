@@ -5,6 +5,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { CLEARANCE_AREA_LABELS } from '$lib/utils/clearance-area'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -47,12 +48,6 @@
 		)
 			input.cancel()
 	})
-
-	function statusClass(st: string) {
-		if (st === 'FINALIZED') return 'bg-gray-500/15 text-gray-400'
-		if (st === 'CLEARED') return 'bg-green-500/15 text-green-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 </script>
 
 <svelte:head>
@@ -121,9 +116,7 @@
 			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
 		>
 			<BackButton fallback="/separations" label="Separations" />
-			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(s.status)}"
-				>{s.status}</span
-			>
+			<Badge status={s.status} domain="separation" />
 		</div>
 	</div>
 
@@ -151,11 +144,7 @@
 						<p class="text-xs text-muted-foreground">{CLEARANCE_AREA_LABELS[item.area]}</p>
 					</div>
 					{#if isFinalized}
-						<span
-							class="rounded-full px-2 py-0.5 text-xs font-medium {item.status === 'CLEARED'
-								? 'bg-green-500/15 text-green-400'
-								: 'bg-yellow-500/15 text-yellow-400'}">{item.status}</span
-						>
+						<Badge status={item.status} domain="clearance" />
 					{:else}
 						{@const toggle = clearanceGuard(item.id)}
 						<form method="POST" action="?/toggleClearance" use:enhance={toggle.enhance}>

@@ -2,17 +2,9 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data }: { data: PageData } = $props()
-
-	const reviewStatusClass = (status: string) =>
-		status === 'COMPLETED' || status === 'ACKNOWLEDGED'
-			? 'bg-green-500/15 text-green-400'
-			: status === 'PENDING'
-				? 'bg-yellow-500/15 text-yellow-400'
-				: status === 'SCORED' || status === 'SIGNING'
-					? 'bg-purple-500/15 text-purple-400'
-					: 'bg-blue-500/15 text-blue-400'
 </script>
 
 <svelte:head>
@@ -56,13 +48,7 @@
 								<td class="px-4 py-3 text-muted-foreground"
 									>{formatShortDate(c.startDate)} – {formatShortDate(c.endDate)}</td
 								>
-								<td class="px-4 py-3"
-									><span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {reviewStatusClass(
-											c.status
-										)}">{c.status}</span
-									></td
-								>
+								<td class="px-4 py-3"><Badge status={c.status} domain="reviewCycle" /></td>
 							</tr>
 						{/each}
 					</tbody>
@@ -155,13 +141,7 @@
 								{review.reviewer.lastName}, {review.reviewer.firstName}
 							</td>
 							<td class="px-4 py-3">
-								<span
-									class="rounded-full px-2 py-0.5 text-xs font-medium {reviewStatusClass(
-										review.status
-									)}"
-								>
-									{review.status}
-								</span>
+								<Badge status={review.status} domain="review" />
 							</td>
 						</tr>
 					{:else}
@@ -199,13 +179,7 @@
 								>
 								<td class="px-4 py-3 text-muted-foreground">{review.cycle.name}</td>
 								<td class="px-4 py-3">
-									<span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {reviewStatusClass(
-											review.status
-										)}"
-									>
-										{review.status}
-									</span>
+									<Badge status={review.status} domain="review" />
 								</td>
 							</tr>
 						{/each}

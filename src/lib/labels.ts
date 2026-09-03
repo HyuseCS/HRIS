@@ -14,6 +14,7 @@ import type {
 	ApplicantStage,
 	ApprovalDecision,
 	AttendanceStatus,
+	BackupRunStatus,
 	BenefitEnrollmentStatus,
 	BranchStatus,
 	ClearanceStatus,
@@ -22,8 +23,10 @@ import type {
 	EmploymentStatus,
 	EmploymentType,
 	InventoryStatus,
+	JobPostingStatus,
 	LeaveRequestStatus,
 	LoanStatus,
+	OfferStatus,
 	PayrollPeriodStatus,
 	PayrollRunStatus,
 	RequestStatus,
@@ -55,6 +58,29 @@ export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = {
 	ACTIVE: 'Active',
 	PAID: 'Paid',
 	CANCELLED: 'Cancelled'
+}
+
+export const BACKUP_RUN_STATUS_LABELS: Record<BackupRunStatus, string> = {
+	RUNNING: 'Running',
+	SUCCESS: 'Success',
+	PARTIAL: 'Partial',
+	FAILED: 'Failed'
+}
+
+export const JOB_POSTING_STATUS_LABELS: Record<JobPostingStatus, string> = {
+	DRAFT: 'Draft',
+	PENDING_APPROVAL: 'Pending approval',
+	OPEN: 'Open',
+	CLOSED: 'Closed'
+}
+
+export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
+	// "Pending" rather than "Sent": the applicant page has always read it as the state it puts
+	// the offer in, not the act of sending, and that copy is preserved here rather than at the
+	// call site.
+	SENT: 'Pending',
+	ACCEPTED: 'Accepted',
+	DECLINED: 'Declined'
 }
 
 export const TIMESHEET_STATUS_LABELS: Record<TimesheetStatus, string> = {
@@ -151,9 +177,14 @@ export const APPLICANT_STAGE_LABELS: Record<ApplicantStage, string> = {
 	REJECTED: 'Rejected'
 }
 
+/**
+ * Both complaint pages already said "Awaiting employee" / "Awaiting HR" rather than echoing the
+ * enum. That copy names who is holding the case, which is the only thing a reader wants from it,
+ * so it is the shared wording rather than a per-page override.
+ */
 export const COMPLAINT_STATUS_LABELS: Record<ComplaintStatus, string> = {
-	OPEN: 'Open',
-	RESPONDED: 'Responded',
+	OPEN: 'Awaiting employee',
+	RESPONDED: 'Awaiting HR',
 	RESOLVED: 'Resolved'
 }
 

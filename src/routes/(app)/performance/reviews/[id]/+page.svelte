@@ -7,6 +7,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { formatDate } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	/**
 	 * The evaluator's real review form (#178 item 131) — the surface this whole feature exists to
@@ -85,13 +86,6 @@
 	// wrong. `releasedAt` is the switch — the same field the server gate reads.
 	const subjectOnly = $derived(data.isSubject && !data.isReviewer)
 	const released = $derived(r.releasedAt != null)
-
-	function statusClass(s: string) {
-		if (s === 'ACKNOWLEDGED') return 'bg-green-500/15 text-green-400'
-		if (s === 'COMPLETED') return 'bg-blue-500/15 text-blue-400'
-		if (s === 'PENDING') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 </script>
 
 <svelte:head>
@@ -114,9 +108,7 @@
 			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
 		>
 			<BackButton fallback="/performance" label="Performance" />
-			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(r.status)}"
-				>{r.status.replace('_', ' ')}</span
-			>
+			<Badge status={r.status} domain="review" />
 		</div>
 	</div>
 
