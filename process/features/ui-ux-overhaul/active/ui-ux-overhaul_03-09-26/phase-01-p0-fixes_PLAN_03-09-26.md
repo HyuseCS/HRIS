@@ -132,13 +132,29 @@ Commit per section (repo convention: one issue, one PR, many commits).
    page at /requests", which is the sentence that caused the bug. State the approval inbox is at
    `/requests/approvals` and the user's own filings are at `/requests`.
 
-**Blast radius:** 1 file, 2 lines. No caller in-repo (`grep -rn "'/approvals'" src` returns the
-route itself only) — the risk is entirely external bookmarks, which is the point of the fix.
+2b. **(added by VALIDATE)** `src/routes/(app)/approvals/+page.svelte:1` carries the *same* wrong
+   sentence in a comment — `<!-- Never rendered: the server load redirects /approvals → /requests
+   (merged page). -->`. Correct it to name `/requests/approvals`. Leaving it is how the bug
+   re-enters on the next read.
+
+**Blast radius:** 2 files, 3 lines. VALIDATE confirmed **zero** in-repo consumers: no
+`goto('/approvals')` and no `href="/approvals"` anywhere in `src/` or `tests/`. The only other hit
+is a stale comment at `tests/e2e/dashboard.spec.ts:10`; that spec asserts the dashboard
+*Pending Approvals* card navigates to `/requests` (the card's own href,
+`dashboard/+page.svelte:171`) and is **unaffected** by this redirect change — do not edit it. The
+risk is entirely external bookmarks, which is the point of the fix.
 
 **Verification:** new unit test `tests/unit/approvals-legacy-redirect.test.ts` — import the
 `load` from the route module, call it, assert the thrown object is a 308 redirect whose
 `location` is `/requests/approvals`. Follow the `page.server` import style already used in
-`tests/unit/complaints-scoping.test.ts`.
+`tests/unit/complaints-scoping.test.ts` —
+`const { load } = await import('../../src/routes/(app)/approvals/+page.server')`.
+**(VALIDATE notes)** In SvelteKit 2 `redirect()` **throws**, so assert with `try/catch` (or
+`expect(() => load(...)).toThrow()`) and read `.status` / `.location` off the caught object;
+`isRedirect` from `@sveltejs/kit` is the type guard. `tsconfig.json` extends
+`.svelte-kit/tsconfig.json`, which type-checks `tests/` — `PageServerLoad` demands an event
+argument, so cast a minimal event the way `tests/unit/audit-log-reveal.test.ts` already does
+rather than calling `load()` bare.
 
 ---
 
@@ -161,16 +177,27 @@ route itself only) — the risk is entirely external bookmarks, which is the poi
 
 **File B:** `src/routes/(app)/+layout.svelte`
 
-4. Add a derived list next to `settingsChildren`/`requestsChildren` (after line ~292):
+4. Add a derived list next to `settingsChildren`/`requestsChildren`. **(VALIDATE line-drift
+   correction)** `settingsChildren` is at line **265**, `requestsChildren` at **294–322** — the
+   plan's original "~292" lands *inside* `requestsChildren`. Insert **after line ~322**:
    `const reportsChildren = $derived([{ href: '/reports/audit-log', label: 'Audit Log', show: isAdmin }].filter((i) => i.show))`
-5. In the nav `{#each navItems}` loop, add a branch after the existing
-   `{#if item.href === '/requests' && canApprove}` arm:
-   `{:else if item.href === '/reports' && reportsChildren.length > 0}` — render the **same**
-   `<a>` markup the generic `{:else}` arm already uses for the Reports link, then, directly under
+5. In the nav `{#each navItems}` loop (**line 515**), add a branch. **(VALIDATE exact insertion
+   point)** the `{#if item.href === '/requests' && canApprove}` arm runs **516–585** and the
+   generic `{:else}` begins at **586** — the new arm goes at line **586, immediately before that
+   `{:else}`**: `{:else if item.href === '/reports' && reportsChildren.length > 0}`. Render the
+   **same** `<a>` markup the generic `{:else}` arm already uses (copy it whole, **including its
+   `{@const active = …}` at 587–590 and the icon `<svg … d={item.icon}>` + `{#if item.badge}`
+   block at 598–616** — a partial copy silently drops the Reports icon), then, directly under
    it, the same indented child list markup used by the requests group
    (`<div class="mt-0.5 space-y-0.5 border-l border-border pl-3 ml-4">` + one `<a>` per child).
    **No toggle, no new state, no new icon, no badge** — the child list is always shown when the
    user holds `MANAGE_HR`. A collapsible Reports group is phase 02 IA work, not this.
+   **(VALIDATE)** There is exactly **one** `<nav>` in this file (line 514) — no separate mobile
+   drawer loop to keep in sync.
+   **(VALIDATE)** The `/reports` navItem itself (lines 244–247) is gated
+   `show: canViewReports` = `canAny(roles,'VIEW_PAYROLL_REPORTS')` (line 101) — **not** `isAdmin`.
+   That is why the `reportsChildren.length > 0` test is load-bearing: a payroll-only viewer keeps
+   the plain Reports link through the generic `{:else}` and gains no child row.
 6. Keep the existing `active` calculation untouched. `/reports` uses `startsWith`, so both rows
    highlight on `/reports/audit-log`. Accept this — changing the `active` rule would break the
    Reports highlight on all 12 other report subpages, which is a bigger diff than the fix.
@@ -188,6 +215,17 @@ page, so the compile check for this section is non-negotiable.
   `VIEW_PAYROLL_REPORTS`, not `MANAGE_HR`). Assert the card is absent AND that a payroll card
   (e.g. `href="/reports/payroll-register"`) IS present — that positive assertion is what proves
   the selector works and the absence is real.
+- **MANAGER exposure arm (added by VALIDATE — mandatory, measurement only):** repeat as a
+  **MANAGER**. `rbac.ts:26` lists `MANAGE_HR: ['MANAGER','HR_ADMIN','SUPER_ADMIN','CEO']`, so a
+  branch manager WILL see the new card and the new sidebar row — and the audit-log query
+  (`audit-log/+page.server.ts:22–28`) scopes on `organizationId` **only**, with no reporting-line
+  filter. Record in the phase report exactly what a MANAGER sees. Do **not** change the gate here:
+  narrowing it to `ADMINISTER_HR_ORGWIDE` is a server-guard decision already owned by the
+  umbrella's open owner-decision "MANAGER / `ADMINISTER_HR_ORGWIDE` guard alignment" (raised by
+  phase 02). See OWNER-DECISION-1 in the Validate Contract.
+- **(VALIDATE, verified)** `reportCards` at `reports/+page.svelte:82–84` is
+  `data.canViewHrReports ? allReportCards : allReportCards.filter((r) => r.payroll)` — the plan's
+  `payroll: false` claim is correct: a payroll-only viewer never sees the card.
 
 ---
 
@@ -231,6 +269,12 @@ phase 01 — logged in Test Infra Improvement Notes below.
 9. On the per-toast `<div>` (line 18–22) add `aria-live={t.kind === 'error' ? 'assertive' : undefined}`
    so an error toast announces immediately. Do **not** put `role="alert"` on the container — the
    container is persistent and would re-announce on every mutation.
+9b. **(added by VALIDATE — required, not optional)** also put `aria-atomic="false"` on the
+   container. `role="status"` carries an **implicit `aria-atomic="true"`**, which re-announces the
+   *whole* toast stack on every mutation — precisely the failure step 9 says it is avoiding by
+   refusing `role="alert"`. Without this the fix trades one bad announcement pattern for another.
+   The container also holds the interactive Dismiss `<button>`s (lines 34–39) inside the live
+   region; acceptable for a toast stack, but re-examine it when phase 04 rebuilds the Toaster.
 
 Attribute-level only. Do not touch `kindClass`, the timer, stacking, or the dismiss button. Pause-on-hover,
 de-dup, stacking cap and `(auth)` mounting are phase 04.
@@ -376,6 +420,22 @@ resolves and reports nothing itself (`ConfirmButton.svelte:38-53`, Addendum §E)
 `form?.saved` banner is what closes the loop for these two actions. Fixing the primitive is
 phase 04.
 
+**Accepted partial (named by VALIDATE):** the `{#if form?.error}` block at lines 48–54 is
+*page-level* and shared by all six actions on this page (`open`, `import`, `generate`, `lock`,
+`release`, `void`). The new `{#if form?.saved}` block is page-level too, but only `release` and
+`void` populate it — so `open`, `import`, `generate` and `lock` stay silent on success after this
+phase. In scope for phase 04 (the repo-wide feedback contract), not phase 01. Record it in the
+phase report.
+
+**(VALIDATE, verified against source)** `ConfirmButton.svelte:7–33` accepts exactly
+`action` (required), `title`, `message`, `confirmText`, `triggerLabel`, `triggerClass`,
+`disabled`, `submit?: SubmitFunction`, `children?: Snippet` — every prop steps 17–18 pass exists,
+and no required prop is omitted. It renders its **own**
+`<form method="POST" {action} use:enhance={submit ?? noop} class="contents">` (line 41), so the
+existing inline `<form>` must be **replaced**, never wrapped around it. `releaseG` is
+`{@const}`-bound at line 182 and `voidG` at line 196, each an immediate child of its `{#if}` —
+that stays legal after the swap, and `.busy` / `.enhance` are the real field names.
+
 **Blast radius:** 2 files. Money surface, but only the confirm wrapper and the return value
 change; the guard and service call are untouched. The `{#each}`-scoped `guard()` memoisation
 (`+page.svelte:19-23`) must survive — passing `submit={…enhance}` preserves it, and losing it
@@ -400,6 +460,15 @@ would reintroduce the #108 double-submit bug.
 
 ### Section 8 — `employees/[id]` error mis-routing: minimal harm reduction (P0-7, partial)
 
+**Accepted regression named explicitly (added by VALIDATE).** The plan states the trade as "a
+failed `addLoan` renders **nowhere** instead of in the wrong form". There is a second, sharper
+loss it did not name: **`setSupervisors` returns `{ success: true }` at line 433 and today lights
+the shared "Saved." banner at `+page.svelte:497`.** After step 25 gates that block on
+`form?.action === 'update'`, a successful supervisor change reports **nothing at all** — a
+currently-*working* success signal is removed, not merely a mis-routed error. Accepted for phase
+01, closed by phase 07's per-form slots. Write it into the phase report by name, alongside the
+`addLoan` case.
+
 **Scope fence:** the full fix (a scoped error slot next to each of the ~21 forms) is phase 07's
 page restructure. This phase does only what the audit calls the disambiguation pattern: tag every
 untagged return with `action`, then gate the one shared block on it. After this phase a failed
@@ -411,8 +480,10 @@ temporary regression in coverage.**
 **File A:** `src/routes/(app)/employees/[id]/+page.server.ts`
 
 22. Three actions already carry `const action = '<name>'` and spread it into every return —
-    `assignTemplate` (line 515), `changeCompensation` (line 567), `promote` (line 593). **Do not
-    touch them.** Copy their shape onto the rest.
+    `assignTemplate` (line **511**), `changeCompensation` (line **564**), `promote` (line **591**).
+    **(VALIDATE line-drift correction — the plan originally read 515/567/593.)** **Do not
+    touch them.** Copy their shape onto the rest. Their page-side blocks are already gated
+    (`+page.svelte:433/439`, `1495–1509`, `1597–1611`) — leave those alone too.
 23. Add `action: '<name>'` to every `return` and every `return fail(...)` in these **18** actions
     (exact names, from `grep -n "^\t[a-zA-Z]*: async" src/routes/(app)/employees/\[id\]/+page.server.ts`):
 
@@ -459,12 +530,33 @@ silently break a working banner. The enumeration table above is the checklist �
 18 rows.
 
 **Verification:**
-- **Enumeration check (run before committing):**
-  `grep -n "return {\|return fail(" "src/routes/(app)/employees/[id]/+page.server.ts" | grep -v "action" `
-  must return **only** the `reveal` line 639 return if you chose to leave it (it should not — step
-  23 tags it too) — i.e. the expected output is empty. Any remaining untagged return is a missed row.
+- **Enumeration check (CORRECTED BY VALIDATE — the original pass-condition was wrong and
+  unachievable).** The original gate was
+  `grep -n "return {\|return fail(" … | grep -v "action"` with an expected output of *empty*. Run
+  on the current tree it returns **46** lines, two of which — **line 73 and line 199** — are
+  `load` returns that must **never** be tagged. Chasing "empty" would push you to tag `load`.
+  Use these **two** gates instead, both run before committing:
+
+  1. Untagged action returns — scope the grep to the actions block, which starts at line 420:
+     ```bash
+     awk 'NR>=420' "src/routes/(app)/employees/[id]/+page.server.ts" \
+       | grep -n "return {\|return fail(" | grep -v "action"
+     ```
+     Expected output after the edit: **empty**. Any line here is a missed row.
+  2. **`failFromError` blind spot (found by VALIDATE).** The grep above matches neither
+     `return {` nor `return fail(` on a `return failFromError(e)` line, so it is **blind** to the
+     five sites step 23 must convert — lines **431** (`setSupervisors`), **657** (`offboard`),
+     **676** (`addLoan`), **694** (`addCashAdvance`), **712** (`addEarning`). Add a second gate:
+     ```bash
+     grep -n "return failFromError" "src/routes/(app)/employees/[id]/+page.server.ts"
+     ```
+     Expected output after the edit: **empty** — each becomes
+     `const f = failFromError(e); return fail(f.status, { action, ...f.data })`. (The bare
+     `import { failFromError }` at line 3 does not match this pattern and stays.)
 - New unit test `tests/unit/employee-detail-action-tags.test.ts`: import the route module's
-  `actions` object, assert `Object.keys(actions)` matches the expected 21-name list (fails loudly
+  `actions` object (VALIDATE confirmed the count is **exactly 21**, and all 18 rows of the table
+  above match the current tree to the line), assert `Object.keys(actions)` matches the expected
+  21-name list (fails loudly
   if an action is added later without a tag), and for at least three representative actions
   (`update`, `addLoan`, `deleteDocument`) drive the cheap failure path (missing/invalid form
   field, no service call needed) and assert the returned `data.action` equals the action name.
@@ -630,7 +722,236 @@ not a reasoning error.
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: sequential (in-thread fan-out)
+Rationale: 7-signal score **6/7** (S2 schema/API/auth surface, S3 3+ directions, S4 phase program,
+S5 depth requested, S6 high-risk class, S7 5+ files; S1 absent — one package). That scores HIGH and
+would normally route to parallel subagents for a read-only 12-agent fan-out (4 Layer-1 dimensions +
+8 Layer-2 sections). **Deviation:** the Agent tool was disabled in the validating session, so all
+12 checks were executed sequentially in-thread against the live source tree. Coverage is
+equivalent — every claim below carries file:line evidence — but wall-clock cost was ~4x the
+parallel plan. Record this if a later phase re-runs PVL with subagents available.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-1 | `GET /approvals` 308s to `/requests/approvals` | Fully-Automated | `tests/unit/approvals-legacy-redirect.test.ts` — `await import('../../src/routes/(app)/approvals/+page.server')`, call `load`, catch, assert `status===308 && location==='/requests/approvals'` | B |
+| AC-2 | HR_ADMIN reaches `/reports/audit-log` from index + sidebar; payroll-only sees neither | Agent-Probe | Audit-log reachability probe + FINANCE negative control + **MANAGER exposure arm** (added by VALIDATE) | A |
+| AC-3 | Two "Add row" clicks leave the preview rendering | Agent-Probe | Rating-row duplicate-key probe, **red control on the pre-fix commit** | A |
+| AC-4 | Toast container is `role="status"` + `aria-live="polite"` + `aria-atomic="false"`; error toasts `assertive` | Agent-Probe | Toaster ARIA DOM probe asserting all three container attributes | A |
+| AC-5 | Approve / reject / return and timesheet approve/reject each return a distinct non-empty `saved` the page renders | Fully-Automated + Agent-Probe | `tests/unit/request-decide-feedback.test.ts` (+ mutation check) + approve-in-browser probe | B |
+| AC-6 | Successful offboard shows a confirmation surviving the ACTIVE-block unmount; DB row reads `OFFBOARDED` | Hybrid | Offboard marker probe — DOM assert **after** the form disappears + `docker exec … psql -p 5434` assert on `employmentStatus` | A |
+| AC-7 | Dead list-page `?/offboard` gone, no orphan imports, no live path broken | Fully-Automated | `pnpm lint` + `pnpm check` + `pnpm test` + `pnpm test:e2e -- tests/e2e/employee.spec.ts` | A |
+| AC-8 | `?/void` and `?/release` each confirm and each report; the per-row double-submit guard holds | Fully-Automated + Agent-Probe | `tests/unit/payroll-period-feedback.test.ts` (+ mutation check) + void/release probe with a Cancel positive control + `tests/e2e/payroll-lock-idempotency.spec.ts` | B |
+| AC-9 | Every `employees/[id]` action returns an `action` key; the shared block renders only for `update` | Fully-Automated + Agent-Probe | **Corrected** two-gate grep (scoped `awk 'NR>=420'` gate + `return failFromError` gate) + `tests/unit/employee-detail-action-tags.test.ts` + mis-routing probe a/b/c | B |
+| AC-10 | Full CI gate set green in CI order | Fully-Automated | `pnpm format:check` → `pnpm lint` → `pnpm check` → `pnpm test` | A |
+| RESIDUAL-1 | Section 3 rating-row key regression-proofed by an automated test | — | none possible: `vitest.config.ts` sets `environment: 'node'`; no DOM in the 193-file suite | D |
+| RESIDUAL-2 | Section 4 Toaster ARIA attributes regression-proofed by an automated test | — | same node-only limitation | D |
+
+gap-resolution legend: A — proven now. B — gate added by this plan's checklist. C — deferred to a
+named later phase. D — backlog test-building stub (named residual; keep-active; continue).
+
+Legacy line form (retained for existing validate-contract consumers):
+- approvals redirect: Fully-automated: `pnpm test` (new `approvals-legacy-redirect.test.ts`)
+- audit-log reachability: agent-probe: HR_ADMIN + FINANCE negative control + MANAGER exposure arm
+- rating-row key: agent-probe: pre-fix red control then post-fix green
+- Toaster ARIA: agent-probe: assert `role`/`aria-live`/`aria-atomic` on the DOM node
+- request + timesheet feedback: Fully-automated: `pnpm test` (new `request-decide-feedback.test.ts`) + mutation check
+- offboard: hybrid: DOM probe + `psql` on `employmentStatus` — precondition: `veent-db-5434` and a user-started dev server
+- dead-action delete: Fully-automated: `pnpm lint && pnpm check && pnpm test && pnpm test:e2e -- tests/e2e/employee.spec.ts`
+- payroll period feedback: Fully-automated: `pnpm test` (new `payroll-period-feedback.test.ts`) + hybrid `pnpm test:e2e -- tests/e2e/payroll-lock-idempotency.spec.ts tests/e2e/payroll-run-void.spec.ts`
+- action-tag sweep: Fully-automated: corrected two-gate grep + `employee-detail-action-tags.test.ts`
+- component-render regression for sections 3 and 4: known-gap: documented (no DOM environment)
+
+### Failing stubs (Fully-Automated rows only — TDD red-first starting point)
+
+```
+test("should 308-redirect GET /approvals to /requests/approvals", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: GET /approvals 308s to /requests/approvals")
+})
+test("should return a distinct non-empty saved string for approve, reject and return", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: decideRequest returns a decision-specific saved string")
+})
+test("should return a non-empty saved string from actions.void and actions.release", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: payroll period void/release report success")
+})
+test("should tag every employees/[id] action return with its own action key", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: all 21 actions return an action key")
+})
+```
+
+### Dimension findings
+
+- **Infra fit: CONCERN** — `ConfirmButton`'s prop surface matches the plan exactly and `voidG`/
+  `releaseG`/`.busy`/`.enhance` are the real names, but the four CI gates were **not** run on the
+  current tree during VALIDATE (`pnpm check` kills a dev server; both are slow). Baseline is
+  unproven — see E1.
+- **Test coverage: CONCERN** — the route-module unit-test pattern the plan copies is real and used
+  in 10+ files, and the action count is exactly 21 as claimed. But section 8 shipped **two broken
+  verification gates** (wrong pass-condition; blind to `return failFromError`). Both corrected in
+  the plan. Sections 2, 3 and 4 still have **zero** automated proof — that is what keeps this gate
+  CONDITIONAL rather than PASS.
+- **Breaking changes: PASS** — `/approvals` has zero in-repo consumers (no `goto`, no `href` in
+  `src/` or `tests/`); `?/offboard` has exactly one hit, a relative action on the detail route, so
+  the list-page delete breaks nothing; every `{#if form?.saved}` block the plan targets exists at
+  the cited line. Two shared-banner side effects named in-plan (see Open gaps).
+- **Security surface: CONCERN** — the nav gate correctly mirrors the route guard (do-not-break
+  item 1 upheld) and nothing touches `rbac.ts`, `prisma/schema.prisma` or `services/**`. The
+  concern is what the correct mirror *reveals*: see OWNER-DECISION-1. `failFromError` rethrows any
+  non-HttpError (`form-fail.ts:12-14`), so `{ action, ...f.data }` leaks nothing new. Masked-reveal
+  stays gated on `ADMINISTER_SYSTEM` (`audit-log/+page.server.ts:12,91`) — unchanged.
+- **Section 1 — /approvals redirect: PASS** — redirect confirmed at line 6 inside `load`. Gap
+  found and fixed: a second stale comment at `approvals/+page.svelte:1`. Highest risk: none;
+  1 file, 3 lines.
+- **Section 2 — Audit Log reachable: CONCERN** — every cited construct verified
+  (`reportCards` filter logic is exactly as the plan claims; `isAdmin` at 94; one `<nav>` at 514).
+  Two line-drift corrections applied (insert point 322 not 292; `{:else if}` at 586). Highest
+  risk: `+layout.svelte` 500s every page on a compile error — `pnpm check` is the non-negotiable
+  gate. Carries OWNER-DECISION-1.
+- **Section 3 — rating-row key: PASS** — line 169 matches verbatim; every other keyed each in the
+  file keys on a real `.id`; `ratingScaleSchema` rows are `.strict()` with only `{value,
+  description}`, so minting ids really would be a schema break. Index keying is right.
+- **Section 4 — Toaster ARIA: CONCERN** — lines 14-16 / 18-22 confirmed, no existing role/aria.
+  Gap found and fixed: `role="status"` implies `aria-atomic="true"`, reintroducing the exact
+  re-announce-everything failure the plan says it avoids. `aria-atomic="false"` added as step 9b.
+- **Section 5 — approve/timesheet feedback: PASS** — `decideRequest` (105-142) ends with no
+  return; `rejectMany`'s `{ saved }` shape confirmed at 178-186; both `?/decideRequest` forms
+  (lines 360, 400) are on the page that renders the shared block at 192, so `form` reaches it.
+  `review` (84-110) and `approved` confirmed; `timesheets/+page.svelte:74` renders `form?.saved`.
+- **Section 6 — offboard feedback + dead-action delete: PASS** — the `{#if canManage &&
+  employmentStatus === 'ACTIVE'}` block is at line **1783** exactly, and the plan's
+  outside-the-block placement is correct. The File C keep/remove import list is right to the
+  specifier: `failFromError`, `offboardEmployee`, `assertCanTouchEmployee` and `Actions` are used
+  **only** by the deleted action; `load` keeps `requireAnyCapability`, `paginate`,
+  `countEmployees`, `listEmployees`, `listAssignableBranches`, `listVisibleEmployeeIds`,
+  `isFoodServiceOrg`, `PageServerLoad`. Highest risk: deleting a live path — mitigated by the
+  verified single-hit grep plus the end-to-end re-run.
+- **Section 7 — payroll periods confirm + message: PASS** — release form 183-190, void form
+  197-205, error block 48-54, guard factory 19-24, server `release` 102-110 and `void` 112-120 all
+  match the plan to the line. `void:` as an object key is legal and `actions.void` is callable
+  from a unit test. Highest risk: losing the `{@const}`-scoped per-row guard (#108 double-submit)
+  — mitigated by passing `submit={voidG.enhance}` and by the idempotency spec.
+- **Section 8 — error mis-routing: CONCERN** — 21 actions confirmed and all 18 table line numbers
+  exact. Two verification-gate defects found and corrected, and one unnamed regression
+  (`setSupervisors` loses a *working* success banner) written into the plan. Highest risk stands
+  as the plan says: a mistyped `action` string turns a working banner silent.
+
+### Open gaps
+
+- Sections 2, 3 and 4 have **no** fully-automated proof and cannot reach `VERIFIED` on a green
+  suite alone. Residual, tracked as gap-resolution D.
+- `known-gap: documented` — no DOM test environment. `vitest.config.ts` pins
+  `environment: 'node'`, so none of the 193 unit files can render a component even though
+  `@testing-library/svelte@5.2` and `@testing-library/jest-dom@6.6` are already devDependencies.
+  A `jsdom` project (or a second vitest project scoped to `tests/component/`) would make AC-3 and
+  AC-4 cheaply regression-proof. Out of scope for phase 01; phase 03/04 should pick it up.
+- **Accepted regression (named):** gating the shared block on `form?.action === 'update'` removes
+  the success banner `setSupervisors` currently gets from `{ success: true }` at line 433. Closed
+  by phase 07.
+- **Accepted partial (named):** `payroll/periods` keeps four still-silent successes (`open`,
+  `import`, `generate`, `lock`) after this phase. Closed by phase 04.
+- CI baseline on the current tree is unproven by this VALIDATE — see E1.
+
+### REJECTED-ROUTED (cross-phase contract violations — not folded into this plan)
+
+| Finding | Owning phase | Why routed |
+|---|---|---|
+| Narrow the audit-log nav/card gate from `MANAGE_HR` to `ADMINISTER_HR_ORGWIDE` so a branch MANAGER stops reaching the org-wide audit log | **Phase 02 / owner backlog** | This is a **server-guard alignment** decision, not a nav-only change. The umbrella's Open owner-decisions registry already carries it as "MANAGER / `ADMINISTER_HR_ORGWIDE` guard alignment (raised by 02)". Folding it into phase 01 would execute a decision phase 02 explicitly routed to the owner. |
+| Rebuild `ConfirmButton` so it waits for the result and reports it | **Phase 04** | Umbrella §Shared-primitive contract: phase 04 owns the rebuild and freezes the API; phase 03 leaves it as a compile canary. A validate finding proposing an edit to it from any other phase is a contract violation, not a gap. Phase 01 only *consumes* the current primitive and closes the loop with a page banner. |
+| `payroll/[id] ?/decide` success signal; Toaster pause-on-hover / stacking cap / de-dup / `(auth)` mounting; the repo-wide `{ action, error?, saved? }` contract; the 13-site raw `e.message` leak | **Phase 04** | Named in the plan's own Non-goals table and in the umbrella's phase-04 scope. |
+| Per-action error slots beside each of the ~21 `employees/[id]` forms (P0-7 proper) | **Phase 07** | The plan's Scope fence. Phase 01 ships the disambiguation pattern only. |
+| Dashboard "Pending Approvals" card links to `/requests` (My Requests) while counting pending *approvals* — the same defect class as P0-1, at `dashboard/+page.svelte:171`, pinned by `tests/e2e/dashboard.spec.ts:11` | **Phase 06** (surface consolidation — the four-inbox / combined-badge item) | Out of phase 01's Touchpoints. Discovered during this PVL; recorded here so it is not lost. |
+
+### OWNER-DECISION gates (do not block EXECUTE)
+
+**OWNER-DECISION-1 — the audit log becomes discoverable to every branch MANAGER.**
+Section 2 gates the new reports card and the new sidebar row on `MANAGE_HR`, correctly mirroring
+the route's own guard (`reports/audit-log/+page.server.ts:11`) per do-not-break item 1.
+`src/lib/rbac.ts:26` lists `MANAGE_HR: ['MANAGER','HR_ADMIN','SUPER_ADMIN','CEO']`, and lines
+30-33 of that same file say in so many words: use `ADMINISTER_HR_ORGWIDE`, **never** `MANAGE_HR`,
+to decide "may reach any employee record". The audit-log query scopes on `organizationId` only —
+there is no reporting-line filter. So after this phase every branch manager sees a signposted door
+to the **org-wide** audit log.
+This is **not** a widening: a MANAGER can already reach the page by typing the URL today, and
+already sees every card on `/reports` because `canViewHrReports` is also `MANAGE_HR`. What changes
+is discoverability. Masked values stay safe — reveal is gated separately on `ADMINISTER_SYSTEM`
+(`audit-log/+page.server.ts:12,91`).
+- Applied default: **ship as planned** (gate = `MANAGE_HR`), plus a mandatory MANAGER probe arm so
+  the exposure is measured and written into the phase report rather than assumed.
+- Owner's call: accept, or answer the umbrella's existing `ADMINISTER_HR_ORGWIDE` alignment
+  decision — which would change the gate on both this nav row and the route guard, in phase 02.
+- If unanswered: phase 01 ships the card and row on `MANAGE_HR` and phase 02 inherits the decision.
+
+**OWNER-DECISION-2 — section 8's accepted coverage regression.**
+After section 8, a failed `addLoan` renders nowhere instead of in the wrong form, **and** a
+successful `setSupervisors` reports nothing at all. Phase 07 closes both. The plan already frames
+the first as the intended trade; the second was unnamed until this PVL.
+- Applied default: **proceed** — a silent failure is less harmful than an error attributed to the
+  wrong form, and the window is bounded by phase 07.
+- Owner's call: accept the temporary regression, or have phase 01 add a second gated slot for
+  `setSupervisors` (a ~6-line addition to `+page.svelte`, still inside this phase's Touchpoints).
+- If unanswered: proceed as planned, recorded in the phase report.
+
+### Execute-agent instructions
+
+| # | Instruction | Trigger condition |
+|---|---|---|
+| E1 | **Run the four CI gates on the untouched tree first** — `pnpm prisma generate`, then `pnpm format:check`, `pnpm lint`, `pnpm check`, `pnpm test`, in that order. VALIDATE could not run them. A red gate before the first edit is a baseline miss, not your diff. | Before section 1 |
+| E2 | Confirm each cited line still reads as the plan quotes it before editing. Every line number in this plan was re-verified against the tree at `093a413` during PVL; if you are on a later commit and a target has moved, update the target and record the drift in the phase report — do **not** skip the step. | Every section entry |
+| E3 | Section 2: the `{:else if}` arm goes at line **586**, immediately before the existing `{:else}`. Copy the generic arm whole — including its `{@const active = …}` (587-590) and the `<svg d={item.icon}>` + `{#if item.badge}` markup (598-616). `{@const}` must stay an immediate child of a block tag. | Section 2 entry |
+| E4 | Section 6: place the offboard message **outside** the `{#if canManage && employmentStatus === 'ACTIVE'}` block at line 1783. Inside it, it can never render — the block unmounts on success. | Section 6 entry |
+| E5 | Section 7: **replace** each inline `<form>` with `<ConfirmButton>`; do not wrap one around the other — ConfirmButton renders its own `<form>` (line 41). Pass `submit={voidG.enhance}` / `submit={releaseG.enhance}` explicitly; dropping it reintroduces the #108 double-submit. | Section 7 entry |
+| E6 | Section 8: run **both** corrected grep gates before committing — the scoped `awk 'NR>=420' … \| grep -n "return {\|return fail(" \| grep -v "action"` gate AND the `grep -n "return failFromError"` gate. Both must be empty. Never tag the `load` returns at lines 73 and 199. | Section 8, before commit |
+| E7 | Run every mutation check the plan names (revert each new `return { saved }` and the `action: 'update'` tag, confirm red). A test that passes with the fix reverted is vacuous — this repo has five recorded cases of a green suite hiding a live defect. | End of sections 5, 7, 8 |
+| E8 | Never start `./start.sh`, vite, or `veent-db-5434` — ask the owner. Driving an already-running app is fine. Run all CI gates **before** the browser pass; `pnpm check` kills the dev server. | Any probe |
+| E9 | Section 3's probe is only evidence with its **red control** on the pre-fix commit. A green run on the fixed build alone proves nothing. | Section 3 verification |
+| E10 | Commit per section (8 commits). No `Co-Authored-By` trailer. Merges target `staging`, so `Closes #N` never fires — close any linked issue by hand. | Every section |
+
+### Backlog artifacts
+
+| Artifact | Location | What it tracks |
+|---|---|---|
+| `component-test-dom-environment_NOTE_03-09-26.md` | `process/features/ui-ux-overhaul/backlog/` | RESIDUAL-1 + RESIDUAL-2 — add a jsdom vitest project (or `tests/component/`) so the rating-row key and Toaster ARIA get automated regression cover. Deps already installed. |
+| `dashboard-pending-approvals-wrong-target_NOTE_03-09-26.md` | `process/features/ui-ux-overhaul/backlog/` | The P0-1 defect class repeating at `dashboard/+page.svelte:171`; routed to phase 06. |
+
+### What this coverage does NOT prove
+
+- `pnpm test` (unit): every service and DB call is mocked. It does **not** prove any value reached
+  Postgres, that the redirect fires over real HTTP, that a banner renders, or that `enhance` ran.
+- `tests/unit/approvals-legacy-redirect.test.ts`: proves the `load` export throws a 308 to the new
+  path. Does **not** prove SvelteKit serves that redirect over the wire, nor that an external
+  bookmark resolves.
+- `request-decide-feedback.test.ts` / `payroll-period-feedback.test.ts`: prove the action returns a
+  non-empty `saved` and that the failure contract survives. Do **not** prove the page renders it,
+  that it is announced, or that the right banner lit for the right action.
+- `employee-detail-action-tags.test.ts` + the two greps: prove every return carries an `action` key
+  and that the key equals the action name for three representative actions. Do **not** prove the
+  remaining 18 tags are spelled correctly against what the template reads — only the probe does.
+- `pnpm lint` + `pnpm check`: prove no orphan import and no type error after the section-6 delete.
+  Do **not** prove the deleted action was unreachable — the grep plus the end-to-end offboard
+  re-run is that evidence. Neither gate typechecks `prisma/**` or `scripts/**`.
+- `pnpm test:e2e`: runs against a build; known-flaky (#287). Read the actual error before
+  re-running — three distinct causes have hidden behind "flaky" in this repo.
+- Agent probes (AC-2, AC-3, AC-4, and the probe halves of AC-5/8/9): prove one path, once, on one
+  build, in one browser. They do **not** prove light/dark rendering, keyboard operability, mobile
+  layout, or screen-reader behaviour in a real AT — only that the attribute or text is in the DOM.
+- The MANAGER exposure arm **measures** the exposure. It does not resolve it — see
+  OWNER-DECISION-1.
+- Nothing here proves the CI baseline was green before the first edit — see E1.
+
+Gate: CONDITIONAL (concerns documented and defaults applied; sections 2/3/4 rest on agent-probe
+evidence with no automated gate, and two OWNER-DECISION items remain open by design)
+Accepted by: session (autonomous, outer-PVL subagent run — no owner present). Concerns accepted by
+name: (1) no DOM test environment, so AC-3 and AC-4 have no automated gate; (2) section 8's
+accepted coverage regression, including the newly-named `setSupervisors` banner loss;
+(3) `payroll/periods` keeps four still-silent successes; (4) the audit log becomes discoverable to
+every branch MANAGER — surfaced as OWNER-DECISION-1 and routed to phase 02, not resolved here;
+(5) the CI baseline was not run by VALIDATE and is carried as execute-agent instruction E1.
 
 ---
 

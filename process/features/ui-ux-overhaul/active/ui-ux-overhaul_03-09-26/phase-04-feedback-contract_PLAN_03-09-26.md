@@ -14,6 +14,11 @@ phase: "04"
 **Feature**: ui-ux-overhaul
 **Phase**: 04 of the UI/UX overhaul phase program
 
+**Orchestrator note (do not re-open):** the validator's 8-gap supplement request is NOT getting a
+separate supplement cycle. Those 8 gaps are already binding execute-agent instructions E1–E8 inside
+the `## Validate Contract` section below, and EXECUTE will follow them from there. A resume-reader
+should treat the supplement cycle as CLOSED.
+
 ## Overview
 
 Veent HRIS has ~165 mutating actions across 53 server files. Only about 29% give a correctly
@@ -190,10 +195,21 @@ length-capped (reject > 512 bytes, drop silently). Cleared by `takeFlash` in the
 Returns `{ message: 'Something went wrong. (Ref: <id>)' }`. Logs `{ ref, message, stack, url,
 userId }` server-side. Never returns `error.message` to the client.
 
-### 5. `ConfirmButton` — API UNCHANGED
+### 5. `ConfirmButton` — API: additive only, then FROZEN
 
-Same nine props. New internal behaviour only. Callers compile without edits. **Phase 05 depends
-on this compatibility guarantee.**
+The existing nine props keep their names and meanings. New internal behaviour only. Every current
+caller compiles without edits. **Phase 05 depends on this compatibility guarantee.**
+
+Two props are ADDED here, before the freeze — both optional, both default to no behaviour change:
+
+| Prop | Type | Default | Why it is added now |
+|---|---|---|---|
+| `successMessage` | `string \| null` | `null` (no toast) | Lets a call site name its own success toast. Without it the rebuilt button is still silent |
+| `triggerTitle` | `string \| undefined` | `undefined` | **Phase 05 site 15 (attendance reset) needs a tooltip on the TRIGGER button.** `title` is already taken as the *dialog* title, so a separate prop is required. Renders as the `title` attribute on the trigger `<button>` only — never on the dialog |
+
+`triggerTitle` is added in phase 04 specifically so phase 05 does not have to reopen this
+primitive after the freeze. **Phase 05 consumes it.** After S2 lands, the API is frozen: no
+further prop additions without a cross-phase agreement.
 
 ---
 
@@ -269,6 +285,10 @@ Six sections, one commit each. Run that section's test gate before committing.
     - Keep the dialog open (or show a busy state on the confirm control) until the result
       resolves. Today the dialog closes at `onconfirm` before the request finishes
       (`ConfirmButton.svelte:38-53` per the audit) — that is the whole defect.
+    - Add an optional `triggerTitle?: string` prop, applied as the `title` attribute on the
+      TRIGGER button only. Do NOT reuse the existing `title` prop — that is the dialog heading.
+      **Phase 05 site 15 (attendance reset) consumes this**; adding it now keeps the API frozen
+      once S2 is merged.
     - Disable the trigger while `fb.busy`.
 11. Verify `ConfirmDialog.svelte` can express a busy/disabled confirm control. If it cannot,
     add the minimum prop — do NOT redesign the dialog (that is phase 03).
@@ -298,7 +318,15 @@ Six sections, one commit each. Run that section's test gate before committing.
     - `apply` → board
     - `separations` create → detail
 18. **No-JS check:** each of the seven redirects above must still show the message when the form
-    is submitted without `use:enhance`. This is the reason flash is a cookie.
+    is submitted without `use:enhance`. This is the reason flash is a cookie. **The gate's named
+    subject is `separations` create -> detail, NOT `leave/new`** — phase 06 deletes `/leave/new`
+    after this phase runs, so exit evidence must not anchor on a route scheduled for deletion.
+    (Item 21's one-line `leave/new:81` `e.message` fix STAYS — that route is still live when
+    phase 04 executes.) Coordinator asked for the `/requests` filing flow as the substitute;
+    verified on disk that `requests ?/create` (`requests/+page.server.ts:108`) RETURNS rather than
+    redirecting — there is no `redirect(` anywhere in that file — so it cannot exercise the flash
+    path at all. `/requests` is therefore used as the no-JS **non-flash control** (a plain POST
+    still renders its page-local banner), and `separations` create carries the flash gate.
 19. Write `tests/unit/flash.test.ts`: set→take round-trip; `takeFlash` clears; a second `takeFlash`
     returns `null`; oversized payload rejected; malformed JSON returns `null` and does not throw.
 20. Gate: `pnpm test -- flash` green. Commit S3.
@@ -444,7 +472,7 @@ files), `pnpm test:e2e` (Playwright, flaky per #287), `pnpm check`, `pnpm lint`,
 | **Money-adjacent:** confirm `payroll/periods ?/void`, `?/release`, `payroll ?/void`, `payroll/[id] ?/decide` each show a success message live. Precondition: `./start.sh` DB + dev server running (user starts them) | **Hybrid** | AC-5 high-stakes money actions are no longer silent |
 | **Permission-adjacent:** `settings/roles ?/setActive` shows a message live. Precondition: dev server + `POST /api/v1/_dev/login-as` | **Hybrid** | AC-5 deactivating a login is confirmed to the operator |
 | **Destructive:** `employees/[id] ?/offboard` shows a message live | **Hybrid** | AC-5 the most consequential person-action reports its outcome |
-| No-JS flash: submit `leave/new` with JS disabled; the message renders at `/leave` | **Hybrid** | AC-3 the no-JS fallback is preserved |
+| No-JS flash: submit `separations` create with JS disabled; the message renders at the detail page. Control: submit `/requests` filing with JS disabled and confirm its page-local banner renders (non-flash path). Subject moved off `leave/new` because phase 06 deletes that route | **Hybrid** | AC-3 the no-JS fallback is preserved |
 | **P0-7 negative control:** open an OFFBOARDED employee's `employees/[id]`, force a document/reveal failure, confirm the error renders in ITS OWN card. The control: the Update Profile card is hidden for that employee, so pre-fix the error renders nowhere | **Hybrid** | AC-7 all 24 actions have their own error slot |
 | Toast pause-on-hover: hover a link-toast past 6s, confirm it survives; positive control = an unhovered toast expires | **Agent-Probe** | AC-8 link-toasts cannot vanish mid-click |
 | Screen-reader/DOM probe: `role="status"` + `aria-live` present on the toast region; `assertive` on `kind === 'error'`. Assert the ATTRIBUTE, not the visual | **Agent-Probe** | AC-8 toasts reach assistive tech |
@@ -503,9 +531,11 @@ absence:
 - [ ] `recruitment/[id]` publish that fails a server rule → error renders (not a no-op)
 - [ ] Create an employee → destination shows "created" AND mentions the temp-password email
 - [ ] Convert and hire from recruitment → destination message
-- [ ] `leave/new` → `/leave` message; with JS disabled too
+- [ ] `leave/new` → `/leave` message (JS on only — this route is deleted in phase 06)
+- [ ] `separations` create → detail message **with JS disabled** (the no-JS flash exit gate)
+- [ ] `/requests` filing with JS disabled → page-local banner renders (non-flash control)
 - [ ] `timesheets ?/create` self-redirect → message appears
-- [ ] `apply` → board message; `separations` create → detail message
+- [ ] `apply` → board message
 - [ ] Trigger an unexpected 500 → error page shows "Something went wrong. (Ref: …)" and the same
       ref appears in the server log
 - [ ] Hover a link-toast past 6s → it survives; unhovered control → it expires
@@ -549,7 +579,7 @@ single commit is a clean rollback.
 |---|---|---|---|
 | AC-1 | `submitFeedback` handles all four enhance result types and always releases `busy` | `tests/unit/submit-feedback.test.ts` + its mutation check | Fully-Automated |
 | AC-2 | `ConfirmButton` waits for the result, shows busy, reports the outcome; every existing call site compiles unchanged | `pnpm check` + the live ConfirmButton probe | Hybrid |
-| AC-3 | All 7 redirect-after-success flows render a message at the destination, including with JS disabled | `tests/unit/flash.test.ts` + the no-JS live check | Hybrid |
+| AC-3 | All 7 redirect-after-success flows render a message at the destination, including with JS disabled | `tests/unit/flash.test.ts` + the no-JS live check on `separations` create (NOT `leave/new` — phase 06 deletes it), with `/requests` filing as the non-flash control | Hybrid |
 | AC-4 | Zero raw `e.message` reaches the client; unexpected errors return "Something went wrong. (Ref: …)" | `grep` returns 0 matches + `tests/unit/handle-error.test.ts` + mutation check | Fully-Automated |
 | AC-5 | Every §B/§C/§E named high-stakes action gives a correctly-placed success or error signal | the manual silent-site checklist | Hybrid |
 | AC-6 | No regression: full unit suite, typecheck, lint, format all green | the full CI gate set | Fully-Automated |
@@ -615,7 +645,217 @@ requires the checklist plus the validate-contract evidence.
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+**Contract amendment — 03-09-26, amended-by outer-pvl cycle 1 (post-validation maintenance).**
+The AC-3 no-JS hybrid gate's subject moved from `leave/new` → `/leave` to **`separations` create
+→ `/separations/[id]` detail**, with a `/requests` filing as the non-flash control. Reason: phase 06
+deletes `/leave/new` after this phase runs, so a gate anchored there would go unrunnable; and
+`requests ?/create` returns rather than redirecting, so it can never carry a flash. Raised as
+CONCERN-9 by the phase-06 validator. Verified against source before amending — see the AC-3 row.
+Two rows changed (the AC-3 test-gate row and the flash legacy line); no verdict, severity count,
+execute-agent instruction, or OWNER-DECISION changed. Gate stays CONDITIONAL.
+
+Parallel strategy: sequential
+Rationale: 7/7 signals present (S1–S7), which scores HIGH, but the validate-agent runtime for this
+pass exposes no Agent/Task spawn tool — the two-layer fan-out (4 Layer-1 dimensions + 6 Layer-2
+sections S1–S6) was executed in-thread against source instead. Every claim below is grep/read
+verified on `staging @ 093a413`, not inferred.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-1 | `submitFeedback` handles success/failure/redirect/error and always releases `busy` | Fully-Automated | `pnpm test -- submit-feedback` exits 0 | B |
+| AC-1 | The `busy` invariant test is not vacuous | Fully-Automated | Mutation: delete the `busy` `finally` → a named test goes RED; restore | B |
+| AC-1 | The ~90 existing `createSubmitGuard` forms are not regressed | Fully-Automated | `pnpm test -- submit-guard` exits 0 (baseline green today) | A |
+| AC-2 | `ConfirmButton`'s 9-prop public API is source-compatible | Fully-Automated | `pnpm check` exits 0 with all 11 call-site files unedited | B |
+| AC-2 | Confirmed actions wait for the result and report it | Agent-Probe | Drive one confirmed delete: trigger disables, row disappears before the dialog is gone, a toast fires | B |
+| AC-3 | Flash survives a redirect, fires once, clears on read | Fully-Automated | `pnpm test -- flash` — round-trip, clear-on-read, second read `null`, >512B rejected, malformed JSON returns `null` without throwing | B |
+| AC-3 | The no-JS fallback is preserved | Hybrid | Submit `separations` create with JS disabled; the message renders at the `/separations/[id]` detail page (verified: `create:` at `separations/+page.server.ts:35` ends in `redirect(303, /separations/${id})` at `:62`, so it can carry a flash). Control: submit a `/requests` filing with JS disabled and confirm its page-local banner renders — `requests/+page.server.ts:155` RETURNS `{ message }` rather than redirecting, so it is the non-flash control. Precondition: `./start.sh` DB + the already-running vite dev server (pid 37184) | B |
+| AC-3 | A hover-preload cannot silently eat a flash | Hybrid | After a flash redirect, hover a nav link, then confirm the message still renders. Precondition: dev server. See C8 | B |
+| AC-4 | No server internals reach the client | Fully-Automated | `pnpm test -- handle-error` — friendly string + ref, never `error.message`, never a stack | B |
+| AC-4 | The leak test is not vacuous | Fully-Automated | Mutation: `handleError` returns `error.message` → a named test goes RED; restore | B |
+| AC-4 | All 13 raw-message form-action arms are gone | Fully-Automated | `grep -rn "e\.message" src/routes \| grep "fail("` returns 0 matches (returns exactly 13 today) | B |
+| AC-5 | Money/permission/destructive actions are no longer silent | Hybrid | Drive `payroll/periods ?/void`, `?/release`, `payroll ?/void`, `payroll/[id] ?/decide`, `settings/roles ?/setActive`, `employees/[id] ?/offboard` live; assert the named toast node and its text. Precondition: dev server + `POST /api/v1/_dev/login-as` | B |
+| AC-6 | No regression across the unit suite | Fully-Automated | `pnpm test` exits 0 — baseline today is 192 files / 2170 tests green | A |
+| AC-6 | CI exit gate | Fully-Automated | `pnpm format:check` && `pnpm lint` && `pnpm check` && `pnpm test`, in that order. **RED today** — see C1 | C |
+| AC-7 | Each of the 24 `employees/[id]` actions renders its own error | Hybrid | Force an `addLoan` failure on an OFFBOARDED employee; the error renders in the Loans card. Control: the Update Profile card is hidden for that employee, so pre-fix the error renders nowhere | B |
+| AC-8 | Toasts pause on hover | Agent-Probe | Hover a link-toast past 6s → survives. Positive control: an unhovered toast expires | B |
+| AC-8 | Toasts reach assistive tech | Agent-Probe | Assert `role="status"` + `aria-live` on the toast region and `assertive` for `kind === 'error'` — the ATTRIBUTE, not the look. Zero ARIA present today | B |
+| AC-9 | No notification is marked read without being shown | Agent-Probe | Create 11 unread; confirm all 11 surface and none is consumed unshown. Defect verified: `listUnread` is `take: 10` and the endpoint calls `markAllRead` | B |
+| AC-10 | The 4 `{#await}` blocks no longer swallow rejections | Agent-Probe | Reject one `data.employees` promise; an error state with a retry renders, not a blank list | B |
+| — | Playwright regression proof | Agent-Probe | `pnpm test:e2e` run, and a red result diagnosed from the actual error before being called a phase failure (#287) | D |
+| — | Offline org-switch `catch` path | Agent-Probe | Cannot be provoked reliably locally | D |
+
+gap-resolution legend: A — proven now. B — gate added by this plan's checklist. C — deferred to a
+named owner/phase. D — backlog test-building stub (named residual; keep-active).
+
+Legacy line form (for existing validate-contract consumers):
+- submitFeedback util: Fully-automated: `pnpm test -- submit-feedback submit-guard`
+- flash: Fully-automated: `pnpm test -- flash`; hybrid: no-JS `separations` create → `/separations/[id]` detail, control `/requests` filing (non-flash), precondition dev server
+- handleError: Fully-automated: `pnpm test -- handle-error` + `grep -rn "e\.message" src/routes | grep "fail("` = 0
+- ConfirmButton: Fully-automated: `pnpm check`; agent-probe: live confirmed-delete
+- money/permission/destructive sites: hybrid: live drive, precondition dev server + `_dev/login-as`
+- Toaster / notifications: agent-probe: hover control + 11-notification overflow
+- e2e regression: known-gap: documented (#287 flakiness)
+- offline org-switch: known-gap: documented
+
+Failing stub (AC-1, `tests/unit/submit-feedback.test.ts`):
+test("should handle all 4 enhance result types and always release busy", () => { throw new Error("NOT IMPLEMENTED — TDD stub: submitFeedback handles success/failure/redirect/error and always releases busy") })
+
+Failing stub (AC-3, `tests/unit/flash.test.ts`):
+test("should round-trip a flash and clear it on read", () => { throw new Error("NOT IMPLEMENTED — TDD stub: flash survives a redirect, fires once, clears on read") })
+
+Failing stub (AC-4, `tests/unit/handle-error.test.ts`):
+test("should return a friendly string with a ref and never error.message or a stack", () => { throw new Error("NOT IMPLEMENTED — TDD stub: no server internals reach the client") })
+
+### Dimension findings
+
+- Infra fit: CONCERN — every named path resolves except `src/routes/(auth)/+layout.svelte`, which
+  does not exist (C6); the `(auth)` group holds only `login/+page.svelte` and
+  `login/+page.server.ts`. All 7 flash destinations, including `apply`, are inside `(app)`
+  (`(app)/recruitment/[id]/apply`), so a layout-load read does cover them. SvelteKit 2.8 / Svelte 5
+  confirmed; `cookies.set`/`delete` in a server load is supported on this version.
+- Test coverage: CONCERN — baseline `pnpm test` is green (192 files / 2170 tests) and `pnpm lint` is
+  green (1 pre-existing a11y warning), but `pnpm format:check` is RED on the current tree (C1) and
+  `pnpm check` could not be baselined because a vite dev server is running (C13). Both mutation
+  checks are correctly specified and both are mandatory.
+- Breaking changes: CONCERN — `ConfirmButton`'s frozen-API claim VERIFIED across all 11 call-site
+  files (only the 9 declared props appear; no site uses `successMessage`), but
+  `/api/v1/notifications/read` gains a required body (C7) and the `saved` return shape conflicts
+  with the sibling it is told to copy (C3).
+- Security surface: CONCERN — the 13 `e.message` `fail()` arms are verified at the exact file:line
+  list, 13/13, and `employees/new:162` is correctly EXCLUDED (its `errMsg` is match-only, never
+  returned). But AC-4's wording is broader than its gate: 4 more `e.message` forwards survive at
+  `src/routes/api/v1/leave/[id]/+server.ts:64,65` and
+  `src/routes/api/v1/timesheets/[id]/+server.ts:60,61` (C4). `+error.svelte:38` already renders
+  `$page.error.message`, so the ref will reach the user with no extra work.
+- S1 (submitFeedback util): CONCERN — mechanically feasible, and better than planned: the guard
+  ALREADY exposes the result. Highest-risk edit is the unnecessary one (C2).
+- S2 (ConfirmButton rebuild): FAIL → REJECTED-ROUTED — item 11 proposes editing a phase-03-owned
+  file (F1). A zero-touch alternative exists and is mandated below.
+- S3 (cookie flash): CONCERN — the mechanism works on all 7 destinations, but the Flash contract
+  carries no nonce (C5) and a hover-preload can consume a flash silently (C8).
+- S4 (server error handling): CONCERN — the strongest-verified section; only AC-4's scope wording
+  is wrong (C4). `hooks.server.ts` has `handle` only, as claimed.
+- S5 (Toaster + notifications): CONCERN — `markRead(userId, ids)` EXISTS with the exact claimed
+  signature; `listUnread` `take: 10` + `markAllRead` confirms the AC-9 overflow defect is real;
+  `listRecent(user.id, 8)` is at dashboard `+page.server.ts:120` exactly. The Toaster has ZERO
+  `role`/`aria-live` today (C9), and the endpoint change is breaking (C7).
+- S6 (named-site adoption): CONCERN — every named site verified. `employees ?/offboard` is
+  confirmed DEAD (C11, owner-decision); the 4 `{#await}` blocks with no `{:catch}` are exact; the
+  org-switcher `try/finally` with no `catch` is exact; audit-log:129 is exact. The `saved` shape
+  conflict (C3) and the `action` name shadow (C10) must be settled before this section starts.
+
+### Findings
+
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| F1 | Item 11 tells the executor to add a prop to `ConfirmDialog.svelte`. That file is claimed by **phase 03** (`phase-03:107`, rewritten in its S7, and its AC-1 pins "No prop added, removed, renamed, or made required"); phase 05 also records "ConfirmButton / ConfirmDialog props are consumed, not changed". The umbrella's Pre-PVL Conflict Resolution covers `ConfirmButton` but never `ConfirmDialog` — this overlap is unresolved. | FAIL → **REJECTED-ROUTED** | Execute instruction E1. Phase 04 must NOT edit `ConfirmDialog.svelte`. |
+| C1 | `pnpm format:check` is RED on `staging @ 093a413` — `docs/ui-ux-audit-2026-09-03.md`, committed at `2f89ba9`. CI runs `format:check` FIRST and skips the rest, so this phase's Exit Gate cannot go green regardless of its own code. The file is a program-wide research artifact, outside phase 04's blast radius. | CONCERN (high) | **Route to the orchestrator / umbrella**, not to phase 04. One line: `pnpm prettier --write docs/ui-ux-audit-2026-09-03.md`. Blocks EVERY phase's exit gate. |
+| C2 | Item 2 ("add the minimal extension to `createSubmitGuard`") is **unnecessary**. The guard already documents and implements the seam: "When the wrapped handler returns its own callback it owns the response — including whether to call `update()`." `submitFeedback` can compose purely as `inner`, and the guard's `finally { busy = false }` then wraps it, so `busy` is released even if the wrapper throws. | CONCERN | Execute instruction E2 — make NO change to `submit-guard.svelte.ts`. This deletes the plan's own #1 Medium risk (90 forms) for free. |
+| C3 | Contract §2 says `saved: true`, but the sibling the plan tells the executor to copy — `rejectMany`, `requests/approvals/+page.server.ts:~178` — returns `saved: "<message string>"`. Two shapes on one page and one template. | CONCERN | Execute instruction E3 — widen the contract to `saved: true \| string` (truthy; a string IS the message) and make templates handle both. |
+| C4 | AC-4 claims "zero raw `e.message` reaches the client", but its gate grep is narrowed with `\| grep "fail("`. Four `e.message` forwards survive at `api/v1/leave/[id]/+server.ts:64,65` and `api/v1/timesheets/[id]/+server.ts:60,61` (via `apiError`). | CONCERN | Reword AC-4 to "zero raw `e.message` in form-action `fail()` arms" + backlog stub for the 4 API sites. |
+| C5 | The Flash contract `{kind, message}` has no id, so the client cannot dedupe defensively. `(app)/+layout.server.ts` reads only `locals` — no `url`, no `params`, no `depends()` — so Kit 2 does NOT re-run it on ordinary client-side navigation and `data.flash` stays cached between re-runs. The JS path is safe because `submitFeedback`'s redirect branch forces `invalidateAll`, and no-JS is a full document load; but the guard item 16 asks for cannot be written robustly without an id. | CONCERN | Execute instruction E4 — add `id: string` (nonce) to `Flash` and dedupe with a `Set`, mirroring the proven `seenNotifications` pattern at `(app)/+layout.svelte:77`. |
+| C6 | `src/routes/(auth)/+layout.svelte` is listed under "Modified" but **does not exist**. The `(auth)` group holds only `login/+page.svelte` and `login/+page.server.ts`. | CONCERN | Execute instruction E5 — treat as a NEW file; it MUST render `{@render children()}` or the login page goes blank. |
+| C7 | Making `{ ids }` a required body on `/api/v1/notifications/read` is a breaking change on a versioned API path. Only one in-repo caller exists (`(app)/+layout.svelte:86`), so in-repo it is safe. | CONCERN | Execute instruction E6 — accept an OPTIONAL body: `ids` present → `markRead`; absent → `markAllRead`. Same diff size, backward compatible. |
+| C8 | `src/app.html:23` sets `data-sveltekit-preload-data="hover"`. A hover-preload issues a data request that can run the `(app)` layout load, and `takeFlash` would delete the cookie with nothing rendered. The window is narrow (invalidation-gated) but the failure is silent. | CONCERN | Covered by the AC-3 preload Hybrid gate above. |
+| C9 | The Toaster has **zero** `role` and `aria-live` today — grep returns nothing. AC-8 depends on a phase-01 deliverable that has not landed. Item 30 already handles this correctly. Also: `listUnread` does not `select` `kind`, so notification toasts cannot carry a kind. | CONCERN | Confirms item 30's "add it here" branch is the live one, not the fallback. |
+| C10 | `payroll/[id]/+page.server.ts ?/decide` already binds a local `const { action, note } = parsed.data`. Adding `action: 'decide'` to the return shape shadows it. | CONCERN | Execute-agent note — do not shadow; name the local differently or qualify the return. |
+| C11 | `employees/+page.server.ts ?/offboard` is confirmed DEAD — no `?/offboard` post exists anywhere in `employees/+page.svelte`. Item 42's "delete it" is correct, but deleting a form action removes a POST surface. | CONCERN | **OWNER-DECISION 1** below. |
+| C12 | Item 17 says "the six named redirect-after-success flows" then lists seven bullets; item 18 says "each of the seven redirects". | CONCERN | Seven is correct. Execute-agent reads seven. |
+| C13 | `pnpm check` could not be baselined — a vite dev server is running (pid 37184) and `pnpm check` kills it. | CONCERN | Named residual — run `pnpm check` when the dev server is down, before locking S2's gate. |
+
+**Verified-correct claims (no action).** All 13 `e.message` `fail()` arms match the plan's file:line
+list exactly, 13/13. `employees/new:162` is correctly excluded (match-only, never returned).
+`markRead(userId, ids: string[])` exists with the exact claimed signature.
+`+error.svelte:38` already renders `$page.error.message`, so item 24 needs no work.
+`listUnread` is `take: 10` and the endpoint calls `markAllRead` — the AC-9 defect is real.
+`listRecent(user.id, 8)` is at dashboard `+page.server.ts:120` exactly. The 4 `{#await}` blocks
+with no `{:catch}` are exact (employees:86, payroll:121, timesheets:224 and :232). The org-switcher
+`try/finally` with no `catch` is exact (`(app)/+layout.svelte:47-62`). `hooks.server.ts` has
+`handle` only. `audit-log/+page.server.ts:129` is the `{ message }` outlier, at that exact line.
+`ConfirmButton`'s frozen-API claim holds across all 11 call-site files.
+
+### Execute-agent instructions
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | **Do NOT edit `src/lib/components/ui/ConfirmDialog.svelte`** — it is phase-03-owned. Achieve the hold-until-resolve behaviour with zero changes to it: `open` is `$bindable`, so `ConfirmDialog.confirm()` setting `open = false` before `onconfirm()` can be undone by re-setting `open = true` inside `ConfirmButton`'s `onconfirm` alongside `formEl.requestSubmit()`, then clearing it in the enhance callback when the result resolves. If that proves impossible, STOP and route the concern to phase 03 — do not edit the file. | S2 entry (item 11) |
+| E2 | Make NO change to `src/lib/utils/submit-guard.svelte.ts`. Build `submitFeedback` purely as an `inner: SubmitFunction` that returns its own response callback. Confirm `pnpm test -- submit-guard` is green with a zero-line diff on that file. | S1 entry (item 2) |
+| E3 | Treat the success contract as `saved: true \| string`. Reconcile with `rejectMany` before writing any S6 return shape. | S6 entry (item 38) |
+| E4 | Add `id: string` (a nonce) to the `Flash` type. Dedupe client-side with a `Set`, mirroring `seenNotifications` at `(app)/+layout.svelte:77`. | S3 entry (items 14, 16) |
+| E5 | `src/routes/(auth)/+layout.svelte` is a CREATE, not an edit. It must render `{@render children()}`. Verify the login page still renders after adding it. | S5 entry (item 32) |
+| E6 | Keep `/api/v1/notifications/read` backward compatible: `{ ids }` present → `markRead(userId, ids)`; body absent or empty → `markAllRead(userId)`. | S5 entry (item 33) |
+| E7 | Run `pnpm check` only while the dev server is DOWN. Run `pnpm prisma generate` before believing a red `pnpm check`. | Every `pnpm check` gate |
+| E8 | Both mutation checks (items 8 and 27) must be RUN and their RED output recorded in the phase report. A planned mutation check is a hypothesis, not evidence. | S1 and S4 gates |
+
+### Backlog artifacts
+
+| Artifact | Location | Tracks |
+|---|---|---|
+| `api-v1-raw-error-message-leak_NOTE_03-09-26.md` | `process/features/ui-ux-overhaul/backlog/` | The 4 `e.message` forwards at `api/v1/leave/[id]:64,65` and `api/v1/timesheets/[id]:60,61` (C4) |
+| `e2e-flakiness-blocks-feedback-regression_NOTE_03-09-26.md` | `process/features/ui-ux-overhaul/backlog/` | #287 e2e flakiness — the Known-Gap residual |
+| `org-switcher-offline-path-unproven_NOTE_03-09-26.md` | `process/features/ui-ux-overhaul/backlog/` | The offline org-switch `catch` path — the Known-Gap residual |
+
+### Open gaps
+
+- `pnpm format:check` RED on `staging @ 093a413` (`docs/ui-ux-audit-2026-09-03.md`): **routed to the
+  orchestrator / umbrella** — blocks the exit gate of every phase, not just 04. NEW PLAN NOT
+  REQUIRED; it is a one-line fix, but it is outside phase 04's blast radius.
+- `ConfirmDialog.svelte` cross-phase ownership: REJECTED-ROUTED to phase 03. The umbrella's Pre-PVL
+  Conflict Resolution should record it alongside the `ConfirmButton` clause.
+- The 4 `api/v1` `e.message` forwards: known-gap: documented as NEW PLAN REQUIRED — see the backlog
+  note above.
+- `pnpm test:e2e` (#287): known-gap: documented.
+- Offline org-switch `catch`: known-gap: documented.
+- `pnpm check` baseline: unverified (dev server running). Residual, not a blocker.
+- `phase-blast-radius-registry.md` still does not exist in the task folder. This plan's inline
+  blast-radius claim and conflict list must be copied into it when it is created — including the
+  `ConfirmDialog` overlap this contract found.
+
+### What this coverage does NOT prove
+
+- `pnpm test -- submit-feedback` runs against a mocked toast store boundary and a fabricated enhance
+  input. It does NOT prove a real form in a real browser releases `busy`, nor that the toast is
+  visible or reaches a screen reader.
+- `pnpm test -- flash` proves the cookie helper's round-trip in isolation. It does NOT prove
+  SvelteKit actually writes the `Set-Cookie` through a 303, nor that the `(app)` layout load re-runs
+  on any given navigation, nor that a hover-preload has not already consumed the cookie.
+- `pnpm test -- handle-error` proves the hook's return shape. It does NOT prove `+error.svelte`
+  renders the ref, nor that the same ref actually appears in a real server log.
+- `grep ... | grep "fail("` returning 0 proves the 13 form-action arms are gone. It does NOT cover
+  `apiError`, `error()`, `json()`, template-side rendering of a caught message, or the 4 known
+  `api/v1` sites.
+- `pnpm check` proves every `ConfirmButton` call site still COMPILES. It does NOT prove any of them
+  still BEHAVES the same — the dialog-hold change is invisible to the type checker.
+- `pnpm test` green (192 files / 2170 tests) proves no unit regression. Unit tests mock the DB, so
+  it proves nothing about the money-adjacent actions; that is why those gates are Hybrid.
+- The Agent-Probe rows are single judgments on a single machine. They do not prove behaviour across
+  browsers, at other viewport sizes, or with a real assistive-tech stack.
+- Nothing here proves the ~100 tracked follow-up call sites behave — they are explicitly out of
+  scope for this phase.
+
+Gate: CONDITIONAL (1 FAIL converted to a binding execute-agent routing instruction; 13 CONCERNs, 8
+fixed as execute-agent instructions, 3 as backlog stubs, 2 routed outside this phase)
+Accepted by: session (autonomous, /goal execution) — accepted concerns: F1 ConfirmDialog
+cross-phase ownership (REJECTED-ROUTED, zero-touch alternative mandated in E1); C1 format:check
+baseline RED (routed to orchestrator); C2 unnecessary guard edit; C3 `saved` shape conflict; C4
+AC-4 scope overclaim; C5 flash nonce; C6 `(auth)` layout is a create; C7 notifications API
+back-compat; C8 preload flash consumption; C9 Toaster ARIA absent; C10 `action` name shadow; C11
+dead offboard action (OWNER-DECISION); C12 six-vs-seven flows; C13 `pnpm check` baseline unverified.
+
+### OWNER-DECISION gates
+
+| # | Decision | Recommended default | Effect if unanswered |
+|---|---|---|---|
+| OD-1 | `employees/+page.server.ts ?/offboard` is confirmed dead (nothing posts to it). Delete it, or wire a list-row offboard button to it? | **Delete it.** Item 42 already says so, and wiring a new destructive list-row action is phase 05's scope, not phase 04's. | Executor follows item 42 and deletes it, noting the removal in the phase report. |
+| OD-2 | `docs/ui-ux-audit-2026-09-03.md` fails `format:check` and blocks every phase's CI exit gate. Fix it now under the umbrella, or waive `format:check` for the program? | **Fix it now** — `pnpm prettier --write docs/ui-ux-audit-2026-09-03.md`, one commit at the umbrella level, before phase 01 executes. | Phase 04's Exit Gate stays unreachable and every later phase inherits the same red gate. |
+| OD-3 | The `ConfirmDialog` overlap is not in the umbrella's Pre-PVL Conflict Resolution. Add it as a resolved conflict (phase 03 owns the file, phase 04 works around it), or let phase 04 own the file instead? | **Phase 03 owns it**; phase 04 uses the zero-touch `$bindable` workaround in E1. Phase 03's S7 rewrite is the larger, more fragile change and should not be edited underneath. | E1 binds the executor to the workaround anyway; the umbrella's registry stays incomplete. |
 
 ---
 

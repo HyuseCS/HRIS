@@ -751,7 +751,180 @@ cannot fail is the exact vacuous-green shape this repo has been burned by five t
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: parallel-subagents (read-only fan-out; Layer 1 x4 + Layer 2 x7 sections)
+Rationale: 5/7 signals — S1 no, S2 no, S3 yes (16 sites, 2 wiring shapes), S4 yes (8-phase
+program), S5 yes (special-scrutiny list), S6 no (no high-risk class touched — zero server files),
+S7 yes (10 files). Dominant signal: independent per-section feasibility with no cross-agent talk.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC3 | Zero native `confirm()` calls remain in `src/` | Fully-Automated | G2 in `tests/unit/destructive-confirms.test.ts` — comment-stripped scan of `src/**/*.svelte` + `src/**/*.ts`; excludes `function confirm()` declarations (`ConfirmDialog.svelte:27`, `ReasonDialog.svelte:48`) and `beforeunload` | B |
+| AC1 (structural) | Each of the 9 changed files imports `ConfirmButton`/`ConfirmDialog` and each named action string co-occurs with it | Fully-Automated | G1, same file | B |
+| AC2 | Every drafted consequence-naming message survives a later softening edit | Fully-Automated | G3, same file — asserts one non-interpolated substring per message | B |
+| AC8 (structural) | Statutory Confirm/Reject are wrapped (the last #108 gap closes) | Fully-Automated | G1 assertion on `?/confirmProposal` + `?/rejectProposal` | B |
+| AC12 | No server behavior changed | Fully-Automated | `git diff --stat` = 9 `.svelte` + 1 new test file only; G4 | A |
+| AC14 | Full CI gate set green in CI order | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` | A |
+| — | Sites 13/14 did not break the one e2e spec on that surface | Fully-Automated | `pnpm test:e2e`, `tests/e2e/separations.spec.ts` no worse than pre-phase baseline (#287 flakiness known — read the error, do not re-run blindly) | A |
+| AC4 | Cancelling a dialog writes nothing to the database | Hybrid | P2 negative control on period void / offboard / deactivate — precondition: running app + `veent-db-5434` + `POST /api/v1/_dev/login-as`, then a `psql` row assertion | B |
+| — | Do-not-break item 3 (masked reveal on `employees/[id]`) survives | Hybrid | R1 — precondition: running app + DB | B |
+| — | Nav resolves for HR_ADMIN / MANAGER / employee | Hybrid | R3 — precondition: running app + seeded roles | B |
+| AC1, AC5 | Each of the 14 changed sites opens a dialog before the action, and reports success after | Agent-Probe | P1 live spot-check matrix, all 16 rows, both cancel and confirm columns, recorded in the phase report | D |
+| AC6 | Net-pay override refuses negatives client-side, shows the delta, skips the dialog at delta 0 | Agent-Probe | P5 | D |
+| AC7 | Statutory dirty guard fires, names touched services incl. unseen tabs, clears on save | Agent-Probe | P4 | D |
+| AC9 | Re-activating a login shows no dialog | Agent-Probe | P1 row 12b — positive absence against a named control | D |
+| AC10 | Attendance reset still keeps untouched cell values | Agent-Probe | P6 | D |
+| AC11 | Focus trap + Escape scoping hold on the two in-container dialogs **and** on the one true dialog-in-dialog (`TimesheetModal.svelte:541`) | Agent-Probe | P3 keyboard-only walk, widened per concern C5 | D |
+| AC13 | The already-correct `ConfirmButton` sites and the bulk-reject `ReasonDialog` still work | Agent-Probe | R2 widened to all 11 on-disk call sites (concern C4); P1 row 16 | D |
+| — | Design-quality bar the CI gates cannot express | Agent-Probe | A1 impeccable audit pass on the 9 changed files | D |
+
+gap-resolution legend: A — proven now. B — gate added by this plan's checklist. C — deferred to a
+named later phase. D — backlog test-building stub (`component-interaction-test-harness_NOTE_{date}.md`,
+`process/features/ui-ux-overhaul/backlog/`), named residual, keep-active.
+
+Failing stub (AC3 / G2):
+test("should find zero native confirm() calls in src, excluding function declarations and beforeunload", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: Zero native confirm() calls remain in src/")
+})
+
+Failing stub (AC1 structural / G1):
+test("should show each changed file imports ConfirmButton or ConfirmDialog and each named action co-occurs with it", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: every §T3 action is routed through the kit confirm")
+})
+
+Failing stub (AC2 / G3):
+test("should find one non-interpolated substring of every drafted confirm message present in source", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: consequence-naming copy survives future edits")
+})
+
+Failing stub (AC8 structural / G1):
+test("should show ?/confirmProposal and ?/rejectProposal are confirm-wrapped", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: statutory Confirm/Reject single-submit guard")
+})
+
+Legacy line form:
+- Native-confirm removal: [Fully-automated: `pnpm test` — G2 in `tests/unit/destructive-confirms.test.ts`]
+- Confirm wiring (structural): [Fully-automated: `pnpm test` — G1]
+- Confirm copy: [Fully-automated: `pnpm test` — G3]
+- CI gate set: [Fully-automated: `pnpm format:check && pnpm lint && pnpm check && pnpm test`]
+- E2E regression: [Fully-automated: `pnpm test:e2e`, baseline-compared]
+- Cancel-writes-nothing: [hybrid: `psql` row assertion + running app + `_dev/login-as` — P2]
+- Masked-reveal + nav regressions: [hybrid: running app + DB — R1, R3]
+- Dialog appears / cancel / confirm / focus behavior: [agent-probe: P1, P3, P4, P5, P6, R2, A1]
+- Component-interaction harness: [known-gap: documented — `@testing-library/svelte@^5.2.0` installed with zero call sites]
+
+### Dimension findings
+
+- Infra fit: PASS — every command in the plan resolves on disk (`test` = `vitest run`, `test:e2e`,
+  `lint`, `check`, `format:check` all in `package.json`); `tests/unit/` exists and the cited
+  structural precedent `tests/unit/performance-no-scoring.test.ts` is real; `tests/e2e/separations.spec.ts`
+  exists. `validate-plan-artifact.mjs` returns 0 failures / 0 warnings on this plan.
+- Test coverage: CONCERN — three of the four automated gates are under-specified as written (C2 G2
+  comment false-positive, C3 G3 verbatim-vs-interpolated, C4 the call-site list the plan points at
+  does not exist). The mutation-check discipline is present and correct; the gates just need exact
+  assertion text before they are run.
+- Breaking changes: PASS — zero `+page.server.ts`, schema, service or capability edits. `netPay`'s
+  server `z.coerce.number().finite().min(0)` is confirmed on disk at
+  `payroll/[id]/+page.server.ts:110` and is not touched. Phase 04 freezes the `ConfirmButton` public
+  API (`action, title, message, confirmText, triggerLabel, triggerClass, disabled, submit, children`)
+  — verified against the phase-04 plan, so this phase's consumption is contract-safe.
+- Security surface: PASS — no auth, secret, trust-boundary or capability change. Every edit adds
+  friction to an already-guarded action; none removes a guard. Site 12 keeps the activate branch's
+  existing per-row `setActiveGuard` (`settings/roles:204`) untouched. No evidence pack required —
+  the phase touches none of the six high-risk classes.
+- Section 0 (entry checks) feasibility: CONCERN — see C6 (entry-gate wording) and C7 (registry
+  "append" to a file that does not exist yet).
+- Section 1 (payroll periods, sites 2/3) feasibility: PASS — both forms verified at
+  `payroll/periods/+page.svelte`: release form `:183-190` (hidden `id` only), void form `:197-205`
+  (hidden `id` only). Shape A is correct for both. Highest-risk edit: removing `voidG`/`releaseG`
+  before phase 04's busy state exists — mitigated by the hard entry gate.
+- Section 2 (payroll run + entry, sites 4/5) feasibility: PASS — site 4 `ConfirmButton` verified at
+  `payroll/+page.svelte:208-217`, props match the current API. Site 5 form verified at
+  `payroll/[id]/+page.svelte:263-296`: `netPay` (`type="number" step="any"`, **no `min`** — the gap
+  is real and client-only) plus a required `note`. Shape B correct. Highest-risk edit: the `baseline`
+  snapshot must be `$state` set once at panel open, not `$derived`, or the delta collapses to 0
+  after save — the plan already says this.
+- Section 3 (payroll config, site 6) feasibility: PASS — `?/updateRates` verified at
+  `payroll/config/+page.svelte:120`, sibling `?/update` at `:53`. Scope fence is real and checkable.
+- Section 4 (statutory rates, sites 7-10) feasibility: CONCERN — file is 585 lines; `?/confirmProposal`
+  form verified at `:210-216` and `?/rejectProposal` at `:218-224`, both bare `use:enhance` with no
+  guard (the audit claim is CONFIRMED). The existing `ConfirmDialog` is verified at `:559-565` with
+  the exact message the plan says it replaces, and the `canManage` / `Submit for CEO approval` split
+  is verified at `:539-555` — **both stale-audit corrections independently confirmed**. Concern is
+  C5: `:284` is `role="tabpanel"`, not a modal, so this is not a dialog-in-dialog case.
+- Section 5 (people and access, sites 1/11/12) feasibility: PASS — offboard form verified at
+  `employees/[id]/+page.svelte:1785-1809` with a required `endDate` (Shape B correct); review release
+  form at `performance/reviews/[id]/+page.svelte:174-180` carries no inputs (Shape A correct);
+  `?/setActive` at `settings/roles/+page.svelte:219-229` with two hidden inputs and the per-row guard
+  bound at `:204` (Shape A correct, and the per-row #108 comment is at `:22-24`, not `:21-25`).
+- Section 6 (kill the native confirms, sites 13-15) feasibility: CONCERN — C1 (attendance reset is
+  two render sites) and C9 (site 14 is Shape B, not Shape A). Native-confirm inventory independently
+  re-derived: exactly three calls, `attendance:19`, `separations:29`, `separations:41` — matches the
+  plan.
+- Section 7 (verification and close) feasibility: CONCERN — C4 (R2 covers 4 of 11 call sites).
+
+### Concerns accepted (execute-agent instructions)
+
+| # | Concern | Severity | Instruction to execute-agent |
+|---|---|---|---|
+| C9 | **Site 14 is Shape B, not Shape A.** The `reopenClearance` checkbox is inside the `?/undo` form (`separations/[id]/+page.svelte:254-276`, input at `:256-262`). `ConfirmButton` renders its own form and cannot carry a user-toggled field. The plan lists 14 under Shape A and only hedges in a wiring note. | CONCERN | Treat site 14 as **Shape B**, definitively — no execution-time re-check needed. Shape A set becomes 2, 3, 7, 8, 11, 12, 13, 15; Shape B set becomes 1, 5, 6, 9, 14. Site 13 stays Shape A (its `?/finalize` form at `:231` carries no fields). |
+| C1 | **Attendance reset renders twice**, not once: `attendance/+page.svelte:685-700` and `:855-875`. Both bind `rowGuard(\`resetDay:${d.id}\`, confirmReset)`. Checklist item 32 is singular. | CONCERN | Convert **both** render sites. Preserve the per-row guard identity: `ConfirmButton`'s busy state is per-instance, so it replaces `rowGuard` per row cleanly — say so in a rewritten `// #108` comment at both sites. Pass the `update({ reset: false })` behavior through `ConfirmButton`'s `submit` prop at both. |
+| C2 | **G2 will false-positive on a comment.** `src/lib/utils/submit-guard.svelte.ts:34` contains the literal text `confirm()` inside a code comment, and the plan tells G2 to scan `src/**/*.ts`. The plan's exclusion list names only `function confirm()` and `beforeunload`. | CONCERN | Strip line and block comments before the G2 scan. Keep the mutation check: re-adding a real native `confirm()` must still turn G2 red. |
+| C3 | **G3 as written is not executable.** At least 8 of the drafted messages are interpolated (`{firstName}`, `{peso(baseline)}`, `{touchedServices.join(', ')}`, `{p.changes.join('\n')}`), so no verbatim rendered string exists in source. The count is also off — 16 sites but **17** message strings (site 9 has two, site 14 has base + conditional clause). | CONCERN | For each message, assert one exact **non-interpolated substring** (e.g. `credited back to the employees`, `Edits on tabs you are not looking at are included`, `once they can see it, they have seen it`). Record the 17 chosen substrings in the phase report. |
+| C4 | **The `ConfirmButton` call-site list site 4 points at does not exist.** Site 4 says "12 files, listed in Blast Radius"; Blast Radius contains no such list. On disk there are **11** `.svelte` call sites (`src/lib/utils/submit-guard.svelte.ts` matches only in a comment). Checklist item 36 / R2 verify only four. | CONCERN | Verify all 11 after phase 04's rebuild: `branches`, `inventory`, `leave`, `settings/holidays`, `settings/offboarding`, `settings/onboarding`, `timesheets`, `payroll`, `performance/templates`, `employees/[id]`, `lib/components/timesheets/TimesheetModal.svelte`. Re-derive with `grep -rln "ConfirmButton" src/` at execution time. |
+| C5 | **The two "nested dialog" cases are not dialogs-in-dialogs.** `payroll/[id]/+page.svelte` has no modal wrapper at all (`fixed inset-0` returns nothing) and the statutory case is `role="tabpanel"` at `:284`. The one genuine dialog-in-dialog in the repo is `TimesheetModal.svelte` — `ConfirmButton` at `:541` inside the `fixed inset-0` overlay at `:286` — and this plan does not list it. | CONCERN | Re-label P3's two rows as "dialog inside a scrolling container / tab panel" (focus trap + focus restore still matter; parent-modal Escape scoping does not apply). **Add a third P3 row for `TimesheetModal`** as the real nested-modal regression against phase 03's Dialog base + phase 04's rebuild. |
+| C6 | **The hard entry gate has an ambiguous antecedent.** "the phase 03 and phase 04 **reports** are both written and **their** `Validate Contract` sections record a green gate set" — reports do not carry Validate Contract sections, plans do. "Green gate set" is also undefined against a CONDITIONAL contract. | CONCERN | Read the gate as: (a) `phase-03-design-system_PLAN_03-09-26.md` and `phase-04-feedback-contract_PLAN_03-09-26.md` each contain a `## Validate Contract` with `Gate: PASS` **or** `Gate: CONDITIONAL`; **and** (b) `phase-03-*_REPORT_*.md` and `phase-04-*_REPORT_*.md` both exist with the CI gate set recorded green. If any of the four is missing → **STOP**, do not start Section 1. |
+| C7 | Checklist item 4 says "**Append** this phase's claim to `phase-blast-radius-registry.md` in this folder". The file does not exist; the umbrella says the first EXECUTE creates it. | CONCERN | Read as "create if absent, then append". |
+| C8 | **Two copy-standard exemptions, both deliberate.** Copy Standard 4 bans jargon, but (a) sites 2/4 use "amortization", carried from the shipped model message, and (b) sites 13/14 keep "snapshots final pay" and the all-caps `RE-ENABLES` / `RE-OPENED` under the explicit "do not rewrite" rule. | CONCERN | Keep both as-is — consistency with the already-shipped model message beats a re-word, and site 13/14's wording is named by audit §G as the repo's model. Record the exemption in the phase report so an EVL reviewer does not read it as a miss. Every other message passes: no message uses "irreversible", "commit" or "persist"; every `confirmText` is a verb phrase. |
+
+### Rejected — routed to phase 04 (shared-primitive contract, umbrella §Pre-PVL)
+
+| Finding | Why rejected here | Route |
+|---|---|---|
+| **Shape A conversions silently drop per-button attributes `ConfirmButton` does not forward.** The attendance reset button carries `title="Discard manual edit and re-derive from punches"` (`attendance:690`, `:875`) — and `ConfirmButton`'s `title` prop is the **dialog** title, not a tooltip, so passing it through is a name collision that loses the tooltip. `ConfirmButton` exposes only `triggerLabel`, `triggerClass`, `disabled`. | Fixing this means adding a trigger-attribute pass-through to `ConfirmButton.svelte`. Per the umbrella's shared-primitive contract, **phase 05 must not edit `ConfirmButton`** — a finding that proposes editing it is a contract violation, not a gap. | **Phase 04.** Amend the `ConfirmButton` rebuild with a `triggerTitle` (and optional `triggerAttrs`) prop before freezing the API. If phase 04 ships without it, site 15 loses the tooltip — accept and record, do not patch in 05. |
+
+Open gaps:
+- Component-interaction test harness: `known-gap: documented as NEW PLAN REQUIRED` — `@testing-library/svelte@^5.2.0` is in `devDependencies` with zero call sites in `tests/`, so no automated tier can prove "clicking the trigger opens the dialog". Backlog stub `component-interaction-test-harness_NOTE_{date}.md` in `process/features/ui-ux-overhaul/backlog/`, to be written at UPDATE-PROCESS. This is why AC1, AC5, AC6, AC7, AC9, AC10, AC11 and AC13 rest on Agent-Probe evidence.
+- `process/context/tests/all-tests.md` terminates at the router ("No deeper test docs yet") — the ad-hoc Playwright + `_dev/login-as` + `psql` harness is prose-only, not routable. Flag at UPDATE-PROCESS.
+
+What this coverage does NOT prove:
+- G1/G2/G3 are **source scans**. They prove text is present in a file. They do **not** prove a dialog
+  renders, opens on click, traps focus, or that its confirm button submits the form. A green
+  `pnpm test` on this phase is compatible with all sixteen dialogs being unreachable.
+- G1 cannot prove an action string is inside a *confirm-wrapped region* without a parser — it proves
+  co-occurrence in the same file. A file that imports `ConfirmButton` and leaves one form bare
+  still passes G1.
+- G3 proves a substring survives. It does not prove the message is accurate, readable, or shown to
+  the right user.
+- G4 (`pnpm check`) does not cover `prisma/**` or `scripts/**` — irrelevant here (neither is touched)
+  but stated so the gate is not over-read.
+- `pnpm test:e2e` is flaky (#287). A green run does not prove sites 13/14 are correct; a red run
+  must be read, not re-run.
+- P2 proves cancel writes nothing on **three** named sites (period void, offboard, deactivate). It
+  says nothing about the other eleven.
+- P1/P3/P4/P5/P6/R2/A1 are agent judgment recorded in a report. They are not repeatable in CI and
+  they do not protect against a later regression.
+- Nothing here proves phase 04's `ConfirmButton` actually reports success — that is phase 04's own
+  gate set, consumed on trust via the hard entry gate.
+
+Gate: CONDITIONAL (0 FAILs, 9 CONCERNs accepted as execute-agent instructions, 1 finding
+REJECTED-ROUTED to phase 04, 2 known gaps on record)
+Accepted by: session (autonomous, outer PVL) — accepted concerns: C1 attendance-reset-two-sites,
+C2 G2-comment-false-positive, C3 G3-interpolated-strings, C4 call-site-list-missing,
+C5 nested-dialog-mislabel, C6 entry-gate-ambiguity, C7 registry-append, C8 copy-standard-exemptions,
+C9 site-14-shape-B. Owner decision requested on the two OWNER-DECISION gates recorded in the
+handoff (site 15 tooltip loss; site 14 shape change), neither of which blocks EXECUTE.
+
+**/goal block:** BRANCH B — the umbrella `ui-ux-overhaul-umbrella_PLAN_03-09-26.md` carries
+`## Stable Program Goal` (line 79). No `## Autonomous Goal Block` is written to this phase plan; the
+umbrella's `/goal` governs. Reference for latest state:
+`process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/ui-ux-overhaul-umbrella_PLAN_03-09-26.md`
 
 ## Resume and Execution Handoff
 

@@ -173,17 +173,34 @@ Adopt `$lib/labels` so no raw enum renders.
 6. Add `reviewStatusLabel` for `ReviewStatus` (`:254-261`): PENDING → "Not started",
    SELF_ASSESSMENT → "Employee self-assessment", SCORED → "Scored by evaluator", SIGNING →
    "Awaiting signatures", COMPLETED → "Completed", ACKNOWLEDGED → "Acknowledged by employee".
-7. Adopt at every raw-enum render site: `performance/+page.svelte:163` and `:207`
-   (`{review.status}`), the `separations/` list and `separations/[id]`, `requests/+page.svelte`,
-   `requests/[id]`, `requests/approvals`, `leave/+page.svelte`. Sweep, do not guess — the section's
-   automated gate is a grep proving zero remaining raw-enum interpolations in `.svelte` files.
+7. Adopt at every raw-enum render site **for the six enums mapped in items 2-6**:
+   `performance/+page.svelte:163` and `:207` (`{review.status}`), the `separations/` list
+   (`:159`, `:166`) and `separations/[id]` (`:116`, `:125`), `requests/+page.svelte:423`,
+   `requests/[id]:135`, `requests/approvals`, `leave/+page.svelte:191`. Sweep, do not guess.
+
+   **VALIDATE scope correction — read before writing the gate.** A repo-wide grep at `5e5cdfe` finds
+   **28** raw `{x.status}` / `{x.type}` interpolations in `src/routes/**/*.svelte`. Only about eight
+   belong to the six enums this phase maps. The rest are *other* enums with no map in this plan:
+   `payroll/+page.svelte:170`, `payroll/[id]:92`, `payslips/+page.svelte:56`, `payroll/periods:130`
+   (payroll run/period status); `benefits/+page.svelte:276`, `profile/+page.svelte:351`,
+   `employees/[id]:829` (enrollment status); `attendance/+page.svelte:622,780` (day status);
+   `dashboard/+page.svelte:207` (last-run status); `recruitment/[id]/+page.svelte:65` (posting
+   status); `settings/backup/+page.svelte:236` (backup status). `branches/+page.svelte:211` is a
+   hidden input `value`, not a render.
+
+   **Ruling:** the S1 gate is **scoped to the eight files above**, not a repo-wide zero-match. The
+   other ~13 sites are a recorded known gap (`raw-enum-sweep-remaining-enums_NOTE_03-09-26.md` in
+   `process/features/ui-ux-overhaul/backlog/`) — mapping six more enums is a second S1-sized commit
+   and would push this phase past its stated blast radius. Do **not** silently widen the sweep, and do
+   **not** write a repo-wide gate that cannot pass.
 8. `reports/[type]/+page.svelte:236-241` — the table header renders the raw column key
    (`TotalGross`). Add a `reportColumnLabel` map in `$lib/labels` and render through it; leave the
    `CURRENCY_COLS` alignment set alone (phase 8 does not restructure the report).
 9. Do **not** touch recruitment's or complaints' existing label maps beyond relocating them into
    `$lib/labels` if phase 3 has not already; they are the pattern being copied, not fixed.
 
-**Section gate:** `pnpm test` (new `tests/unit/labels.test.ts`), plus the raw-enum grep gate.
+**Section gate:** `pnpm test` (new `tests/unit/labels.test.ts`), plus the raw-enum grep gate
+**scoped to the eight files named in item 7** — not repo-wide (see the ruling there).
 
 ### S2 — Naming and routes (concern: *naming*)
 
@@ -191,15 +208,27 @@ Adopt `$lib/labels` so no raw enum renders.
     (both `+page.svelte`/`+page.server.ts` and the `[id]/` pair). Add
     `src/routes/(app)/complaints/+page.server.ts` and `src/routes/(app)/complaints/[id]/+page.server.ts`
     whose `load` does `redirect(308, '/inquiries')` and `redirect(308, \`/inquiries/${params.id}\`)`.
+    **Each stub route also needs a `+page.svelte`** — SvelteKit will not build a route that has a
+    `+page.server.ts` and no page component. Copy the shape of the existing precedent:
+    `src/routes/(app)/approvals/` carries **both** a 245-byte `+page.server.ts` and a 91-byte
+    `+page.svelte`. So four files, not two: `complaints/+page.server.ts`, `complaints/+page.svelte`,
+    `complaints/[id]/+page.server.ts`, `complaints/[id]/+page.svelte`.
     This is the SvelteKit-conventional smallest diff: a `load`-only redirect stub, matching the
     `/approvals` redirect phase 1 already fixed. **Alternative rejected:** a `reroute` hook in
     `src/hooks.ts` — it rewrites the URL silently, so the address bar would keep saying
     `/complaints`, which is the exact defect being fixed.
 11. **Keep the data keys.** `src/lib/server/services/complaints/`, the Prisma models, the audit-log
     entity names, and `tests/unit/complaints*.test.ts` keep the word *complaint*. Only the route,
-    the visible copy, and the internal `href`s change. Update the 4 non-route referrers:
-    `src/routes/(app)/+layout.svelte`, `src/routes/(app)/+layout.server.ts`, and the two page files
-    that link internally.
+    the visible copy, and the internal `href`s change. Update the non-route referrers. Verified
+    inventory at `5e5cdfe`: `src/routes/(app)/+layout.svelte:187` (`href: '/complaints'`),
+    `src/routes/(app)/complaints/+page.svelte:236` and `complaints/[id]/+page.svelte:49` (both move
+    with the rename), and — **added by VALIDATE** —
+    `src/lib/server/services/complaints/index.ts:124,176,182,226`, which build the *notification link
+    target* stored on the notification row as `/complaints/{id}`. Those are user-facing navigation
+    targets, not data keys, so they become `/inquiries/...`; the module path, the Prisma models and
+    the audit entity names still keep the word *complaint*. The S2 grep gate must therefore match
+    template-literal forms too, not only `href="/complaints`.
+    `src/routes/(app)/+layout.server.ts` imports `countWaitingInquiries` only — no URL, no change.
 12. **Login rebrand.** `src/routes/(auth)/login/+page.svelte`: `<title>Sign In — Avipa</title>` →
     `Sign In — Veent HRIS` (`:15`); `<img src="/avipa-logo.png" alt="Avipa">` →
     `src="/veent-logo.png" alt="Veent"` (`:21`); footer `Avipa · {year}` → `Veent HRIS · {year}`
@@ -228,17 +257,34 @@ Adopt `$lib/labels` so no raw enum renders.
     ("Detail" opening a *run*) is **phase 6's** call on which surface is canonical — phase 8 only
     relabels once phase 6 has ruled. If phase 6's report has not ruled, skip and note it.
 
-**Section gate:** `pnpm test` + `pnpm test:e2e -g "auth"` (login) + a route-redirect grep gate.
+**Section gate:** `pnpm test` + `pnpm test:e2e tests/e2e/auth.spec.ts` (login) + a route-redirect
+grep gate. **VALIDATE correction:** Playwright's `-g` filters on the *test title*, not the file name.
+`-g "auth"` matches only `unauthenticated user is redirected to the login page` and misses
+`valid credentials sign in and reach the dashboard` — the one test AC4 depends on. Select e2e specs
+**by file path** everywhere in this plan.
 
 ### S3 — Copy quality (concern: *naming*, split for reviewable commit size)
 
 18. **INFO_UPDATE field picker.** `requests/+page.svelte:305-320` — replace the free-text
     `name="field"` input (placeholder `e.g. contactAddress`) with a `<select name="field">` of the
-    updatable fields, human-labelled: Home address, Mobile number, Personal email, Emergency contact
-    name, Emergency contact number, Bank account, Civil status, Surname. The option `value` stays the
-    existing internal key so **the server action and its Zod schema are unchanged** — this is a
-    presentation swap only. Confirm the exact key list against `requests` INFO_UPDATE handling before
-    writing the options; do not invent a key.
+    updatable fields, human-labelled. The option `value` stays the existing internal key so **the
+    server action and its Zod schema are unchanged** — this is a presentation swap only.
+
+    **VALIDATE pinned the key list — do not extend it.** `src/lib/server/services/requests/apply.ts:7-15`
+    accepts exactly four keys onto two columns (`contactPhone` from `contactPhone`/`phone`;
+    `contactAddress` from `contactAddress`/`address`). Every other value hits `if (!column) return null`
+    at `apply.ts:55`, so the request **approves and writes nothing**. The select therefore carries
+    exactly **two** options:
+
+    | Label | `value` |
+    |---|---|
+    | Home address | `contactAddress` |
+    | Mobile number | `contactPhone` |
+
+    Personal email, emergency contact, bank account, civil status and surname are **deliberately not
+    self-service** (`apply.ts:4-6` — they land with T164 and stay HR-only). Adding them would be a
+    service change, which is out of bounds for this phase. If the owner wants more self-service
+    fields, that is a new plan.
 19. **Apply-page voice.** `recruitment/[id]/apply/+page.svelte:101-103` — "Link to your resume
     (Google Drive, Dropbox, etc.)" → "Link to the applicant's resume (Google Drive, Dropbox, etc.)".
     Sweep the rest of that form for second-person copy; it is an HR-only form.
@@ -272,13 +318,21 @@ Adopt `$lib/labels` so no raw enum renders.
     by R5. After the rewrite, re-run the `fail(400` grep and list any remaining machine-voiced string
     in the phase report as a known gap rather than expanding scope.
 
-**Section gate:** `pnpm test` + `pnpm test:e2e -g "form-errors"`.
+**Section gate:** `pnpm test` + `pnpm test:e2e tests/e2e/form-errors.spec.ts` (by path — no test
+title in that file contains the string `form-errors`, so `-g "form-errors"` selects zero tests).
 
 ### S4 — Row accessibility (concern: *row-a11y*)
 
-22. Apply R1 to `employees/+page.svelte:109`, `requests/+page.svelte:395`,
-    `leave/balances/+page.svelte:79`, `leave/+page.svelte:150`, `recruitment/+page.svelte:186`, and
-    the `timesheets/+page.svelte` row at `:159`.
+22. Apply R1 to the **five** rows that carry `role="link"` at `5e5cdfe`:
+    `employees/+page.svelte:109`, `requests/+page.svelte:395`, `leave/balances/+page.svelte:79`,
+    `leave/+page.svelte:150`, `recruitment/+page.svelte:186`.
+
+    **VALIDATE carve-out — `timesheets/+page.svelte:157-161` is NOT an R1 target.** That row has no
+    `role="link"` and no URL: it calls `openReview(ts)`, which opens a modal. There is nothing to put
+    in an `<a href>`. Give its name cell a real `<button type="button">` that calls `openReview`, drop
+    the `tabindex="0"` from the `<tr>`, and keep the whole-row click as the mouse convenience — the
+    same shape as R1, with a button instead of an anchor. Item 23's `preventDefault()` fix still
+    applies to the row handler that remains.
 23. **Timesheets Space-scroll bug.** `timesheets/+page.svelte:159` —
     `onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openReview(ts)}` has no
     `preventDefault()`, so Space both opens the modal and scrolls the page. Add it, matching
@@ -292,8 +346,15 @@ Adopt `$lib/labels` so no raw enum renders.
 26. Cross-check §5 item 10: the team attendance matrix and its "Exceptions only" filter are not row
     links and must be left alone.
 
-**Section gate:** `pnpm test:e2e -g "back-navigation|pagination|employee"` + the `role="link"` grep
-gate + the keyboard probe on one converted table.
+**Section gate:** `pnpm test:e2e tests/e2e/back-navigation.spec.ts tests/e2e/pagination.spec.ts
+tests/e2e/employee.spec.ts tests/e2e/employee-view-only.spec.ts tests/e2e/leave-balances.spec.ts
+tests/e2e/recruitment.spec.ts tests/e2e/posting-approver-sod.spec.ts
+tests/e2e/timesheet-approval.spec.ts tests/e2e/onboarding-checklist.spec.ts
+tests/e2e/tenancy-switch.spec.ts` + the `role="link"` grep gate + the keyboard probe on one converted
+table. **VALIDATE correction (two parts):** (a) select by file path — `-g` filters test titles, and
+neither `back-navigation` nor `pagination` appears in any title; (b) the plan's "six specs"
+undercounts — at least ten specs drive `/employees`, `/leave`, `/timesheets` or `/recruitment` lists
+at `5e5cdfe`.
 
 ### S5 — Dialogs and focus (concern: *dialogs-focus*)
 
@@ -452,7 +513,9 @@ speed on every remaining live check.
 
 - `src/lib/labels.ts` — only if phase 3 did not create `$lib/labels` (see entry dependencies)
 - `src/routes/(app)/inquiries/` — the renamed `complaints/` route tree (4 files moved)
-- `src/routes/(app)/complaints/+page.server.ts`, `src/routes/(app)/complaints/[id]/+page.server.ts` — 308 redirect stubs
+- `src/routes/(app)/complaints/+page.server.ts` + `+page.svelte`, and
+  `src/routes/(app)/complaints/[id]/+page.server.ts` + `+page.svelte` — 308 redirect stubs (four
+  files; the `+page.svelte` half is mandatory, see item 10)
 - `tests/unit/labels.test.ts`
 
 **Changed — copy/naming**
@@ -514,8 +577,10 @@ speed on every remaining live check.
 - **The two riskiest items and why:**
   1. **The route rename (item 10).** A missed `href` produces a redirect chain or a dead link. Mitigation:
      the redirect stubs mean no URL can 404, plus a grep gate proving zero `href="/complaints` remains.
-  2. **The row-link conversion (item 22).** Six tables, six existing e2e specs that click rows.
-     Mitigation: run those specs per section, not at the end.
+  2. **The row-link conversion (item 22).** Five `role="link"` tables plus the timesheets button
+     carve-out; **at least ten** existing e2e specs drive those lists (not six — VALIDATE recount).
+     Mitigation: run the ten specs named in the S4 section gate, by file path, inside section S4
+     rather than at the end.
 - **What could break invisibly:** a label map that silently falls through on an enum value the map
   does not cover, rendering `undefined`. Mitigation: `tests/unit/labels.test.ts` asserts every map is
   **exhaustive against the Prisma enum member list**, not just that known keys resolve.
@@ -526,13 +591,13 @@ speed on every remaining live check.
 |---|---|---|
 | `pnpm format:check && pnpm lint && pnpm check && pnpm test` green **in that order** (CI runs format first and skips the rest) | Fully-Automated | Phase exit criterion: the full CI gate set passes |
 | `tests/unit/labels.test.ts` — every label map is exhaustive against its Prisma enum member list and returns no `undefined` | Fully-Automated | Goal 1 (no raw enum reaches a user) — proves the maps are total |
-| Grep gate: zero `{\s*\w+\.status\s*}` / raw SCREAMING_SNAKE interpolations in `src/routes/**/*.svelte` | Fully-Automated | Goal 1 — proves the maps are *adopted*, which the unit test cannot show |
+| Grep gate: zero raw `{x.status}` / `{x.type}` interpolations **in the eight files named in S1 item 7** (scoped, not repo-wide — 28 such sites exist and only ~8 belong to this phase's six enums) | Fully-Automated | Goal 1 — proves the maps are *adopted*, which the unit test cannot show |
 | Grep gate: zero `role="link"` on a `<tr>` in `src/` | Fully-Automated | Goal 4 (row semantics) |
-| Grep gate: zero `href="/complaints` and zero `src="/avipa-logo` in `src/`; `/complaints` redirect stubs exist | Fully-Automated | Goal 2 (one noun per concept) + login rebrand |
+| Grep gate: zero `/complaints` in `src/` **in any string form** — `href="/complaints`, `'/complaints`, and the backtick template literals in `src/lib/server/services/complaints/index.ts` — excluding the four redirect-stub files themselves; zero `src="/avipa-logo`; all four redirect-stub files exist | Fully-Automated | Goal 2 (one noun per concept) + login rebrand |
 | Grep gate: zero occurrences of the 10 replaced error strings in `src/routes/**/*.server.ts`, and `'Invalid email or password'` still present in `(auth)/login/+page.server.ts` (negative control for R5) | Fully-Automated | Goal 3 (actionable errors) — the negative control proves the sweep did not overreach into the auth message |
 | Grep gate: no `<title>` in `src/routes/(app)/separations/` or `inquiries/` interpolates `firstName`/`lastName`/`subject` | Fully-Automated | Goal 6 (titles stop leaking) |
-| `pnpm test:e2e -g "auth"` green | Fully-Automated | Login rebrand did not break sign-in |
-| `pnpm test:e2e -g "back-navigation\|pagination\|employee\|recruitment\|form-errors"` no worse than the pre-phase baseline (record the baseline before section S4) | Hybrid — precondition: seeded DB + built app, and #287 flakiness means a baseline diff, not an absolute pass | Row conversions and the route rename did not break a working flow |
+| `pnpm test:e2e tests/e2e/auth.spec.ts` green (by path — `-g "auth"` misses the sign-in test) | Fully-Automated | Login rebrand did not break sign-in |
+| The ten specs named in the S4 section gate, selected **by file path**, no worse than the pre-phase baseline (record the baseline before section S4) | Hybrid — precondition: seeded DB + built app, and #287 flakiness means a baseline diff, not an absolute pass | Row conversions and the route rename did not break a working flow |
 | **Keyboard-only walk of one full flow: file a leave request.** `/dashboard` → nav to Leave → open the file-leave form → complete and submit → open the filed request from the list. Tab/Shift-Tab/Enter/Space/Escape only, mouse untouched. Assert: focus is always visible; the mobile drawer traps Tab and closes on Escape restoring focus to the hamburger; Space on a row checkbox toggles it and does **not** navigate; Enter on a row's name link opens the request; the org switcher opens, moves with arrows or is a native select, and closes on Escape. | Agent-Probe | Goal 4 (keyboard operability) end-to-end, on the persona (§6 Sam) the phase is aimed at |
 | **Screen-reader spot-check list** (see below) | Agent-Probe | Goals 1, 4, 5 — announcement correctness, which no grep can show |
 | Live spot-check, light **and** dark mode: login page reads Veent HRIS with the Veent logo and lists no tenant orgs *only if OWNER-DECISION-1 was granted* — otherwise assert the list is unchanged and the brand is Veent | Agent-Probe | Login rebrand landed; the owner-decision boundary was respected |
@@ -598,7 +663,9 @@ test("no separations or inquiries <title> interpolates a person name or a subjec
 |---|---|---|
 | Screen-reader announcement correctness | `vitest.config.ts` runs `environment: 'node'` over `tests/unit/**` only; there is no jsdom, no component-render harness and no axe integration. Adding one is a test-infrastructure project, not a copy phase. | Covered by the Agent-Probe spot-check list above **and** a backlog stub: `a11y-component-test-harness_NOTE_03-09-26.md` in `process/features/ui-ux-overhaul/backlog/`. This behaviour's gate stays **CONDITIONAL** — it is not declared PASS on the grep gates alone. |
 | Rendered contrast of the fixed colour-only signals | No automated contrast tool in the repo; the audit was source-only | Live spot-check in both themes, plus the same backlog stub |
-| Whether the Veent logo renders correctly at `h-16 w-auto` | Asset dimensions unknown from source | Live spot-check item; a bad render is a report item for the owner, not an asset edit |
+| Whether the Veent logo renders correctly at `h-16 w-auto` | Asset dimensions unknown from source | Live spot-check item; a bad render is a report item for the owner, not an asset edit. **VALIDATE note:** `static/veent-logo.png` is **934 KB** against `avipa-logo.png`'s 43 KB — a 22x payload increase on the unauthenticated login page. Not a blocker and not fixable here (`static/*` is out of bounds); record it for the owner. |
+| The ~13 raw-enum render sites belonging to enums this phase does not map (payroll run/period, benefit enrollment, attendance day, posting, backup status) | Mapping six more enums is a second S1-sized commit, outside this phase's stated blast radius | Backlog stub `raw-enum-sweep-remaining-enums_NOTE_03-09-26.md` in `process/features/ui-ux-overhaul/backlog/`. AC1 is scoped to the six mapped enums. |
+| Whether `favicon.png` / `apple-touch-icon.png` still carry Avipa artwork | Binary assets; source-only inspection cannot tell, and `static/*` is out of bounds for this phase | Owner spot-check item; a follow-up asset swap if it is Avipa artwork |
 
 ## Test Infra Improvement Notes
 
@@ -631,13 +698,13 @@ test("no separations or inquiries <title> interpolates a person name or a subjec
 
 | # | Criterion | proven by | strategy |
 |---|---|---|---|
-| AC1 | No raw database enum renders anywhere in `src/routes/**/*.svelte` | raw-enum grep gate + `tests/unit/labels.test.ts` exhaustiveness | Fully-Automated |
+| AC1 | No raw database enum renders **for the six enums mapped in S1 items 2-6**, across the eight files named in item 7 (the ~13 other-enum sites are the recorded known gap) | scoped raw-enum grep gate + `tests/unit/labels.test.ts` exhaustiveness | Fully-Automated |
 | AC2 | Every label map covers every member of its Prisma enum | `tests/unit/labels.test.ts` | Fully-Automated |
 | AC3 | `/inquiries` serves the page; `/complaints` and `/complaints/[id]` 308-redirect; no internal `href` points at `/complaints`; the Prisma/service/audit word *complaint* is unchanged | route-redirect grep gate + `pnpm test` (complaints unit tests still pass unchanged) | Fully-Automated |
-| AC4 | The login page reads Veent HRIS in title, logo and footer; sign-in still works | login-brand grep gate + `pnpm test:e2e -g "auth"` | Fully-Automated |
+| AC4 | The login page reads Veent HRIS in title, logo and footer; sign-in still works | login-brand grep gate + `pnpm test:e2e tests/e2e/auth.spec.ts` | Fully-Automated |
 | AC5 | The tenant-enumeration flow is **unchanged** unless OWNER-DECISION-1 was granted | `loginSchema` diff is empty; `(auth)/login/+page.server.ts` load is unchanged | Fully-Automated |
 | AC6 | All 10 machine-voiced error strings are replaced per the S3 table; `'Invalid email or password'` survives | error-string grep gate incl. the R5 negative control | Fully-Automated |
-| AC7 | No `<tr>` carries `role="link"`; every converted table has a real link in its name cell | row-semantics grep gate + `pnpm test:e2e -g "employee\|pagination"` | Fully-Automated |
+| AC7 | No `<tr>` carries `role="link"`; every converted table has a real link in its name cell (timesheets: a real button — item 22 carve-out) | row-semantics grep gate + the ten S4 specs by file path | Fully-Automated |
 | AC8 | Space on a timesheets row does not scroll the page; Space on a recruitment row checkbox toggles it without navigating | keyboard walk, steps 4 and 5 | Agent-Probe |
 | AC9 | The mobile drawer traps Tab, closes on Escape, and restores focus to the hamburger | keyboard walk, drawer step + screen-reader item 6 | Agent-Probe |
 | AC10 | The org switcher is keyboard-operable and announced as a listbox or a native select | keyboard walk + screen-reader item 7 | Agent-Probe |
@@ -688,7 +755,155 @@ schema and no stored link is affected, because `/complaints` keeps resolving eit
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: parallel-subagents (read-only fan-out), executed in-session
+Rationale: 5/7 signals (S2 route+form surface, S3 six independent sections, S4 phase program, S6
+medium-low but auth-adjacent login file, S7 ~40 files). Read-only validation of one finished plan
+needs no inter-agent talk, so independent dimension/section probes were the right shape.
+
+Test gates (C3 5-column table):
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC1 | the six mapped enums render human labels in the eight named files | Fully-Automated | scoped raw-enum grep over the eight files in S1 item 7 | B |
+| AC2 | every label map is total against its Prisma enum | Fully-Automated | `pnpm test` — `tests/unit/labels.test.ts` | B |
+| AC3 | `/inquiries` serves; `/complaints` 308-redirects; no `/complaints` string survives in `src/` | Fully-Automated | route-redirect grep (all string forms, incl. the service template literals) + `pnpm test` | B |
+| AC4 | login reads Veent HRIS and sign-in still works | Fully-Automated | login-brand grep + `pnpm test:e2e tests/e2e/auth.spec.ts` | B |
+| AC5 | the tenant-enumeration flow is untouched | Fully-Automated | `git diff` on `(auth)/login/+page.server.ts` is comment-only; `loginSchema` diff empty | A |
+| AC6 | the 10 machine-voiced strings are gone and `'Invalid email or password'` survives | Fully-Automated | error-string grep with the R5 negative control | B |
+| AC7 | no `<tr>` carries `role="link"`; converted rows have a real link (timesheets: a real button) | Fully-Automated | row-semantics grep + the ten S4 specs by file path | B |
+| AC8 | Space on a timesheets row does not scroll; Space on a recruitment row checkbox does not navigate | Agent-Probe | keyboard walk steps 4 and 5 | D |
+| AC9 | the mobile drawer traps Tab, closes on Escape, restores focus | Agent-Probe | keyboard walk drawer step + screen-reader item 6 | D |
+| AC10 | the org switcher is keyboard-operable and correctly announced | Agent-Probe | keyboard walk + screen-reader item 7 | D |
+| AC11 | no status is signalled by colour alone | Hybrid | colour-only grep + screen-reader items 4 and 5 — precondition: running app + screen reader | D |
+| AC12 | separations/inquiries titles leak no person name or subject | Fully-Automated | title-policy grep | B |
+| AC13 | person names render `Last, First` in lists, cells, options and definition lists | Agent-Probe | live walk of `employees/[id]` + `impeccable` audit | D |
+| AC14 | a failed submit on the five long pages scrolls the error into view and focuses the field | Agent-Probe | keyboard walk + live spot-check on the other four | D |
+| AC15 | the onboarding control is a real checkbox or a >=24px target | Agent-Probe | live spot-check + `impeccable` audit | D |
+| AC16 | audit-log filters reflect the URL params; entity IDs have an affordance | Agent-Probe | live spot-check | D |
+| AC17 | report headers read as human column names | Hybrid | live spot-check + `tests/unit/labels.test.ts` covers `reportColumnLabel` | B |
+| AC18 | the full CI gate set is green in CI order | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` | A |
+| AC19 | do-not-break items 1, 3, 6, 8 are intact | Hybrid | the two regression rows + a read of `punch/+page.svelte` — precondition: running app + seeded DB | B |
+| AC20 | both OWNER-DECISION items are reported and neither was silently built | Fully-Automated | phase report review + `git diff` on `(auth)/login/+page.server.ts` and `DevLoginSwitcher.svelte` | A |
+
+gap-resolution legend: A = proven now; B = gate added by this plan's checklist; C = deferred to a
+named later phase; D = backlog test-building stub (named residual, keep-active).
+
+Legacy line form:
+- enum labels: [Fully-automated: `pnpm test` + scoped raw-enum grep over the eight S1 files]
+- route alias: [Fully-automated: route-redirect grep, all string forms + `pnpm test`]
+- login rebrand: [Fully-automated: `pnpm test:e2e tests/e2e/auth.spec.ts` + brand grep]
+- error copy: [Fully-automated: error-string grep with the R5 negative control]
+- row a11y: [Fully-automated: `role="link"` grep + the ten S4 specs by file path]
+- dialogs/focus, announcement correctness, contrast: [agent-probe: keyboard walk + 10-item screen-reader spot-check]
+- component-level a11y assertions: [known-gap: documented — `a11y-component-test-harness_NOTE_03-09-26.md`]
+- unmapped enums (~13 sites): [known-gap: documented as NEW PLAN REQUIRED — `raw-enum-sweep-remaining-enums_NOTE_03-09-26.md`]
+
+Dimension findings:
+- Infra fit: CONCERN — one SvelteKit app, no container/port/deploy surface. The one real infra
+  defect was mechanical: the `/complaints` redirect stubs needed a `+page.svelte` each (SvelteKit
+  will not build a `+page.server.ts`-only route; the repo's own `/approvals` precedent carries both).
+  Fixed in plan (P1).
+- Test coverage: CONCERN — every e2e section gate selected specs with `pnpm test:e2e -g "<filename>"`,
+  but Playwright's `-g` filters on the **test title**. `-g "auth"` misses `valid credentials sign in
+  and reach the dashboard` (the test AC4 leans on); `-g "form-errors"`, `-g "back-navigation"` and
+  `-g "pagination"` match no title at all. All e2e gates rewritten to file-path selection, and the
+  S4 spec list recounted from six to ten (P5). No component-render tier exists — residual gap D.
+- Breaking changes: CONCERN — `src/lib/server/services/complaints/index.ts:124,176,182,226` build the
+  notification link target `/complaints/{id}`. The plan's referrer list missed them and the planned
+  grep gate (`href="/complaints`) was blind to template literals. They still resolve via the 308, but
+  every inquiry notification would take a redirect hop forever. Added to the checklist and the gate
+  widened (P2). Form-action names, payload keys, Zod schemas, `loginSchema` and Prisma: unchanged.
+- Security surface: PASS — no auth, permission, secret or trust-boundary logic changes. OWNER-DECISION-1
+  is deliberately not built and AC5/AC20 make its absence an automated check. The `DevLoginSwitcher`
+  double dev-gate (`import { dev }` plus `if (dev && !navigator.webdriver)`) was verified in source —
+  the plan's correction of the audit's "already on staging" claim is right. The redirect stubs sit
+  inside the `(app)` group so they inherit the existing session guard.
+- Section S1 (enum labels): FAIL -> fixed in plan. Item 7's gate ("zero remaining raw-enum
+  interpolations in `.svelte` files") could not pass with the six maps items 2-6 define: 28 such
+  sites exist repo-wide and ~13 belong to enums this phase never maps. Gate scoped to the eight named
+  files; the rest are a named residual with a backlog note (P4).
+- Section S2 (naming/routes): FAIL -> fixed in plan (P1 stub files, P2 service links). The
+  `/complaints` -> `/inquiries` mechanism itself is correct — a `load`-only 308 stub, not a `reroute`
+  hook — and the rejection rationale is right (a `reroute` keeps the old URL in the address bar).
+  `static/veent-logo.png` exists; `avipa-logo.png` is referenced only at `login/+page.svelte:21`;
+  `src/app.html` names only `favicon.png` and `apple-touch-icon.png`. Item 14's noun sweep stays
+  BLOCKED-ON-PHASE-02 (see Open gaps).
+- Section S3 (copy quality): FAIL -> fixed in plan (P3). All 10 error-string sites spot-checked at
+  their exact `file:line` — 10/10 verbatim matches at `5e5cdfe`. No test in `tests/` or `tests/e2e/`
+  asserts any of the old strings, so the rewrite breaks nothing. The real defect was item 18: the
+  proposed 8-option INFO_UPDATE picker versus a server map (`apply.ts:7-15`) that accepts four keys
+  onto two columns. Six of the eight options would have produced requests that approve and write
+  nothing (`apply.ts:55` returns null), and those fields are excluded on purpose (T164, HR-only).
+  Option list pinned to two.
+- Section S4 (row a11y): CONCERN -> fixed in plan (P6). Only five `<tr>`s carry `role="link"`, not
+  six; `timesheets/+page.svelte:157-161` opens a modal and has no URL, so R1's "real `<a>`" is
+  inapplicable there — carved out to a real `<button>`. No existing e2e locator depends on the
+  `role="link"` role (checked every spec); removing it only widens `getByRole('row')` matches, which
+  is additive. The R1 ruling itself is sound against the three live row patterns.
+- Section S5 (dialogs/focus): PASS — pins verified (`sidebarOpen` at `+layout.svelte:345-350`,
+  backdrop at `:392-401`, company switcher at `:437-490`). Hard dependency on phase 03's Dialog trap
+  is correctly declared. Item 29's (a)/(b) choice is legitimately deferred to research-refresh.
+- Section S6 (misc): PASS — `aria-current` count is 0 as claimed; the `scrollIntoView` source at
+  `performance/templates/[id]:80-90` exists in the shape described; `payroll/+page.svelte:171`,
+  `settings/schedules:66/:267` and `reports/[type]:236-241` all verified. `sr-only` is not declared
+  in `src/app.css`, so the Tailwind v3 built-in utility is the path — the plan already anticipates it.
+
+Open gaps:
+- Stores/Branches noun ruling: OWNER-DECISION gate. Phase 02's plan does **not** rule the noun — it
+  states the label "stays tenant-conditional" and "stays 'Stores' (#182 clash rule preserved)", i.e.
+  it preserves the inversion rather than resolving it. The umbrella registry lists this as an open
+  owner decision that "blocks phase 08 section S2". Checklist item 14 is therefore
+  BLOCKED-ON-PHASE-02 at EXECUTE time; the plan's stated fallback (ship S2 without item 14, report
+  the gap, one-commit follow-up) is the accepted resolution.
+- Login tenant enumeration (OWNER-DECISION-1): unbuilt by design. Isolated — only item 13
+  (comment wording) touches that file, and AC5 asserts the flow diff is empty.
+- `DevLoginSwitcher` removal (OWNER-DECISION-2): unbuilt by design. Isolated, with one adjacency to
+  watch — the mount at `(app)/+layout.svelte:6,354` sits in a file section S5 edits. EXECUTE must not
+  disturb it while reworking the drawer; AC20 catches it if it does.
+- Item 17's verb split waits on phase 06's canonical-surface ruling — plan already says skip and note.
+- Component-level a11y assertions: known-gap documented as NEW PLAN REQUIRED — see
+  `process/features/ui-ux-overhaul/backlog/a11y-component-test-harness_NOTE_03-09-26.md`.
+- The ~13 unmapped raw-enum render sites: known-gap documented as NEW PLAN REQUIRED — see
+  `process/features/ui-ux-overhaul/backlog/raw-enum-sweep-remaining-enums_NOTE_03-09-26.md`.
+- `static/veent-logo.png` is 934 KB against `avipa-logo.png`'s 43 KB — a 22x payload increase on the
+  unauthenticated login page. `static/*` is out of bounds for this phase; owner report item.
+- `favicon.png` / `apple-touch-icon.png` may still carry Avipa artwork — binary, unverifiable from
+  source, and out of bounds. Owner spot-check.
+
+What this coverage does NOT prove:
+- The scoped raw-enum grep does not prove the app is free of raw enums — 13 sites in other enum
+  families remain by design.
+- `tests/unit/labels.test.ts` proves the maps are total; it cannot prove they are *adopted* at any
+  render site, and it cannot prove a label reads well to a person.
+- The route-redirect grep proves no `/complaints` string survives; it does not prove `/inquiries`
+  actually renders, that the 308 fires, or that an old bookmark lands correctly — no e2e spec covers
+  the inquiries route at all.
+- `tests/e2e/auth.spec.ts` proves sign-in still works; it does not look at the logo, the title or the
+  footer, and it does not prove the tenant list is unchanged.
+- The `role="link"` grep proves the attribute is gone; it does not prove a real link took its place,
+  that the link is reachable by keyboard, or that a screen reader announces the row correctly.
+- The error-string grep proves the old strings are gone; it does not prove the new sentences are the
+  ones a person needs, and it does not prove any of them ever renders.
+- The ten S4 specs are a baseline diff, not an absolute pass (#287 flakiness) — an unrecorded
+  baseline makes that row prove nothing.
+- No gate proves the mobile drawer traps focus, the switcher is announced as a listbox, contrast is
+  adequate in either theme, or that the onboarding checkbox meets the 24px target. Those are
+  Agent-Probe judgement plus the two backlog residuals.
+- Nothing here proves the phase-02 noun ruling arrived, so nothing proves goal 2 ("one noun per
+  concept per tenant") end to end.
+
+Gate: CONDITIONAL (four FAIL-grade findings fixed in the plan by this PVL pass; the remaining
+concerns are recorded residuals with backlog stubs on disk, and one owner-owned blocker — the
+phase-02 noun ruling — with an accepted fallback)
+Accepted by: session (autonomous, /goal execution) — accepted concerns: (1) component-level a11y
+assertions stay Agent-Probe with a backlog stub; (2) ~13 unmapped raw-enum sites deferred to a new
+plan; (3) item 14's noun sweep may ship omitted if phase 02 never rules; (4) the Veent logo payload
+and the possibly-Avipa favicon are owner report items, not phase-08 edits.
 
 ## Resume and Execution Handoff
 

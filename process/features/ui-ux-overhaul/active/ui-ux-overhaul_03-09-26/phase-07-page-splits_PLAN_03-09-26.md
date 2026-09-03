@@ -76,7 +76,7 @@ finds itself editing a fifth server file must stop and report.
 | # | File | Change | Justification |
 |---|---|---|---|
 | SC-1 | `employees/[id]/+page.server.ts` | Add `action: '<name>'` to the return/`fail()` payload of every action that lacks it (19 of 22) | P0-7. The page's own `form?.action` disambiguation pattern already exists on 3 actions; the fix is applying it, not inventing it. No signature, guard, or service call changes. |
-| SC-2 | `employees/[id]/+page.server.ts` — non-`reveal` actions | Thread `revealed`/`history` back through the action result when the caller was already revealed | People finding: "reveal drops on any save". **No new reveal, no second audit row** — see the hard constraint below. |
+| SC-2 | `employees/[id]/+page.server.ts` — non-`reveal` actions | Thread `revealed`/`history` back through the action result when the caller was already revealed | People finding: "reveal drops on any save". **No new reveal, no second audit row** — see the hard constraint below. **VALIDATE 03-09-26: authorized but expected to be UNUSED.** `grep -n redirect` on this file returns nothing — no action here redirects, so B5's stated fallback trigger cannot occur and the client-only path suffices. Taking SC-2 anyway requires recording the reason in the phase report. |
 | SC-3 | `settings/+page.server.ts` | Delete the four now-orphaned capability flags (`isSuperAdmin`, `canRoles`, `canStatutory`, `canHrOrgwide`); keep `requireAnyCapability(user.roles, 'MANAGE_HR')` untouched | The shared array evaluates capabilities client-side from `data.user.roles` via `$lib/rbac.canAny` (the same table, the same function the sidebar already uses). Leaving the flags would be dead code my own change created. |
 | SC-4 | `separations/+page.server.ts`, `inventory/+page.server.ts`, `complaints/+page.server.ts` (employee branch only) | Call `paginate(url, rows.length, { param, pageSize })` and slice the already-fetched array | `Pagination.svelte` is server-fed by design — its `meta` prop has no client-only path. Slicing in the load keeps `src/lib/server/services/**` untouched. |
 
@@ -209,6 +209,20 @@ Commit after each section (S1–S7). Run that section's test gate before the com
         inactive tab's form. `hidden` keeps the nodes alive (input values intact, in-flight
         `use:enhance` guards intact) and removes them from the accessibility tree and tab order.
         This is also why S2–S4 are wrapper insertions rather than content moves.
+      - **VALIDATE hardening 03-09-26 — Tailwind defeats the bare `hidden` attribute.**
+        `[hidden] { display: none }` is a UA rule; any Tailwind display utility on the panel
+        element (`grid`, `flex`, `block`, `inline-flex`) wins the cascade and the "hidden" panel
+        stays visible. Set BOTH: the attribute (for the accessibility tree and tab order) **and**
+        Tailwind's `hidden` class — `hidden={!active} class:hidden={!active}` — or carry no display
+        utility on the panel wrapper at all. Gate G14 asserts this.
+      - **VALIDATE hardening 03-09-26 — tabs must be anchors, not bare buttons.** A `<button>` +
+        `pushState` tab strip is inert before hydration and with JS off, which makes four of the
+        five tabs unreachable in exactly the window this repo has already been bitten in (the
+        pre-hydration click-drop idiom documented in `tests/e2e/employee-view-only.spec.ts` and
+        reused in `settings-visibility.spec.ts`). Render each tab as
+        `<a role="tab" href={hrefFor(id)}>` and `preventDefault()` + `pushState` in the click
+        handler. Deep links, middle-click and G7's walk all keep working; the ARIA tabs keyboard
+        pattern is unchanged.
       - After a form POST, `use:enhance` re-runs `load` but does not change the URL, so `?tab=`
         persists and the user stays on the tab they submitted from.
 - [ ] A3. Add `resolveTab(raw: string | null): TabId` as a pure exported function (unknown/absent
@@ -230,7 +244,11 @@ Commit after each section (S1–S7). Run that section's test gate before the com
 ### S2 — Overview tab content fixes
 
 - [ ] B1. **P0-7, part 1 (server).** In `employees/[id]/+page.server.ts`, add `action: '<name>'` to
-      every success return and every `fail()` payload of the 19 actions that lack it. Do not rename
+      every success return and every `fail()` payload of the 18 actions that lack it.
+      **VALIDATE count correction 03-09-26:** the page has **21** actions, not 22. Three already
+      carry the key (`assignTemplate`, `changeCompensation`, `promote`, each via a local
+      `const action = '<name>'`), so **18** need it. Read "22 actions" as "21" everywhere in this
+      plan, AC-4 and G7 included. Do not rename
       or remove any existing key. `reveal` keeps returning `{ revealed, history }` and gains
       `action: 'reveal'`.
 - [ ] B2. **P0-7, part 2 (markup).** Give each form in the Overview tab its own scoped feedback
@@ -271,6 +289,31 @@ Commit after each section (S1–S7). Run that section's test gate before the com
       redirecting action) fall back to SC-2's server threading, and record why in the phase report.
       Hard invariant either way: no second `revealEmployeeSensitive` call, no second audit row, and
       a full page reload still re-masks.
+- [ ] **B5a. HARD GATE (VALIDATE 03-09-26 — cross-employee reveal leak). The `$state` cache MUST be
+      keyed to the employee and cleared whenever `data.employee.id` changes.**
+      SvelteKit reuses the same component instance across `employees/A` → `employees/B` (same
+      route, new `data`). A plain `$state` survives that navigation; the `$derived(form?.revealed)`
+      it replaces does not. Without a reset, employee A's unmasked SSS / PhilHealth / Pag-IBIG /
+      TIN, bank account, GCash and basic monthly salary render on employee B's page — and because
+      those values **pre-fill editable inputs** (`+page.svelte:632-662`, `730-740`, `1551`, `1685`)
+      inside `?/update`, `?/changeCompensation` and `?/promote`, a save on B would **write A's data
+      onto B**. That is a PII disclosure plus a data-corruption path: a phase failure, not a
+      tradeoff. Required shape (either is acceptable; both must survive `pnpm check`):
+      - hold `let cache = $state<{ id: string; revealed: R; history: H } | null>(null)` and read it
+        through `const revealed = $derived(cache?.id === data.employee.id ? cache.revealed : null)`;
+        or
+      - wrap the reveal-consuming subtree in `{#key data.employee.id}` so the state is recreated.
+      Also required: the cache holds ONLY what `?/reveal` returned for the currently-loaded
+      employee; it is never written from any other action's payload; and it is never persisted to
+      `sessionStorage`, `localStorage` or `$page.state` — shallow-routing state is serialized into
+      the history entry, so putting revealed values there would leave plaintext PII in browser
+      history. Proven by gate G13.
+      **OWNER-DECISION required before S2:** B5 deliberately changes behavior that
+      `+page.svelte:38-42` documents as intentional under #111 ("any other action result (e.g. a
+      save) drops back to the masked display"). Holding a reveal across saves widens the
+      client-side exposure window even with no extra audit row. The owner must accept the new
+      posture — or rule that reveal SHOULD keep dropping on save, which deletes B5, B5a and SC-2
+      entirely.
 - [ ] B6. Gate: `pnpm check` + `pnpm test` + `pnpm test -- employee` green. Commit.
 
 ### S3 — Compensation & Payroll tab: disambiguate the three edit forms
@@ -316,8 +359,15 @@ Commit after each section (S1–S7). Run that section's test gate before the com
       state, `data`/`form` props) and reduces to a header plus a two-way branch. Pass `data` and
       `form` down as props. **No route, URL, action, or `?view=` change.**
 - [ ] E2. **Preserve §5 item 10 exactly:** the team attendance matrix and the "Exceptions only"
-      filter move into `AttendanceHrGrid` **byte-identical**. Do not restyle, do not re-key, do not
-      change the filter's semantics. Damaging either is a phase failure.
+      filter move into `AttendanceHrGrid` **behavior-identical**. Do not restyle, do not re-key, do
+      not change the filter's semantics. Damaging either is a phase failure.
+      **VALIDATE clarification 03-09-26:** "byte-identical" is literally impossible for an
+      extraction — every `data.*` reference becomes a prop and the parent's local state must be
+      threaded. The bar is behavior-identical markup, and the following MUST be passed down (not
+      duplicated, not re-created inside the child): the `exceptionsOnly` filter state, the period /
+      date state, and every `createSubmitGuard` instance the moved markup calls. Re-creating a
+      guard inside the child gives each component its own in-flight flag and silently re-opens the
+      double-submit hole the guards exist to close.
 - [ ] E3. Group the 5-button bulk bar. Two labelled clusters inside the existing bar:
       - `Recalculate` (read/derive): `Derive`, `Derive team`
       - `Lock & release` (destructive/irreversible): `Lock`, `Unlock`, `Lock team`, `Unlock team`
@@ -397,6 +447,20 @@ Commit after each section (S1–S7). Run that section's test gate before the com
       Phase 02 owns it. The sidebar's labels now come from the array, so `Company` → `Company
       Information`, `Schedules` → `Work Schedules`, `Holidays` → `Holiday Calendar`, `Roles` →
       `Roles & Access`. That is the point.
+      **OWNER-DECISION required (VALIDATE 03-09-26 — this is more than a label swap).** Today
+      `settingsChildren` has **8** entries (`All settings`, Company, Earnings & Deductions, Salary
+      Grades, Org Structure, Schedules, Roles, Holidays). `visibleSettings()` returns **17**, so a
+      straight derive grows the sidebar Settings group to **18** rows for a Super Admin and pulls
+      `/payroll/config` and `/payroll/statutory-rates` — two payroll pages — into the Settings nav
+      group. That is a navigation IA change, and `(app)/+layout.svelte` IA belongs to Phase 02 per
+      the umbrella's shared-file ordering. Pick one before F6:
+      (a) sidebar shows the full 17 — accept the growth and get Phase 02's ruling on the two
+      payroll rows; or (b) sidebar keeps a curated subset, selected from the array via an explicit
+      `inSidebar: boolean` field on `SettingsDestination` — still one source, still one canonical
+      label per destination, no IA change. **Recommended default: (b).**
+      Parity note either way: keep the outer `isAdmin` (MANAGE_HR) gate on the group. Destinations
+      with `capabilities: []` are gated only by that outer check; dropping it would widen the
+      sidebar to every role that reaches the layout.
 - [ ] F7. Rewrite `tests/unit/settings-cards.test.ts` → assert `visibleSettings(roles)` returns the
       **exact ordered href list** per role, for `SUPER_ADMIN` / `CEO` / `HR_ADMIN` / `MANAGER`.
       Write the expected lists **longhand**, not derived from `CAPABILITIES` — the existing test's
@@ -406,6 +470,15 @@ Commit after each section (S1–S7). Run that section's test gate before the com
       `getByRole('link', { name: 'Holidays', exact: true })` becomes `'Holiday Calendar'`. The
       `Payroll Config` / `Roles & Access` count-0 assertions for non-super roles are **unchanged and
       are the parity gate** — if the array's capability mapping is wrong, this spec catches it.
+      **VALIDATE addition 03-09-26 — the rename is not the only breakage.** The spec's positive
+      locators are page-wide (`page.getByRole('link', { name: /Holiday Calendar/ })` at line 26,
+      `/Payroll Config/` and `/Roles & Access/` at lines 56-59). Once the sidebar renders the same
+      canonical labels, each of those matches **two** links (hub card + sidebar child) and
+      Playwright strict mode throws on `toBeVisible()` / `.click()`. Scope every positive locator
+      before asserting — e.g. `page.getByRole('main').getByRole('link', { name: ... })` for the hub
+      card and `page.getByRole('navigation').getByRole('link', { name: ... })` for the sidebar row.
+      The `toHaveCount(0)` negative assertions are unaffected (0 stays 0) and stay exactly as they
+      are — they are the parity gate.
 - [ ] F9. Gate: `pnpm check` + `pnpm test` + the new `settings-destinations` test green. Commit.
 
 ### S7 — settings/org, employees/new, pagination
@@ -436,6 +509,12 @@ Commit after each section (S1–S7). Run that section's test gate before the com
       when `total <= pageSize`, so short lists are visually unchanged.
 - [ ] G4. Complaints: paginate the **employee branch only**. The HR branch is already paginated with
       `param: 'page'` — do not touch it, and do not let the two params collide.
+      **VALIDATE addition 03-09-26:** the HR branch also returns its meta under the key
+      `pagination` (`complaints/+page.server.ts:34,56`) and uses the helper's **default pageSize of
+      10**, not 20. Return the employee branch's meta under a distinct key (`myPagination`) so the
+      template cannot confuse the two, and either match the HR branch at `pageSize: 10` or state in
+      the phase report why one feature paginates at two sizes. **Recommended default: `pageSize: 10`
+      for the complaints employee branch** (match its sibling); 20 for separations and inventory.
 - [ ] G5. Separations: add the `overflow-x-auto` wrapper its sibling tables have (People/Requests
       finding, one class, adjacent to the Pagination edit).
 - [ ] G6. Gate: full CI set. Commit.
@@ -457,12 +536,14 @@ tier assignments are **not** blocked.
 | G3. `visibleSettings()` unit test: exact ordered href list per role for SUPER_ADMIN / CEO / HR_ADMIN / MANAGER, longhand, `toEqual` | Fully-Automated (`tests/unit/settings-destinations.test.ts`) | D7 parity — no capability widened or narrowed; MANAGER still cannot see Review Schedule, Payroll Config, Roles, Backup |
 | G4. `tests/e2e/settings-visibility.spec.ts` green after the label update — hub shows Holiday Calendar for HR_ADMIN, hides Payroll Config and Roles & Access; sidebar shows the canonical label | Hybrid (needs seeded DB + `pnpm build` + preview; suite is flaky per #287 — read the error, do not re-run blind) | D7 hub + sub-nav + sidebar all render the same names from the same array |
 | G5. **P0-7 live probe.** As HR_ADMIN, open an **OFFBOARDED** employee. Force a failure in a Documents-tab action (upload an over-size file) and in a reveal. Assert the error text renders **inside the Documents tab, attached to that form**, with `role="alert"`. Positive control: a successful upload shows its own `role="status"` in the same place. Negative control: the Update Profile card is absent (offboarded) and no error appears anywhere near where it used to. | Agent-Probe (Playwright + `POST /api/v1/_dev/login-as`) | Addendum P0-7 fully closed, including the offboarded tail that is the whole point of the finding |
-| G6. **Reveal-survives-save + audit invariant.** Reveal salary. Save a gov-ID edit. Assert the figure is **still unmasked** after the save AND that the Employment History panel is still unmasked. Then `psql` the audit table: assert **exactly one** VIEW row for that employee in the window. Reload the page: assert everything re-masks. | Hybrid (running app + DB assertion) | People finding "reveal drops on any save"; do-not-break item 3 (#111/#290) unharmed |
+| G6. **Reveal-survives-save + audit invariant.** Reveal salary. Save a gov-ID edit. Assert the figure is **still unmasked** after the save AND that the Employment History panel is still unmasked. Then `psql` the audit table: assert **exactly one** VIEW row for that employee in the window. Reload the page: assert everything re-masks. **The probe MUST use an employee that is NOT the logged-in HR user's own 201 file** — `+page.server.ts:617-620` exempts a self-reveal from the audit log, so a self-reveal makes "exactly one row" vacuously true (0 = 0). Name the exact table and predicate in the phase report before running. | Hybrid (running app + DB assertion) | People finding "reveal drops on any save"; do-not-break item 3 (#111/#290) unharmed |
 | G7. **Live walk of `employees/[id]` as HR_ADMIN** on an ACTIVE employee: every one of the 22 actions submits from its new tab and renders its own result in that tab; no section is unreachable from any tab; typing into a Compensation form, switching to Documents and back **preserves the typed text**; `?tab=documents` deep-links; back-navigation via `?from=` still works | Agent-Probe (Playwright, screenshot each tab) | §T6 employees/[id] criterion + the dirty-form risk; "no section became unreachable" is the umbrella's stated phase-07 exit |
 | G8. **Attendance persona walk.** As a view-only employee: `/attendance` renders the self view, `Export CSV` present, `Employee` selector absent (this is exactly what `employee-view-only.spec.ts:162-169` already asserts — run it). As HR_ADMIN: the matrix and "Exceptions only" filter behave identically to before; the Save column is visible without horizontal scrolling at 1280px and 1440px; the import disclosure auto-opens on an import result | Hybrid + Agent-Probe | §T6 attendance criterion; §5 item 10 preserved; the sticky-Save finding |
 | G9. `pnpm test -- attendance` (14 unit files) green, unchanged | Fully-Automated | The component extraction changed markup only — no attendance logic moved |
 | G10. Pagination probe: seed 25+ separations, assert page 1 shows 20 with a working "Next", page 2 shows the rest, and an out-of-range `?page=99` clamps to the last page (the helper's documented behavior) | Hybrid (needs seeded DB) | §T6 unbounded-list criterion |
 | G11. **impeccable audit pass** on every changed `.svelte` file | Agent-Probe | Design-quality bar the CI gates cannot express (umbrella per-phase requirement) |
+| G13. **Cross-employee reveal-cache probe (B5a).** As HR_ADMIN: reveal employee A's gov IDs and salary, then navigate client-side (in-app link, NOT a reload) to employee B. Assert every sensitive field on B renders **masked**, and that the Update Profile / Change Salary / Promote inputs on B are empty or hold B's own masked values — never A's plaintext. Positive control: revealing on B unmasks B. Then assert `$page.state`, `sessionStorage` and `localStorage` hold no plaintext sensitive value. | Agent-Probe (Playwright + `POST /api/v1/_dev/login-as`) | B5a hard gate — the cross-employee leak and the write-A-onto-B path |
+| G14. **Hidden-panel render probe.** For each of the five panels: assert `getComputedStyle(panel).display === 'none'` while inactive (catches a Tailwind display utility beating `[hidden]`), that its form controls are out of the tab order, and that a pre-hydration / JS-disabled load of `?tab=documents` still shows the Documents panel (anchor-based tabs). | Agent-Probe (Playwright) | A2's hidden-not-`{#if}` decision actually holds in a Tailwind build |
 | G12. Regression: nav resolves for HR_ADMIN / MANAGER / employee; masked-reveal still masks, reveals once, writes its audit row | Hybrid | Umbrella regression rule, phases 2+ |
 
 **TDD stubs** for the fully-automated rows (destined for the validate-contract Test Gates section,
@@ -531,6 +612,8 @@ Each criterion names the gate that proves it (REQ-TEST-LINK) and that gate's str
 | AC-18 | `employees/new` shows a "Required to hire" group and a collapsed "Complete later" group; no field name or `required` attribute changed; the group auto-opens on a validation error inside it | G1 + G11 | Agent-Probe |
 | AC-19 | Separations, inventory and employee-side complaints paginate at 20 rows with working next/previous and out-of-range clamping | G10 | Hybrid |
 | AC-20 | Full CI gate set green, in CI order; e2e no worse than the recorded pre-phase baseline | G1 | Fully-Automated |
+| AC-22 | Revealing employee A then navigating to employee B leaves every sensitive field on B masked, and no editable input on B is pre-filled with A's plaintext | G13 | Agent-Probe |
+| AC-23 | Each inactive tab panel computes to `display: none` in the built CSS and its controls are out of the tab order; `?tab=` deep links resolve without JS | G14 | Agent-Probe |
 | AC-21 | No capability added, removed or re-scoped; `src/lib/rbac.ts`, `prisma/schema.prisma` and `src/lib/server/services/**` untouched | `git diff --stat` shows none of those paths + G3 | Fully-Automated |
 
 **Vacuous-green note:** no criterion above is proved by Known-Gap. The one recorded residual —
@@ -545,7 +628,7 @@ stub required at EXECUTE time, and does not make any criterion here PASS-able on
   per section, never batched to the end.
 - **CODE DONE** = all seven sections committed and the CI gate set green.
 - **VERIFIED** = CODE DONE **plus** all of: G5 (offboarded P0-7 probe), G6 (reveal + single-audit
-  row), G7 (HR_ADMIN employee-page walk), G8 (attendance persona walk), G11 (impeccable audit),
+  row), **G13 (cross-employee reveal-cache probe — hard gate)**, **G14 (hidden-panel render probe)**, G7 (HR_ADMIN employee-page walk), G8 (attendance persona walk), G11 (impeccable audit),
   G12 (regression), the phase report written, the backlog stub created, and the validate-contract
   recorded. Green CI alone is never VERIFIED.
 - If a gate goes red: (1) fix inline if the cause is in this phase's blast radius; (2) if the fix
@@ -607,7 +690,167 @@ files. Re-verify before editing and record every drift in the phase report:
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: sequential (capability-constrained deviation — see note)
+Rationale: 5/7 signals present (S2 schema/API/auth surface, S4 phase program, S5 depth requested,
+S6 high-risk class, S7 5+ files) → HIGH, which recommends parallel subagents or an agent team for
+the two-layer fan-out. The validating agent had no Agent/Task tool in this invocation, so both
+layers were executed inline against source with Bash/Grep evidence. Every Layer 1 dimension and
+every Layer 2 section was covered; the deviation cost wall-clock time, not coverage. Recorded as a
+CONCERN, not a gap.
+
+Test gates:
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-2 | `?tab=` resolves, unknown/absent falls back to Overview, `?from=` survives | Fully-Automated | `pnpm test` → `tests/unit/employee-tab-resolve.test.ts` | B |
+| AC-14, AC-15 | Per-role settings visibility byte-identical; one label per destination | Fully-Automated | `pnpm test` → `tests/unit/settings-destinations.test.ts` (longhand `toEqual`) | B |
+| AC-20, AC-21 | CI gate set green in CI order; no out-of-bounds path touched | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test`, then `git diff --stat` shows no `src/lib/rbac.ts`, `prisma/schema.prisma`, `src/lib/server/services/**` | A |
+| AC-11 | Attendance logic unmoved by the component extraction | Fully-Automated | `pnpm test -- attendance` (14 unit files) green, unchanged | A |
+| AC-8 | Reveal survives save; exactly ONE audit VIEW row; reload re-masks | Hybrid | G6 — running app + `psql` audit assertion, precondition: app + `veent-db-5434` running (owner starts them), non-self employee | B |
+| AC-22 | Reveal cache never crosses employees; no plaintext in `$page.state`/web storage | Agent-Probe | G13 — Playwright + `POST /api/v1/_dev/login-as`, A→B client-side navigation | B |
+| AC-23 | Inactive panels compute to `display: none`; `?tab=` works without JS | Agent-Probe | G14 — Playwright computed-style + JS-disabled load | B |
+| AC-5 | Offboarded employee still sees scoped action errors | Agent-Probe | G5 — Playwright, OFFBOARDED employee, forced upload + reveal failure, positive and negative controls | B |
+| AC-1, AC-3, AC-4, AC-6, AC-7, AC-9 | All 21 actions submit from their tab; typed text survives a tab switch; one emergency-contact surface | Agent-Probe | G7 — HR_ADMIN live walk, screenshot per tab | B |
+| AC-10, AC-12, AC-13 | Attendance persona split, bulk-bar grouping, sticky Save at 1280/1440px | Hybrid + Agent-Probe | G8 + `tests/e2e/employee-view-only.spec.ts` | B |
+| AC-16 | Payroll pages linked from both nav surfaces, one label each | Hybrid | G4 — `tests/e2e/settings-visibility.spec.ts` (after the F8 locator scoping) | B |
+| AC-19 | Three lists paginate at their page size with working next/prev and out-of-range clamping | Hybrid | G10 — seeded DB, 25+ separations, `?page=99` clamps | B |
+| AC-17, AC-18 | settings/org filters; employees/new grouping with auto-expand on error | Agent-Probe | G11 impeccable audit + G1 | B |
+| — (residual) | Query-level pagination for separations / inventory / employee complaints | — | none — backlog stub required at EXECUTE time | D |
+
+gap-resolution legend: A — proven now. B — gate added by this plan's checklist. C — deferred to a
+named later phase. D — backlog test-building stub (named residual; keep-active; continue).
+
+C-4 reconciliation: `strategy` carries only the three proving strategies. The one Known-Gap is
+carried as a named residual (row above, gap-resolution D), never as the reason a criterion passes.
+
+Legacy line form:
+- `employees/[id]` tabs: [Fully-automated: `pnpm test` + `pnpm check`] | [agent-probe: G7, G13, G14]
+- Settings IA: [Fully-automated: `pnpm test` → settings-destinations.test.ts] | [hybrid: `pnpm test:e2e tests/e2e/settings-visibility.spec.ts` — precondition: seeded DB + `pnpm build` + preview]
+- Reveal / audit surface: [hybrid: G6 — running app + psql, non-self employee] | [agent-probe: G13]
+- Attendance split: [Fully-automated: `pnpm test -- attendance`] | [hybrid: G8 + employee-view-only.spec.ts]
+- Pagination: [hybrid: G10 — seeded DB] | [known-gap: query-level pagination, backlog stub required]
+
+Dimension findings:
+- Infra fit: PASS — every one of the 21 Touchpoint paths resolves on disk; all 17 settings routes
+  exist; `paginate()`, `Pagination.svelte` (`meta` prop, self-hide at `total <= pageSize`) and the
+  `myPage` convention are exactly as the plan describes; all named commands exist in `package.json`.
+- Test coverage: CONCERN — the two red-by-design tests exist exactly as claimed
+  (`settings-cards.test.ts` pins the four flags with `toEqual`; `settings-visibility.spec.ts`
+  asserts `'Holidays', exact: true` at lines 29 and 60). But the label unification also makes three
+  page-wide positive locators match two links each, which is a Playwright strict-mode failure the
+  plan's F8 did not anticipate. Fixed in-plan.
+- Breaking changes: CONCERN — F6 as written grows the sidebar Settings group from 8 rows to 18 and
+  pulls two `/payroll/*` pages into it. That is a nav-IA change inside a Phase 02-owned file, not
+  the label swap the plan describes. Raised as an OWNER-DECISION with a recommended default.
+- Security surface: CONCERN (was FAIL, resolved in-plan) — B5's `$state` reveal cache survives an
+  `employees/A` → `employees/B` client-side navigation because SvelteKit reuses the component
+  instance, and the cached plaintext pre-fills editable inputs that `?/update` /
+  `?/changeCompensation` / `?/promote` would then write onto B. Now blocked by the B5a hard gate
+  and gate G13, and gated on an owner ruling about the #111 posture change.
+- Section S1 (tab shell): CONCERN — mechanically feasible (no duplicate element IDs across panels;
+  the page-level `form` prop is unaffected by always-rendered panels because each form sits wholly
+  inside one panel; no action on this page redirects, so `use:enhance` never navigates away from
+  the pushed `?tab=`). Two real gaps found and fixed in-plan: Tailwind display utilities defeat the
+  bare `hidden` attribute, and `<button>`-only tabs are inert before hydration. Highest-risk edit:
+  wrapping ~16 sections without editing them — sequence it as wrapper-only, `pnpm check` after each
+  panel, no content moves.
+- Section S2 (Overview fixes): CONCERN — SC-1's premise verified true (`assignTemplate`,
+  `changeCompensation`, `promote` already return `action` via a local `const action`), but the page
+  has 21 actions, not 22, so 18 need the key, not 19. B5 carries the security finding above.
+  Highest-risk edit: B5; do it last in S2, behind G13.
+- Section S3 (compensation signposting): PASS — copy-only plus three container `id`s; all three
+  actions verified present and untouched; the Phase 06 skip condition is stated.
+- Section S4 (Documents/History/Actions): PASS — all named actions exist; the Phase 05
+  `ConfirmButton` preserve-exactly rule matches the umbrella's shared-primitive contract.
+- Section S5 (attendance split): CONCERN — `data.canManage` branches at ~15 sites and the
+  `?view=employee|team` axis lives inside the `canManage === true` path, so "one two-way branch" is
+  an under-description of the extraction. "Byte-identical" is impossible for a component
+  extraction; restated as behavior-identical with the `exceptionsOnly` state, the period state and
+  the `createSubmitGuard` instances explicitly threaded down. Highest-risk edit: E2 — move the
+  matrix first, run `pnpm test -- attendance`, commit, then do E3–E5.
+- Section S6 (settings array/hub/sub-nav): CONCERN — the 17-destination capability mapping is
+  faithful to the current hub gating, role for role (`super`→ADMINISTER_SYSTEM,
+  `roles`→MANAGE_USER_ROLES|ADMINISTER_SYSTEM, `hrOrgwide`→ADMINISTER_HR_ORGWIDE,
+  `statutory`→MANAGE_STATUTORY_RATES|PROPOSE_STATUTORY_RATES). The `canAny` client-safe claim is
+  VERIFIED: `$lib/rbac.ts` imports only `import type { Role }`, and `(app)/+layout.svelte:8`
+  already imports `canAny` from it. The "no `settings/+layout.server.ts` needed" claim is VERIFIED:
+  `(app)/+layout.server.ts` returns `user.roles` and child layouts inherit parent layout data.
+  Concerns are the sidebar growth (breaking-changes row) and the e2e strict-mode breakage.
+- Section S7 (org/new/pagination): CONCERN — the complaints HR branch already returns its meta
+  under the key `pagination` at `pageSize: 10`; the employee branch needs a distinct key and a
+  page-size ruling. Everything else verified against the helper.
+
+Server-change allow-list audit (special-scrutiny item 2): PASS with one correction. SC-1, SC-3 and
+SC-4 are each verified necessary and correctly scoped against source. SC-2 is verified UNNEEDED —
+`employees/[id]/+page.server.ts` contains no `redirect(`, so B5's stated fallback trigger cannot
+occur. Nothing else in the plan implies a fifth server file: S1–S4 are markup, E1–E5 are markup,
+G1 and G2 are client-side `$derived` filtering and fieldset regrouping, and F5's no-new-layout-load
+claim holds. Effective server surface: 3 files.
+
+Open gaps:
+- Query-level pagination for separations / inventory / employee complaints: known-gap: documented
+  as NEW PLAN REQUIRED — backlog stub `query-level-pagination-unbounded-lists_NOTE_{date}.md` must
+  be created at EXECUTE time (this phase's own Known Gaps table already requires it).
+- Parallel fan-out executed inline rather than as spawned subagents (tooling constraint). Coverage
+  is complete; the deviation is recorded for the phase report.
+
+What this coverage does NOT prove:
+- `pnpm check` / `pnpm test`: prove no broken reference and no unit regression. They do NOT prove
+  any panel is visible, that the tab strip is reachable, or that the reveal cache resets — nothing
+  in the unit tier renders this page.
+- `tests/unit/settings-destinations.test.ts`: proves the array's per-role href list. It does NOT
+  prove the hub, the sub-nav and the sidebar all consume it, nor that the rendered labels match.
+- `tests/unit/employee-tab-resolve.test.ts`: proves two pure functions. It does NOT prove
+  `pushState` fires, that `?from=` survives a real click, or that an inactive panel is hidden.
+- `pnpm test -- attendance`: proves the 14 attendance unit files still pass. It does NOT prove the
+  extracted components render, that the matrix is unchanged, or that the submit guards survived —
+  this repo has no component-test harness.
+- G4 e2e: proves label parity for four roles on two surfaces. It does NOT prove the other 13
+  destinations' labels, nor the sub-nav's `aria-current`.
+- G6: proves one audit row for one reveal-then-save sequence on one employee. It does NOT prove the
+  cache is per-employee — that is G13's job alone.
+- G10: proves the pagination affordance. It does NOT prove query cost; the load still fetches every
+  row (the recorded residual).
+- G7/G8/G11/G13/G14 are Agent-Probe: they prove what an agent observed in one session on one seed.
+  They do NOT prove behavior across tenants, viewports beyond 1280/1440px, or browsers beyond the
+  Playwright default.
+
+Gate: CONDITIONAL (concerns noted; the one FAIL-severity finding was resolved by amending this plan
+before the contract was written, and is now held by the B5a hard gate + G13)
+Accepted by: session (autonomous, outer PVL, no user present at V5) — accepted concerns:
+sidebar-growth IA change (OWNER-DECISION, recommended default (b)), #111 reveal-posture change
+(OWNER-DECISION, blocks S2), e2e strict-mode locator scoping, attendance extraction wording and
+threaded state, complaints pagination key/page-size, 21-vs-22 action count, SC-2 unused,
+inline-executed fan-out.
+
+### OWNER-DECISION gates (must be answered before the named section runs)
+
+| # | Decision | Blocks | Recommended default |
+|---|---|---|---|
+| OD-1 | Accept holding a reveal across saves (a real widening of the client-side exposure window under #111), or rule that reveal keeps dropping on save and delete B5/B5a/SC-2? | S2 (B5) | Accept, with B5a's per-employee key + G13 as the price of admission |
+| OD-2 | Sidebar Settings group: show all 17 destinations (and rule on the two `/payroll/*` rows, which is Phase 02's IA), or keep a curated subset via an `inSidebar` field on the shared array? | S6 (F6) | (b) curated subset — same single source, zero Phase 02 overlap |
+| OD-3 | Complaints employee-branch page size: 10 (match its HR sibling) or 20 (match separations/inventory)? | S7 (G3/G4) | 10 |
+| OD-4 | Owner EXECUTE go-ahead for this phase, per the umbrella (not standing-granted), after Phases 02 and 03 are VERIFIED | S1 | — owner's call |
+
+### REJECTED-ROUTED (cross-phase-owned files)
+
+| Finding | Owner | Routing |
+|---|---|---|
+| The three overlapping edit forms (`?/update` / `?/changeCompensation` / `?/promote`) should be consolidated, not merely signposted | Phase 06 (§T5) | REJECTED-ROUTED — this phase adds signposting only (C3 already states the skip condition). Do not consolidate here. |
+| `(app)/+layout.svelte` nav shape beyond the Settings children | Phase 02 | REJECTED-ROUTED — F6 may change only the Settings children's source; OD-2 exists so the row *count* change is ruled on by Phase 02, not decided inside this phase. |
+| `ConfirmButton` around Offboard / attendance reset | Phase 04 owns the rebuild, Phase 05 consumes it | REJECTED-ROUTED — D2 preserves any Phase 05 wrapper exactly and adds none. Per the umbrella's shared-primitive contract, any finding proposing a `ConfirmButton` edit here is a contract violation, not a gap. |
+| `MANAGER` / `ADMINISTER_HR_ORGWIDE` guard alignment | Umbrella owner-decision registry (raised by Phase 02) | REJECTED-ROUTED — F2 reproduces today's visibility exactly and must not "fix" the guard. |
+| Real `skip`/`take` in `listSeparations`, the inventory query and `listComplaintsForEmployee` | `src/lib/server/services/**` — out of bounds program-wide | REJECTED-ROUTED to backlog: `query-level-pagination-unbounded-lists_NOTE_{date}.md` |
+
+Autonomous goal block: BRANCH B — the umbrella
+(`ui-ux-overhaul-umbrella_PLAN_03-09-26.md`, `## Stable Program Goal` at line 79) governs. No
+`## Autonomous Goal Block` is written into this phase plan. Reference for latest state:
+`process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/ui-ux-overhaul-umbrella_PLAN_03-09-26.md`
 
 ---
 

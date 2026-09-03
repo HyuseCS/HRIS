@@ -207,18 +207,32 @@ next one starts. Do not batch.
 
 ### S1 — `src/app.css`: theme-paired badge tokens + colour fixes
 
-1. Rewrite `.badge-green` → `bg-green-500/15 text-green-700 dark:text-green-400`.
-2. Rewrite `.badge-red` → `bg-red-500/15 text-red-700 dark:text-red-400`.
-3. Rewrite `.badge-yellow` → `bg-yellow-500/20 text-yellow-800 dark:text-yellow-400`.
+1. Rewrite `.badge-green` → `@apply badge bg-green-500/15 text-green-800 dark:text-green-400`.
+2. Rewrite `.badge-red` → `@apply badge bg-red-500/15 text-red-700 dark:text-red-400`.
+3. Rewrite `.badge-yellow` → `@apply badge bg-yellow-500/20 text-yellow-800 dark:text-yellow-400`.
    (Yellow needs the darker light-mode step and slightly stronger tint — 700 on 15% yellow is the
    weakest pair in the set; verify with the contrast check in §8 before accepting.)
-4. Rewrite `.badge-blue` → `bg-blue-500/15 text-blue-700 dark:text-blue-400`.
-5. Rewrite `.badge-gray` → `bg-muted text-muted-foreground` (real tokens, not `white/10`). This is
-   the white-on-white fix.
+4. Rewrite `.badge-blue` → `@apply badge bg-blue-500/15 text-blue-700 dark:text-blue-400`.
+5. Rewrite `.badge-gray` → `@apply badge bg-muted text-foreground/70` (real tokens, not `white/10`). This
+   is the white-on-white fix. `text-muted-foreground` was the first choice and is REJECTED: it measures
+   4.34:1 light / 4.20:1 dark against `bg-muted`, under the 4.5:1 floor at the badge's 12px size.
 6. Replace `::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 28%) }` (`app.css:141`) with a
    token-based rule — `@apply bg-muted-foreground/50`.
 7. Add a short comment above the badge block recording that each variant is theme-paired and why
    (`text-*-400` alone is below AA on white).
+
+**MUST-KEEP (VALIDATE V2 finding, `src/app.css:145-173`):** every `.badge-*` rule is composed as
+`@apply badge <colours>`. The `badge` base carries the pill layout (`inline-flex items-center
+gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium`) and `.badge::before` paints the leading dot
+from `bg-current`. **Dropping `badge` from any rewritten rule silently destroys the pill on all 32
+usages.** Keep `badge` first in every rule.
+
+**Contrast note (measured, not assumed):** the badge is `text-xs` = 12px `font-medium`. That is NOT
+WCAG "large text", so the 3:1 allowance never applies to a badge here — every badge pair must clear
+**4.5:1**. Measured over the light card (`--card: 0 0% 100%`), tint composited:
+`yellow-800` 6.02:1 PASS - `blue-700` 5.64:1 PASS - `red-700` 5.32:1 PASS -
+`green-700` **4.40:1 FAIL** (hence `green-800` above) - `text-muted-foreground` on `bg-muted`
+**4.34:1 FAIL** (hence `text-foreground/70` above). Re-measure both replacements in §8.5 and record.
 
 **Constraint:** no new class names, no new tokens in `:root`/`.dark` unless step 3 proves a pair
 cannot meet AA with the existing palette. If a new token is needed, add it to BOTH themes.
@@ -311,9 +325,44 @@ returns nothing.
 3. Backdrop: `fixed inset-0 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm`,
    `role="presentation"`, click-to-close, `transition:fade`. Panel: `bg-card`, ring, shadow,
    `role="dialog"`, `aria-modal="true"`, `tabindex="-1"`, `transition:scale`.
+
+   **Panel API — corrected by VALIDATE V2.** A three-value `size` prop CANNOT express the seven real
+   panel shapes this primitive must absorb. Measured current state:
+
+   | Consumer | z | width | padding | shape |
+   |---|---|---|---|---|
+   | `ConfirmDialog` | 60 | `max-w-sm` | `p-6` | — |
+   | `ReasonDialog` | 70 | `max-w-md` | `p-6` | — |
+   | `ApplicantKanban` | 60 | `max-w-md` | `p-6` | — |
+   | `PunchMapDialog` | 60 | `max-w-lg` | `p-4` | — |
+   | `NewTimesheetDialog` | 70 | `max-w-lg` | `p-8` | — |
+   | roles editor | 70 | `max-w-lg sm:max-w-2xl lg:max-w-4xl` | none | `flex flex-col max-h-[90vh]` |
+   | `TimesheetModal` | 50 | `max-w-6xl` | none | `flex flex-col overflow-hidden max-h-[92vh]` |
+
+   So `Dialog`'s panel API is: `size?: 'sm'\|'md'\|'lg'\|'wide'\|'full'` (`sm`=`max-w-sm`, `md`=`max-w-md`,
+   `lg`=`max-w-lg`, `wide`=`max-w-lg sm:max-w-2xl lg:max-w-4xl`, `full`=`max-w-6xl`),
+   `padding?: 'none'\|'sm'\|'md'\|'lg'` (`none` / `p-4` / `p-6` / `p-8`, default `md`), and
+   `scroll?: boolean` (adds `flex flex-col max-h-[90vh]`, plus `overflow-hidden` when set).
+   These five/four/one values are exactly what the seven consumers need — no more. Do not add a
+   free-form `panelClass` escape hatch.
+
+3b. **`title` renders nothing.** `Dialog` uses `title` only for `aria-label` on the panel, and
+   `labelledBy` (when given) for `aria-labelledby` instead. Every consumer keeps rendering its own
+   `<h2>` inside the `children` snippet. This is load-bearing: 13 e2e assertions match dialogs by
+   accessible name (`getByRole('dialog', { name: 'Timesheet review' \| 'New timesheet' \| 'Edit roles'
+   \| 'Punch location' \| 'Confirm stage move' })`). If a migration changes a dialog's accessible name,
+   those specs break. Preserve each name byte-for-byte.
+
+3c. **`initialFocus` prop.** `Dialog` focuses the panel on open. `ReasonDialog` focuses its textarea,
+   and both are `$effect`s keyed on `open` — they race. Expose
+   `initialFocus?: 'panel' \| 'none'` (default `'panel'`); `ReasonDialog` passes `'none'` and keeps
+   focusing its own textarea. Assert the landing element in the §8.4 check for every migrated modal.
 4. Keep the existing `e.stopPropagation()` on Escape — the current dialogs rely on it so a nested
    dialog does not close its parent. Losing this is a silent regression.
-5. `zIndex` prop defaults to 60; `ReasonDialog` currently uses 70 and must keep it.
+5. `zIndex` prop defaults to 60. **Measured current values — each migration MUST pass its own:**
+   `ConfirmDialog` 60, `ApplicantKanban` 60, `PunchMapDialog` 60, `ReasonDialog` 70,
+   `NewTimesheetDialog` 70, roles editor 70, `TimesheetModal` **50**. (Context: `(app)/+layout.svelte`
+   nav drawer is z-40, `Toaster` is z-100.) Never let a migration silently take the default.
 6. `role` is fixed as `dialog`; `ConfirmDialog` needs `alertdialog`, so expose a `role` prop with
    `'dialog'` default.
 7. Add a file comment naming the roles page as the source and the audit line ("Five modal
@@ -367,8 +416,17 @@ Escape now closes it.
 ### S13 — `Banner.svelte` + banner recipe sweep
 
 1. Create `src/lib/components/ui/Banner.svelte`. Copy the class recipe already correct in
-   `separations/[id]/+page.svelte:65-100` — `rounded-md border border-{c}-500/20 bg-{c}-500/10
-   px-4 py-2 text-sm text-{c}-600 dark:text-{c}-400`, with amber using `700/400`.
+   `separations/[id]/+page.svelte:63-100` — `rounded-md border border-{c}-500/20 bg-{c}-500/10
+   px-4 py-2 text-sm text-{c}-600 dark:text-{c}-400`, with amber using `border-amber-500/30` and
+   `text-amber-700 dark:text-amber-400`.
+
+   **`{c}` above is shorthand for this plan only — it must NEVER reach the source.** Tailwind's JIT
+   scans literal class strings; an interpolated `bg-{kind}-500/10` compiles to **no CSS at all** and
+   there is no `safelist` in `tailwind.config`. Write a static record of complete class strings, e.g.
+   `const TONE = { error: 'rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm
+   text-red-600 dark:text-red-400', success: '…green…', warning: '…amber…', info: '…blue…' }` and
+   index it with `kind`. Verify by loading a page with each of the four kinds and confirming a
+   non-transparent computed `background-color` — a silently unstyled banner is the failure mode.
 2. `role="alert"` for `error`/`warning`; `role="status"` for `success`/`info` (the split the punch
    page already gets right, audit §G.1).
 3. Replace `text-red-400`-only banners across the 36 files that carry them, plus the success/warning
@@ -378,7 +436,7 @@ Escape now closes it.
 ### S14 — PageHeader sweep: people + time
 
 Convert hand-rolled `<h1>` to `<PageHeader>` in: `dashboard`, `employees` (×3), `team`, `profile`,
-`attendance`, `timesheets`, `punch`, `leave` (×3). `profile` also uses the legacy `.page-header` /
+`attendance`, `timesheets`, `punch`, `leave` (×3), `benefits`, `departments`. `profile` also uses the legacy `.page-header` /
 `.page-title` CSS classes — remove those usages.
 
 Rules: keep the existing title string verbatim (renaming is phase 08). Add `description` only where
@@ -388,6 +446,20 @@ one already exists in the markup. Move an existing Back link into the `back` sni
 
 Same conversion in: `requests` (×4), `complaints` (×2), `separations` (×2), `payroll` (×5),
 `performance` (×2), `recruitment` (×4), `reports` (×2), `settings` (×2), `inventory`, `branches`.
+
+**Coverage correction (VALIDATE V2):** the real `<h1>` set is 39 files. S14+S15 as first written named
+only 37 — `benefits/+page.svelte` and `departments/+page.svelte` were missing, so AC-6's exit grep could
+never have reached zero. Both are now in the lists (benefits/departments added to S14). Before starting
+S14, re-derive the list with `grep -rl '<h1' 'src/routes/(app)'` and reconcile against S14+S15; a file in
+the grep and in neither section is a plan defect, not an execute decision.
+
+**Action-adjacency warning (29 of 39 sites).** `PageHeader` takes **no** actions prop — by deliberate
+design, per its own source comment: page actions belong on the heading row of the first section they act
+on. 29 of the 39 `<h1>` sites currently sit in a `justify-between` row beside a button or link. Converting
+those is therefore a small layout move per page, not a one-line swap. Rule: move the action cluster down
+to the first section heading, right-aligned. Do NOT add an actions prop to `PageHeader`, and do NOT leave
+the action orphaned above the title. If a page's action cannot be placed without redesigning the page,
+STOP and leave that page's `<h1>` in place with a note — do not improvise a layout.
 
 **Exit condition for S14+S15:** `grep -rl '<h1' 'src/routes/(app)'` returns 0 files, and
 `grep -rn 'page-header\|page-title' src --include='*.svelte'` returns 0.
@@ -440,6 +512,15 @@ pnpm test
 ```
 
 `pnpm prisma generate` first if `pnpm check` goes red — a stale client produces phantom errors.
+
+**Plus `pnpm test:e2e` at the S12, S15 and S17 boundaries (VALIDATE V2 — added, was missing).** This is
+the phase most able to break selector-based e2e and the plan had no e2e gate at all. The exposure is
+measured: **13 `getByRole('dialog', { name })` assertions** across `settings-roles`, `posting-approver-sod`,
+`recruitment`, `timesheet-*`, `manager-org-wide-timesheets`, `employee-view-only`,
+`timesheet-punch-location` and `helpers.ts`, all riding on the accessible names S8-S12 rewrite; and
+**31 `getByRole('heading', ...)` assertions** (several with `level: 1`) riding on the `<h1>` text S14/S15
+rewrites. The bar is the umbrella's: no worse than the recorded baseline (#287 flakiness is known). Run
+the baseline e2e in §8.2 too, so a pre-existing red is never blamed on this phase.
 
 ### 8.2 Baseline confirmation (do this ONCE, before S1)
 
@@ -506,10 +587,21 @@ Each criterion names its proving scenario and strategy (REQ-TEST-LINK). The gate
 | AC-4 | Zero hand-rolled status-class helpers remain in `src/routes/(app)` or `src/lib/components` | `grep -rl 'statusClass\|statusCls\|badgeClass\|pillClass'` returns nothing | Fully-Automated |
 | AC-5 | Exactly one modal implementation remains, and every migrated modal takes focus on open, wraps Tab and Shift+Tab, closes on Escape and backdrop, and restores focus to its trigger | `fixed inset-0` grep exit condition + the per-modal before/after check (§Verification — 8.4), with the S8 "before" run as the negative control | Fully-Automated + Hybrid |
 | AC-6 | Every `(app)` page uses `PageHeader`; no hand-rolled `<h1>` and no legacy `.page-header`/`.page-title` usage survives | `<h1>` grep and `page-header`/`page-title` grep both return nothing | Fully-Automated |
-| AC-7 | No dark-only status colour survives: every `text-{green,yellow,gray,blue}-400` occurrence carries a light-mode pair, and the named badge pages render correctly in BOTH themes | dark-pair grep + light/dark computed-style spot-check with a negative control on 5 named pages (§Verification — 8.3) | Fully-Automated + Hybrid |
+| AC-7 | No dark-only status colour survives **in the files S1/S4/S5/S13 touch**: every `text-{green,yellow,gray,blue}-400` occurrence in those files carries a light-mode pair, and the named badge pages render correctly in BOTH themes. The 31 occurrences in the 11 files outside this phase's section lists are a **named residual**, not a failure of AC-7 (see the AC-7 scope note below). | scoped dark-pair grep + light/dark computed-style spot-check with a negative control on 5 named pages (§Verification — 8.3) | Fully-Automated + Hybrid |
 | AC-8 | Every colour pair this phase introduces or changes meets WCAG AA — ≥4.5:1 for body text, ≥3:1 for large/bold badge text — measured against the composited background | contrast measurement per changed pair, recorded in the phase report (§Verification — 8.5) | Hybrid |
 | AC-9 | The full CI gate set is green at every one of the 17 section boundaries, relative to the recorded pre-phase baseline | `pnpm format:check && pnpm lint && pnpm check && pnpm test` per section, plus the §Verification 8.2 baseline record | Fully-Automated |
 | AC-10 | Each swept route family still reads as one coherent screen, and every `EmptyState` uses `no-results` when a filter is active and `empty` when nothing exists | screenshot review per route family + filter-applied empty-state judgement (Agent-Probe rows in §Verification Evidence) | Agent-Probe |
+
+**AC-7 scope note (VALIDATE V2, measured).** There are 135 `text-{green,yellow,gray,blue}-400`
+occurrences across 36 files, and **0** of them currently carry a `dark:` pair. 104 sit in the 30 files
+S4/S5/S13 name; **31 sit in 11 files no section of this phase touches**:
+`benefits`, `dashboard`, `payroll/config`, `payroll/statutory-rates`, `recruitment/[id]`, `reports`,
+`requests/approvals`, `settings/company`, `settings/holidays`, `settings/onboarding`, and
+`lib/components/recruitment/ApplicantKanban.svelte`. Most are decorative or muted-icon uses, not status
+pills. An unscoped "grep returns zero" gate could therefore never go green inside this phase, so AC-7 is
+scoped to the touched files and the 31 remaining occurrences get a backlog stub
+(`phase-03-residual-dark-only-colours_NOTE_03-09-26.md`) written during EXECUTE. **OWNER-DECISION OD-2**
+below may widen this.
 
 **Residual (not a proving strategy):** responsive verification at 390px across the sweep is a
 Known-Gap. It gets a backlog stub during EXECUTE and its gate stays CONDITIONAL. No criterion above
@@ -601,7 +693,155 @@ Sibling phase files (phases 01-08 of the ui-ux-overhaul program) are NOT inputs 
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: sequential
+Rationale: score 2/7 (S4 phase-program, S7 5+ files) recommends parallel subagents, but the Agent
+tool is disabled in this session, so the two-layer fan-out ran in-thread as batched read-only
+greps and source reads. No finding depended on inter-agent coordination.
+
+### Test gates (C3 5-column)
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-1 | `ConfirmDialog`/`ReasonDialog` public API survives the S7 rewrite; `ConfirmButton` compiles untouched | Fully-Automated | `pnpm check` green after S7 with `ConfirmButton.svelte` unedited | A (verified now: all 8 call sites stay inside the declared props) |
+| AC-1 | nested-dialog Escape closes only the inner dialog | Hybrid | §8.4.7 control, run on the `ReasonDialog` nested inside `TimesheetModal.svelte:527` | B |
+| AC-2 | `Badge` degrades to `gray` + raw text on an unknown status; honours `tone`/`label` | Fully-Automated | `pnpm test` → `tests/unit/badge-tone.test.ts` | B |
+| AC-3 | `$lib/labels.ts` covers every member of the 19 mapped Prisma enums; `labelFor` never returns blank | Fully-Automated | `pnpm test` → `tests/unit/labels.test.ts` | B |
+| AC-4 | zero hand-rolled status-class helpers remain | Fully-Automated | `grep -rl 'statusClass\|statusCls\|badgeClass\|pillClass' 'src/routes/(app)' src/lib/components` returns nothing | B |
+| AC-5 | one modal implementation remains | Fully-Automated | `grep -rln 'fixed inset-0' src --include='*.svelte'` returns only `ui/Dialog.svelte` + `(app)/+layout.svelte` | B |
+| AC-5 | each migrated modal takes focus, wraps Tab/Shift+Tab, closes on Escape + backdrop, restores focus | Hybrid | §8.4 per-modal before/after, S8 "before" as the negative control | B |
+| AC-5 | Leaflet still initialises inside the migrated `PunchMapDialog` | Hybrid | open `/punch`, screenshot the tile area | B |
+| AC-6 | every `(app)` page uses `PageHeader`; no `<h1>`, no `.page-header`/`.page-title` | Fully-Automated | `grep -rl '<h1' 'src/routes/(app)'` and `grep -rn 'page-header\|page-title' src` both return nothing | B |
+| AC-7 | no dark-only status colour survives in the touched files | Fully-Automated | scoped dark-pair grep over the S1/S4/S5/S13 file set | B (31 occurrences in 11 untouched files are a named residual — see Open gaps) |
+| AC-7 | named badge pages render correctly in BOTH themes | Hybrid | §8.3 computed-style spot-check + negative control on `/payroll/periods`, `/timesheets`, `/requests/[id]`, `/separations/[id]`, `/employees` | B |
+| AC-8 | every changed colour pair meets 4.5:1 at the badge's 12px size | Hybrid | §8.5 composited contrast measurement, recorded in the phase report | B |
+| AC-9 | the CI gate set is green at every section boundary vs the §8.2 baseline | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` | A |
+| AC-9 | the e2e suite is no worse than baseline across the dialog + heading rewrites | Fully-Automated | `pnpm test:e2e` at the S12, S15 and S17 boundaries, against the §8.2 baseline | B (gate added by this contract — the plan had none) |
+| AC-10 | each swept route family still reads as one coherent screen; `no-results` vs `empty` chosen correctly | Agent-Probe | screenshot review per route family; apply a filter on each swept page and judge the copy | B |
+| — | responsive behaviour at 390px across the sweep | (residual) | — | D — backlog stub `phase-03-responsive-sweep_NOTE_03-09-26.md`, written during EXECUTE |
+| — | the 31 dark-only occurrences in the 11 untouched files | (residual) | — | D — backlog stub `phase-03-residual-dark-only-colours_NOTE_03-09-26.md`, written during EXECUTE |
+
+gap-resolution legend: A proven now - B gate added by this plan's checklist - C deferred to a named
+later phase - D backlog test-building stub (named residual; keep-active; continue).
+
+`strategy:` carries only the 3 proving strategies. Known-Gap is never a strategy — the two residual
+rows above are carried as gap-resolution D and prove nothing.
+
+Legacy line form (for existing contract consumers):
+- Component API compat: Fully-automated: `pnpm check` after S7 with `ConfirmButton.svelte` unedited
+- Unit logic (`labels.ts`, `badge.ts`): Fully-automated: `pnpm test`
+- Sweep exit conditions: Fully-automated: the four exit greps (`statusClass`, `<h1>`, `page-header`, `fixed inset-0`)
+- Regression: Fully-automated: `pnpm format:check && pnpm lint && pnpm check && pnpm test` per section
+- Selector regression: Fully-automated: `pnpm test:e2e` at S12/S15/S17 vs the §8.2 baseline
+- Theme + contrast + focus trap: hybrid: Playwright MCP + `POST /api/v1/_dev/login-as` — precondition: owner-started dev server and `veent-db-5434`
+- Visual coherence + empty-state variant choice: agent-probe: per-route-family screenshot review
+- Responsive at 390px: known-gap: documented, backlog stub during EXECUTE
+- 31 dark-only occurrences outside the section lists: known-gap: documented, backlog stub during EXECUTE
+
+### Dimension findings
+
+- Infra fit: PASS — presentation-only. No server code, no schema, no API, no container, no new
+  dependency. Every path the plan names resolves on disk. Touchpoints correctly exclude
+  `(app)/+layout.svelte`, so the phase-02 collision the umbrella flags cannot occur.
+- Test coverage: CONCERN — `vitest.config.ts` `include: ['tests/unit/**/*.{test,spec}.{js,ts}']`
+  picks up both new unit tests, and 74 existing unit tests already import from `@prisma/client`, so
+  AC-3's exhaustiveness test has precedent. `environment: 'node'` with no jsdom/happy-dom means
+  component-render tests are NOT runnable — the plan's `badge.ts` extraction is therefore correct
+  and necessary, not optional. The concern is the missing e2e gate, now added.
+- Breaking changes: PASS — all 8 `ConfirmDialog`/`ReasonDialog` usage sites
+  (`ConfirmButton.svelte:48`, `performance/templates/[id]:474,483`, `payroll/statutory-rates:560`,
+  `requests/proposals:239`, `requests/timesheets:182`, `requests/approvals:409`,
+  `TimesheetModal.svelte:527`) pass only props inside the declared interfaces, none passes slotted
+  content, and every `open` is `bind:`. `ConfirmButton.svelte` consumes exactly
+  `bind:open`/`title`/`message`/`confirmText`/`onconfirm` and reads no internal behaviour — **no S7
+  change forces an edit to it.** The umbrella's ConfirmButton contract is respected; no finding
+  proposes editing it, so nothing is REJECTED-ROUTED to phase 04.
+- Security surface: PASS — no auth, identity, billing, schema, secret or trust-boundary surface.
+  `src/lib/rbac.ts` is read-only. Money is only aligned, never computed. No evidence pack required.
+- Section S1-S5 (tokens + badge): CONCERN — 19/19 named Prisma enums exist verbatim in
+  `prisma/schema.prisma`. The `Table.svelte` + `table.ts` precedent the plan cites is real.
+  `.badge-*` are real `@layer components` classes, so `badge-{tone}` interpolation in `Badge.svelte`
+  is safe. Highest-risk edit was the `@apply badge` drop (fixed in-plan). Two prescribed colour
+  pairs measured under the 4.5:1 floor (fixed in-plan; see OD-1).
+- Section S6-S12 (Dialog): CONCERN — the roles-page trap at `settings/roles/+page.svelte:135-158`
+  is exactly as the plan describes and IS liftable verbatim, including the `e.stopPropagation()` on
+  Escape and the `triggerEl` capture/restore pair. Svelte 5 snippet slotting is not a problem: the
+  panel is plain markup and the `children` snippet carries it. The real gap was the panel API
+  (fixed in-plan) plus the `open`-keyed `$effect` focus race with `ReasonDialog`'s textarea
+  (fixed in-plan via `initialFocus`).
+- Section S13-S17 (sweep): CONCERN — two `<h1>` files were missing from S14/S15 (fixed in-plan);
+  `PageHeader` takes no actions prop by design and 29 of 39 `<h1>` sites are action-adjacent
+  (documented in-plan; see OD-3); `EmptyState`'s `variant` accepts exactly `'empty' | 'no-results'`
+  as the plan assumes; the `Banner` recipe exists at `separations/[id]:63-100` and needed the
+  static-class-record correction (fixed in-plan). The 17 sections are independently committable —
+  S2/S3/S6/S13 are purely additive, S1 changes only CSS declarations under unchanged class names,
+  and every consumer section (S4/S5, S7, S8-S12, S14-S17) depends only on earlier sections. No
+  section depends on a later one.
+
+### Open gaps
+
+- 31 dark-only `text-{green,yellow,gray,blue}-400` occurrences in 11 files outside every section
+  list (`benefits`, `dashboard`, `payroll/config`, `payroll/statutory-rates`, `recruitment/[id]`,
+  `reports`, `requests/approvals`, `settings/company`, `settings/holidays`, `settings/onboarding`,
+  `ApplicantKanban.svelte`): known-gap: documented — backlog stub
+  `phase-03-residual-dark-only-colours_NOTE_03-09-26.md`, written during EXECUTE. OD-2 may widen.
+- Responsive verification at 390px across the sweep: known-gap: documented — backlog stub
+  `phase-03-responsive-sweep_NOTE_03-09-26.md`, written during EXECUTE.
+- The Blast Radius "PageHeader gap by route family" table omits four families (`approvals`,
+  `benefits`, `departments`, `payslips` — 5 pages), which is why it sums to 56 against the real 61.
+  The h1 consequence is fixed in S14; the table itself is left as-is because it is descriptive, not
+  a gate.
+
+### What this coverage does NOT prove
+
+- `pnpm check` proves the `ConfirmDialog`/`ReasonDialog` props still type-check. It does NOT prove
+  the rewritten dialogs still look or behave the same — that is the §8.4 hybrid gate's job.
+- `pnpm test` proves `labels.ts` and `badge.ts` logic. It does NOT prove any component renders, at
+  all: `vitest.config.ts` runs `environment: 'node'`, so nothing in this phase's UI is unit-rendered.
+- The four exit greps prove the old shapes are gone. They do NOT prove the new shapes are correct —
+  a `<Badge>` with a wrong tone, a `<PageHeader>` with an orphaned action, or an `EmptyState` using
+  `empty` where `no-results` was right all pass every grep.
+- `pnpm test:e2e` proves the named dialogs and headings are still reachable by accessible name. It
+  does NOT cover the pages with no e2e spec, and it does not check any colour.
+- The §8.3 computed-style spot-check covers 5 named pages. It does NOT cover the other ~55 swept
+  files, and it says nothing about any viewport narrower than the one it runs at.
+- The §8.5 contrast measurement covers pairs this phase *changes*. It does NOT re-measure the pairs
+  it leaves alone, including the 31 residual occurrences above.
+- Nothing here proves the 390px layout, and nothing here proves the sweep did not degrade a page's
+  information hierarchy beyond what the Agent-Probe reviewer happens to look at.
+
+### OWNER-DECISION gates (answer before EXECUTE reaches the named section)
+
+- **OD-1 — contrast vs the frozen palette (blocks S1).** Two of the plan's original pairs measure
+  under the 4.5:1 floor at the badge's 12px size: `text-green-700` on `bg-green-500/15` over the
+  light card = **4.40:1**, and `text-muted-foreground` on `bg-muted` = **4.34:1 light / 4.20:1
+  dark**. This contract provisionally applies the darker replacements (`text-green-800`,
+  `text-foreground/70`). Owner call: accept those, OR change `--muted-foreground` in both themes
+  (a token edit the umbrella freezes), OR sign a documented waiver at ~4.3:1. Default applied:
+  darker replacements, no token change.
+- **OD-2 — AC-7 scope (blocks S5 exit).** 31 dark-only occurrences sit in 11 files this phase does
+  not touch. Widen phase 03 to cover them (scope growth, ~11 extra files), or keep AC-7 scoped to
+  the touched files and backlog the rest. Default applied: scoped + backlog stub.
+- **OD-3 — 29 action-adjacent page headings (blocks S14/S15).** `PageHeader` refuses an actions
+  prop by design, so converting 29 of the 39 `<h1>` sites means relocating an action cluster down
+  to the first section heading on each — a real layout change inside a phase billed as mechanical.
+  Do it here, or convert only the 10 action-free headings now and route the other 29 to a later
+  phase. Default applied: do it here, with the explicit STOP rule added to S14.
+
+Gate: CONDITIONAL — 0 unresolved FAILs. Four blocking findings were found and fixed in the plan
+during this cycle (the dropped `@apply badge` base, the two missing `<h1>` files, the unreachable
+AC-7 gate, and the under-specified `Dialog` panel API); three further concerns were fixed in-plan
+(missing e2e gate, interpolated Banner classes, the `initialFocus` race); two residuals are carried
+as backlog stubs; three OWNER-DECISION gates carry applied defaults and may be overridden.
+
+Accepted by: session (autonomous, /goal execution) — accepted concerns: (1) AC-7 scoped to touched
+files with 31 residual occurrences backlogged; (2) responsive 390px verification carried as a
+known-gap; (3) the badge contrast floor met via darker steps rather than a token change, pending
+OD-1; (4) the 29 action-adjacent heading conversions accepted as in-scope pending OD-3.
 
 ---
 

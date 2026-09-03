@@ -499,18 +499,19 @@ the overlap visible and sequenced, not to prevent it.
 
 | Phase | Slug | Plan status | Validation status |
 |---|---|---|---|
-| 1 | p0-fixes | PLANNED | — (VALIDATE to fill) |
-| 2 | nav-ia | PLANNED | — (VALIDATE to fill) |
-| 3 | design-system | PLANNED | — (VALIDATE to fill) |
-| 4 | feedback-contract | PLANNED | — (VALIDATE to fill) |
-| 5 | destructive-actions | PLANNED | — (VALIDATE to fill) |
-| 6 | surface-consolidation | PLANNED | — (VALIDATE to fill) |
-| 7 | page-splits | PLANNED | — (VALIDATE to fill) |
-| 8 | copy-a11y | PLANNED | — (VALIDATE to fill) |
+| 1 | p0-fixes | PLANNED | contract written — **CONDITIONAL** |
+| 2 | nav-ia | PLANNED | contract written — **CONDITIONAL** |
+| 3 | design-system | PLANNED | contract written — **CONDITIONAL** |
+| 4 | feedback-contract | PLANNED | contract written — **CONDITIONAL** |
+| 5 | destructive-actions | PLANNED | contract written — **CONDITIONAL** |
+| 6 | surface-consolidation | PLANNED | contract written — **BLOCKED → supplement in progress** |
+| 7 | page-splits | PLANNED | contract written — **CONDITIONAL** |
+| 8 | copy-a11y | PLANNED | contract written — **CONDITIONAL** |
 
 All eight phase plan files exist in this folder (`phase-01-p0-fixes_PLAN_03-09-26.md` through
-`phase-08-copy-a11y_PLAN_03-09-26.md`). None has been validated or executed; validation is pending
-for all eight. The blast-radius registry does not exist yet — it is created at first execution.
+`phase-08-copy-a11y_PLAN_03-09-26.md`), and **all eight now carry a written validate-contract**.
+Seven gates are CONDITIONAL; phase 06 came back BLOCKED and is in a supplement cycle. Nothing has
+been executed. The blast-radius registry does not exist yet — it is created at first execution.
 
 ---
 
@@ -518,8 +519,9 @@ for all eight. The blast-radius registry does not exist yet — it is created at
 
 - **Position:** all nine plan artifacts written (umbrella + 8 phase plans). Nothing validated,
   nothing executed, no code changed.
-- **Next step:** outer PVL — validate the eight phase plans. Fill `## Pre-PVL Conflict Resolution`
-  first, then fan out.
+- **Validation:** outer PVL has run. All eight validate-contracts are written — 7 CONDITIONAL,
+  phase 06 BLOCKED and in a supplement cycle.
+- **Next step:** close phase 06's supplement cycle, then start phase 01 EXECUTE.
 - **Next execution:** Phase 1, `p0-fixes`
   (`phase-01-p0-fixes_PLAN_03-09-26.md`). It has no entry dependency.
 - **Branch:** `staging`, clean at `5e5cdfe`.
@@ -541,18 +543,21 @@ eight phase plans were written is resolved below. No conflict is left open.
 |---|---|---|---|
 | 1 | Supervisor picker (`<select multiple size=4>`, `employees/[id]:400-417`) claimed by both 07 and 08 | reassign | **Phase 07 owns it.** Phase 08 and this umbrella updated 03-09-26 to disown it. |
 | 2 | Phase 04/05 dependency inversion carried over from INNOVATE | reassign | **Phases swapped.** 04 = feedback-contract, 05 = destructive-actions. Reflected in the ordering diagram, entry criteria, status table, touchpoints, and the `/goal` block. |
+| 3 | `leave/new` claimed by both 04 and 06 (04 fixes it, 06 deletes the route) | parallel-safe in order | **Phase 04 keeps its `e.message` fix at `leave/new:81`** and re-points its no-JS flash gate at **separations create** — `requests ?/create` returns instead of redirecting, so it cannot carry a flash; `/requests` serves as the no-JS non-flash control. **Phase 06 S2 deletes the route afterward.** Dated 03-09-26. |
 
 ### Shared-file ordering (parallel-safe only in the stated order)
 
-**`src/routes/(app)/+layout.svelte`** — three phases touch it, so the execution order is the
-control, not a lock:
+**`src/routes/(app)/+layout.svelte`** — four phases touch it. Required order: **01 → 02 → 06 → 07**.
 
-- **Phase 02 owns the restructure.** It writes the sectioned nav shape.
+- **Phase 01** edits it first: it adds `reportsChildren` plus an `{:else if}` arm inside the same
+  nav loop (the audit-log link, P0-2).
+- **Phase 02 owns the restructure** and must **carry phase 01's arm forward** into the sectioned
+  shape — phase 02's plan now carries that carry-forward rule explicitly.
 - **Phase 06** edits it after 02, for the summed approvals badge.
 - **Phase 07** edits it after 02, for the settings children sourced from
   `$lib/settings-destinations.ts`.
-- Both 06 and 07 must rebase on the shape 02 lands. Because execution is strictly sequential,
-  this is enforced by the phase order itself — no additional coordination is needed.
+- 06 and 07 both rebase on the shape 02 lands. Because execution is strictly sequential, the phase
+  order enforces all of this — no additional coordination is needed.
 
 ### Shared-primitive contract
 
@@ -562,8 +567,15 @@ control, not a lock:
   Dialog-base work in 03 breaks `ConfirmButton`, `pnpm check` says so immediately.
 - **Phase 04 owns the rebuild**, and freezes its public API on the way out.
 - **Phase 05 consumes it** against that frozen API.
+- Phase 04's `ConfirmButton` spec includes a **`triggerTitle` prop**, consumed by phase 05.
 - Any validate finding that proposes editing `ConfirmButton` inside phase 03 or phase 05 is a
   **contract violation**, not a gap. Reject it and route the concern to phase 04.
+
+**`src/lib/components/ui/ConfirmDialog.svelte`** — a different owner from `ConfirmButton`:
+
+- **Phase 03 owns it** (its S7 rewrite).
+- **Phase 04 does NOT edit it.** Phase 04 uses the `$bindable` re-open workaround instead —
+  binding instruction **E1** in its validate-contract.
 
 ### Stale-audit corrections accepted program-wide
 
@@ -577,22 +589,47 @@ audit; the audit file itself is not edited.
 | `DevLoginSwitcher` does not render on staging — the audit's "already on staging" claim is stale | 08 |
 | The MANAGER nav-gate flip is a **server-guard** change, not a nav-only one — routed to backlog as an OWNER-DECISION rather than executed inside 02 | 02 |
 
-### Open owner-decisions registry
+### Open owner-decisions registry (consolidated post-validation)
 
-These block or gate work and are the owner's to answer. None is an agent decision.
+Every open decision surfaced by the eight validate-contracts. "Blocking" means execution cannot
+complete without the owner's answer; everything else has a default the validator already applied.
 
-| Decision | Raised by | Effect if unanswered |
-|---|---|---|
-| MANAGER / `ADMINISTER_HR_ORGWIDE` guard alignment | 02 (backlog) | Phase 02 ships the nav regroup without the gate flip |
-| Login tenant enumeration (customer-list disclosure) | 08 | Item stays unbuilt in 08 |
-| `DevLoginSwitcher` removal | 08 | Item stays unbuilt in 08 |
-| Stores/Branches noun ruling — **phase 02 must rule before phase 08 can run S2** | 02 → 08 | **Blocks** phase 08 section S2 |
+| Decision | From | Blocking? | Default / fallback |
+|---|---|---|---|
+| MANAGER / `ADMINISTER_HR_ORGWIDE` guard alignment across **14 routes** (raised by 02, echoed by 01's audit-log MANAGER-exposure OD) | 02, 01 | **No** — but it **needs its own SPEC** | Phase 01 ships with a MANAGER probe arm; the guard flip is not executed inside this program |
+| Stores/Branches noun ruling | 02 → 08 | **Yes — blocks phase 08 item 14 only** | Phase 02 keeps the tenant split. Fallback: ship phase 08 S2 without item 14 |
+| Login tenant enumeration (customer-list disclosure) | 08 | No | Unbuilt by design; default option is **email-first** |
+| `DevLoginSwitcher` removal timing | 08 | No | Default: **remove after the live gate** |
+| Phase 03 OD defaults (applied by the validator) | 03 | No | `green-800` contrast steps with **no token change**; AC-7 scoped with **31 residuals backlogged**; all **39 `h1` conversions in-phase** under a STOP rule |
+| Reveal-survives-save posture | 07 | No | **Accept**, with the B5a per-employee-key hard gate + G13 |
+| Sidebar settings subset | 07 | No | **Curated subset via an `inSidebar` field** |
+| Complaints page size | 07 | No | **10** |
+| Dead `employees`-list offboard action | 04 | No | **Delete it** |
 
 ### Blast-radius registry
 
 Still uncreated, by convention — the first EXECUTE creates it. Phases 04 and 07 carry inline
 blast-radius claims in their plan files; those must be transcribed into
 `phase-blast-radius-registry.md` at that point.
+
+### Format and CI facts (carry into every phase)
+
+- **`docs/ui-ux-audit-2026-09-03.md` was reformatted at `cb7d830`**, so `pnpm format:check` is green
+  on the current tree. Do not re-baseline against the pre-`cb7d830` state.
+- **A dev server may be live during EXECUTE, and `pnpm check` kills it.** Baseline the gates
+  accordingly — this is binding instruction **E1** in phase 01's validate-contract. The owner
+  starts servers; never relaunch one to "fix" this.
+
+### Backlog artifacts on disk
+
+Written by the validators, in `process/features/ui-ux-overhaul/backlog/`:
+
+| Artifact | Path |
+|---|---|
+| Raw-enum sweep — remaining enums | `raw-enum-sweep-remaining-enums_NOTE_03-09-26.md` |
+| A11y component-test harness | `a11y-component-test-harness_NOTE_03-09-26.md` |
+| Component-test DOM environment | `component-test-dom-environment_NOTE_03-09-26.md` |
+| Dashboard pending-approvals wrong target | `dashboard-pending-approvals-wrong-target_NOTE_03-09-26.md` |
 
 ---
 
@@ -653,13 +690,13 @@ This umbrella's table is the program-level floor, not a substitute.
 
 1. **Selected plan file:** `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/ui-ux-overhaul-umbrella_PLAN_03-09-26.md`
 2. **Last completed step:** umbrella plan and all eight phase plans written. No code changed.
-3. **Validate-contract status:** pending — VALIDATE has not run on this umbrella.
+3. **Validate-contract status:** all eight phase contracts written (7 CONDITIONAL, 06 BLOCKED
+   → supplement in progress). The umbrella's own `## Validate Contract` stays a placeholder.
 4. **Context files loaded:** `process/context/all-context.md`, `process/context/planning/all-planning.md`, `process/development-protocols/phase-programs.md`, `.claude/skills/vc-generate-phase-program/references/program-goal-charter-template.md`, `docs/ui-ux-audit-2026-09-03.md`.
-5. **Next step for a fresh agent:** the eight phase plans already exist — do not re-create them.
-   Fill `## Pre-PVL Conflict Resolution` above, then run outer PVL across the eight phase plans
-   (`vc-agent-strategy-compare` first; read-only validation fan-out is fine here since each
-   validator reads one finished plan). Do not start Phase 1 execution until its validate-contract
-   is written.
+5. **Next step for a fresh agent:** plans and contracts both exist — do not re-create either.
+   Read `## Pre-PVL Conflict Resolution` above first; it carries the ownership rules that override
+   any single phase plan. Close phase 06's supplement cycle, then start Phase 1 EXECUTE against
+   `phase-01-p0-fixes_PLAN_03-09-26.md` and its contract.
 
 ---
 
