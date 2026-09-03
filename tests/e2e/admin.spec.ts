@@ -124,6 +124,8 @@ test.describe('Government ID validation', () => {
 		await page.getByLabel('Job Title').fill('QA Engineer')
 		await page.getByLabel('Start Date').fill('2026-03-02')
 		await page.getByLabel('Basic Monthly Salary').fill('28000')
+		// The gov-ID fields sit inside the collapsed "Complete later" disclosure (phase 07).
+		await page.getByText('Complete later — 12 optional fields').click()
 		await page.getByLabel('SSS Number').fill('1234') // 4 digits, not 10
 		await page.getByRole('button', { name: 'Create Employee' }).click()
 
@@ -154,6 +156,7 @@ test.describe('Government ID validation', () => {
 		await page.getByLabel('Start Date').fill('2026-03-02')
 		await page.getByLabel('Basic Monthly Salary').fill('28000')
 		// Typed three different ways; all three should land normalised.
+		await page.getByText('Complete later — 12 optional fields').click()
 		await page.getByLabel('SSS Number').fill('34 1234567 8')
 		await page.getByLabel('PhilHealth Number').fill('123456789012')
 		await page.getByLabel('TIN Number').fill('123-456-789')
