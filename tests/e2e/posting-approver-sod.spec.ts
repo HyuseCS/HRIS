@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { PrismaClient } from '@prisma/client'
 import { login, USERS } from './helpers'
 
 /**
@@ -20,6 +21,21 @@ const TITLE_A = `E2E-F4-mapped-${Date.now()}`
 const TITLE_B = `E2E-F4-self-${Date.now()}`
 
 test.describe.configure({ mode: 'serial' })
+
+test.beforeAll(async () => {
+	// Sweep the residue of EVERY earlier run before filing this run's postings. The self-submitted
+	// posting (b) is undecidable by design, so it stays PENDING forever, and the app has no delete
+	// path — the afterAll below documents that. Harmless while the dashboard card was unbounded;
+	// phase 10 capped that card at 10 oldest-first, so 86 accumulated E2E-F4 rows crowded this
+	// run's posting clean off it. Prisma-level fixture cleanup is the same house pattern as
+	// pagination.spec.ts and container-bounds.spec.ts.
+	const db = new PrismaClient()
+	try {
+		await db.jobPosting.deleteMany({ where: { title: { startsWith: 'E2E-F4-' } } })
+	} finally {
+		await db.$disconnect()
+	}
+})
 
 /** Set (or clear, with '') the department's posting approver as CEO. */
 async function mapApprover(page: Page, approverLabel: string) {
@@ -203,10 +219,10 @@ test.afterAll(async ({ browser }) => {
 	})
 	expect(res.ok(), `role restore failed: ${res.status()} ${await res.text()}`).toBe(true)
 
-	// KNOWN RESIDUE: the two postings this spec files are NOT removed. Nothing in the app deletes
-	// a job posting — no form action, no v1 route — so there is no honest way to clean them from a
-	// UI-driven spec. They are uniquely named (E2E-F4-*, timestamped), so they never collide with
-	// a later run; they simply accumulate in the dev database. Clear them by hand when it matters:
-	//   delete from job_postings where title like 'E2E-F4%';
+	// KNOWN RESIDUE: the two postings this spec files are NOT removed here. Nothing in the app
+	// deletes a job posting — no form action, no v1 route — so a UI-driven teardown cannot clean
+	// them. They are uniquely named (E2E-F4-*, timestamped), so they never collide with a later
+	// run; the beforeAll above sweeps them at Prisma level on the NEXT run instead, which also
+	// covers runs that die before any teardown.
 	await ctx.close()
 })

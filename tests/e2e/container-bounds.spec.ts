@@ -41,13 +41,27 @@ test.beforeAll(async () => {
 		})
 		const orgId = admin.organizationId
 
-		// A department of its own, with NO postingApprover mapping. `canApprovePosting` makes a
-		// MAPPED department decidable only by its designated approver and falls back to HR only
-		// for unmapped ones — borrowing a seeded department could silently render zero rows.
+		// A department of its own, MAPPED to the admin (EMP-001) as designated approver.
+		// `canApprovePosting` makes a mapped department decidable ONLY by its designated
+		// approver; unmapped ones fall back to EVERY HR holder — which put these fixtures on
+		// posting-approver-sod's twoHat card and pushed its own posting past the new cap of 10.
+		// Mapping to the actor this spec logs in as keeps the card populated here and empty
+		// everywhere else.
 		const department = await db.department.upsert({
 			where: { organizationId_name: { organizationId: orgId, name: DEPARTMENT } },
 			update: {},
 			create: { organizationId: orgId, name: DEPARTMENT }
+		})
+		const adminEmployee = await db.employee.findFirstOrThrow({
+			where: { userId: admin.id },
+			select: { id: true }
+		})
+		await db.postingApprover.upsert({
+			where: {
+				organizationId_departmentId: { organizationId: orgId, departmentId: department.id }
+			},
+			update: { approverId: adminEmployee.id },
+			create: { organizationId: orgId, departmentId: department.id, approverId: adminEmployee.id }
 		})
 
 		// (a) Probationary staff inside the 21-day regularization notice window. Six months of
@@ -141,6 +155,12 @@ test.afterAll(async () => {
 		await db.user.deleteMany({ where: { email: { startsWith: EMAIL_PREFIX } } })
 		await db.jobPosting.deleteMany({ where: { title: { startsWith: MARKER } } })
 		await db.publicHoliday.deleteMany({ where: { name: { startsWith: MARKER } } })
+		// PostingApprover has no department relation field — resolve the id by name.
+		const dept = await db.department.findFirst({
+			where: { name: DEPARTMENT },
+			select: { id: true }
+		})
+		if (dept) await db.postingApprover.deleteMany({ where: { departmentId: dept.id } })
 		await db.department.deleteMany({ where: { name: DEPARTMENT } })
 	} catch {
 		// Best-effort, same as pagination.spec.ts: a concurrent compute can attach an entry
@@ -187,9 +207,15 @@ test('the three dashboard cards cap at ten and scroll inside their boxes', async
 	// Two patterns, and the assertion differs by design. `.card-scroll` sets an explicit
 	// max-height; the Upcoming Events list instead stretches to its grid row via
 	// `min-h-0 flex-1`, which sets NO max-height at all — asserting one there would fail on
-	// correct code.
-	expect(await overflows(events)).toBe(true)
+	// correct code. And whether ten capped rows actually EXCEED the grid-driven row height is
+	// viewport-dependent (they fit on a tall desktop), so `overflows` is not a valid gate for
+	// this card either — the first full-suite run proved that. What correct code guarantees is
+	// the MECHANISM: the box scrolls instead of growing (`overflow-y: auto`) and is allowed to
+	// shrink below its content (`flex-grow: 1`, `min-height: 0`). Whether it looks right when
+	// it does overflow is on the owner look pass, like the other twenty containers.
 	expect(await computed(events, 'overflow-y')).toBe('auto')
+	expect(await computed(events, 'flex-grow')).toBe('1')
+	expect(await computed(events, 'min-height')).toBe('0px')
 
 	for (const list of [regularizations, postings]) {
 		expect(await overflows(list)).toBe(true)
