@@ -140,7 +140,6 @@ export const actions: Actions = {
 			)
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 		return { message: 'Document uploaded.' }
@@ -163,7 +162,6 @@ export const actions: Actions = {
 			)
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 		return { message: 'Document removed.' }
@@ -190,7 +188,6 @@ export const actions: Actions = {
 			)
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 		return { message: verified ? 'Document marked as verified.' : 'Verification cleared.' }

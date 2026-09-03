@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatCurrency } from '$lib/utils/format'
+	import { REPORT_COLUMN_LABELS, labelFor } from '$lib/labels'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import { navigating } from '$app/stores'
@@ -235,9 +236,13 @@
 							<tr>
 								{#each data.columns as col (col)}
 									<th
-										class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+										class="px-4 py-3 font-medium text-muted-foreground whitespace-nowrap {CURRENCY_COLS.has(
+											col
+										)
+											? 'text-right'
+											: 'text-left'}"
 									>
-										{col}
+										{labelFor(REPORT_COLUMN_LABELS, col)}
 									</th>
 								{/each}
 							</tr>
@@ -248,7 +253,7 @@
 									{#each data.columns as col (col)}
 										<td
 											class="px-4 py-3 whitespace-nowrap {CURRENCY_COLS.has(col)
-												? 'text-right font-mono'
+												? 'text-right font-mono tabular-nums'
 												: ''}"
 										>
 											{formatCell(col, row[col])}

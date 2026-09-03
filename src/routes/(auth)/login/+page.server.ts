@@ -20,7 +20,10 @@ const loginSchema = z.object({
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) redirect(302, '/dashboard')
 
-	// Tenant selector options — every org is a login target under the Avipa brand.
+	// Tenant selector options — every org is a login target under the Veent HRIS brand.
+	// The owner has ruled that this list moves to an email-first step 1 in a later, auth-scoped
+	// plan; until that plan ships, this query, `loginSchema` and the two-step flow stay as they
+	// are. See process/features/ui-ux-overhaul/backlog/login-email-first-tenant-privacy_NOTE_03-09-26.md
 	const orgs = await db.organization.findMany({
 		select: { id: true, name: true },
 		orderBy: { name: 'asc' }

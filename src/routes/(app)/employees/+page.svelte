@@ -1,14 +1,21 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
 	import { tenureLabel } from '$lib/utils/dates'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import type { PageData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data }: { data: PageData } = $props()
 	let search = $state($page.url.searchParams.get('search') ?? '')
+	// Read the APPLIED filter from the URL, not the bound input: typing must not flip the empty
+	// state to "no results" before the search is submitted.
+	const filtered = $derived(!!($page.url.searchParams.get('search') || data.branchFilter))
 
 	// Active / Offboarded tab links (#184) — keep the search and branch filters, switch the
 	// status, and drop the page so a tab always opens on its first page.
@@ -27,15 +34,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Employees</h1>
-		<a
-			href="/employees/new"
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			Add Employee
-		</a>
-	</div>
+	<PageHeader title="Employees" />
 
 	<!-- Search -->
 	<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
@@ -49,10 +48,10 @@
 		{#if data.showBranches}
 			<select
 				name="branch"
-				aria-label="Branch"
+				aria-label="Store"
 				class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			>
-				<option value="">All branches</option>
+				<option value="">All stores</option>
 				{#each data.branches as br (br.id)}
 					<option value={br.id} selected={data.branchFilter === br.id}>{br.name}</option>
 				{/each}
@@ -60,6 +59,12 @@
 		{/if}
 		<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent">Search</button
 		>
+		<a
+			href="/employees/new"
+			class="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+		>
+			Add Employee
+		</a>
 	</form>
 
 	<!-- Active / Offboarded tabs (#184) -->
@@ -93,7 +98,7 @@
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
 						{#if data.showBranches}
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Branch</th>
+							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Store</th>
 						{/if}
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -104,20 +109,22 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each employees as emp (emp.id)}
+						<!-- R1: the real link lives in the name cell. The whole-row click stays as a mouse
+						     convenience only — the row is not focusable and carries no key handler, so a
+						     keyboard reader gets a plain table row containing a link. -->
 						<tr
 							class="cursor-pointer hover:bg-muted/30"
-							role="link"
-							tabindex="0"
-							onclick={() => goto(`/employees/${emp.id}`)}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault()
-									goto(`/employees/${emp.id}`)
-								}
+							onclick={(e) => {
+								if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+								goto(`/employees/${emp.id}`)
 							}}
 						>
 							<td class="px-4 py-3">
-								<div class="font-medium">{emp.lastName}, {emp.firstName}</div>
+								<a
+									href="/employees/{emp.id}"
+									class="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									>{emp.lastName}, {emp.firstName}</a
+								>
 								<div class="text-xs text-muted-foreground">{emp.employeeNumber}</div>
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">{emp.department.name}</td>
@@ -128,16 +135,7 @@
 							<td class="px-4 py-3 text-muted-foreground">{emp.employmentType.replace('_', ' ')}</td
 							>
 							<td class="px-4 py-3">
-								<span
-									class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {emp.employmentStatus ===
-									'ACTIVE'
-										? 'bg-green-500/15 text-green-400'
-										: emp.employmentStatus === 'ON_LEAVE'
-											? 'bg-yellow-500/15 text-yellow-400'
-											: 'bg-gray-500/15 text-gray-400'}"
-								>
-									{emp.employmentStatus.replace('_', ' ')}
-								</span>
+								<Badge status={emp.employmentStatus} domain="employment" />
 								{#if emp.employmentStatus === 'OFFBOARDED' && emp.endDate}
 									<div class="mt-0.5 text-xs text-muted-foreground">
 										left {formatShortDate(emp.endDate)}
@@ -151,16 +149,24 @@
 						</tr>
 					{:else}
 						<tr>
-							<td
-								colspan={data.showBranches ? 8 : 7}
-								class="px-4 py-8 text-center text-muted-foreground"
-								>{data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}</td
-							>
+							<td colspan={data.showBranches ? 8 : 7} class="p-0">
+								<EmptyState
+									variant={filtered ? 'no-results' : 'empty'}
+									title={data.tab === 'offboarded'
+										? 'No offboarded employees'
+										: 'No employees found'}
+									description={filtered
+										? 'No employee matches your search or store filter.'
+										: undefined}
+								/>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	{:catch}
+		<LoadError what="the employee list" />
 	{/await}
 
 	<Pagination meta={data.pagination} />

@@ -418,6 +418,7 @@ function scopedToEmployee(actions: Actions): Actions {
 export const actions: Actions = scopedToEmployee({
 	// Set the employee's additional supervisors (#176). HR-only.
 	setSupervisors: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'setSupervisors'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const ids = (await request.formData()).getAll('supervisorIds').map(String).filter(Boolean)
 		try {
@@ -428,12 +429,14 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e) {
-			return failFromError(e)
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	update: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'update'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
@@ -443,7 +446,7 @@ export const actions: Actions = scopedToEmployee({
 			// Surface the field messages (the disbursement formats validate in the schema);
 			// fall back to the generic text when zod produced none.
 			const messages = parsed.error.errors.map((e) => e.message).filter(Boolean)
-			return fail(400, { error: messages.length ? messages.join(' · ') : 'Invalid input' })
+			return fail(400, { action, error: messages.length ? messages.join(' · ') : 'Invalid input' })
 		}
 
 		// #111: the government IDs and disbursement numbers render masked and are never prefilled,
@@ -484,12 +487,15 @@ export const actions: Actions = scopedToEmployee({
 		} catch (e: unknown) {
 			// Unique constraint on Employee.discordId
 			if (e && typeof e === 'object' && 'code' in e && (e as { code?: string }).code === 'P2002') {
-				return fail(409, { error: 'That Discord ID is already linked to another employee.' })
+				return fail(409, {
+					action,
+					error: 'That Discord ID is already linked to another employee.'
+				})
 			}
 			throw e
 		}
 
-		return { success: true }
+		return { action, success: true }
 	},
 
 	/**
@@ -613,6 +619,7 @@ export const actions: Actions = scopedToEmployee({
 	// #111: audited reveal of every masked sensitive field (gov IDs, salary, disbursement). The
 	// role check runs server-side — the UI button is cosmetic gating only (Constitution P2).
 	reveal: async ({ locals, params, getClientAddress }) => {
+		const action = 'reveal'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		// A self-reveal (an HR user opening their own 201 file) is exempt from the audit log —
 		// own data, decision #2. Same identity comparison as load's object-level access check.
@@ -636,10 +643,11 @@ export const actions: Actions = scopedToEmployee({
 		const history = await getEmploymentHistory(params.id, locals.user!.organizationId, {
 			unmask: true
 		})
-		return { revealed, history }
+		return { action, revealed, history }
 	},
 
 	offboard: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'offboard'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
@@ -654,17 +662,20 @@ export const actions: Actions = scopedToEmployee({
 				ipAddress: getClientAddress()
 			})
 		} catch (e) {
-			return failFromError(e)
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
 		}
+		return { action, saved: 'Employee offboarded.' }
 	},
 
 	// ponytail: only the two loan actions were folded into ctxOf — the rest of the inline ctx
 	// literals in this file are audit-only, and converting them would be churn.
 	addLoan: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'addLoan'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = loanSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid loan details' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid loan details' })
 		try {
 			await createLoan(
 				params.id,
@@ -673,16 +684,18 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e) {
-			return failFromError(e)
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	addCashAdvance: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'addCashAdvance'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = cashAdvanceSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid cash-advance details' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid cash-advance details' })
 		try {
 			await createCashAdvance(
 				params.id,
@@ -691,16 +704,18 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e) {
-			return failFromError(e)
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	addEarning: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'addEarning'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = earningSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid recurring earning details' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid recurring earning details' })
 		try {
 			await createEmployeeEarning(params.id, user.organizationId, parsed.data, {
 				organizationId: user.organizationId,
@@ -709,16 +724,18 @@ export const actions: Actions = scopedToEmployee({
 				ipAddress: getClientAddress()
 			})
 		} catch (e) {
-			return failFromError(e)
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	endEarning: async ({ request, locals, getClientAddress }) => {
+		const action = 'endEarning'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const id = (await request.formData()).get('id') as string
-		if (!id) return fail(400, { error: 'Missing earning id' })
+		if (!id) return fail(400, { action, error: 'Missing earning id' })
 		try {
 			await endEmployeeEarning(id, user.organizationId, {
 				organizationId: user.organizationId,
@@ -727,17 +744,18 @@ export const actions: Actions = scopedToEmployee({
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	addDeduction: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'addDeduction'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const parsed = deductionSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid recurring deduction details' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid recurring deduction details' })
 		try {
 			await createEmployeeDeduction(params.id, user.organizationId, parsed.data, {
 				organizationId: user.organizationId,
@@ -746,17 +764,18 @@ export const actions: Actions = scopedToEmployee({
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	endDeduction: async ({ request, locals, getClientAddress }) => {
+		const action = 'endDeduction'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 		const id = (await request.formData()).get('id') as string
-		if (!id) return fail(400, { error: 'Missing deduction id' })
+		if (!id) return fail(400, { action, error: 'Missing deduction id' })
 		try {
 			await endEmployeeDeduction(id, user.organizationId, {
 				organizationId: user.organizationId,
@@ -765,17 +784,18 @@ export const actions: Actions = scopedToEmployee({
 				ipAddress: getClientAddress()
 			})
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	// Exempt/restore an individual employee from a statutory contribution (#173). HR-only, audited.
 	toggleStatutoryExemption: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'toggleStatutoryExemption'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = statutoryToggleSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid statutory toggle' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid statutory toggle' })
 		try {
 			await setStatutoryExemption(
 				params.id,
@@ -785,20 +805,21 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	// Toggle "employer share paid externally" for one contribution (#173, Feature C). Zeroes the ER
 	// share only; the EE share is still deducted. HR-only, audited.
 	toggleEmployerShareExternal: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'toggleEmployerShareExternal'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = employerShareExternalToggleSchema.safeParse(
 			Object.fromEntries(await request.formData())
 		)
-		if (!parsed.success) return fail(400, { error: 'Invalid statutory toggle' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid statutory toggle' })
 		try {
 			await setEmployerShareExternal(
 				params.id,
@@ -808,17 +829,18 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	// Set which semi-monthly cutoff the EE share is deducted on (#173, Feature E). HR-only, audited.
 	setStatutoryAllocation: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'setStatutoryAllocation'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = statutoryAllocationSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid statutory allocation' })
+		if (!parsed.success) return fail(400, { action, error: 'Invalid statutory allocation' })
 		try {
 			await setStatutoryAllocation(
 				params.id,
@@ -828,16 +850,18 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	addEmergencyContact: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'addEmergencyContact'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = emergencyContactSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Name, relationship, and phone are required.' })
+		if (!parsed.success)
+			return fail(400, { action, error: 'Name, relationship, and phone are required.' })
 		try {
 			await addEmergencyContact(
 				params.id,
@@ -846,16 +870,17 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	deleteEmergencyContact: async ({ request, locals, getClientAddress }) => {
+		const action = 'deleteEmergencyContact'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const contactId = (await request.formData()).get('contactId') as string
-		if (!contactId) return fail(400, { error: 'Missing contact id.' })
+		if (!contactId) return fail(400, { action, error: 'Missing contact id.' })
 		try {
 			await deleteEmergencyContact(
 				contactId,
@@ -863,13 +888,14 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	uploadDocument: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'uploadDocument'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 
 		const data = await request.formData()
@@ -878,7 +904,7 @@ export const actions: Actions = scopedToEmployee({
 		const label = (data.get('label') as string) || ''
 
 		if (!(file instanceof File) || file.size === 0)
-			return fail(400, { error: 'Please choose a file to upload.' })
+			return fail(400, { action, error: 'Please choose a file to upload.' })
 		const category = DOC_CATEGORIES.includes(categoryRaw as never)
 			? (categoryRaw as (typeof DOC_CATEGORIES)[number])
 			: 'OTHER'
@@ -892,16 +918,17 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	deleteDocument: async ({ request, locals, getClientAddress }) => {
+		const action = 'deleteDocument'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const docId = (await request.formData()).get('docId') as string
-		if (!docId) return fail(400, { error: 'Missing document id.' })
+		if (!docId) return fail(400, { action, error: 'Missing document id.' })
 		try {
 			await deleteEmployeeDocument(
 				docId,
@@ -909,19 +936,20 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	},
 
 	// Tick a MANUAL onboarding step on/off for this employee (#116). Derived steps are
 	// read-only — they check themselves off from the record — so only manual items post here.
 	toggleOnboardingStep: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'toggleOnboardingStep'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const data = await request.formData()
 		const itemId = data.get('itemId') as string
-		if (!itemId) return fail(400, { error: 'Missing item id.' })
+		if (!itemId) return fail(400, { action, error: 'Missing item id.' })
 		const done = data.get('done') === 'true'
 		try {
 			await setManualCompletion(
@@ -932,9 +960,9 @@ export const actions: Actions = scopedToEmployee({
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
 			throw e
 		}
-		return { success: true }
+		return { action, success: true }
 	}
 })

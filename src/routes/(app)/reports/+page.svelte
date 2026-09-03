@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
@@ -77,6 +78,12 @@
 			label: 'Recruitment',
 			desc: 'Job postings, applicant funnel & days open',
 			payroll: false
+		},
+		{
+			href: '/reports/audit-log',
+			label: 'Audit Log',
+			desc: 'Who changed what, when',
+			payroll: false
 		}
 	]
 	const reportCards = $derived(
@@ -110,7 +117,7 @@
 {/snippet}
 
 <div class="space-y-8">
-	<h1 class="text-2xl font-bold tracking-tight">Reports</h1>
+	<PageHeader title="Reports" />
 
 	{#if data.canViewHrReports}
 		<!-- Attrition summary -->
@@ -188,13 +195,13 @@
 								<td class="px-4 py-3"
 									>{formatShortDate(run.periodStart)} – {formatShortDate(run.periodEnd)}</td
 								>
-								<td class="px-4 py-3 text-right font-mono"
+								<td class="px-4 py-3 text-right font-mono tabular-nums"
 									>{formatCurrency(Number(run.totalGross))}</td
 								>
-								<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+								<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 									>{formatCurrency(Number(run.totalDeductions))}</td
 								>
-								<td class="px-4 py-3 text-right font-mono font-medium"
+								<td class="px-4 py-3 text-right font-mono font-medium tabular-nums"
 									>{formatCurrency(Number(run.totalNet))}</td
 								>
 							</tr>

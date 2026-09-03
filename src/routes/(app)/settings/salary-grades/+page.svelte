@@ -1,5 +1,7 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { formatCurrency } from '$lib/utils/format'
@@ -36,11 +38,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<!-- Grades -->
@@ -87,11 +85,7 @@
 							</td>
 						</tr>
 					{:else}
-						<tr
-							><td colspan="5" class="px-3 py-6 text-center text-muted-foreground"
-								>No grades yet.</td
-							></tr
-						>
+						<tr><td colspan="5" class="p-0"><EmptyState title="No grades yet" /></td></tr>
 					{/each}
 				</tbody>
 			</table>

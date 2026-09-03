@@ -1,4 +1,7 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
 	import { monthsOfService, tenureRequirement } from '$lib/utils/dates'
 	import type { PageData } from './$types'
@@ -13,6 +16,7 @@
 	}
 
 	const colCount = $derived(3 + data.leaveTypes.length)
+	const filtered = $derived(!!(data.search || data.departmentId))
 </script>
 
 <svelte:head>
@@ -20,13 +24,14 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<a href="/leave" class="text-sm text-muted-foreground hover:text-foreground">← Leave</a>
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Leave Balances</h1>
-		<p class="text-sm text-muted-foreground">
-			Remaining / allocated days per active employee for {data.year}.
-		</p>
-	</div>
+	<PageHeader
+		title="Leave Balances"
+		description="Remaining / allocated days per active employee for {data.year}."
+	>
+		{#snippet back()}
+			<BackButton fallback="/leave" label="Leave" />
+		{/snippet}
+	</PageHeader>
 
 	<form method="GET" class="flex flex-wrap gap-2">
 		<input
@@ -74,27 +79,28 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.rows as row (row.id)}
+					<!-- R1: the real link lives in the name cell; the whole-row click is a mouse
+					     convenience only. -->
 					<tr
 						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
 						data-employee={row.employeeNumber}
-						onclick={() => goto(`/employees/${row.id}`)}
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/employees/${row.id}`)
-							}
+						onclick={(e) => {
+							if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+							goto(`/employees/${row.id}`)
 						}}
 					>
 						<td class="px-4 py-3">
-							<div class="font-medium">{row.name}</div>
+							<a
+								href="/employees/{row.id}"
+								class="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>{row.name}</a
+							>
 							<div class="text-xs text-muted-foreground">{row.employeeNumber}</div>
 						</td>
 						<td class="px-4 py-3 text-muted-foreground">{row.department}</td>
 						{#each row.cells as cell, i (data.leaveTypes[i].id)}
 							{@const gated = locked(row.startDate, data.leaveTypes[i].minMonthsOfService)}
-							<td class="px-4 py-3 text-right">
+							<td class="px-4 py-3 text-right tabular-nums">
 								{#if !cell}
 									<span class="text-muted-foreground" title="No balance allocated for {data.year}"
 										>—</span
@@ -107,7 +113,7 @@
 								{/if}
 							</td>
 						{/each}
-						<td class="px-4 py-3 text-right font-medium">
+						<td class="px-4 py-3 text-right font-medium tabular-nums">
 							{row.cells
 								.reduce(
 									(sum, cell, i) =>
@@ -122,8 +128,14 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan={colCount} class="px-4 py-8 text-center text-muted-foreground"
-							>No employees found</td
+						<td colspan={colCount} class="p-0"
+							><EmptyState
+								variant={filtered ? 'no-results' : 'empty'}
+								title="No employees found"
+								description={filtered
+									? 'No employee matches your search or department filter.'
+									: undefined}
+							/></td
 						>
 					</tr>
 				{/each}

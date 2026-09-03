@@ -1,9 +1,12 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -36,8 +39,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-2">
-		<h1 class="text-2xl font-bold tracking-tight">Recruitment</h1>
+	<PageHeader title="Recruitment" />
+
+	<!-- The posting actions sit above the list they publish into, not on the title row. -->
+	<div class="flex flex-wrap items-center justify-end gap-2">
 		<div class="flex items-center gap-2">
 			{#if selectedDraftIds.length}
 				<form
@@ -181,16 +186,15 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.postings as jp (jp.id)}
+					<!-- R1: the real link lives in the title cell; the whole-row click is a mouse
+					     convenience only. Dropping the row key handler is item 24's fix at the root —
+					     Space on the row's DRAFT checkbox toggled the box AND navigated away, losing the
+					     selection, because the checkbox cell stopped `click` but not `keydown`. -->
 					<tr
 						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
-						onclick={() => goto(`/recruitment/${jp.id}`)}
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/recruitment/${jp.id}`)
-							}
+						onclick={(e) => {
+							if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+							goto(`/recruitment/${jp.id}`)
 						}}
 					>
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
@@ -204,7 +208,11 @@
 							{/if}
 						</td>
 						<td class="px-4 py-3 font-medium">
-							{jp.title}
+							<a
+								href="/recruitment/{jp.id}"
+								class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>{jp.title}</a
+							>
 							{#if jp.status === 'DRAFT' && jp.rejectionReason}
 								<span class="block text-xs font-normal text-red-400"
 									>Sent back: {jp.rejectionReason}</span
@@ -214,17 +222,7 @@
 						<td class="px-4 py-3 text-muted-foreground">{jp.department.name}</td>
 						<td class="px-4 py-3">{jp._count.applicants}</td>
 						<td class="px-4 py-3">
-							<span
-								class="rounded-full px-2 py-0.5 text-xs font-medium {jp.status === 'OPEN'
-									? 'bg-green-500/15 text-green-400'
-									: jp.status === 'CLOSED'
-										? 'bg-gray-500/15 text-gray-400'
-										: jp.status === 'PENDING_APPROVAL'
-											? 'bg-blue-500/15 text-blue-400'
-											: 'bg-yellow-500/15 text-yellow-400'}"
-							>
-								{jp.status.replace('_', ' ')}
-							</span>
+							<Badge status={jp.status} domain="jobPosting" />
 						</td>
 						<td class="px-4 py-3 text-muted-foreground"
 							>{jp.postedAt ? formatShortDate(jp.postedAt) : '—'}</td
@@ -232,9 +230,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No job postings yet</td
-						>
+						<td colspan="6" class="p-0"><EmptyState title="No job postings yet" /></td>
 					</tr>
 				{/each}
 			</tbody>

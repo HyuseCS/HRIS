@@ -68,19 +68,21 @@ test.describe('Back navigation', () => {
 
 	test('employee files a leave request for the approvals flow', async ({ page }) => {
 		await login(page, USERS.employee)
-		await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+		// Phase 6 retired /leave/new; ?new=leave opens the canonical form on /requests.
+		await page.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 		// Wait for hydration before touching the bound <select>; otherwise Svelte's
 		// bind:value re-initialises it to empty after our selection.
 		await page.waitForLoadState('networkidle')
 
-		const leaveType = page.getByLabel('Leave Type')
+		const leaveType = page.locator('#leaveTypeId')
 		await leaveType.selectOption({ label: 'Vacation Leave' })
 		await expect(leaveType).not.toHaveValue('')
 		const day = nextWeekdayISO()
-		await page.getByLabel('Start Date').fill(day)
-		await page.getByLabel('End Date').fill(day)
-		await page.getByRole('button', { name: 'Submit Request' }).click()
-		await page.waitForURL('**/leave')
+		await page.locator('#startDate').fill(day)
+		await page.locator('#endDate').fill(day)
+		await page.getByRole('button', { name: 'Submit request' }).click()
+		// /requests re-renders in place rather than redirecting, so the banner is the signal.
+		await expect(page.getByText('Request submitted.')).toBeVisible()
 	})
 
 	test('request detail returns to approvals, including via ?from on hard load', async ({

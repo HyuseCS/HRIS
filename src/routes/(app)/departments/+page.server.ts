@@ -69,7 +69,7 @@ export const actions: Actions = {
 		const parsed = nameSchema.safeParse(raw)
 
 		if (!parsed.success) {
-			return fail(400, { error: parsed.error.errors[0]?.message ?? 'Invalid input' })
+			return fail(400, { error: parsed.error.errors[0]?.message ?? 'Enter a department name.' })
 		}
 
 		await createDepartment(user.organizationId, parsed.data.name, {
@@ -88,7 +88,7 @@ export const actions: Actions = {
 		const parsed = updateSchema.safeParse(raw)
 
 		if (!parsed.success) {
-			return fail(400, { error: parsed.error.errors[0]?.message ?? 'Invalid input' })
+			return fail(400, { error: parsed.error.errors[0]?.message ?? 'Enter a department name.' })
 		}
 
 		await updateDepartment(parsed.data.id, user.organizationId, parsed.data.name, {
@@ -133,7 +133,7 @@ export const actions: Actions = {
 		const user = locals.user!
 
 		const parsed = headSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid input' })
+		if (!parsed.success) return fail(400, { error: 'Choose a department and an employee.' })
 
 		await setDepartmentHead(
 			parsed.data.departmentId,

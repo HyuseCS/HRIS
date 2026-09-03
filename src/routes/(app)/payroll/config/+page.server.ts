@@ -101,7 +101,9 @@ export const actions: Actions = {
 			)
 		})
 
-		return { success: true }
+		// The two actions share one success banner, so the banner needs to know which ran —
+		// "Payroll configuration saved" after a multipliers save named the wrong thing.
+		return { success: true, action: 'update' as const }
 	},
 
 	updateRates: async ({ request, locals, getClientAddress }) => {
@@ -151,6 +153,6 @@ export const actions: Actions = {
 			)
 		})
 
-		return { success: true }
+		return { success: true, action: 'updateRates' as const }
 	}
 }

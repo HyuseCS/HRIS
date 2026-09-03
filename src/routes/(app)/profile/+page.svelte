@@ -1,8 +1,11 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDate, formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -30,16 +33,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="page-header">
-		<h1 class="page-title">My Profile</h1>
-	</div>
+	<PageHeader title="My Profile" />
 
 	{#if form?.success}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			Profile updated successfully.
-		</div>
+		<Banner kind="success" message="Profile updated successfully." />
 	{/if}
 
 	{#if form?.error}
@@ -101,9 +98,7 @@
 					<div>
 						<dt class="text-xs text-muted-foreground">Status</dt>
 						<dd class="mt-0.5">
-							<span class="badge-{emp.employmentStatus === 'ACTIVE' ? 'green' : 'gray'}">
-								{emp.employmentStatus}
-							</span>
+							<Badge status={emp.employmentStatus} domain="employment" />
 						</dd>
 					</div>
 				</div>
@@ -342,14 +337,7 @@
 										: '—'}</td
 								>
 								<td class="px-3 py-2">
-									<span
-										class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {b.status ===
-										'ACTIVE'
-											? 'bg-green-500/15 text-green-400'
-											: b.status === 'WAIVED'
-												? 'bg-yellow-500/15 text-yellow-400'
-												: 'bg-gray-500/15 text-gray-400'}">{b.status}</span
-									>
+									<Badge status={b.status} domain="benefitEnrollment" />
 								</td>
 							</tr>
 						{/each}

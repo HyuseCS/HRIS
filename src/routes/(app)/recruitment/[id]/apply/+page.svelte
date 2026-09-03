@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -14,12 +15,10 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6 py-8">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Add applicant to {data.posting.title}</h1>
-		{#if data.posting.department}
-			<p class="text-sm text-muted-foreground">{data.posting.department?.name}</p>
-		{/if}
-	</div>
+	<PageHeader
+		title="Add applicant to {data.posting.title}"
+		description={data.posting.department?.name}
+	/>
 
 	<!-- HR-only form: a successful add redirects to the posting board (see the
 	     action), so there is no applicant-facing success panel here. -->
@@ -99,7 +98,8 @@
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 					<p class="mt-1 text-xs text-muted-foreground">
-						Link to your resume (Google Drive, Dropbox, etc.)
+						<!-- HR fills this form in on the applicant's behalf, so the copy is third person. -->
+						Link to the applicant's resume (Google Drive, Dropbox, etc.)
 					</p>
 				</div>
 				<div>

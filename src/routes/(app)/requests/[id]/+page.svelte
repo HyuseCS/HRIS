@@ -1,9 +1,12 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDateRange, formatShortDate, formatDate } from '$lib/utils/format'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const req = $derived(data.request)
@@ -47,14 +50,6 @@
 		REST_DAY_WORK: 'Work on Rest Day',
 		HOLIDAY_WORK: 'Holiday Work',
 		INFO_UPDATE: 'Info Update'
-	}
-
-	function statusClass(s: string) {
-		if (s === 'APPROVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'REJECTED') return 'bg-red-500/15 text-red-400'
-		if (s === 'RETURNED') return 'bg-orange-500/15 text-orange-400'
-		if (s === 'CANCELLED') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
 	}
 
 	// payload is Json; show only the type-specific extras. Fields already surfaced in
@@ -123,19 +118,12 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<h1 class="min-w-0 flex-1 text-2xl font-bold tracking-tight">
-			{typeLabels[req.type] ?? req.type}
-		</h1>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<PageHeader title={typeLabels[req.type] ?? req.type}>
+		{#snippet back()}
 			<BackButton fallback="/requests" label="Requests" />
-			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(req.status)}"
-				>{req.status}</span
-			>
-		</div>
-	</div>
+			<Badge status={req.status} domain="request" />
+		{/snippet}
+	</PageHeader>
 
 	<div class="rounded-lg border bg-card p-4">
 		<dl class="grid grid-cols-3 gap-y-2 text-sm">
@@ -201,18 +189,10 @@
 		<h2 class="text-lg font-semibold">Supporting documents</h2>
 
 		{#if form?.error}
-			<div
-				class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-			>
-				{form.error}
-			</div>
+			<Banner kind="error" message={form.error} />
 		{/if}
 		{#if form?.message}
-			<div
-				class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
-			>
-				{form.message}
-			</div>
+			<Banner kind="success" message={form.message} />
 		{/if}
 
 		{#if req.documents.length === 0}
@@ -241,13 +221,10 @@
 							{/if}
 						</div>
 						<div class="flex shrink-0 items-center gap-3">
-							<span
-								class="rounded-full px-2 py-0.5 text-xs font-medium {doc.verifiedAt
-									? 'bg-green-500/15 text-green-400'
-									: 'bg-yellow-500/15 text-yellow-400'}"
-							>
-								{doc.verifiedAt ? 'Verified' : 'Unverified'}
-							</span>
+							<Badge
+								status={doc.verifiedAt ? 'Verified' : 'Unverified'}
+								tone={doc.verifiedAt ? 'green' : 'yellow'}
+							/>
 							{#if data.canReview}
 								{@const verify = verifyGuard(doc.id)}
 								<form method="POST" action="?/verifyDoc" use:enhance={verify.enhance}>
@@ -359,11 +336,7 @@
 		     their queue by design (AC-15/AC-21/US-8). This page is where they come to ask why, and
 		     it has no decide control to disable, so the explanation stands on its own. -->
 		{#if data.actBlockedReason}
-			<p
-				class="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400"
-			>
-				{data.actBlockedReason}
-			</p>
+			<Banner kind="warning" message={data.actBlockedReason} />
 		{/if}
 
 		<!-- Origin: the employee's own submission, so "HR pending" doesn't read as if
@@ -371,7 +344,7 @@
 		<ol class="space-y-2">
 			<li class="flex items-start gap-3 rounded-lg border p-3">
 				<div
-					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-xs font-medium text-green-500"
+					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-xs font-medium text-green-700 dark:text-green-400"
 				>
 					✓
 				</div>
@@ -404,11 +377,11 @@
 						<div
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium
 							{step.decision === 'APPROVED'
-								? 'bg-green-500/15 text-green-400'
+								? 'bg-green-500/15 text-green-700 dark:text-green-400'
 								: step.decision === 'REJECTED'
-									? 'bg-red-500/15 text-red-400'
+									? 'bg-red-500/15 text-red-700 dark:text-red-400'
 									: step.decision === 'RETURNED'
-										? 'bg-orange-500/15 text-orange-400'
+										? 'bg-orange-500/15 text-orange-800 dark:text-orange-400'
 										: 'bg-muted text-muted-foreground'}"
 						>
 							{i + 1}

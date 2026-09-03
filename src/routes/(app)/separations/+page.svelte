@@ -1,7 +1,13 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
+	import { SEPARATION_TYPE_LABELS, labelFor } from '$lib/labels'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showForm = $state(false)
@@ -14,11 +20,6 @@
 	// Red-border the specific field(s) the server rejected (#142).
 	const invalid = (name: string) => (fe(name) ? true : undefined)
 
-	function statusClass(s: string) {
-		if (s === 'FINALIZED') return 'bg-gray-500/15 text-gray-400'
-		if (s === 'CLEARED') return 'bg-green-500/15 text-green-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 	function clearedCount(items: { status: string }[]) {
 		return items.filter((i) => i.status === 'CLEARED').length
 	}
@@ -29,13 +30,13 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Separations</h1>
-			<p class="text-sm text-muted-foreground">
-				Record resignations and terminations, run clearance, and settle final pay.
-			</p>
-		</div>
+	<PageHeader
+		title="Separations"
+		description="Record resignations and terminations, run clearance, and settle final pay."
+	/>
+
+	<!-- The create action sits directly above the form it opens, not on the title row. -->
+	<div class="flex justify-end">
 		<button
 			onclick={() => (showForm = !showForm)}
 			class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -45,11 +46,7 @@
 	</div>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	{#if showForm}
@@ -135,7 +132,7 @@
 		</form>
 	{/if}
 
-	<div class="rounded-lg border">
+	<div class="overflow-x-auto rounded-lg border">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -156,28 +153,30 @@
 							>
 							<span class="text-xs text-muted-foreground">({s.employee.employeeNumber})</span>
 						</td>
-						<td class="px-4 py-3 text-muted-foreground">{s.type}</td>
+						<td class="px-4 py-3 text-muted-foreground"
+							>{labelFor(SEPARATION_TYPE_LABELS, s.type)}</td
+						>
 						<td class="px-4 py-3 text-muted-foreground">{formatShortDate(s.effectiveDate)}</td>
 						<td class="px-4 py-3 text-muted-foreground"
 							>{clearedCount(s.clearanceItems)}/{s.clearanceItems.length}</td
 						>
 						<td class="px-4 py-3">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(s.status)}"
-								>{s.status}</span
-							>
+							<Badge status={s.status} domain="separation" />
 						</td>
 						<td class="px-4 py-3 text-right">
-							<a href="/separations/{s.id}" class="btn-row">Open</a>
+							<!-- Item 17: "Review", not "Open" — this destination is where the clearance is
+							     worked and the case finalized, and "Open" also names a separation status. -->
+							<a href="/separations/{s.id}" class="btn-row">Review</a>
 						</td>
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No separation cases yet.</td
-						>
+						<td colspan="6" class="p-0"><EmptyState title="No separation cases yet" /></td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
 	</div>
+
+	<Pagination meta={data.pagination} />
 </div>

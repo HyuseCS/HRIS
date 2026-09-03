@@ -85,7 +85,7 @@ describe('complaints service (#112)', () => {
 		expect(notifyMock).toHaveBeenCalledWith(
 			'u-emp',
 			expect.stringContaining('HR opened'),
-			'/complaints/c1'
+			'/inquiries/c1'
 		)
 		// #5: the audit write shares the transaction that created the thread.
 		expect(writeAuditLog).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx)
@@ -110,7 +110,7 @@ describe('complaints service (#112)', () => {
 		expect(notifyMock).toHaveBeenCalledWith(
 			'u-hr',
 			expect.stringContaining('responded'),
-			'/complaints/c1'
+			'/inquiries/c1'
 		)
 	})
 
@@ -122,7 +122,7 @@ describe('complaints service (#112)', () => {
 		expect(notifyMock).toHaveBeenCalledWith(
 			'u-emp',
 			expect.stringContaining('HR replied'),
-			'/complaints/c1'
+			'/inquiries/c1'
 		)
 	})
 
@@ -145,7 +145,7 @@ describe('complaints service (#112)', () => {
 		expect(notifyMock).toHaveBeenCalledWith(
 			'u-emp',
 			expect.stringContaining('resolved'),
-			'/complaints/c1'
+			'/inquiries/c1'
 		)
 	})
 })

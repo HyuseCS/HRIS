@@ -96,7 +96,7 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	await page.waitForURL('**/timesheets')
 	const row = page
 		.locator('tr', { hasText: 'HR, Hannah' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: '0.00 hrs' })
 	await expect(row).toHaveCount(1)
 
@@ -108,7 +108,9 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	}).toPass({ timeout: 15000 })
 	await modal.getByRole('button', { name: 'Sync from attendance' }).click()
 
-	await expect(page.getByText(/Synced \d+ days? from attendance/)).toBeVisible()
+	// Scoped to <main>: phase 04 also toasts this message, and a page-wide locator now matches
+	// both the page banner and the toast.
+	await expect(page.getByRole('main').getByText(/Synced \d+ days? from attendance/)).toBeVisible()
 	await expect(page.getByText('You can only review items for your direct reports')).toHaveCount(0)
 })
 
@@ -117,7 +119,7 @@ test('a manager can delete that timesheet too', async ({ page }) => {
 	await login(page, USERS.manager)
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 
-	const row = page.locator('tr', { hasText: 'HR, Hannah' }).filter({ hasText: 'DRAFT' })
+	const row = page.locator('tr', { hasText: 'HR, Hannah' }).filter({ hasText: /draft/i })
 	const modal = page.getByRole('dialog', { name: 'Timesheet review' })
 	await expect(async () => {
 		await row.first().click()

@@ -1,9 +1,13 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -38,14 +42,6 @@
 			if (result.type === 'success') selected = []
 		}
 	}
-
-	function statusClass(s: string) {
-		if (s === 'APPROVED') return 'bg-green-500/15 text-green-400'
-		if (s === 'REJECTED') return 'bg-red-500/15 text-red-400'
-		if (s === 'RETURNED') return 'bg-orange-500/15 text-orange-400'
-		if (s === 'CANCELLED') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 </script>
 
 <svelte:head>
@@ -53,25 +49,25 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Leave</h1>
-			<p class="text-sm text-muted-foreground">
-				Your leave balances and history. File leave from
-				<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
-			</p>
-		</div>
-		{#if data.canViewOrgBalances}
+	<!-- The description carries a link, which PageHeader's string `description` cannot, so it
+	     stays its own paragraph directly under the title. -->
+	<PageHeader title="Leave" />
+	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
+		Your leave balances and history. File leave from
+		<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
+	</p>
+
+	<!-- Balances. The org-wide link sits beside the balances it widens, not on the title row. -->
+	{#if data.canViewOrgBalances}
+		<div class="flex justify-end">
 			<a
 				href="/leave/balances"
 				class="rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
 			>
 				View all balances
 			</a>
-		{/if}
-	</div>
-
-	<!-- Balances -->
+		</div>
+	{/if}
 	{#if data.balances.length > 0}
 		<div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
 			{#each data.balances as b (b.id)}
@@ -84,12 +80,13 @@
 		</div>
 	{/if}
 
+	<!-- `deleteMany` can fail per item; without this slot the page rendered nothing at all. -->
+	{#if form?.error}
+		<Banner kind="error" message={form.error} />
+	{/if}
+
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	<!-- Bulk actions; appear once rows are selected -->
@@ -145,22 +142,15 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.requests as req (req.id)}
+					<!-- R1: the real link lives in the leave-type cell; the whole-row click is a mouse
+					     convenience only, and the row carries no key handler so Space on the selection
+					     checkbox can no longer navigate away. -->
 					<tr
-						class={`cursor-pointer hover:bg-muted/30 focus:bg-muted/40 focus:outline-none ${selected.includes(req.id) ? 'bg-primary/5' : ''}`}
-						role="link"
-						tabindex="0"
-						aria-label={`Open ${leaveName(req.payload)} request`}
+						class={`cursor-pointer hover:bg-muted/30 ${selected.includes(req.id) ? 'bg-primary/5' : ''}`}
 						onclick={(e) => {
-							// Don't navigate when the click is on the row's selection checkbox.
-							if ((e.target as HTMLElement).closest('input, label')) return
+							// Don't navigate when the click is on the row's selection checkbox or its link.
+							if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
 							goto(`/requests/${req.id}`)
-						}}
-						onkeydown={(e) => {
-							if ((e.target as HTMLElement).closest('input, label')) return
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/requests/${req.id}`)
-							}
 						}}
 					>
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
@@ -175,7 +165,14 @@
 						{#if data.isManager}
 							<td class="px-4 py-3">{req.employee.lastName}, {req.employee.firstName}</td>
 						{/if}
-						<td class="px-4 py-3 font-medium">{leaveName(req.payload)}</td>
+						<td class="px-4 py-3 font-medium">
+							<a
+								href="/requests/{req.id}"
+								aria-label={`Open ${leaveName(req.payload)} request`}
+								class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>{leaveName(req.payload)}</a
+							>
+						</td>
 						<td class="px-4 py-3 text-muted-foreground">
 							{#if req.dateFrom}
 								{formatDateRange(req.dateFrom, req.dateTo)}
@@ -187,9 +184,7 @@
 							{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
 						</td>
 						<td class="px-4 py-3">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {statusClass(req.status)}"
-								>{req.status}</span
-							>
+							<Badge status={req.status} domain="request" />
 						</td>
 						<td class="px-4 py-3 text-right text-muted-foreground"
 							>{formatShortDate(req.createdAt)}</td
@@ -197,9 +192,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan={cols} class="px-4 py-8 text-center text-muted-foreground"
-							>No leave requests</td
-						>
+						<td colspan={cols} class="p-0"><EmptyState title="No leave requests" /></td>
 					</tr>
 				{/each}
 			</tbody>

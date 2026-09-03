@@ -107,6 +107,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'release', saved: 'Period released.' }
 	},
 
 	void: async (event) => {
@@ -117,5 +118,6 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'void', saved: 'Period voided.' }
 	}
 }

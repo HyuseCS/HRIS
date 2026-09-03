@@ -2,8 +2,9 @@
 	import type { Snippet } from 'svelte'
 
 	// One page title treatment for every route. Before this the app carried six different
-	// `<h1>` class strings across 52 pages and `.page-header` was used on two of them, so the
-	// heading size and the gap under it drifted page to page.
+	// heading class strings across 52 pages, plus a legacy pair of CSS utility classes used on
+	// two of them, so the heading size and the gap under it drifted page to page. Those legacy
+	// rules are gone from app.css now — this component is the only title treatment left.
 	let {
 		title,
 		description,
