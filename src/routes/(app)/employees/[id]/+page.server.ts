@@ -640,6 +640,7 @@ export const actions: Actions = scopedToEmployee({
 	},
 
 	offboard: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'offboard'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
@@ -654,8 +655,10 @@ export const actions: Actions = scopedToEmployee({
 				ipAddress: getClientAddress()
 			})
 		} catch (e) {
-			return failFromError(e)
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
 		}
+		return { action, saved: 'Employee offboarded.' }
 	},
 
 	// ponytail: only the two loan actions were folded into ctxOf — the rest of the inline ctx

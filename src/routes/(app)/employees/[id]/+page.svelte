@@ -1780,6 +1780,24 @@
 				{/if}
 			</section>
 		{/if}
+		<!--
+			OUTSIDE the ACTIVE block on purpose: a successful offboard flips employmentStatus to
+			OFFBOARDED, which unmounts the block below — a message placed inside it could never be
+			read. Gated on form.action so it only answers the offboard form.
+		-->
+		{#if form?.action === 'offboard' && form?.saved}
+			<div
+				class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400 lg:col-span-2"
+			>
+				{form.saved}
+			</div>
+		{:else if form?.action === 'offboard' && form?.error}
+			<div
+				class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400 lg:col-span-2"
+			>
+				{form.error}
+			</div>
+		{/if}
 		{#if canManage && employee.employmentStatus === 'ACTIVE'}
 			<form
 				method="POST"
