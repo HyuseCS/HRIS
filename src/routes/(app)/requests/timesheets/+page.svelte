@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -71,8 +72,8 @@
 	{/if}
 
 	{#if data.pendingTimesheets.length === 0}
-		<div class="rounded-md border bg-muted/50 px-6 py-12 text-center text-muted-foreground text-sm">
-			No pending timesheets to review.
+		<div class="rounded-md border bg-muted/50">
+			<EmptyState title="No pending timesheets to review" />
 		</div>
 	{:else}
 		<!-- Bulk bar: appears when cards are selected -->

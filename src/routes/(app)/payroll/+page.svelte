@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
@@ -219,8 +220,8 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan={crossTenant ? 7 : 6} class="px-4 py-8 text-center text-muted-foreground"
-								>No payroll runs yet</td
+							<td colspan={crossTenant ? 7 : 6} class="p-0"
+								><EmptyState title="No payroll runs yet" /></td
 							>
 						</tr>
 					{/each}

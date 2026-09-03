@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency } from '$lib/utils/format'
@@ -175,8 +176,11 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No benefit plans found</td
+						<td colspan="6" class="p-0"
+							><EmptyState
+								title="No benefit plans yet"
+								description="Add a plan to start enrolling employees."
+							/></td
 						>
 					</tr>
 				{/each}
@@ -305,11 +309,7 @@
 							</td>
 						</tr>
 					{:else}
-						<tr
-							><td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-								>No enrollments yet.</td
-							></tr
-						>
+						<tr><td colspan="6" class="p-0"><EmptyState title="No enrollments yet" /></td></tr>
 					{/each}
 				</tbody>
 			</table>

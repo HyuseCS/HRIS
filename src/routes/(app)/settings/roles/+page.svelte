@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import { tick } from 'svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -242,7 +243,7 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">No users found</td>
+						<td colspan="5" class="p-0"><EmptyState title="No users found" /></td>
 					</tr>
 				{/each}
 			</tbody>

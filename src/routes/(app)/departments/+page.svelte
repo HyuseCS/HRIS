@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -313,8 +314,8 @@
 					{/if}
 				{:else}
 					<tr>
-						<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-							No departments yet. Add one to get started.
+						<td colspan="4" class="p-0">
+							<EmptyState title="No departments yet" description="Add one to get started." />
 						</td>
 					</tr>
 				{/each}

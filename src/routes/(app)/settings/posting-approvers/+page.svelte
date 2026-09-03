@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -73,11 +74,7 @@
 						</td>
 					</tr>
 				{:else}
-					<tr
-						><td colspan="3" class="px-4 py-8 text-center text-muted-foreground"
-							>No departments yet</td
-						></tr
-					>
+					<tr><td colspan="3" class="p-0"><EmptyState title="No departments yet" /></td></tr>
 				{/each}
 			</tbody>
 		</table>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -228,8 +229,8 @@
 	{/if}
 
 	{#if data.pendingRequests.length === 0}
-		<div class="rounded-md border bg-muted/50 px-6 py-12 text-center text-muted-foreground text-sm">
-			No requests awaiting your decision.
+		<div class="rounded-md border bg-muted/50">
+			<EmptyState title="No requests awaiting your decision" />
 		</div>
 	{:else}
 		<!-- A real grid, so cards align in columns and share a row height instead of each

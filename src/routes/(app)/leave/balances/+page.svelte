@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
@@ -15,6 +16,7 @@
 	}
 
 	const colCount = $derived(3 + data.leaveTypes.length)
+	const filtered = $derived(!!(data.search || data.departmentId))
 </script>
 
 <svelte:head>
@@ -125,8 +127,14 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan={colCount} class="px-4 py-8 text-center text-muted-foreground"
-							>No employees found</td
+						<td colspan={colCount} class="p-0"
+							><EmptyState
+								variant={filtered ? 'no-results' : 'empty'}
+								title="No employees found"
+								description={filtered
+									? 'No employee matches your search or department filter.'
+									: undefined}
+							/></td
 						>
 					</tr>
 				{/each}

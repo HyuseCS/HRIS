@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -700,12 +701,14 @@
 						</tr>
 					{:else}
 						<tr
-							><td
-								colspan={data.showAmPm ? 12 : 8}
-								class="px-3 py-8 text-center text-muted-foreground"
-								>{exceptionsOnly
-									? 'No exceptions — everyone is accounted for.'
-									: 'No active employees.'}</td
+							><td colspan={data.showAmPm ? 12 : 8} class="p-0"
+								><EmptyState
+									variant={exceptionsOnly ? 'no-results' : 'empty'}
+									title={exceptionsOnly ? 'No exceptions today' : 'No active employees'}
+									description={exceptionsOnly
+										? 'Everyone is accounted for. Clear the exceptions filter to see the whole roster.'
+										: undefined}
+								/></td
 							></tr
 						>
 					{/each}
@@ -869,11 +872,18 @@
 						</tr>
 					{:else}
 						<tr
-							><td
-								colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)}
-								class="px-3 py-8 text-center text-muted-foreground"
-								>{#if exceptionsOnly}No exceptions in this range.{:else}No attendance for this range{#if data.canManage}
-										— no punches yet, or use Refresh{/if}.{/if}</td
+							><td colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)} class="p-0"
+								><EmptyState
+									variant={exceptionsOnly ? 'no-results' : 'empty'}
+									title={exceptionsOnly
+										? 'No exceptions in this range'
+										: 'No attendance for this range'}
+									description={exceptionsOnly
+										? 'Everyone in this range is accounted for. Clear the exceptions filter to see every day.'
+										: data.canManage
+											? 'No punches yet, or use Refresh.'
+											: undefined}
+								/></td
 							></tr
 						>
 					{/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -243,9 +244,7 @@
 						{/if}
 					{:else}
 						<tr>
-							<td colspan="7" class="px-4 py-8 text-center text-muted-foreground"
-								>No positions defined</td
-							>
+							<td colspan="7" class="p-0"><EmptyState title="No positions defined" /></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -304,9 +303,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No employees found</td
-							>
+							<td colspan="5" class="p-0"><EmptyState title="No employees found" /></td>
 						</tr>
 					{/each}
 				</tbody>
