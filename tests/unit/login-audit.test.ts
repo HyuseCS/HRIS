@@ -20,8 +20,7 @@ const { dbMock, writeAuditLog, lucia, recordFailure, recordSuccess, checkRateLim
 		},
 		dbMock: {
 			user: { findUnique: vi.fn(), update: vi.fn() },
-			userOrganization: { findUnique: vi.fn() },
-			organization: { findMany: vi.fn() }
+			userOrganization: { findUnique: vi.fn() }
 		}
 	}))
 
@@ -34,12 +33,17 @@ vi.mock('bcrypt', () => ({ default: { compare } }))
 const { actions } = await import('../../src/routes/(auth)/login/+page.server')
 
 const ORG = 'org-1'
+const ORG_ROW = { id: ORG, name: 'Org One' }
 const USER = {
 	id: 'user-1',
 	organizationId: ORG,
 	roles: ['CEO'],
 	isActive: true,
-	passwordHash: 'h'
+	passwordHash: 'h',
+	// The shape `resolveLoginOrgs` selects (phase 09) — one membership, mirroring the
+	// primary org, which is what the seed backfill gives every account.
+	organization: ORG_ROW,
+	memberships: [{ organization: ORG_ROW }]
 }
 
 const event = () => {
@@ -59,6 +63,18 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	checkRateLimit.mockReturnValue({ allowed: true, retryAfterMs: 0 })
 	dbMock.user.findUnique.mockResolvedValue(USER)
+	// Keyed on the compound id, never a bare resolved value: a mock that ignores its `where`
+	// would call every org a membership and the tenant boundary would go untested.
+	dbMock.userOrganization.findUnique.mockImplementation(
+		async ({
+			where
+		}: {
+			where: { userId_organizationId: { userId: string; organizationId: string } }
+		}) => {
+			const { userId, organizationId } = where.userId_organizationId
+			return userId === USER.id && organizationId === ORG ? { id: 'uo-1' } : null
+		}
+	)
 	writeAuditLog.mockResolvedValue(undefined)
 	lucia.createSession.mockResolvedValue({ id: 'sess-1' })
 	lucia.createSessionCookie.mockReturnValue({ name: 'auth', value: 'v', attributes: {} })
@@ -68,7 +84,7 @@ describe('login audit writes — class D, outside any transaction', () => {
 	it('records LOGIN_FAILED on a bad password, passing db explicitly', async () => {
 		compare.mockResolvedValue(false)
 
-		const result = await actions.default(event())
+		const result = await actions.signin(event())
 
 		expect(result).toMatchObject({ status: 401 })
 		const [, payload, client] = writeAuditLog.mock.calls[0]
@@ -80,7 +96,7 @@ describe('login audit writes — class D, outside any transaction', () => {
 		compare.mockResolvedValue(true)
 		dbMock.user.update.mockRejectedValue(new Error('lastLoginAt down'))
 
-		await expect(actions.default(event())).rejects.toThrow('lastLoginAt down')
+		await expect(actions.signin(event())).rejects.toThrow('lastLoginAt down')
 
 		// The session cookie is already set, so the audit row must have been attempted anyway —
 		// and on `db`, not a transaction client that would have rolled it back.
