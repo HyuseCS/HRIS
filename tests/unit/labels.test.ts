@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
 	ApplicantStage,
 	ApprovalDecision,
@@ -45,6 +47,7 @@ import {
 	OFFER_STATUS_LABELS,
 	PAYROLL_PERIOD_STATUS_LABELS,
 	PAYROLL_RUN_STATUS_LABELS,
+	REPORT_COLUMN_LABELS,
 	REQUEST_STATUS_LABELS,
 	REQUEST_TYPE_LABELS,
 	REVIEW_CYCLE_STATUS_LABELS,
@@ -112,6 +115,65 @@ describe('labels.ts covers every mapped Prisma enum', () => {
 			expect(Object.keys(labels).sort()).toEqual(Object.values(prismaEnum).sort())
 		})
 	}
+})
+
+// ── Phase 08 S1 — adoption, not just totality ────────────────────────────────
+/**
+ * WHAT THESE TWO GATES DO NOT PROVE. They are source scans. The first proves the eight files below
+ * contain no raw `{x.status}` / `{x.type}` interpolation; it cannot prove the label that replaced
+ * one reads well, or that the element ever renders. The second proves every declared report column
+ * has a header entry; it cannot prove the header is the right English for the number under it.
+ *
+ * The scan is deliberately SCOPED to the eight files phase 08 item 7 names. 13 further raw-enum
+ * sites exist in other enum families and are a recorded known gap
+ * (`process/features/ui-ux-overhaul/backlog/raw-enum-sweep-remaining-enums_NOTE_03-09-26.md`).
+ * Widening this list without adding the matching maps would make the gate unpassable.
+ */
+const APP = join(import.meta.dirname, '../../src/routes/(app)')
+
+const ENUM_ADOPTION_FILES = [
+	'performance/+page.svelte',
+	'separations/+page.svelte',
+	'separations/[id]/+page.svelte',
+	'requests/+page.svelte',
+	'requests/[id]/+page.svelte',
+	'requests/approvals/+page.svelte',
+	'leave/+page.svelte',
+	'reports/[type]/+page.svelte'
+]
+
+/**
+ * A raw enum reaching the page as text: `{req.status}`, `{s.type}`, `{form.status}`. The
+ * `(?<!=)` rules out `status={s.status}`, which is a prop binding into `Badge` — that path already
+ * goes through `$lib/labels`, so it is the fix, not the defect.
+ */
+const RAW_ENUM = /(?<!=)\{\s*[A-Za-z_$][\w$]*(?:\.[\w$]+)*\.(?:status|type)\s*\}/g
+
+describe('the six phase-08 enums are rendered through $lib/labels, not raw', () => {
+	for (const file of ENUM_ADOPTION_FILES) {
+		it(`${file} interpolates no raw enum`, () => {
+			const source = readFileSync(join(APP, file), 'utf8')
+			expect(source.match(RAW_ENUM) ?? []).toEqual([])
+		})
+	}
+
+	it('the scan can still see a raw enum (guards against a regex that matches nothing)', () => {
+		expect('<td>{s.status}</td>'.match(RAW_ENUM)).toEqual(['{s.status}'])
+		expect('<Badge status={s.status} />'.match(RAW_ENUM)).toBeNull()
+	})
+})
+
+describe('REPORT_COLUMN_LABELS covers every column the report loader declares', () => {
+	it('has a header for each key in reports/[type]/+page.server.ts', () => {
+		const source = readFileSync(join(APP, 'reports/[type]/+page.server.ts'), 'utf8')
+		const declared = [...source.matchAll(/columns = \[([^\]]*)\]/g)].flatMap((match) =>
+			[...match[1].matchAll(/'([^']+)'/g)].map((key) => key[1])
+		)
+		expect(declared.length).toBeGreaterThan(0)
+		for (const key of declared) {
+			expect(REPORT_COLUMN_LABELS[key], `report column "${key}" has no header label`).toBeTruthy()
+		}
+	})
 })
 
 describe('labelFor', () => {

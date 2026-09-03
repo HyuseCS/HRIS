@@ -6,6 +6,7 @@
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import { SEPARATION_TYPE_LABELS, labelFor } from '$lib/labels'
 	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -152,7 +153,9 @@
 							>
 							<span class="text-xs text-muted-foreground">({s.employee.employeeNumber})</span>
 						</td>
-						<td class="px-4 py-3 text-muted-foreground">{s.type}</td>
+						<td class="px-4 py-3 text-muted-foreground"
+							>{labelFor(SEPARATION_TYPE_LABELS, s.type)}</td
+						>
 						<td class="px-4 py-3 text-muted-foreground">{formatShortDate(s.effectiveDate)}</td>
 						<td class="px-4 py-3 text-muted-foreground"
 							>{clearedCount(s.clearanceItems)}/{s.clearanceItems.length}</td

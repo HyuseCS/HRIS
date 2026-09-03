@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatCurrency } from '$lib/utils/format'
+	import { REPORT_COLUMN_LABELS, labelFor } from '$lib/labels'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import { navigating } from '$app/stores'
@@ -241,7 +242,7 @@
 											? 'text-right'
 											: 'text-left'}"
 									>
-										{col}
+										{labelFor(REPORT_COLUMN_LABELS, col)}
 									</th>
 								{/each}
 							</tr>
