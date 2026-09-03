@@ -82,6 +82,43 @@ describe('table rows are rows, not fake links (S4 items 22-25)', () => {
 	})
 })
 
+// ── S5 items 27-29 — the drawer and the org switcher ─────────────────────────
+describe('the mobile drawer and the org switcher are keyboard-operable (S5 items 27-29)', () => {
+	const layout = () => read('routes/(app)/+layout.svelte')
+
+	it('the drawer announces itself as a modal and the hamburger says so too', () => {
+		const page = layout()
+		expect(page).toContain('aria-controls="main-sidebar"')
+		expect(page).toContain('aria-expanded={sidebarOpen}')
+		expect(page).toContain(`aria-label={sidebarOpen ? 'Main menu' : undefined}`)
+		// Conditional on purpose: above lg this same <aside> is the persistent page sidebar, and
+		// a permanent aria-modal would tell a reader the rest of the page is inert when it is not.
+		expect(page).toContain(`role={sidebarOpen ? 'dialog' : undefined}`)
+	})
+
+	it('the drawer traps Tab, closes on Escape and hands focus back to the hamburger', () => {
+		const page = layout()
+		expect(page).toContain('onkeydown={onDrawerKeydown}')
+		expect(page).toContain(`if (e.key === 'Escape')`)
+		expect(page).toContain('hamburgerEl?.focus()')
+		// The backdrop and the in-drawer close button must restore focus too, not just hide it.
+		expect(page.match(/onclick=\{closeDrawer\}/g)).toHaveLength(2)
+	})
+
+	it('the org switcher is a native select, not a hand-rolled popover', () => {
+		const page = layout()
+		expect(page).toContain(`aria-label="Active organization"`)
+		expect(page).toContain('onchange={(e) => switchOrg(e.currentTarget.value)}')
+		// The popover's open/close state is gone with it — a leftover would mean both exist.
+		expect(page).not.toContain('orgMenuOpen')
+	})
+
+	it('the sidebar nav keeps its landmark name', () => {
+		// Phase 02 already added this (item 28); the gate keeps it.
+		expect(layout()).toContain('<nav aria-label="Main"')
+	})
+})
+
 // ── S6 items 31-33 — no status is signalled by colour alone ──────────────────
 describe('colour is never the only signal (S6 items 31-33)', () => {
 	it('the payroll manual-override marker carries text, not just a yellow asterisk', () => {

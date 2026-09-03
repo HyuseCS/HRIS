@@ -3,7 +3,9 @@
 	import { browser } from '$app/environment'
 	import { invalidateAll } from '$app/navigation'
 	import Toaster from '$lib/components/ui/Toaster.svelte'
-	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte' // TEMP DEV — remove before merge
+	// DEV ONLY — dev-gated (dev && !navigator.webdriver), never ships enabled; remove after the
+	// program's owner test pass
+	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte'
 	import { addToast } from '$lib/stores/toast.svelte'
 	import { canAny } from '$lib/rbac'
 	import { buildNavSections, isNavItemActive, APPROVALS_ICON } from '$lib/nav'
@@ -17,7 +19,6 @@
 	// from data.user.organizationId, which the server resolves from the session.
 	const memberOrgs = $derived(data.memberOrgs ?? [])
 	const showOrgSwitcher = $derived(memberOrgs.length > 1)
-	const currentOrg = $derived(memberOrgs.find((o) => o.id === data.user.organizationId))
 
 	// App-wide branding (#139): header logo follows the active org, falling back to
 	// the default asset when the tenant has no logoUrl set.
@@ -37,14 +38,10 @@
 			? `--primary: ${data.org.themePrimary}; --ring: ${data.org.themePrimary}`
 			: undefined
 	)
-	let orgMenuOpen = $state(false)
 	let switchingOrg = $state(false)
 
 	async function switchOrg(organizationId: string) {
-		if (switchingOrg || organizationId === data.user.organizationId) {
-			orgMenuOpen = false
-			return
-		}
+		if (switchingOrg || organizationId === data.user.organizationId) return
 		switchingOrg = true
 		try {
 			const res = await fetch('/api/v1/session/switch-org', {
@@ -56,7 +53,6 @@
 				addToast('Could not switch organization.', { kind: 'error' })
 				return
 			}
-			orgMenuOpen = false
 			await invalidateAll()
 		} catch {
 			// Offline, or the request threw. Without this the switcher just silently gave up.
@@ -186,6 +182,69 @@
 		void $page.url.pathname
 		sidebarOpen = false
 	})
+
+	// ── Mobile drawer focus trap ────────────────────────────────────────────────
+	// Deliberately a local copy of the trap in `$lib/components/ui/Dialog.svelte`, not a reuse of
+	// it. Dialog is a centred, max-width panel; this drawer is a full-height slide-in pinned to the
+	// left edge and is the SAME <aside> that is the persistent desktop sidebar at lg:. Mounting it
+	// in Dialog would mean restyling both, and Dialog's trap is inline rather than exported —
+	// lifting it out is a change to `components/ui`, which phase 03 owns and this phase may not
+	// touch. So: same FOCUSABLE selector, same Tab/Shift+Tab cycling, same focus restore. The
+	// duplication is a recorded backlog item, not an accident.
+	let drawerEl = $state<HTMLElement>()
+	let hamburgerEl = $state<HTMLElement>()
+
+	const FOCUSABLE =
+		'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
+	function closeDrawer() {
+		sidebarOpen = false
+		hamburgerEl?.focus()
+	}
+
+	// Move focus into the drawer on open. Without this the caret stays on the hamburger behind the
+	// backdrop and a keyboard reader tabs through the page underneath instead of the menu.
+	$effect(() => {
+		if (!sidebarOpen || !drawerEl) return
+		drawerEl.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+	})
+
+	// The drawer only exists below lg — above it the same <aside> is the persistent sidebar. A
+	// resize while it is open would otherwise leave the desktop sidebar as a focus-trapped dialog.
+	$effect(() => {
+		if (!browser) return
+		const wide = window.matchMedia('(min-width: 1024px)')
+		const sync = () => {
+			if (wide.matches) sidebarOpen = false
+		}
+		sync()
+		wide.addEventListener('change', sync)
+		return () => wide.removeEventListener('change', sync)
+	})
+
+	function onDrawerKeydown(e: KeyboardEvent) {
+		if (!sidebarOpen) return
+		if (e.key === 'Escape') {
+			closeDrawer()
+			return
+		}
+		if (e.key !== 'Tab' || !drawerEl) return
+		// Rebuilt per keypress: the nav's collapsible groups add and remove controls as they open.
+		const items = [...drawerEl.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+			(el) => el.offsetParent !== null
+		)
+		if (items.length === 0) return
+		const first = items[0]
+		const last = items[items.length - 1]
+		const active = document.activeElement
+		if (e.shiftKey && active === first) {
+			e.preventDefault()
+			last.focus()
+		} else if (!e.shiftKey && active === last) {
+			e.preventDefault()
+			first.focus()
+		}
+	}
 </script>
 
 <Toaster />
@@ -198,8 +257,11 @@
 	>
 		<button
 			type="button"
+			bind:this={hamburgerEl}
 			onclick={() => (sidebarOpen = true)}
 			aria-label="Open menu"
+			aria-expanded={sidebarOpen}
+			aria-controls="main-sidebar"
 			class="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 		>
 			<svg
@@ -231,14 +293,24 @@
 	{#if sidebarOpen}
 		<button
 			type="button"
-			onclick={() => (sidebarOpen = false)}
+			onclick={closeDrawer}
 			aria-label="Close menu"
 			class="fixed inset-0 z-40 bg-black/50 lg:hidden"
 		></button>
 	{/if}
 
-	<!-- Sidebar (persistent on lg+, slide-in drawer below lg) -->
+	<!-- Sidebar (persistent on lg+, slide-in drawer below lg).
+	     The dialog semantics are conditional on purpose: above lg this same element is the
+	     always-present page sidebar, and calling that a modal dialog would tell a screen reader the
+	     rest of the page is inert when it is not. `sidebarOpen` can only be true below lg — the one
+	     control that sets it is `lg:hidden`, and the resize effect clears it on the way up. -->
 	<aside
+		id="main-sidebar"
+		bind:this={drawerEl}
+		onkeydown={onDrawerKeydown}
+		role={sidebarOpen ? 'dialog' : undefined}
+		aria-modal={sidebarOpen ? 'true' : undefined}
+		aria-label={sidebarOpen ? 'Main menu' : undefined}
 		class="fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-border bg-card transition-transform duration-200 lg:translate-x-0 {sidebarOpen
 			? 'translate-x-0'
 			: '-translate-x-full'}"
@@ -255,7 +327,7 @@
 			</a>
 			<button
 				type="button"
-				onclick={() => (sidebarOpen = false)}
+				onclick={closeDrawer}
 				aria-label="Close menu"
 				class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
 			>
@@ -272,79 +344,43 @@
 			</button>
 		</div>
 
-		<!-- Company switcher (cross-org members only) -->
+		<!-- Company switcher (cross-org members only).
+		     A native <select>, not a custom popover. The old one was a button that toggled a div of
+		     buttons: no Escape, no listbox semantics, no arrow-key movement and no announced selection.
+		     The list is nothing but org names with a tick on the active one, which is exactly what a
+		     <select> already is — so the platform control gives all of that for free and deletes the
+		     open/close state with it.
+		     "Active organization", not "Organization": phase 02's nav carries a section group of that
+		     exact name, and two controls with one accessible name is ambiguous to a reader (and to a
+		     test locator). -->
 		{#if showOrgSwitcher}
-			<div class="relative shrink-0 border-b border-border px-3 py-2">
-				<button
-					type="button"
-					onclick={() => (orgMenuOpen = !orgMenuOpen)}
-					aria-expanded={orgMenuOpen}
-					disabled={switchingOrg}
-					class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+			<div class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-4 w-4 shrink-0 text-muted-foreground"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="1.75"
+					aria-hidden="true"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4 shrink-0 text-muted-foreground"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="1.75"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
-						/>
-					</svg>
-					<span class="flex-1 truncate text-left">{currentOrg?.name ?? 'Select org'}</span>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform {orgMenuOpen
-							? 'rotate-180'
-							: ''}"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-					</svg>
-				</button>
-				{#if orgMenuOpen}
-					<div
-						class="absolute inset-x-3 top-full z-10 mt-1 overflow-hidden rounded-md border border-border bg-card shadow-lg"
-					>
-						{#each memberOrgs as org (org.id)}
-							{@const active = org.id === data.user.organizationId}
-							<button
-								type="button"
-								onclick={() => switchOrg(org.id)}
-								class="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors
-									{active
-									? 'bg-primary/15 font-medium text-primary'
-									: 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
-							>
-								<span class="flex-1 truncate text-left">{org.name}</span>
-								{#if active}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="h-4 w-4 shrink-0"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M4.5 12.75l6 6 9-13.5"
-										/>
-									</svg>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				{/if}
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
+					/>
+				</svg>
+				<select
+					aria-label="Active organization"
+					disabled={switchingOrg}
+					value={data.user.organizationId}
+					onchange={(e) => switchOrg(e.currentTarget.value)}
+					class="min-w-0 flex-1 truncate rounded-md bg-transparent px-1 py-1 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+				>
+					{#each memberOrgs as org (org.id)}
+						<option value={org.id}>{org.name}</option>
+					{/each}
+				</select>
 			</div>
 		{/if}
 
