@@ -699,7 +699,422 @@ Machine coverage stops at one 390px assertion on one page. These go on the owner
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 03-09-26
+date: 2026-09-03
+generated-by: outer-pvl
+
+Parallel strategy: sequential (single validate-agent), by owner direction
+Rationale: 5/7 signals — S2 (three service signatures + a shared-component prop = public contract
+change), S4 (phase program, 10 of 10), S5 (the owner demanded ten named truth checks), S6 (the plan
+self-declares MEDIUM-HIGH and lifts an umbrella hard stop on `src/lib/server/services/**`), S7 (~26
+files). A 5/7 score would normally route to a fan-out; the plan-agent recommended and the owner
+directed a **sequential exhaustive** pass instead, which is the right call here because every check
+is a read of the same twenty-odd files and a fan-out would have re-read them N times without any
+cross-agent finding. Cost guard: not triggered (1 agent).
+
+**Grade: CONDITIONAL — GO, with 8 binding execute-agent instructions, four of them blocking.**
+Every claim in the plan that was checkable against source was re-read on disk at `feat/uiux-phase-10`
+(1c84d3f). The plan is unusually accurate — all fourteen `employees/[id]` line references are exact,
+both research corrections are confirmed verbatim, and the six traps hold. Three findings are
+FAIL-severity as facts and are converted to CONDITIONAL only because each has a small, in-scope fix
+that reopens **no settled ruling**: a false proof under D-3 that makes G3 vacuous (C1), a false
+premise under D-8 about `Table.svelte`'s consumer count (C2), and an e2e seed that cannot produce
+the row volumes G6 asserts (C3). A fourth (C4) is a hard collision with an existing unit gate that
+would only surface as a confusing red at execution time.
+
+Test gates (C3 5-column table):
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC1 | each of the three dashboard cards renders at most 10 rows however many rows exist | Fully-Automated | `pnpm test` G1 (unit cap) + `pnpm test:e2e tests/e2e/container-bounds.spec.ts` G6 — **G6 requires the E3 fixtures; it is unrunnable on today's seed** | B |
+| AC2 | `listUpcomingRegularizations` returns the genuinely most-overdue rows under a cap | Fully-Automated | `pnpm test` G3 **as re-specified by E1** (assert the 10 lowest `daysUntil`, not the 10 earliest `startDate`) + new G3b straddle fixture | B |
+| AC3 | `listUpcomingEvents` is capped on the merged sorted output so no event kind is dropped | Fully-Automated | `pnpm test` G2 — slice point confirmed at `dashboard.ts:591`, sole exit of the function | B |
+| AC4 | `listPostingsAwaitingApprover` caps AFTER the approver filter | Fully-Automated | `pnpm test` G1b — filter confirmed at `recruitment.ts:248-259`, `orderBy: { updatedAt: 'asc' }` at `:238` | B |
+| AC5 | every bounded container scrolls inside its box instead of growing the page | Fully-Automated (dashboard, **G7 as re-specified by E6**); Agent-Probe elsewhere (P2) | G7 + P2 | B / D |
+| AC6 | Postings → `/recruitment`, Regularizations → `/employees`, Upcoming Events → no link | Fully-Automated | G6 (link presence) + G9 (scoped absence) — both need E3 fixtures; markup placement per E8 | B |
+| AC7 | no existing `Table.svelte` call site changes | Fully-Automated | G4 source scan — **scope corrected by C2/E2: there are exactly TWO call sites, `payslips/+page.svelte:32` and `settings/backup/+page.svelte:217`, not ~30** | B |
+| AC8 | the thirteen paginated pages are unchanged | Fully-Automated | G5 + its RED mutation (`take: 10` into `employees/+page.server.ts`) | B |
+| AC9 | `employees/[id]` documents and `/team` members are not query-capped | Fully-Automated | G10 source scan — T5 confirmed at `employees/[id]/+page.server.ts:141` → `:161-167`; T3 confirmed at `team/+page.server.ts:42-51` → `:71-77` → `:80-88` | B |
+| AC10 | no picker `<select>` gained a cap | Fully-Automated | G10 — the five picker sites confirmed, `employees/[id]:510` already carries `max-h-48 overflow-y-auto` | B |
+| AC11 | the dashboard renders at 390px with no horizontal overflow | Fully-Automated | G8 — `grid-cols-1` min-content note confirmed verbatim at `dashboard/+page.svelte:143-146`; **mutation coherence unproven, see C14/E7** | B |
+| AC12 | `/leave/balances` loses no rows | Fully-Automated + Agent-Probe | G10 (no cap constant) + P3 — **and E4: that file may not gain `tabindex="0"`** | B / D |
+| AC13 | `tests/e2e/dashboard.spec.ts` no worse than the pre-phase baseline | Fully-Automated (flaky, #287) | G11 — risk assessed LOW: the announcement locator is `page.locator('li', {hasText: TITLE}).filter({hasText:'Byline check.'})` and this phase adds no `<li>` carrying that text | A |
+| AC14 | the 390px / 1440px look pass across every changed surface | Agent-Probe (owner) | owner manual list, recorded for PROGRAM CLOSE | D |
+| AC15 | the full CI gate set is green in CI order | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` | A |
+| R1 | nav resolves for HR_ADMIN / MANAGER / employee | Hybrid — precondition: running app + seeded roles | umbrella standing regression from phase 02 | B |
+| R2 | masked-reveal walk on `employees/[id]` still holds | Hybrid — precondition: running app + DB | do-not-break item 3 | B |
+| A1 | design-quality bar the CI gates cannot express | Agent-Probe | `impeccable` audit on the changed `.svelte` files | D |
+
+gap-resolution legend: A = proven now; B = gate added by this plan's checklist; C = deferred to a
+named later phase; D = backlog test-building stub (named residual, keep-active).
+
+Legacy line form:
+- service caps and ordering: [Fully-automated: `pnpm test` — `tests/unit/container-bounds.test.ts` G1/G1b/G2/G3/G3b, each with a named RED mutation]
+- source-scan invariants: [Fully-automated: `pnpm test` — `tests/unit/container-bounds-scan.test.ts` G4/G5/G10]
+- dashboard counts, geometry and viewport: [Fully-automated: `pnpm test:e2e tests/e2e/container-bounds.spec.ts` G6/G7/G8/G9 — precondition: the E3 seed fixtures]
+- dashboard regression: [Fully-automated (flaky #287): `pnpm test:e2e tests/e2e/dashboard.spec.ts`, baseline-compared, read on red]
+- CI gate set: [Fully-automated: `pnpm format:check && pnpm lint && pnpm check && pnpm test`]
+- nav + masked-reveal regressions: [hybrid: running app + seeded DB]
+- the ~20 non-dashboard bounded containers, `/leave/balances` row count, design quality: [agent-probe: P2, P3, impeccable]
+- query COST for every container except the three in D-1: [known-gap: documented — `query-level-pagination-unbounded-lists_NOTE_03-09-26.md`, updated at checklist 61]
+- a viewport matrix (390/768/1440) for the other nineteen surfaces: [known-gap: documented — cross-reference `phase-03-responsive-sweep_NOTE_03-09-26.md` at UPDATE-PROCESS]
+- a shared where→orderBy→take Prisma mock helper: [known-gap: documented — `prisma-mock-orderby-take-helper_NOTE_{date}.md`]
+- roster picker typeahead (T4): [known-gap: documented — `roster-select-typeahead_NOTE_{date}.md`, checklist 60]
+
+Dimension findings:
+
+- **Infra fit: PASS.** One SvelteKit app; no container, port, proxy or deploy surface.
+  `validate-plan-artifact.mjs` returns 0 failures / 0 warnings. The one genuine infra unknown —
+  whether Tailwind v3 JIT compiles `min()` inside an arbitrary value inside `@apply` — was **settled
+  empirically, not by reasoning**: there is no existing `min()`/`clamp()` arbitrary value anywhere in
+  `src/`, so I built it. `tailwindcss` (v3.4, `package.json:60`) compiled
+  `.card-scroll { @apply max-h-[min(60vh,28rem)] overflow-y-auto; }` to
+  `.card-scroll { max-height: min(60vh, 28rem); overflow-y: auto }`. **Confirmed working; first
+  `min()` in the repo.** `.card` is at `app.css:234-236` as claimed and carries `p-5`, so a scroll
+  box on an inner `<ul>` sits inside the card padding — correct.
+- **Test coverage: CONCERN.** The anti-vacuous-mock analysis is right and important:
+  `tests/unit/dashboard-org-scoping.test.ts:110-130` really does apply only `where`
+  (`findMany.mockImplementation(async ({ where }) => EMPLOYEES.filter(...))`) and ignores `orderBy`
+  and `take` entirely — reusing it would have made every cap assertion vacuous, exactly as the plan
+  says. Three gaps: G3 as specified is vacuous for a different reason (C1); G6/G7/G9 cannot be seeded
+  today (C3); and G7 contradicts D-7 Pattern B (C6).
+- **Breaking changes: CONCERN.** The three service signature changes are genuinely safe — each
+  function has exactly ONE route caller (`dashboard/+page.server.ts:89`, `:102`, `:111-116`), and the
+  only other consumer is `tests/unit/recruitment-posting-sod.test.ts:298`, which passes four
+  positional arguments, so an optional fifth is inert. `/api/v1/dashboard` genuinely does not call
+  any of the three. But the `Table.svelte` blast-radius statement is **wrong by an order of
+  magnitude** (C2), and the risk framing that justifies G4 rests on it.
+- **Security surface: PASS.** No auth, billing, schema, secret or trust-boundary surface. No
+  where-clause, org-scoping or capability change. The two new links are plain anchors inside cards
+  that are already gated (`{#if data.canPost && data.regularizations.length}` at
+  `dashboard/+page.svelte:606`; `{#if data.postingsToApprove.length}` at `:656`), so neither widens
+  reach — the nav-visibility-mirrors-the-load-guard rule is satisfied, and I checked it rather than
+  taking the plan's word. **No evidence pack required.** One adjacent note: `canApprovePosting`
+  (`recruitment.ts:132-144`) makes a MAPPED department decidable only by its designated approver, HR
+  being the fallback for UNMAPPED ones only — the E3 fixtures must respect that or the postings card
+  will silently render zero rows.
+
+Section verdicts (Layer 2 — twelve sections, 0 through 11, all probed):
+
+- Section 0 — entry checks: **PASS.** The branch is already `feat/uiux-phase-10` at 1c84d3f with a
+  clean tree, so Branch-handling steps 1-2 are done; the merge-not-rebase rule for a stacked PR is
+  correct. The registry exists and carries phases 5-8; no `## Phase 10` yet, correct for item 4.
+- Section 1 — the shared mechanism: **CONCERN.** C2 (the Table prop has zero consumers), C9 (the
+  mobile wrapper has no overflow utility; three line refs off by two). `.card-scroll` itself is
+  clean and empirically compiles.
+- Section 2 — Upcoming Events: **CONCERN.** C5 (the `<ul>` at `:256` has no focusable descendant, so
+  the scroll box is keyboard-unreachable) and C6 (Pattern B sets no max-height, so G7 fails on this
+  card). Everything else is exact: the card is `card flex h-full flex-col gap-3` at `:251`, the
+  `{:else}` branch at `:279-282` uses `flex flex-1` on a sibling of the `{#if}`, so the plan is right
+  that the two `flex-1`s never coexist.
+- Section 3 — Upcoming Regularizations: **FAIL-severity finding, converted.** C1 — D-3's
+  monotonicity proof is false and G3 as written cannot catch it. Highest-risk edit in the phase.
+- Section 4 — Postings: **PASS with a note.** The service shape is exactly as described. Note C8 —
+  the card heading at `:657-659` is a bare `<p>`, not a `justify-between` row, so the mandatory link
+  needs a wrapper.
+- Section 5 — `employees/[id]`: **PASS.** All fourteen line references are **exact** — `:272`, `:511`,
+  `:854`, `:905`, `:1029`, `:1067`, `:1131`, `:1194`, `:1392`, `:1692`, `:1754`, `:1864`, `:1886`,
+  and `:510`'s existing `max-h-48 overflow-y-auto`. RC-2 confirmed verbatim.
+- Section 6 — `/team`: **CONCERN.** C7 — the `overflow-x-auto` wrapper already exists at `:117`;
+  "wrap the matrix (`:136` × `:145`)" cannot be done literally because no element may sit between
+  `<table>` and `<tbody>`. OD-1 note: the first body cell already carries `sticky left-0 bg-background
+  z-10` (`:138`), so a sticky `<thead>` makes this a two-axis sticky and the corner `<th>` needs both
+  offsets plus a higher `z-index`.
+- Section 7 — `/benefits` + `/leave/balances`: **CONCERN.** C4 — `/leave/balances` is inside
+  `a11y-invariants.test.ts`'s `CONVERTED_ROWS`, which asserts that file contains no `tabindex="0"`
+  **at file level**. Row refs `:81` and `:101` are exact; the `overflow-x-auto` wrapper is at `:58`.
+- Section 8 — `/performance`: **PASS with a note.** RC-1 confirmed exactly — `grep -n orderBy` on
+  `performance.ts` returns only `:26`, `:70`, `:81`; `listStalledSignoffs` (`:824-844`) has none and
+  post-processes through `Promise.all` + a null filter, the T2 shape. Note C12: **none** of the four
+  tables uses `Table.svelte` — all are hand-rolled inside `overflow-x-auto` divs at `:35`, `:81`,
+  `:122`, `:161` — so item 47's `Table.svelte` branch is dead and C7 applies to all four.
+- Section 9 — `/payroll/[id]` + `/profile`: **PASS.** The `overflow-x-auto` wrapper is at
+  `payroll/[id]/+page.svelte:196`; C7 applies.
+- Section 10 — settings and config-scale: **PASS.** The "re-derive with grep at execution time rather
+  than trusting this list" instruction is the right shape and is why this section is not a concern.
+- Section 11 — verification and close: **CONCERN.** C3 (the e2e fixtures do not exist), C10 (fixture
+  pollution), C13 (AC7 overclaims what a source scan proves), C14 (G8's mutation may not go red).
+
+Totals: 0 unresolved FAILs / 14 CONCERNs / 6 PASSes (of 16 probes)
+→ Net Gate: **CONDITIONAL**
+
+### Concerns
+
+**C1 — CRITICAL, correctness. D-3's monotonicity proof is FALSE, and G3 as specified stays green on
+the bug.** `regularizationDate` is `addUTCMonths(startDate, 6)` (`utils/dates.ts:191-193`), and
+`addUTCMonths` (`:172-176`) is `d.setUTCMonth(d.getUTCMonth() + months)`. `setUTCMonth` **overflows;
+it does not clamp.** Measured, not reasoned:
+
+```
+2025-08-31  +6mo → 2026-03-03
+2025-09-01  +6mo → 2026-03-01
+```
+
+So `startDate` ascending is **not** `daysUntil` ascending. The map is non-monotonic across every
+31-day-month → February boundary; a scan of 400 consecutive start dates found the inversion. The
+21-day notice window is narrow but can straddle Aug 29 – Sep 2, which is precisely where it breaks.
+Consequence: with `orderBy: { startDate: 'asc' }` + a query `take: 10` (checklist items 17-18), the
+database can return a row that is **not** among the ten most overdue, and the surviving JS `.sort()`
+at `:53` then presents those wrong rows in convincingly correct order. AC2 is not met. **G3 cannot
+catch it** — G3 asserts "returns the 10 earliest `startDate` rows", which is exactly what the buggy
+code does. That is the vacuous-green shape this gate exists to prevent, one level up. Fix: **E1**.
+This does not reopen the orchestrator's `orderBy`-before-`take` ruling — the `orderBy` stays.
+
+**C2 — HIGH, false premise. `Table.svelte` has TWO call sites, not "~30".** Verified by grep across
+`src/routes` and `src/lib`: the only importers are `payslips/+page.svelte:32` and
+`settings/backup/+page.svelte:217`. Neither is a phase-10 touchpoint, and `/payslips` is fully
+paginated (`paginate` at `+page.server.ts:26`, `take: pagination.take` at `:43`) — it is one of the
+thirteen pages G5 exists to protect. Separately, **no** phase-10 target uses `Table.svelte`:
+`/performance` (4 hand-rolled tables), `/team`, `/leave/balances`, `/payroll/[id]`, `/settings/*` and
+every `employees/[id]` panel are all hand-rolled `{#each}` or `<table>` markup. So the new
+`maxHeight` prop would ship with **zero consumers**, and G4 would exist purely to prove that dead
+code is harmless. Two plan statements rest on the wrong number — Blast Radius risk 2 ("consumed by
+~30 call sites… regresses every table in the app at once") and D-8 ("the 30-odd existing call
+sites") — and so does the Resume section's claim that item 7 is "the highest-risk edit in the phase
+before twenty files consume it". Nothing consumes it. Fix: **E2**.
+
+**C3 — HIGH, unrunnable gate. The e2e seed cannot produce the row volumes G6/G7/G9 assert; those
+gates would fail at 0, not pass at 10.** Read `prisma/seed-core.ts` end to end:
+- **Zero `PROBATIONARY` employees.** Every `employmentType` in the file is `'REGULAR'` (`:76`, `:224`,
+  `:274`, `:457`, `:762`, `:793`). `listUpcomingRegularizations` filters
+  `employmentType: 'PROBATIONARY'`, so it returns `[]` and the card does not render at all
+  (`{#if data.canPost && data.regularizations.length}`).
+- **Zero `publicHoliday` rows** — `grep publicHoliday prisma/seed-core.ts` returns nothing. With
+  ~13 employee records total and a 14-day window (`UPCOMING_EVENT_DAYS = 14`,
+  `dashboard.ts:402`), Upcoming Events will not reach 10.
+- **One `jobPosting`** (`:877`), `status: 'OPEN'` — not `PENDING_APPROVAL`. So
+  `listPostingsAwaitingApprover` returns `[]` and that card does not render either.
+
+G6's `toHaveCount(10)` therefore cannot bite; the plan's "use an org with >10 rows per card" names no
+mechanism. The repo already has the right precedent and the plan does not cite it:
+`tests/e2e/pagination.spec.ts:13-62` seeds its own 25 fixtures in `beforeAll` with a distinctive
+surname and tears them down in `afterAll`. Fix: **E3**.
+
+**C4 — HIGH, hard collision with an existing gate. `/leave/balances` may not gain `tabindex="0"`.**
+`tests/unit/a11y-invariants.test.ts` lists `routes/(app)/leave/balances/+page.svelte` in
+`CONVERTED_ROWS` (`:45`) and then asserts, at **file level, not scoped to `<tr>`**:
+`expect(read(file), file).not.toContain('tabindex="0"')` (`:75-81`). If the executor makes that
+page's scroll box keyboard-reachable the obvious way, `pnpm test` goes red with the message *"no
+converted row is still a focusable fake control"* — a failure that points at the wrong thing and will
+cost an execution cycle. The same trap applies to the other four `CONVERTED_ROWS` files
+(`employees/`, `requests/`, `leave/`, `recruitment/`). Fix: **E4**.
+
+**C5 — MEDIUM, accessibility. The Upcoming Events scroll box would be keyboard-unreachable.** Its
+`<li>` contents (`dashboard/+page.svelte:257-278`) are `<p>` and `<span>` only — no link, no button,
+no focusable descendant of any kind. A scrollable region with no focusable child cannot be scrolled
+by keyboard (WCAG 2.1.1). Of the phase's scroll boxes this is the one confirmed case; the
+regularizations `<ul>` (`:631`) and the postings `<ul>` (`:666`) both contain links or form buttons,
+and `dashboard/+page.svelte` is **not** in `CONVERTED_ROWS`, so it is safe to fix. Fix: **E5**.
+
+**C6 — MEDIUM, contradiction. G7 fails on the one card that uses D-7 Pattern B.** G7 asserts
+`getComputedStyle(el).maxHeight !== 'none'` for "each capped card". Pattern B (Upcoming Events) is
+`min-h-0 flex-1 overflow-y-auto` — it sets **no** `max-height` at all; the bound comes from the flex
+parent's height. G7 would report `'none'` and go red on correct code. Fix: **E6**.
+
+**C7 — MEDIUM, mechanical feasibility. "Wrap the matrix" cannot be done as written — the wrapper
+already exists.** Every table target already sits inside an `overflow-x-auto` div: `/team` `:117`,
+`/leave/balances` `:58`, `/performance` `:35`/`:81`/`:122`/`:161`, `/payroll/[id]` `:196`. Checklist
+39 says to wrap `team/+page.svelte:136 × :145` — those are the `{#each}` lines **inside** `<tbody>`,
+and no element may legally sit between `<table>` and `<tbody>`. Fix: **E7**.
+
+**C8 — MEDIUM, markup. Neither view-all link has a heading row to sit in.** The `.btn-row` precedent
+(`dashboard/+page.svelte:155`) lives inside a `flex items-center justify-between` wrapper. The
+regularizations heading is `<div class="flex items-center gap-2">` holding an `<svg>` and a `<p>`
+(`:608-627`) — adding an anchor there puts it flush against the label. The postings heading
+(`:657-659`) is a bare `<p>` with no flex row at all. Fix: **E8**.
+
+**C9 — LOW, line drift in `Table.svelte` (only load-bearing if C2 is overridden).** `$props()` is
+`:13-37` (plan says `:13-35`); the desktop wrapper is `:59-61` (plan says `:57-59` — those are its
+comment lines); the `rows.length === 0` branch is `:47-55` (plan says `:45-53`). All three are off by
+two. Also: the mobile wrapper is `<ul class="space-y-2 sm:hidden">` at `:106` and carries **no**
+overflow utility, so a `maxHeight` applied there without `overflow-y-auto` would clip rather than
+scroll. The desktop wrapper already has `overflow-x-auto`, so adding `overflow-y-auto` there gives
+`overflow: auto` on both axes — correct, but worth knowing.
+
+**C10 — LOW, e2e fixture pollution.** New **ACTIVE** `PROBATIONARY` fixtures will be swept into any
+payroll compute running in another spec, and `payrollEntry → employee` is FK `RESTRICT`. This is the
+exact trap `pagination.spec.ts:64-79` documents in its teardown comment. Covered by E3.
+
+**C11 — LOW, citation drift elsewhere (excellent hit rate overall).** Off by one or two:
+regularizations card `:607` not `:608`, its `<ul>` `:631` not `:632`; `team/+page.server.ts` members
+`:42-51` not `:43-50`, the attendance `in:` `:71-77` not `:69-75`, the map `:80-88` not `:78-84`;
+`getEmploymentHistory`'s derivation loop is `:1354-1395`, not `~:1355-1370`; `/performance`'s `:45`,
+`:92`, `:132`, `:171` are the `{#each}` rows, not the table wrappers. Exact and confirmed:
+`dashboard.ts:22-37`, `:53`, `:449-453`, `:591`, `:469-481`; `recruitment.ts:229-266`, `:238`,
+`:248-259`, `:256-258`; `employees.ts:1307-1322`; `performance.ts:824-832`;
+`employees/[id]/+page.server.ts:141`, `:161-167`; `dashboard/+page.server.ts:89`, `:102`, `:111-116`,
+`:119-121`; `dashboard/+page.svelte:143-146`, `:147`, `:155`, `:251`, `:256`, `:279-282`, `:307`,
+`:657`, `:666`, `:667-668`; `app.css:234-236`; `leave/balances/+page.svelte:81`, `:101`;
+`performance/templates/[id]/+page.svelte:436`; and all fourteen `employees/[id]/+page.svelte` refs.
+Checklist item 2 already mandates re-verification, which is why this is LOW.
+
+**C12 — LOW, dead branch. Checklist 47's `Table.svelte` fork never fires.** None of `/performance`'s
+four tables uses `Table.svelte`; all four are hand-rolled. The instruction resolves to "`.card-scroll`
+on all four" — and per C7, onto the existing `overflow-x-auto` wrapper.
+
+**C13 — LOW, overclaim. AC7 says "renders a character-identical class string"; G4 is a source scan.**
+There is no component-render harness in this repo, so no gate can observe rendered output. The plan's
+own "What this coverage does NOT prove" already says source scans do not prove rendering; AC7's
+wording should match. Restate AC7 as: *no call site outside the listed ones passes `maxHeight`, and
+the prop is never given a default in `$props()`* — which is what G4 actually proves and what its two
+mutations actually test.
+
+**C14 — LOW, unproven mutation. G8's RED mutation may not go red.** `grid-cols-1` emits
+`minmax(0, 1fr)`, so the column can shrink; a `whitespace-nowrap` added inside a chain that still has
+`min-w-0` will clip rather than overflow. The mutation must remove `min-w-0` from the whole chain to
+the nowrap element, and it must be **run**, not assumed. Covered by E7's general rule.
+
+### Truth checks demanded by the owner — results
+
+1. **RC-1 and RC-2 — both CONFIRMED exactly.** RC-1: `grep -n orderBy src/lib/server/services/
+   performance.ts` returns only `:26`, `:70`, `:81`. `listStalledSignoffs` (`:824-844`) has no
+   `orderBy` and post-processes via `Promise.all` + `.filter(Boolean)` — the T2 shape exactly as the
+   correction states. RC-2: `getEmploymentHistory` (`:1307-1322`) does carry
+   `orderBy: { createdAt: 'desc' }`, so a `take` would be order-safe — but the derivation loop ends
+   `if (changes.length > 0) { events.push(...) }`, so a log row that produced no field change yields
+   no event and `take: N` gives fewer than N events, unpredictably. Both corrections stand and both
+   correctly **narrow** the service surface.
+2. **The `startDate` monotonicity claim — FALSE. See C1.** This is the one place the plan reasoned to
+   a number instead of measuring it. `setUTCMonth` overflows rather than clamps; `2025-08-31 → 2026-03-03`
+   while `2025-09-01 → 2026-03-01`.
+3. **The `Table.svelte` prop-less no-op claim — provable in principle, but the premise is wrong and
+   the gate is weaker than AC7 says.** G4 **can** go red: adding `maxHeight="10rem"` to an unlisted
+   call site fails the second assertion, and writing `maxHeight = 'none'` into `$props()` fails the
+   first. Both mutations are real. But it proves text, not bytes (C13), and there are two call sites,
+   not thirty (C2) — and the phase's own list of sites to add is empty.
+4. **The `listUpcomingEvents` slice point — CONFIRMED.** `return events.sort((a, b) =>
+   a.date.localeCompare(b.date) || a.title.localeCompare(b.title))` at `dashboard.ts:591` is the
+   function's **sole** exit. `grep` across `src` and `tests` finds exactly one caller,
+   `dashboard/+page.server.ts:89`; nothing else consumes the merged array. T1's four-in-one roster
+   read is confirmed at `:469-481` with the comment at `:469-470` stating the intent.
+5. **The extended mock harness — the diagnosis is CONFIRMED and the fixture design is sound, given
+   E1.** `dashboard-org-scoping.test.ts:110-130` really is
+   `findMany.mockImplementation(async ({ where }) => EMPLOYEES.filter((e) => matches(e, where)))` —
+   `orderBy` and `take` are destructured away and never read. Reusing it would make every cap
+   assertion vacuous, exactly as the plan warns. The where→orderBy→take ordering and the
+   declared-out-of-order fixtures are the right design and would catch a dropped `orderBy` **at the
+   mock level**. What they cannot catch is C1, because there the service forwards a *correct-looking*
+   `orderBy` that is the wrong key. E1's G3b closes it.
+6. **The six traps — all CONFIRMED at source.** T1 `dashboard.ts:469-481`/`:591`. T2
+   `dashboard.ts:22-37` (no `orderBy`) + `:53` (JS sort). T3 `team/+page.server.ts:42-51` →
+   `employeeId: { in: members.map((m) => m.id) }` `:71-77` → `attendanceMap` `:80-88`. T4 five picker
+   sites, `employees/[id]:510` already `max-h-48 … overflow-y-auto`. T5
+   `employees/[id]/+page.server.ts:141` → `documents.map((d) => d.category)` into
+   `getEmployeeOnboarding` `:161-167`. T6 out of scope, G5 covers it. **The plan's sections respect
+   every one**: no `take` on the `/team` members query (item 38 forbids it), no query cap on the
+   documents query (items 30-31 forbid it), pickers untouched (items 36, 43).
+7. **e2e — the seeds CANNOT produce the volumes. See C3.** The `dashboard.spec.ts` locator risk is
+   real but LOW: `page.locator('li', { hasText: TITLE }).filter({ hasText: 'Byline check.' })` is
+   page-wide, but this phase adds no `<li>` carrying that body text. Item 58's "read the failure, do
+   not re-run blindly" is the right mitigation and is adequate.
+8. **Tailwind `min()` — CONFIRMED by building it.** v3.4 (`package.json:60`); no existing
+   `min()`/`clamp()` arbitrary value anywhere in `src/`; a real `tailwindcss` build of
+   `@apply max-h-[min(60vh,28rem)] overflow-y-auto` emitted `max-height: min(60vh, 28rem)`. The
+   390px constraint is not violated: `grid-cols-1` at `dashboard/+page.svelte:147` with its
+   min-content note verbatim at `:143-146`, and the new wrappers are inner `<ul>`s that add no
+   min-content floor — provided E5's `tabindex` addition does not introduce one, which it does not.
+9. **Mutation coherence — 8 of 10 sound, 2 flawed.** Sound and able to go red: G1 (remove `take`),
+   G1b (move the slice before the filter), G2 (move the limit onto the roster `findMany`), G4 ×2,
+   G5 (`take: 10` into `employees/+page.server.ts`), G6 (remove a cap), G9 (add a link). Flawed: **G3
+   cannot go red on the real defect** (C1) — and its stated negative control, "G3 red while G1 stays
+   green", *is* coherent as written and remains coherent after E1, because G1 counts rows and G3
+   checks identity; E1 only changes which rows G3 demands. **G7 goes red on correct code** for the
+   Pattern B card (C6). **G8's mutation is unverified** (C14).
+10. **Phase-9 interaction — CONFIRMED, zero overlap.** Phase 09's Touchpoints are
+    `src/routes/(auth)/login/+page.server.ts` and `+page.svelte` plus test files; it declares
+    `src/app.css`, `src/lib/components/ui/**` and `src/lib/server/services/**` **out of bounds**
+    (`phase-09…:644-646`). Phase 10 touches none of the login files. The intersection is empty. The
+    branch instructions are present and correct — the merge-not-rebase rule is right for a pushed
+    branch with PR #19 stacked on #18, and recording the phase-9 tip SHA in the report is the right
+    audit trail. Steps 1-2 are already satisfied: the tree is on `feat/uiux-phase-10` at 1c84d3f,
+    clean.
+
+### Binding execute-agent instructions
+
+| # | Instruction | Trigger |
+|---|---|---|
+| **E1** (blocking) | **Do not apply the regularization limit as a query `take`.** Keep checklist item 17 exactly as written — `orderBy: { startDate: 'asc' }` goes in, for query determinism, and its comment stays. **Replace item 18**: apply `limit` as `.slice(0, limit ?? events.length)` **after** the existing JS `.sort((a, b) => a.daysUntil - b.daysUntil)` at `dashboard.ts:53`, the same shape T1 mandates for `listUpcomingEvents`. Reason, and put it in the comment: `regularizationDate = addUTCMonths(startDate, 6)` and `setUTCMonth` **overflows rather than clamps**, so `2025-08-31 → 2026-03-03` while `2025-09-01 → 2026-03-01` — `startDate` order is **not** `daysUntil` order across a 31-day-month → February boundary, and a query `take` can return rows that are not the most overdue. Amend **D-3** in this plan to say so; the `orderBy`-before-`take` ruling is honoured (the `orderBy` stays), only the cap's position moves. Then **re-specify G3**: assert the returned 10 are the 10 lowest `daysUntil`, not the 10 earliest `startDate`. Then **add G3b**, a straddle fixture with `startDate`s at `2025-08-30`, `2025-08-31` and `2025-09-01` and an `asOf` that puts all three in window, asserting the `2025-09-01` row outranks both August rows. **RED mutation for G3b:** put the limit back as a query `take` → G3b goes red while G1 stays green. Record both in the phase report. The query stays unbounded for this function; note that residual in the checklist-61 backlog update alongside the others. | Section 3, items 17-18, 22-23 |
+| **E2** (blocking) | **Default: do NOT add the `maxHeight` prop to `Table.svelte`.** It has exactly two call sites — `payslips/+page.svelte:32` and `settings/backup/+page.svelte:217` — and **no** phase-10 target uses the component, so the prop would ship with zero consumers, which the repo's simplicity rule forbids. Use `.card-scroll` (or the existing wrapper per E7) everywhere instead. Drop checklist item 7, drop G4, drop AC7, and delete the `Table.svelte` row from Touchpoints and from Blast Radius risk 2 — replacing that risk with the accurate one: **the risk is that ~20 hand-rolled containers each get their own wrapper edit, so `.card-scroll` is the single point of change and the only shared surface.** Correct D-8 to one addition, not two. If the owner overrides and wants the prop kept anyway, then it MUST be applied to at least one real call site in this phase, C9's line numbers apply (`$props()` `:13-37`, desktop wrapper `:59-61`, empty branch `:47-55`), and the mobile `<ul>` at `:106` must also receive `overflow-y-auto` or a max-height there clips instead of scrolling. Record the choice and its reason in the phase report. | Section 1, item 7; Section 8, item 47 |
+| **E3** (blocking) | **`tests/e2e/container-bounds.spec.ts` must seed its own fixtures — G6/G7/G9 cannot run on today's seed.** Verified: zero `PROBATIONARY` employees, zero `publicHoliday` rows, one `jobPosting` and it is `OPEN`. Mirror `tests/e2e/pagination.spec.ts:13-79` exactly — `test.describe.configure({ mode: 'serial' })`, a `beforeAll` that upserts with a distinctive marker, an `afterAll` that deletes **`payrollEntry` first** (FK `RESTRICT`), then employees, then users, wrapped in try/catch as best-effort. Seed: (a) ≥11 `PROBATIONARY` `ACTIVE` employees with `startDate` inside the 21-day notice window; (b) ≥11 `publicHoliday` rows inside the next 14 days — the cheapest way to overflow Upcoming Events, since none are seeded today; (c) ≥11 `jobPosting` rows with `status: 'PENDING_APPROVAL'`, `submittedById` **≠** the logged-in actor's user id, and a `departmentId` whose `postingApprover` mapping resolves to the actor — or an UNMAPPED department with an HR actor. Both routes work; `canApprovePosting` (`recruitment.ts:132-144`) makes a MAPPED department decidable **only** by its designated approver, HR being the fallback for unmapped ones only, so getting this wrong renders zero rows and G6 fails for the wrong reason. If any fixture cannot be created, say so and mark that gate a named gap — do **not** weaken `toHaveCount(10)` into a `toBeLessThanOrEqual`. | Section 11, item 57 |
+| **E4** (blocking) | **Never add `tabindex="0"` to `src/routes/(app)/leave/balances/+page.svelte`** — nor to `employees/+page.svelte`, `requests/+page.svelte`, `leave/+page.svelte`, or `recruitment/+page.svelte`. `tests/unit/a11y-invariants.test.ts:75-81` asserts, at file level, that each `CONVERTED_ROWS` file (`:42-48`) contains no `tabindex="0"`. It is not needed on any of them: their rows carry real `<a>` links, so the scroll region already has focusable descendants. If `pnpm test` ever fails with *"no converted row is still a focusable fake control"* after a phase-10 edit, this is the cause — remove the `tabindex`, do not amend the gate. | Sections 7 and 10 |
+| E5 | **Make the Upcoming Events scroll box keyboard-operable.** Its `<li>` contents (`dashboard/+page.svelte:257-278`) are `<p>`/`<span>` only — no focusable descendant, so a keyboard user cannot scroll it. Add `tabindex="0"` **plus** `role="region"` and an `aria-label` (or `aria-labelledby` pointing at the "Upcoming Events" `<p>`) to the `<ul>` at `:256`. `dashboard/+page.svelte` is **not** in `CONVERTED_ROWS`, so this is safe. Apply the same test to every other scroll box this phase creates — add `tabindex="0"` only where the region has **no** focusable child, and never in the five files E4 names. Record which boxes got it. | Section 2, item 13 |
+| E6 | **Re-specify G7 so it does not fail on correct code.** For Pattern A boxes (`.card-scroll`) keep both assertions. For Pattern B boxes — the Upcoming Events card, `min-h-0 flex-1 overflow-y-auto`, which sets **no** `max-height` — assert `scrollHeight > clientHeight` and `getComputedStyle(el).overflowY === 'auto'` instead. Name in the spec which card is which. **RED mutation for the Pattern B arm:** remove `overflow-y-auto` from that `<ul>` → `overflowY` is `'visible'`, red. | Section 11, item 57 |
+| E7 | **Put the vertical bound on the EXISTING wrapper; do not add a new one.** Every table target already sits in an `overflow-x-auto` div — `/team` `:117`, `/leave/balances` `:58`, `/performance` `:35`/`:81`/`:122`/`:161`, `/payroll/[id]` `:196`. No element may sit between `<table>` and `<tbody>`, so checklist 39's literal "wrap the matrix (`:136` × `:145`)" is not executable. Add the max-height and `overflow-y-auto` to that existing div, giving `overflow: auto` on both axes and preserving the horizontal backstop item 40 asks about (it is present on all of them — nothing to add). **OD-1 is settled per the plan's own recommendation — attempt sticky, fall back once, record it** — with this addition: the first body cell already carries `sticky left-0 bg-background z-10` (`team/+page.svelte:138`), so a sticky `<thead>` makes this a two-axis sticky; the corner `<th>` needs `sticky left-0 top-0` **and** a higher `z-index` than either single-axis cell, or it will scroll under. One attempt, then the plain box. **And the general rule for this phase: every RED mutation named in the Verification Evidence table must be RUN. If a mutation does not go red — G8's is the one I could not verify statically, because `grid-cols-1` emits `minmax(0, 1fr)` and a `min-w-0` chain will clip rather than overflow — the gate is VOID. Report it as a gap; do not accept the green.** | Sections 6, 7, 8, 9; item 59 |
+| E8 | **Give both view-all links a heading row.** The `.btn-row` precedent (`dashboard/+page.svelte:155`) sits inside `flex items-center justify-between`. The regularizations heading is `<div class="flex items-center gap-2">` with an `<svg>` and a `<p>` (`:608-627`) — add `justify-between` and wrap the svg+`<p>` pair so the anchor lands on the right. The postings heading (`:657-659`) is a bare `<p>` — wrap the `<p>` and the new anchor in `<div class="flex items-center justify-between gap-2">`. Labels stay exactly as D-4 specifies: `View all employees` and `View all postings`. | Sections 3 and 4, items 21 and 28 |
+
+**Also settled by this contract, no further decision needed:**
+- **OD-1** — settled per the plan's recommendation: attempt `sticky top-0`, fall back to the plain
+  scroll box after one attempt and record the compromise. See E7 for the two-axis corner-cell detail.
+- **OD-2** — settled per the plan's recommendation: show the "showing first 25 of N" note **only when
+  N > 25**. A note on an uncapped list is noise.
+- **No evidence pack required.** No high-risk class is touched: no auth, billing, schema, migration,
+  destructive write, deploy/container surface, or trust-boundary logic. The three service signature
+  changes are additive optional parameters with one caller each, and no where-clause or org-scoping
+  changes.
+
+Open gaps:
+- Query **cost** is unchanged for every container except the three in D-1 — and after E1, for
+  `listUpcomingRegularizations` too, since its cap moves off the query: known-gap: documented —
+  `query-level-pagination-unbounded-lists_NOTE_03-09-26.md`, updated at checklist 61. E1 adds one line
+  to that update.
+- `/leave/balances` still needs real `skip`/`take` + `count`: known-gap: documented — same note, D-6.
+- `/benefits` enrolments would be `take`-safe (`benefits.ts:115-123` carries
+  `orderBy: [{ status: 'asc' }, { effectiveDate: 'desc' }]`) but the D-1 lift does not cover it:
+  known-gap: documented — same note.
+- No viewport-matrix Playwright projects (390 / 768 / 1440): known-gap: documented — cross-reference
+  `phase-03-responsive-sweep_NOTE_03-09-26.md` at UPDATE-PROCESS rather than filing a third note.
+- No shared where→orderBy→take Prisma mock helper: known-gap: documented —
+  `prisma-mock-orderby-take-helper_NOTE_{date}.md` at UPDATE-PROCESS.
+- Roster picker typeahead (T4, five sites): known-gap: documented — `roster-select-typeahead_NOTE_{date}.md`,
+  checklist 60.
+- No component-render test tier exists in this repo, which is why AC7 can only ever be a source scan
+  (C13) and why the ~20 non-dashboard containers rest on P2: known-gap: documented.
+
+What this coverage does NOT prove:
+- **G4/G5/G10 are source scans.** They prove a string is or is not present in a file. They do not
+  prove a table renders, a cap applies at runtime, or a scroll box is usable. After E2, G4 is dropped
+  entirely.
+- **G1/G1b/G2/G3/G3b run against a mocked Prisma client.** They prove the service's own logic given a
+  mock that applies where → orderBy → take. They do **not** prove Postgres returns rows in that order,
+  that the `startDate` index exists, or that `take` is pushed into SQL. G3b proves the JS ordering is
+  correct after E1; it says nothing about the database.
+- **G6/G7/G8/G9 cover the dashboard only**, and only once the E3 fixtures exist. The ~20 other bounded
+  containers rest on **P2** — agent judgment recorded in a report, not repeatable in CI.
+- **G8 proves one viewport on one page.** It says nothing about 390px on the other nineteen surfaces;
+  that is AC14, the owner's list. Its RED mutation is unverified (C14) — if it does not go red the
+  gate is void.
+- **Nothing proves the cap is the RIGHT number.** Ten rows is an owner default; no gate can tell a
+  useful cap from a frustrating one. That is P1 and the owner's look pass.
+- **Nothing proves query cost improved.** For every container except the two remaining D-1 functions
+  the database still returns every row — and after E1, three of the four capped surfaces are
+  render-caps, not query-caps.
+- **`pnpm test:e2e` is flaky (#287).** A green run does not prove correctness; a red run must be read,
+  never re-run blindly.
+- **Nothing proves this is safe in production.** This repo has never been deployed live.
+
+Gate: CONDITIONAL (0 unresolved FAILs; 14 concerns, every one with a named fix; execute-agent bound
+to E1-E8, of which E1, E2, E3 and E4 are blocking for their sections)
+Accepted by: session (outer PVL, autonomous) — accepted concerns, by name: C1 (false monotonicity
+proof → fixed by E1, D-3 amended, G3 re-specified, G3b added), C2 (`Table.svelte` consumer count
+wrong by an order of magnitude → fixed by E2), C3 (e2e fixtures do not exist → fixed by E3), C4
+(`tabindex` collision with `a11y-invariants` → fixed by E4), C5 (keyboard-unreachable scroll box →
+E5), C6 (G7 contradicts Pattern B → E6), C7 (wrapper already exists → E7), C8 (heading rows → E8),
+C9/C11 (line drift → checklist item 2 already mandates re-verification), C10 (fixture pollution →
+covered by E3), C12 (dead branch → covered by E2), C13 (AC7 overclaim → restated), C14 (unverified
+G8 mutation → covered by E7's run-every-mutation rule). The owner's settled rulings — cap plus
+max-height plus view-all-where-a-destination-exists, scale on all screens, the branch and PR
+stacking, the narrow service lift, the six traps, `orderBy` before `take` with a negative control,
+no new pages, dashboard cap 10, one `.card-scroll` class, the viewport-relative idiom, the full
+ranked scope, and `/leave/balances` scroll-only — were treated as binding. **None is reopened.** E1
+keeps the `orderBy` and keeps the negative control; it moves only where the cap is applied, because
+the arithmetic proves the query position is unsafe. E2 asks the owner to confirm one half of the
+"one class plus one optional prop" mechanism, because the fact that justified the prop turned out to
+be false; the `.card-scroll` half is untouched.
+
+Autonomous Goal Block: not written to this phase plan — BRANCH B. The umbrella
+`ui-ux-overhaul-umbrella_PLAN_03-09-26.md` carries `## Stable Program Goal` (line 79) and governs
+this program's autonomous execution.
 
 ## Resume and Execution Handoff
 
