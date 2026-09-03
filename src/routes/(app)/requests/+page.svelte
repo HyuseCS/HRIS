@@ -2,7 +2,9 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import { page } from '$app/stores'
 	import Banner from '$lib/components/ui/Banner.svelte'
+	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import { goto } from '$app/navigation'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
@@ -36,7 +38,10 @@
 	const submitted = (form as { values?: Record<string, string> } | null)?.values
 
 	let selectedType = $state(submitted?.type ?? 'LEAVE')
-	let showForm = $state(Boolean(submitted))
+	// `?new=leave` is what the retired /leave/new door now redirects to (phase 6, S2): it opens the
+	// already-existing form on the type this page already defaults to. Read once at mount, like
+	// `submitted` above.
+	let showForm = $state(Boolean(submitted) || $page.url.searchParams.get('new') === 'leave')
 
 	// Per-field validation errors returned by the create action (zod fieldErrors).
 	const fieldErrors = $derived(
@@ -138,6 +143,9 @@
 			</div>
 
 			{#if selectedType === 'LEAVE'}
+				{#if data.balances.length}
+					<BalanceSummary balances={data.balances} />
+				{/if}
 				<div class="grid gap-1.5">
 					<label for="leaveTypeId" class="text-sm font-medium">Leave type {@render req()}</label>
 					<select

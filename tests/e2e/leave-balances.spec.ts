@@ -34,6 +34,21 @@ test.describe('Leave balances', () => {
 		await expect(page.locator('tbody tr[data-employee="EMP-003"]')).toHaveCount(0)
 	})
 
+	// Phase 6 / S2. The retired door must keep working, and it must land on a page with the leave
+	// form OPEN — landing on /requests with the form closed is the same "old link, wrong surface"
+	// bug the redirect exists to avoid. The 308 status itself is pinned in
+	// tests/unit/leave-new-redirect.test.ts; this is the half only a browser can prove.
+	test('the retired /leave/new lands on the canonical form, already open', async ({ page }) => {
+		await login(page, USERS.employee)
+		await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+
+		await expect(page).toHaveURL(/\/requests\?new=leave$/)
+		await expect(page.locator('#leaveTypeId')).toBeVisible()
+		// Positive control: the form is open because of the param, not because it is always open.
+		await page.goto('/requests', { waitUntil: 'domcontentloaded' })
+		await expect(page.locator('#leaveTypeId')).toHaveCount(0)
+	})
+
 	test('a regular employee cannot open the HR balances view', async ({ page }) => {
 		await login(page, USERS.employee)
 		const res = await page.goto('/leave/balances', { waitUntil: 'domcontentloaded' })
@@ -58,7 +73,8 @@ test.describe('Leave balances', () => {
 			})
 
 			await login(page, USERS.employee)
-			await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+			// Phase 6 retired /leave/new; ?new=leave opens the canonical form on /requests.
+			await page.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 			await page.waitForLoadState('networkidle')
 
 			const sil = page.locator('#leaveTypeId option', { hasText: 'Service Incentive Leave' })
@@ -108,17 +124,18 @@ test.describe('Leave balances', () => {
 		const filer = await filerCtx.newPage()
 		try {
 			await login(filer, USERS.employee)
-			await filer.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+			// Phase 6 retired /leave/new; ?new=leave opens the canonical form on /requests.
+			await filer.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 			await filer.waitForLoadState('networkidle')
 
-			const leaveType = filer.getByLabel('Leave Type')
+			const leaveType = filer.locator('#leaveTypeId')
 			await leaveType.selectOption({ label: 'Sick Leave' })
 			await expect(leaveType).not.toHaveValue('')
 			const day = nextWeekdayISO()
-			await filer.getByLabel('Start Date').fill(day)
-			await filer.getByLabel('End Date').fill(day)
-			await filer.getByRole('button', { name: 'Submit Request' }).click()
-			await filer.waitForURL('**/leave')
+			await filer.locator('#startDate').fill(day)
+			await filer.locator('#endDate').fill(day)
+			await filer.getByRole('button', { name: 'Submit request' }).click()
+			await expect(filer.getByText('Request submitted.')).toBeVisible()
 		} finally {
 			await filerCtx.close()
 		}

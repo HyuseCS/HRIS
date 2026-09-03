@@ -55,7 +55,6 @@ vi.mock('$lib/server/services/requests/leave', () => leaveHelpers)
 
 const { POST: apiRoute } = await import('../../src/routes/api/v1/requests/+server')
 const { actions: requestActions } = await import('../../src/routes/(app)/requests/+page.server')
-const { actions: leaveActions } = await import('../../src/routes/(app)/leave/new/+page.server')
 const { actions: leaveListActions } = await import('../../src/routes/(app)/leave/+page.server')
 
 const ACTOR_USER = 'user-actor'
@@ -165,12 +164,16 @@ describe('(app)/requests ?/create', () => {
 	})
 })
 
-describe('(app)/leave/new ?/create', () => {
-	// The action redirects on success, so the handler throws a 303 rather than returning.
-	const file = async (roles: Role[]) =>
-		expect(leaveActions.create!(formEvent(roles, LEAVE_FIELDS))).rejects.toMatchObject({
-			status: 303
-		})
+/**
+ * These two cases used to drive `(app)/leave/new ?/create`. Phase 6 retired that door to a 308
+ * redirect onto `/requests?new=leave`, so the assertions MOVED here rather than being deleted —
+ * `/requests ?/create` is the surviving choke point for a leave filing, and losing the leave-shaped
+ * role-context coverage was called out as unacceptable. The OVERTIME cases above cover the same
+ * chain on a type with no balance branch; these cover it on LEAVE.
+ */
+describe('(app)/requests ?/create — LEAVE (moved off the retired /leave/new)', () => {
+	const file = (roles: Role[]) =>
+		requestActions.create!(formEvent(roles, { type: 'LEAVE', ...LEAVE_FIELDS }))
 
 	it('leaves MAKE open for a plain [EMPLOYEE] filer', async () => {
 		await file(['EMPLOYEE'])

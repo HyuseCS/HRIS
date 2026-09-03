@@ -10,6 +10,7 @@ import {
 	deleteRequest
 } from '$lib/server/services/requests'
 import { uploadsFromForm, saveRequestDocuments } from '$lib/server/services/requests/documents'
+import { getLeaveBalances } from '$lib/server/services/leave'
 import { meetsLeaveTenure } from '$lib/server/services/requests/leave'
 import { requestSchema } from '$lib/server/schemas/requests'
 import type { Actions, PageServerLoad } from './$types'
@@ -53,8 +54,22 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		})
 	])
 
+	// The balance affordance the retired /leave/new form carried (phase 6, S2). It cannot join the
+	// Promise.all above — that runs before `myEmployee` is known to be non-null, and passing
+	// `myEmployee!.id` there is exactly the failure mode. A caller with no employee record can file
+	// nothing, so it has no balances to show.
+	const balances = myEmployee ? await getLeaveBalances(myEmployee.id, new Date().getFullYear()) : []
+
 	return {
 		requests,
+		// Coerce Decimal balance fields to numbers at the boundary so PageData matches
+		// BalanceSummary's numeric prop types (the transport hook serializes at runtime).
+		balances: balances.map((b) => ({
+			...b,
+			allocated: Number(b.allocated),
+			used: Number(b.used),
+			remaining: Number(b.remaining)
+		})),
 		// Tenure-gated types are greyed out in the file form; createRequest is the real
 		// enforcement point (#137). Without an employee record nothing is filable anyway.
 		leaveTypes: leaveTypes.map((lt) => ({

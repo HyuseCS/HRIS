@@ -808,7 +808,7 @@
 		{/if}
 
 		<a
-			href="/leave/new"
+			href="/requests?new=leave"
 			class="card group flex items-center gap-4 transition-colors hover:border-primary/40 hover:bg-card/80"
 		>
 			<div
