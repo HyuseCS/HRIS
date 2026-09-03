@@ -60,3 +60,25 @@ Precondition: the owner starts `./start.sh` and the dev server. Do not launch th
 
 CONDITIONAL. This residual does not make phase 03 un-shippable and does not count as proof
 of anything. Phase 03 is `CODE DONE`, not `VERIFIED`.
+
+---
+
+## Cross-reference — phase 10 (`container-bounds`), 04-09-26
+
+Phase 10 **narrows** this residual for the pages it touched, and does not close it.
+
+- `tests/e2e/container-bounds.spec.ts` now asserts one viewport, on one page:
+  `page.setViewportSize({ width: 390, height: 844 })` on `/dashboard`, then
+  `document.documentElement.scrollWidth <= 390`. That is the first machine-checked 390px assertion
+  in the repo.
+- The `.card-scroll` value is `max-h-[min(60vh,28rem)]` deliberately so one declaration covers a
+  390px phone (where it resolves to 60vh) and a wide desktop (where it caps at 28rem) with **no**
+  breakpoint variant — the repo is a two-breakpoint system and this phase added none.
+- Everything else stays as this note describes. Nineteen other surfaces gained scroll boxes in
+  phase 10 and **none** of them has a 390px gate; they rest on the owner's look pass, which is
+  listed in `phase-10-container-bounds_REPORT_04-09-26.md`.
+
+**The ask is unchanged and now slightly larger:** viewport-matrix Playwright projects
+(390 / 768 / 1440) would convert both this note's residual and phase 10's AC14 from an owner look
+pass into a machine gate for the whole program. File that as one piece of test infrastructure — do
+not open a third note for it.

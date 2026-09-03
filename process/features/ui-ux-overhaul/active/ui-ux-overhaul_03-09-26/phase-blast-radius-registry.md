@@ -370,7 +370,7 @@ This phase is explicitly authorised to cross phase 08's AC5/AC20 boundary — th
 | `src/routes/(app)/profile/+page.svelte` | 3 bounds |
 | `src/routes/(app)/settings/org/+page.svelte` | 2 bounds |
 | `src/routes/(app)/settings/roles/+page.svelte` | 1 bound |
-| config-scale pages (branches, departments, offboarding, posting-approvers, statutory-rates, salary-grades, schedules, pay-codes, org-chart) | markup backstop only |
+| config-scale pages (branches, departments, offboarding, posting-approvers, statutory-rates, salary-grades, schedules, pay-codes) | markup backstop only — **there is no /org-chart route**, re-derived at execution |
 | `tests/unit/container-bounds.test.ts` | **new** — G1/G1b/G2/G3/G3b |
 | `tests/unit/container-bounds-scan.test.ts` | **new** — G5/G10 |
 | `tests/e2e/container-bounds.spec.ts` | **new** — G6/G7/G8/G9, self-seeded (E3) |
