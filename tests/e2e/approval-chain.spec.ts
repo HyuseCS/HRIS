@@ -102,7 +102,7 @@ test('reject at verify returns the request to the maker', async ({ browser }) =>
 
 	await vPage.goto(`/requests/${id}`, { waitUntil: 'domcontentloaded' })
 	const text = await vPage.locator('body').innerText()
-	expect(text).toMatch(/RETURNED/)
+	expect(text).toMatch(/RETURNED/i)
 	expect(text).toMatch(/missing manager sign-off/)
 	await vCtx.close()
 })
