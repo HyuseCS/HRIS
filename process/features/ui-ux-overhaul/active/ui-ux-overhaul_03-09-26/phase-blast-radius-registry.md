@@ -137,3 +137,68 @@ executed 03-09-26. Full CI gate set green in CI order after each section; all fo
 went red as predicted. The owner's role walk, live walk, both-theme pass, `impeccable` audit,
 masked-reveal regression and the Playwright baseline are the gates left. See
 `phase-06-surface-consolidation_REPORT_03-09-26.md`.
+
+---
+
+## Phase 7 — `page-splits`
+
+**Plan:** `phase-07-page-splits_PLAN_03-09-26.md`
+**Claimed:** 03-09-26 (transcribed from the plan's Touchpoints by the S6/S7 agent, as the plan's
+blast-radius note instructed) · **Branch:** `feat/uiux-phase-7`
+**Commits:** `96a05ab` `a763df7` `6adf133` `f30c22b` (S1-S4) · `d11219e` `ee37138` (S5) ·
+`621685d` (S6) · `a7b76ae` (S7)
+
+**Files modified**
+
+| File | Section |
+|---|---|
+| `src/routes/(app)/employees/[id]/+page.svelte` | S1-S4 — five URL-backed tabs, scoped feedback, one emergency-contact surface, checkbox supervisors, per-employee reveal cache, danger zone |
+| `src/routes/(app)/employees/[id]/+page.server.ts` | S2 — SC-1 (`action:` key on every action result) |
+| `src/routes/(app)/attendance/+page.svelte` | S5 — persona split, bulk-bar grouping, CSV disclosure, sticky Save column |
+| `src/routes/(app)/settings/+page.svelte` | S6 — grouped hub rendered from the shared array |
+| `src/routes/(app)/settings/+page.server.ts` | S6 — SC-3 (four orphaned flags deleted; `MANAGE_HR` guard kept) |
+| `src/routes/(app)/settings/org/+page.svelte` | S7 — search + only-unassigned filter on the assignment wall |
+| `src/routes/(app)/employees/new/+page.svelte` | S7 — Required-to-hire / Complete-later grouping |
+| `src/routes/(app)/+layout.svelte` | S6 — **Settings children only** (source swapped to `visibleSettings().filter(inSidebar)`; two orphaned derives removed) |
+| `src/routes/(app)/separations/+page.svelte`, `+page.server.ts` | S7 — SC-4 pagination (20) + `overflow-x-auto` wrapper |
+| `src/routes/(app)/inventory/+page.svelte`, `+page.server.ts` | S7 — SC-4 pagination (20) |
+| `src/routes/(app)/complaints/+page.svelte`, `+page.server.ts` | S7 — SC-4 pagination, **employee branch only** (`myPage`, 10) |
+| `tests/unit/settings-cards.test.ts` | S6 — rewritten onto `visibleSettings`, longhand per-role href lists |
+| `tests/e2e/settings-visibility.spec.ts` | S6 — canonical label + landmark-scoped positive locators |
+| `tests/unit/destructive-confirms.test.ts` | S5 — pointer follow-through after the attendance extraction |
+
+**Files created**
+
+`src/lib/settings-destinations.ts` · `src/routes/(app)/settings/+layout.svelte` ·
+`src/lib/components/employees/EmployeeTabs.svelte` ·
+`src/lib/components/employees/employee-tabs.ts` ·
+`src/lib/components/attendance/AttendanceSelfView.svelte` ·
+`src/lib/components/attendance/AttendanceHrGrid.svelte` ·
+`src/lib/components/attendance/Icon.svelte` · `src/lib/components/attendance/shared.ts` ·
+`tests/unit/settings-destinations.test.ts` · `tests/unit/employee-tab-resolve.test.ts`
+
+**Read-only (verified, not edited):** `src/lib/rbac.ts`, `src/lib/components/Pagination.svelte`,
+`src/lib/server/pagination.ts`, `src/lib/components/ui/**`, `docs/ui-ux-audit-2026-09-03.md`.
+
+**Out of bounds (verified untouched — `git diff --name-only` over the whole phase):**
+`src/lib/rbac.ts`, `prisma/schema.prisma`, `src/lib/server/services/**`,
+`src/lib/components/ui/**`.
+
+**Overlap notices for later phases:**
+
+- **Phase 08 (`copy-a11y`)** inherits the final structure. Item 34 (the onboarding manual-step
+  control) is **already compliant** — S4 replaced the 16px glyph with a real `<button>` carrying
+  `aria-label="Mark {step} complete"`; skip it. Three new attendance components
+  (`AttendanceSelfView`, `AttendanceHrGrid`, `shared.ts`) and two new settings surfaces
+  (`settings/+layout.svelte`, the regrouped hub) are new copy/a11y surface that did not exist when
+  the audit was written.
+- **Any later phase adding a settings page** adds ONE entry to `src/lib/settings-destinations.ts`.
+  Do not add a card, a sub-nav row or a sidebar row by hand — that is the bug this array closed.
+  Changing a label there changes it on all three surfaces at once, and
+  `tests/e2e/settings-visibility.spec.ts` asserts on those labels.
+
+**Status:** DONE (CODE DONE, not VERIFIED) — all seven sections executed and committed 03-09-26;
+full CI gate set green in CI order. The live gates (G5-G8, G10-G14, the five-role settings walk,
+the `impeccable` audit and the Playwright baseline) are the owner's and are still unrun. See
+`phase-07-page-splits-s1-s4_REPORT_03-09-26.md`, `phase-07-page-splits-s5_REPORT_03-09-26.md` and
+`phase-07-page-splits-s6-s7_REPORT_03-09-26.md`.
