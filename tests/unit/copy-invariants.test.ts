@@ -96,26 +96,33 @@ describe('the login page reads Veent HRIS, not Avipa (S2 item 12)', () => {
 	})
 
 	/**
-	 * One documented survivor: a comment INSIDE `loginSchema`. Phase 08's AC5 requires that schema
-	 * block to stay byte-for-byte untouched so the "the auth flow was not silently changed" check
-	 * is a plain empty diff, and a brand word in a comment is not worth weakening that proof. It
-	 * goes with the email-first login plan (see the backlog note).
+	 * The one documented survivor — a comment inside `loginSchema` — went with phase 09's
+	 * email-first rewrite. `src/` is now Avipa-free with no exceptions.
 	 */
-	const ALLOWED_AVIPA = 'routes/(auth)/login/+page.server.ts'
-
-	it('leaves no Avipa string anywhere in src/ except the one AC5 protects', () => {
+	it('leaves no Avipa string anywhere in src/', () => {
 		const offenders = sourceFiles()
 			.filter((path) => /avipa/i.test(readFileSync(path, 'utf8')))
 			.map(rel)
-		expect(offenders).toEqual([ALLOWED_AVIPA])
+		expect(offenders).toEqual([])
 	})
 
-	it('the surviving Avipa mention is a comment inside loginSchema, not rendered copy', () => {
-		const lines = read(ALLOWED_AVIPA)
-			.split('\n')
-			.filter((line) => /avipa/i.test(line))
-		expect(lines).toHaveLength(1)
-		expect(lines[0].trim().startsWith('//')).toBe(true)
+	/**
+	 * Phase 09. The login page used to hand every Organization row to any anonymous visitor.
+	 * The org query is the thing that must never come back. This is deliberately the ONLY half
+	 * of the check that is textually expressible: a file-level grep for `orgs` would be red
+	 * forever, because `?/resolve` legitimately returns an `orgs` key.
+	 */
+	it('the login server never reads the org table again', () => {
+		expect(read('routes/(auth)/login/+page.server.ts')).not.toContain('organization.findMany')
+	})
+
+	/**
+	 * The step-2 heading must stay generic. Naming the resolved org would make a single-org
+	 * email distinguishable from an unknown one — the same disclosure phase 09 closed, one
+	 * level down.
+	 */
+	it('the password step never names the resolved org', () => {
+		expect(login()).not.toContain('Sign in to {')
 	})
 })
 
