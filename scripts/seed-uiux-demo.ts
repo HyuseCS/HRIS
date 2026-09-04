@@ -1,7 +1,11 @@
 // One-off: make two UI/UX phase-3 test-pass dialogs reachable in the dev database.
 //
-//   pnpm tsx scripts/seed-uiux-demo.ts            # seed
-//   pnpm tsx scripts/seed-uiux-demo.ts --clear    # remove what this script wrote
+//   npx dotenv -e .env.dev -- tsx scripts/seed-uiux-demo.ts          # seed
+//   npx dotenv -e .env.dev -- tsx scripts/seed-uiux-demo.ts --clear  # remove what this script wrote
+//
+// The `dotenv -e .env.dev` wrapper is required, not optional: there is no `.env` in this repo,
+// so a bare `pnpm tsx` has no DATABASE_URL and dies on connect. Every DB script in package.json
+// carries the same wrapper.
 //
 // Punch map dialog: PunchMapDialog.svelte only ever needs a punch's own
 // { at, latitude, longitude, locationAccuracyM } — it never reads `source`, and it only

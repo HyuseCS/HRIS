@@ -750,7 +750,7 @@ grep -n "getByRole('button', { name: 'New Timesheet' })" \
 because `scripts/seed-uiux-demo.ts` currently has demo data seeded:
 
 ```bash
-pnpm tsx scripts/seed-uiux-demo.ts --clear     # MUST run before any e2e
+npx dotenv -e .env.dev -- tsx scripts/seed-uiux-demo.ts --clear     # MUST run before any e2e
 pnpm test:e2e
 ```
 
@@ -847,7 +847,7 @@ does not touch.
 
 | # | Gap | Why deferred | Resolution if picked up |
 |---|---|---|---|
-| KG-1 | `pnpm test:e2e` is not run for the two edited specs | e2e needs a production build, a running app, and a seeded DB the **owner** starts. The change is provably inert for Playwright name-matching (case-insensitive, `exact: true` not set), so the cost is not justified for a capitalisation edit. Gate stays **CONDITIONAL**. | Owner starts the DB + app, then `pnpm tsx scripts/seed-uiux-demo.ts --clear` followed by `pnpm test:e2e`, compared against a baseline e2e run on the pre-change tree. |
+| KG-1 | `pnpm test:e2e` is not run for the two edited specs | e2e needs a production build, a running app, and a seeded DB the **owner** starts. The change is provably inert for Playwright name-matching (case-insensitive, `exact: true` not set), so the cost is not justified for a capitalisation edit. Gate stays **CONDITIONAL**. | Owner starts the DB + app, then `npx dotenv -e .env.dev -- tsx scripts/seed-uiux-demo.ts --clear` followed by `pnpm test:e2e`, compared against a baseline e2e run on the pre-change tree. |
 | KG-2 | The `24` count and the per-file table in the dark-only note are not re-measured at HEAD | They were measured at the S5 commit and are correct **for that basis**. Later sections (S13's banner sweep) touched `dashboard`, so a HEAD re-count gives 23 across the six pill files and would break F10's `24 + 4 + 3 = 31` arithmetic. Changing the basis is a bigger job than this remediation. Step 12 therefore requires the basis to be **stated**, not changed. | A future dark-only fixing pass re-measures at its own HEAD and restates the basis explicitly in the note. |
 | KG-3 | The S13-S17 report's section table still cites pre-rebase commit hashes (`73c4f8f`, `d9087c5`, `1bb272f`, `b2d22c5`) that no longer resolve | Not a CodeRabbit finding, and rewriting the hashes risks a second rebase making them stale again. Out of scope by the surgical rule. | If the branch stops being rebased, refresh the table's hashes in one pass and note the rebase in the report. |
 | KG-4 | No visual regression suite exists for the badge block | The repo has no screenshot-diff tier. Nothing in this plan changes rendered CSS (AC-1 asserts `src/app.css` is untouched), so there is nothing to regress. The 04-09-26 build grep in D1′ is the standing evidence that the dot ships. | A screenshot tier is a separate infra item — see TI-2. |
