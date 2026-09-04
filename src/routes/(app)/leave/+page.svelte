@@ -9,6 +9,7 @@
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
+	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -69,15 +70,7 @@
 		</div>
 	{/if}
 	{#if data.balances.length > 0}
-		<div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-			{#each data.balances as b (b.id)}
-				<div class="rounded-lg border bg-card p-4">
-					<p class="text-xs font-medium text-muted-foreground">{b.leaveType.name}</p>
-					<p class="mt-1 text-2xl font-bold">{Number(b.remaining).toFixed(1)}</p>
-					<p class="text-xs text-muted-foreground">of {Number(b.allocated)} days</p>
-				</div>
-			{/each}
-		</div>
+		<BalanceSummary balances={data.balances} />
 	{/if}
 
 	<!-- `deleteMany` can fail per item; without this slot the page rendered nothing at all. -->
