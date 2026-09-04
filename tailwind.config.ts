@@ -2,6 +2,10 @@ import type { Config } from 'tailwindcss'
 import plugin from 'tailwindcss/plugin'
 
 export default {
+	// The theme switch writes `html.dark` from localStorage and never reads the OS. Tailwind's
+	// default is `media`, so every `dark:` utility followed prefers-color-scheme instead — the
+	// two never agreed, and the whole dark palette was inert under the app's own toggle.
+	darkMode: 'class',
 	content: ['./src/**/*.{html,js,svelte,ts}'],
 	theme: {
 		container: {
