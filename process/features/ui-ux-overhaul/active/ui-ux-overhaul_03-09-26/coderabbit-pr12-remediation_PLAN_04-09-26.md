@@ -951,142 +951,158 @@ of the ui-ux-overhaul program) are **not** inputs to this work.
 
 ## Validate Contract
 
-Status: BLOCKED
+Status: CONDITIONAL
 Date: 04-09-26
 date: 2026-09-04
 generated-by: outer-pvl
+supersedes: 2026-09-04 (outer-pvl) — second outer-PVL pass on the amended plan (`e52237e`); both FAILs of the prior BLOCKED contract are cleared and re-verified against source
+
+**Prior verdict, preserved.** The first outer-PVL pass returned **BLOCKED** on two FAILs:
+FAIL-1 (F1's premise was factually false — the badge dot ships and renders) and FAIL-2 (F1's
+negative control was theatre — it asserted something already true). Both are **CLEARED** by this
+amendment; the evidence is under §Dimension findings below. The four CONCERNs of that pass
+(CONCERN-1 wrong `PunchMapDialog` path, CONCERN-2 unverified X1 figures, CONCERN-3 F11 basis mix,
+CONCERN-4 anchor drift) are also all cleared and re-verified.
 
 Parallel strategy: sequential
-Rationale: 1/7 signals (S7 only — 10 files in blast radius). No multi-package scope, no
-schema/API/auth surface, no 3+ directions, not a phase program, no high-risk class. Score 1 = LOW,
-and the auto-skip rule for presentation-only edits reinforces it. Verification was run inline by one
-agent; a fan-out would have cost more than it proved.
+Rationale: 1/7 signals (S7 only — 11 files in blast radius). No multi-package scope, no
+schema/API/auth surface, no 3+ directions, not a phase program, no high-risk class. Score 1 = LOW.
+This is a targeted re-validation of two FAILs plus three new steps; a fan-out would have cost more
+than it proved. Verification was run inline by one agent.
 
 ### Test gates
 
 | criterion id | behavior | strategy | proving test | gap-resolution |
 |---|---|---|---|---|
-| AC-1 | Deleting `.badge::before` changes the shipped stylesheet | Fully-Automated | `grep -o "\.badge[a-zA-Z-]*\(:[a-z]*\)\?{[^}]*}" build/client/_app/immutable/assets/*.css` before and after `pnpm build` | B — gate REDESIGN required; see FAIL-1. The current "byte-identical" wording asserts a false expectation |
-| AC-1 (control) | The bundle grep is capable of failing | Fully-Automated | Delete `.badge::before`, rebuild, confirm the five `.badge-*:before` rules disappear | B — replaces the current `class="badge"` control, which cannot fail (FAIL-2) |
-| AC-2 | No `app.css` badge comment mentions a dot except the tombstone | Fully-Automated | `grep -in "dot" src/app.css` | A |
-| AC-3 | `tests/unit/badge-class-literals.test.ts` unchanged and green | Fully-Automated | `git diff --exit-code tests/unit/badge-class-literals.test.ts` + `pnpm test` | A |
-| AC-4 | A nameless `<Dialog>` is a compile error; all 7 consumers compile untouched | Fully-Automated | `pnpm check` green, then scratch `<Dialog bind:open>` turns it RED, then revert | A — the negative control is real and can fail |
-| AC-5 | `Dialog` rendered markup unchanged | Fully-Automated | `git diff src/lib/components/ui/Dialog.svelte` touches only the `Props` block | A |
-| AC-6 | `New timesheet` casing gone; button locators untouched | Fully-Automated | `grep -rn "New timesheet" tests/ src/` returns nothing; `grep -n "getByRole('button', { name: 'New Timesheet' })"` on both specs | A |
-| AC-7 | S1-S5 files-changed heading reads 46 | Fully-Automated | arithmetic on the report's own list, restated in the phase report | A — anchor is line 31, not 33 |
-| AC-8 | `RETURNED` entry names three identical orange copies, no second colour | Agent-Probe | `git grep -n "RETURNED'" 7742e59 -- 'src/**/*.svelte'` returns exactly 3, all `bg-orange-500/15 text-orange-400` — VERIFIED at V2 | A |
-| AC-9 | S13-S17 S16 heading reads 23; the `:33` table untouched | Fully-Automated | `git show --name-only --pretty=format: 15ffdd1 \| grep -c .` = 23 — VERIFIED at V2 | A |
-| AC-10 | PageHeader row gives 59 of 61 and names both holdouts | Fully-Automated | `find "src/routes/(app)" -name '+page.svelte' \| wc -l` = 61; `grep -rl PageHeader … \| wc -l` = 59; holdouts `approvals`, `payslips/[id]` — ALL VERIFIED at V2 | A — anchor is line 279, not 277 |
-| AC-11 | All 15 backlog notes carry `name: note:` | Fully-Automated | `grep -h "^name:" process/features/ui-ux-overhaul/backlog/*_NOTE_*.md \| cut -d: -f2 \| sort \| uniq -c` — today: 14 note, 1 plan | A |
-| AC-12 | Responsive note splits pattern 1 (3) from pattern 3 (10) | Agent-Probe | `sed -n '78,90p'` on the S13-S17 report — the 3/10 split is VERIFIED at V2 | A |
-| AC-13 | Dark-only reconciliation closes at 31 and names ApplicantKanban's 3 | Agent-Probe | read; the sum `24 + 4 + 3 = 31` present and correct | A |
-| AC-14 | Note states one answer on status pills in both `:13` and `:59` | Agent-Probe | per-file pill grep — 16 pills VERIFIED at V2 (3/5/3/2/2/1) | A |
-| AC-15 | Phase plan `:596` states the true already-paired count | Fully-Automated | **NO COMMAND EXISTS.** "Proven by: Read" cannot verify a count. See CONCERN-2 | B — a re-derivation command must be added before EXECUTE writes a number |
-| AC-16 | Full CI gate set green at all 3 commit boundaries | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` — order VERIFIED against `.github/workflows/ci.yml:36,39,42,45` | A |
+| AC-1 | `src/app.css` is not modified by this plan | Fully-Automated | `git diff c030e7f -- src/app.css` empty at the final commit | A — re-verified: the plan prescribes **no** source change to `src/app.css`; every "delete" reference is either the VOID D1 record, the temporary §V.6 mutation, or the guard rationale |
+| AC-2 | The guard asserts `.badge::before` exists with `content:`, and every `.badge-*` rule contains `@apply badge` | Fully-Automated | `pnpm test tests/unit/badge-class-literals.test.ts` green with the new `describe` block | A — VERIFIED at V2: `src/app.css:155-158` is `.badge::before { @apply …; content: ''; }`; all five tone rules (`:161,164,167,170,173`) begin `@apply badge …` |
+| AC-3 (mutation A) | Assertion 1 can fail | Fully-Automated | Delete `.badge::before` from `src/app.css`, re-run — assertion 1 RED; restore, green | A — **the control is real.** Deleting the only `.badge::before` block removes the sole text that can satisfy "selector + block containing `content:`" |
+| AC-3 (mutation B) | Assertion 2 can fail, naming `badge-green` | Fully-Automated | Remove `badge ` from `.badge-green`'s `@apply`, re-run — assertion 2 RED naming `badge-green`; restore, green | A — **the control is real.** After the mutation the block reads `@apply bg-green-500/15 text-green-800 dark:text-green-400;`, which contains no `@apply badge` substring, while `/\.badge-(\w+)\s*\{/g` still discovers `badge-green`. The two mutations are disjoint: A cannot redden assertion 2 and B cannot redden assertion 1, so each isolates one assertion |
+| AC-3 (restore) | No mutation survives | Fully-Automated | `git diff --exit-code src/app.css` after §V.6 | A |
+| AC-4 | The test's comments state the source-only limit and do not over-claim | Agent-Probe | Agent reads the header comment and the new block's comment against KG-5 / TI-1 | A — Step 14 already **requires** the comment to say the test will stay green while the dot disappears if the `@apply` mechanism changes. Honest, not over-claiming |
+| AC-5 | The `:27-28` comment names the `team/+page.svelte:143` literal | Fully-Automated + Agent-Probe | `grep -n "does not need a literal" tests/unit/badge-class-literals.test.ts` returns nothing; read the replacement | A — anchor VERIFIED: the quoted text is at `tests/unit/badge-class-literals.test.ts:27-28`, verbatim |
+| AC-6 | A nameless `<Dialog>` is a compile error; all 7 consumers compile untouched | Fully-Automated | `pnpm check` green, then the scratch nameless-`Dialog` control turns it RED, then revert | A — real control; 5 import sites / 7 usage sites, none under `tests/` |
+| AC-7 | `Dialog` rendered markup unchanged | Fully-Automated | `git diff src/lib/components/ui/Dialog.svelte` touches only the `Props` block | A |
+| AC-8 | `New timesheet` casing gone; the two button locators untouched | Fully-Automated | `grep -rn "New timesheet" tests/ src/` returns nothing; both `getByRole('button', { name: 'New Timesheet' })` still present | A — anchors VERIFIED: dialog locators at `timesheet-create-for-employee.spec.ts:74` and `manager-org-wide-timesheets.spec.ts:79`; button locators at `:76` / `:81`; `NewTimesheetDialog.svelte:37` holds `title="New timesheet"` |
+| AC-9 | S1-S5 files-changed heading reads 46 | Fully-Automated | arithmetic on the report's own list, restated in the phase report | A — **anchor VERIFIED at line 31** (corrected from 33) |
+| AC-10 | `RETURNED` entry names three identical orange copies, no second colour | Agent-Probe | `git grep -n "RETURNED'" 7742e59 -- 'src/**/*.svelte'` | A — carried from pass 1 (VERIFIED there) |
+| AC-11 | S13-S17 S16 heading reads 23; the `:33` table untouched | Fully-Automated | `git show --name-only --pretty=format: 15ffdd1 \| grep -c .` = 23 | A — anchor VERIFIED at line 111 |
+| AC-12 | PageHeader row gives 59 of 61 and names both holdouts | Fully-Automated | the three §V.3 commands | A — **anchor VERIFIED at line 279** (corrected from 277) |
+| AC-13 | All 15 backlog notes carry `name: note:` | Fully-Automated | §V.4 first command | A — anchor VERIFIED: `phase-03-responsive-sweep_NOTE_03-09-26.md:2` is the sole `name: plan:` |
+| AC-14 | Responsive note splits pattern 1 (3) from pattern 3 (10) | Agent-Probe | §V.4 `sed -n '78,90p'` + read | A — anchor VERIFIED: the merged bullet is at `:27-30` |
+| AC-15 | Dark-only reconciliation closes at 31 and names ApplicantKanban's 3 | Fully-Automated + Agent-Probe | §V.4 subset commands: 31 lines = 24 bare + 7 paired | A — **RE-DERIVED INDEPENDENTLY at V2, all figures reproduce.** ApplicantKanban: 3 paired, 0 bare. **Anchor VERIFIED at line 35** (corrected from 37). See CONCERN-A for the one prose caveat |
+| AC-16 | The note states one answer on status pills in both `:13` and `:59` and names the S5 basis | Fully-Automated + Agent-Probe | §V.4 pill grep + read of both lines | A — anchors VERIFIED: `:13` "None of them is a status pill." and `:59` "Most of these are decorative…" |
+| AC-17 | Phase plan `:596` states 137 / 37 / 21 / 116 (92 + 24) and keeps 31 labelled | Fully-Automated | the four §V.4 X1 commands | A — **RE-DERIVED INDEPENDENTLY at V2: 137 occurrences, 37 files, 21 `dark:`-paired, 116 bare; subset 31 lines = 24 bare + 7 paired; complement bare 92. Both additions close (92+24=116, 24+7=31).** Anchor VERIFIED at `phase-03-design-system_PLAN_03-09-26.md:596`. The `mktemp` file-list workaround is necessary and works — a bare `[id]` pathspec matches nothing |
+| AC-18 | `code-review-pr-12.md` has no `## Warning`, F1 sits under `## Rejected` | Fully-Automated + Agent-Probe | `grep -c "^## Warning"` = 0; `### F1` falls after the `## Rejected` line | A — structure VERIFIED: `## Warning` at `:17` holds **only** F1 (`:19`), so deleting the heading after the move is correct; `## Rejected` at `:115` holds F12 at `:117` |
+| AC-19 | The header count line says two rejected, no Warning severity; the map matches; `## Suggested order` no longer leads with F1 | Fully-Automated + Agent-Probe | `grep -n "rejected with evidence\|Severity map\|^1\. F"` + read | A — anchors VERIFIED: count line `:10-11`, severity map `:13`, `## Suggested order` `:131` with item 1 = "F1 — the only user-visible defect." See CONCERN-B |
+| AC-20 | The F1 entry records that three passes reached the same wrong conclusion | Agent-Probe | read the entry | A |
+| AC-21 | The full CI gate set is green at all four commit boundaries | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` per commit | A |
 
 Legacy line form:
-- `src/app.css` badge block: [hybrid: `pnpm build` + bundle grep, precondition: clean build tree — gate must be redesigned per FAIL-1]
-- `src/lib/components/ui/Dialog.svelte`: [Fully-automated: `pnpm check` + scratch nameless-Dialog negative control]
+- `src/app.css` badge block: [Fully-automated: `git diff c030e7f -- src/app.css` empty — the file is read-only for this plan]
+- `tests/unit/badge-class-literals.test.ts` (A2 guard): [Fully-automated: `pnpm test tests/unit/badge-class-literals.test.ts` + the §V.6 two-mutation negative control + `git diff --exit-code src/app.css`]
+- `src/lib/components/ui/Dialog.svelte`: [Fully-automated: `pnpm check` + scratch nameless-`Dialog` negative control]
 - `NewTimesheetDialog` + 2 e2e specs: [Fully-automated: `grep -rn "New timesheet" tests/ src/`]
-- Documentation (5 files): [Fully-automated: the §V.3/§V.4 re-derivation commands] + [agent-probe: prose-vs-source read]
+- Documentation (6 files incl. `code-review-pr-12.md`): [Fully-automated: the §V.3/§V.4 re-derivation commands] + [agent-probe: prose-vs-source read]
 - `pnpm test:e2e` for the two edited specs: [known-gap: KG-1, documented — CI job 2 runs it on push regardless]
+- Built-bundle proof that `@apply` still carries `::before`: [known-gap: KG-5, documented — build-level guard filed as TI-1]
 
 gap-resolution legend: A — proven now. B — fixed in this plan. C — deferred to a named later phase. D — backlog stub.
 
+Failing stub (AC-2, the one genuinely new Fully-Automated behavior):
+
+```
+test("should assert .badge::before exists with content: and every .badge-* rule @apply badge", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: .badge::before rule + @apply badge on every tone")
+})
+```
+
 ### Dimension findings
 
-- Infra fit: PASS — every one of the 11 named files exists at HEAD; the four CI scripts exist with
-  the exact names the plan uses; `.github/workflows/ci.yml` runs them in the plan's stated order as
-  four sequential steps of one job, so a red `format:check` does skip the rest exactly as §V.1 says.
-- Test coverage: CONCERN — F2's negative control is a real check that can fail. F1's negative
-  control (add `class="badge"`, confirm `.badge` now appears) **cannot fail**: `.badge` is already in
-  the shipped bundle unconditionally, so the control is a no-op. AC-15 has no command at all.
-- Breaking changes: CONCERN — `Dialog` has exactly 7 consumers and **zero** in `tests/`
-  (`grep -rn "ui/Dialog" src/ tests/ scripts/` → 5 import sites, 7 usage sites, none under `tests/`).
-  One consumer path in §Touchpoints is wrong: `src/lib/components/attendance/PunchMapDialog.svelte`
-  does not exist; the file is `src/lib/components/timesheets/PunchMapDialog.svelte:122`. Both
-  forwarding consumers (`ConfirmDialog`, `ReasonDialog`) default `title` to a string literal, so the
-  forwarded `{title}` stays `string` and the discriminated union should compile untouched.
-- Security surface: PASS — no auth, billing, schema, migration, public API, container, or secret
-  path is touched. No evidence pack required.
-- Section C1 feasibility (F1, F2, F3): **FAIL** — see FAIL-1. Anchors for Steps 1-3 are exact
-  (`.badge` `:152-154`, `.badge::before` `:155-158`, block comment `:146-151`, trailing comment
-  `:163`). Steps 7/8 anchors exact (`NewTimesheetDialog.svelte:37`, `:72`, `:9`; specs `:74` and
-  `:79`; button locators `:76` and `:81`). Highest-risk edit: Step 1, because it is the one the plan
-  is factually wrong about.
-- Section C2 feasibility (F4-F7): CONCERN — substance all re-derived and correct (46, 23, 61/59, the
-  two holdouts, the three identical baseline orange sites). Two anchors drifted: F4 is at line **31**
-  not 33; F7 is at line **279** not 277. Highest-risk edit: F7, because the plan asks for a
-  restructure of a table cell plus a footnote.
-- Section C3 feasibility (F8-F11, X1): CONCERN — F8, F9, F10 all verified correct against source.
-  F11's core claim is correct. X1's replacement number is unverified. Anchor drift: F10's section
-  heading is at line **35**, not 37. Highest-risk edit: X1, because it replaces one unverified number
-  with another unverified number.
+- Infra fit: PASS — every file named in §Touchpoints exists at HEAD. `src/lib/components/timesheets/PunchMapDialog.svelte` exists; `src/lib/components/attendance/` does **not** exist, so prior CONCERN-1 is cleared by the corrected path. The structural validator returns 0 failures / 0 warnings on this plan file.
+- Test coverage: PASS — **prior FAIL-2 is CLEARED.** The A2 control is now two real mutations, each of which can redden exactly one assertion, plus a restore proof. Judged against the assertions Step 14 specifies:
+  - **Mutation A** (delete the whole `.badge::before { … }` rule at `src/app.css:155-158`) removes the only text in the file that can satisfy assertion 1's "selector plus a declaration block containing `content:`" → assertion 1 goes RED. Real.
+  - **Mutation B** (remove `badge ` from `.badge-green`'s `@apply`) leaves `@apply bg-green-500/15 text-green-800 dark:text-green-400;`. Assertion 2's tone discovery `/\.badge-(\w+)\s*\{/g` still finds `badge-green` (the selector is untouched), but its block no longer contains the substring `@apply badge` → assertion 2 goes RED naming `badge-green`. **Mutation B does redden.** Real.
+  - The two are disjoint — neither reddens the other's assertion — so each mutation isolates one assertion rather than both failing for one reason. Plus `git diff --exit-code src/app.css` proves the restore.
+- Breaking changes: PASS — `Dialog` has 5 import sites / 7 usage sites, none under `tests/`. All 7 pass `title` or `labelledBy`. No CSS, schema, API, or server surface moves.
+- Security surface: PASS — no auth, billing, schema, migration, public API, container, or secret path. No evidence pack required.
+- Section C1 feasibility (F2, F3): PASS — **prior FAIL-1 is CLEARED.** F1 is out of scope as a source change (§Scope "Explicitly out of scope" row 1), D1 is marked **VOID in place** at `:109-112` (retracted, not silently removed), D1′ replaces it, AC-1 asserts `git diff c030e7f -- src/app.css` is empty, and R3 names the exact failure mode of a reader following the retracted D1. A full sweep of every "delete" and every `app.css` mention in the plan found **no surviving instruction to remove anything from `src/app.css`**. Anchors exact: `NewTimesheetDialog.svelte:37`, spec locators `:74` / `:79`, button locators `:76` / `:81`.
+- Section C2 feasibility (F4-F7): PASS — all three corrected anchors re-verified at HEAD: F4 at line **31**, F6 at line **111**, F7 at line **279**. No previously-correct anchor drifted.
+- Section C3 feasibility (F8-F11, X1): CONCERN — every figure re-derived independently and every one reproduces (137 / 37 / 21 / 116; 31 = 24 + 7; complement 92; ApplicantKanban 3 paired / 0 bare). F10's anchor re-verified at line **35**. One prose caveat: see CONCERN-A. Highest-risk edit: X1, mitigated by R9 + AC-17 requiring EXECUTE to re-run the commands rather than copy the table.
+- Section C4 feasibility (A1, A2 — the three NEW steps 14/15/16): CONCERN — all three targets exist and every quoted string is verbatim present. Step 16's five edits cover all five sites in `code-review-pr-12.md` and the resulting counts are internally consistent (12 findings, 2 rejected, 10 real = F2-F11, 0 Warning-severity). Two mechanical wrinkles: CONCERN-C (the `tones` const is function-scoped and must be hoisted for a second `describe` to reuse it) and CONCERN-B (one stale half-sentence Step 16 does not name). Highest-risk edit: Step 14, because it is the one that must not over-claim; AC-4's Agent-Probe covers it.
+- KG-5 / TI-1 honesty: PASS — the plan does **not** imply a stronger guarantee than the test gives. D3 states the source-only scope, Step 14 requires the test comment to say in plain words that the test "will still pass while the dot disappears" if the Tailwind `@apply` mechanism changes, KG-5 records the same limit as a named residual, TI-1 files the build-level guard as out-of-scope future work, and the Public Contracts row scopes the new contract to "must exist in `src/app.css`". No sentence in the plan claims A2 proves the dot ships; the standing evidence for that stays the 04-09-26 hand build-grep in D1′.
 
 ### Open gaps
 
-- FAIL-1 (F1 / D1's stated premise): the badge dot **is** rendering today. Both causes given in D1
-  are false. `@apply badge` DOES carry the `.badge::before` rule, and `.badge` is NOT purged.
-  Evidence, two independent lines:
-  1. The shipped bundle contains it —
-     `grep -o "\.badge[a-zA-Z-]*\(:[a-z]*\)\?{[^}]*}" build/client/_app/immutable/assets/0.DJzqpuKf.css`
-     returns `.badge:before{…content:""}` **and** `.badge-green:before`, `.badge-red:before`,
-     `.badge-yellow:before`, `.badge-blue:before`, `.badge-gray:before`, all with `content:""`.
-  2. Isolated repro with this repo's own Tailwind — a 3-rule input where `.badge-green` does
-     `@apply badge` compiles to `.badge-green:before{…content:""}`. `@apply` carries the
-     pseudo-element rule.
-  Cause of the purge claim being wrong: the literal token `badge` DOES appear in `src` —
-  `src/routes/(app)/team/+page.svelte:143-150` (`{@const badge = …}` / `{badge.class}`) — so
-  Tailwind's scanner keeps `.badge` alive.
-  Consequence: `Badge.svelte` renders `.badge-{tone}` on 16 literal call sites, so deleting
-  `.badge::before` **removes a visible 6px leading dot from every status pill in the app**. The plan's
-  "no visual change" is false, its Public Contracts row for `.badge::before` is false, and AC-1's
-  byte-identical gate would go RED by construction. The owner's *decision* to delete may still stand,
-  but it must be re-taken as "delete a dot that currently ships", not "delete dead CSS".
-- FAIL-2 (AC-1 negative control is theatre): §V.2 step 3 adds `class="badge"` and expects `.badge` to
-  "NOW appear". It already appears with or without the scratch edit, so the control passes either way
-  and proves nothing. Replace it with a control that can fail: delete the rule, rebuild, and confirm
-  the five `.badge-*:before` rules disappear from the bundle.
-- CONCERN-1: §Touchpoints lists `src/lib/components/attendance/PunchMapDialog.svelte:122`. That path
-  does not exist. Real path: `src/lib/components/timesheets/PunchMapDialog.svelte:122`.
-- CONCERN-2 (X1 / AC-15): the replacement figure "7 already carry a `dark:` pair, so 128 of 135" is
-  not reproducible and has no command. Measured at the baseline `7742e59`:
-  `git grep -ohE "text-(green|yellow|gray|blue)-400" 7742e59 -- 'src/**/*.svelte' | wc -l` = **137**
-  across **37** files, of which `git grep -ohE "dark:text-(green|yellow|gray|blue)-400" …| wc -l` =
-  **21** are the `dark:` half of a pair. The "7" is the already-paired count inside the 31-occurrence
-  subset only; it is not the already-paired count across all 135. AC-15's "Proven by: Read" cannot
-  catch this. X1 must either carry an exact command that yields the number it writes, or scope its
-  sentence to the 31-subset it actually measured.
-- CONCERN-3 (F11 basis mix): "16 of the 24" mixes two bases. The **16 pills are exactly right** —
-  re-derived per file at HEAD as dashboard 3, benefits 5, recruitment/[id] 3, holidays 2,
-  requests/approvals 2, settings/onboarding 1. But at HEAD the total across those 6 files is **23**,
-  not 24 (dashboard has 10 dark-only occurrences at HEAD; the note's table records 11 on the S5
-  basis, which KG-2 already explains). The qualitative claim — the majority ARE status pills, and the
-  decorative remainder is entirely in `dashboard` — is CORRECT and survives either basis. State the
-  basis when writing the sentence.
-- CONCERN-4 (anchor drift, 3 of 17 steps): F4 line 33 → **31**; F7 line 277 → **279**; F10 section
-  heading line 37 → **35**. Every other anchor in all 17 steps was checked against HEAD and is exact.
-- Not a gap, an unrecorded safety net: `.github/workflows/ci.yml:105-106` runs `pnpm test:e2e` as a
-  separate CI job. KG-1 defers e2e **locally**; the two edited specs still get run on push.
+- **CONCERN-A (X1 prose precision — accept with an execute instruction).** The re-derived numbers are all correct and reproduce exactly. The amendment's *explanation* of why the old `104 + 31 = 135` appeared to close is not quite right. Measured: the 11-file subset has **31 matching lines and 31 matching occurrences** — one match per line — so the line-count-vs-occurrence-count distinction is **not** what made the old arithmetic close. The old `104` was simply `135 − 31`: a subtraction from a wrong total, so it closed by construction and never measured anything. Step 13's *required substance* is unaffected and stays correct (labelling 31 as the matching-line count is true). **Execute instruction E1** below prevents EXECUTE writing the misleading half.
+- **CONCERN-B (Step 16 edit 3 leaves one stale half-sentence).** The header count line at `code-review-pr-12.md:10-11` reads "**12 unique findings** — 1 major, 11 minor." The plan elides "1 major, 11 minor" behind an ellipsis and asks to "restate both halves". Once F1 is rejected there is no major/Warning finding left, so "1 major, 11 minor" contradicts the corrected severity map on the next line. AC-19's Agent-Probe would catch it, but the step should name it. **Execute instruction E2.**
+- **CONCERN-C (Step 14 reuse is not mechanically possible as written).** Step 14 says to "reuse the existing `/\.badge-(\w+)\s*\{/g` tone discovery so the two blocks cannot drift", but `const tones` (and the `readFileSync('src/app.css')` it reads) live **inside** the existing `describe` callback at `tests/unit/badge-class-literals.test.ts:29-31`. A second `describe` block cannot see them. **Execute instruction E3.**
+- **Stale back-reference (documentation only).** §Resume item 3 says "Validate-contract status: **written, verdict BLOCKED** … Re-run VALIDATE before EXECUTE", and the §What-changed intro says the BLOCKED contract is "left in place unedited". This contract supersedes it. **Execute instruction E4.**
+- KG-1 (`pnpm test:e2e` not run locally) — known-gap: documented. Gate stays CONDITIONAL; CI job 2 runs the specs on push, and AC-8 proves the change statically.
+- KG-2 (the `24` and the per-file table stay on the S5 basis) — known-gap: documented. Step 12 requires the basis to be **stated**, not changed.
+- KG-3 (S13-S17 pre-rebase commit hashes) — known-gap: documented, out of scope by the surgical rule.
+- KG-4 (no screenshot tier for the badge dot) — known-gap: documented. Nothing in this plan changes rendered CSS.
+- KG-5 (A2 cannot catch a Tailwind upgrade that stops `@apply` carrying `::before`) — known-gap: documented, honestly stated in the plan and required in the test's own comment. Build-level guard filed as TI-1.
+
+### Execute-agent instructions
+
+| # | Instruction | Trigger condition |
+|---|---|---|
+| E1 | When rewriting `phase-03-design-system_PLAN_03-09-26.md:596`, write the 31 as: "**31 matching lines** across those 11 files — 24 bare and 7 already `dark:`-paired; each line carries exactly one match, so 31 is also the occurrence total for that subset." Do **not** write "a line count, not an occurrence count" — that framing is false for this subset. If it helps the reader, add that the old `104` was `135 − 31`, a subtraction from a wrong total, which is why it appeared to close. | Step 13 |
+| E2 | In `code-review-pr-12.md:10-11`, also correct "**1 major, 11 minor**" — after the F1 rejection there is no major/Warning-severity finding. State it as 12 raised, 2 rejected with evidence, 10 real, all Info. | Step 16, edit 3 |
+| E3 | To satisfy Step 14's "reuse the tone discovery", **hoist** `const src = readFileSync('src/app.css','utf8')` and `const tones = [...]` from inside the first `describe` (currently `:29-31`) to module scope, then have both `describe` blocks read them. Hoisting does not change what the three existing `it` blocks assert, so the Step-14 constraint holds. Do not duplicate the regex — a second copy is the drift Step 14 is trying to prevent. | Step 14 |
+| E4 | After the four commits, update §Resume item 3 of this plan to read "validate-contract status: **CONDITIONAL**, second outer-PVL pass, 2026-09-04" and correct the §What-changed intro's "left in place unedited" wording. Record the change in the phase report. | Phase report / plan close |
+| E5 | Record all **five** `pnpm test` runs of §V.6 (green → red → green → red → green — four transitions between five states; the plan says "four transitions" in Step 15/§V.6 and "five transitions" in AC-3, and they describe the same sequence) plus the closing `git diff --exit-code src/app.css`. | Step 15 |
 
 ### What this coverage does NOT prove
 
-- `pnpm build` + bundle grep proves what the CSS **file** contains. It does not prove what a browser
-  paints — no screenshot tier exists (KG-4). After the F1 gate is redesigned, "the dot is gone" will
-  need one human or agent look at a badge-heavy page.
-- `pnpm check` proves the `Dialog` type compiles. It does not prove the rendered `aria-label` /
-  `aria-labelledby` output is unchanged at runtime — only `git diff` scope (AC-5) covers that, and a
-  diff is not a render.
-- `grep -rn "New timesheet"` proves the string is gone from `src/` and `tests/`. It does not prove the
-  dialog is still reachable by its accessible name in a real browser — that is KG-1, mitigated by the
-  Playwright case-insensitivity fact (VERIFIED: `playwright-core@1.61.1` `types/types.d.ts:3009` —
-  "By default, matching is case-insensitive and searches for a substring, use `exact` to control this
-  behavior"; neither dialog locator sets `exact`) and by CI's own e2e job.
-- The §V.3 / §V.4 re-derivation commands prove the **numbers**. They do not prove the surrounding
-  prose is non-contradictory — that is the Agent-Probe on AC-8, AC-12, AC-13, AC-14, and an agent
-  read is judgment, not a gate.
-- `pnpm test` (vitest) does not execute any CSS. It cannot see the F1 regression at all.
+- The A2 guard proves the **source rule** in `src/app.css` — that `.badge::before` exists and that every tone rule still `@apply badge`. It does **not** prove that the built bundle still emits `.badge-*:before`, and it does not prove a browser paints the dot. A Tailwind upgrade that changed what `@apply` copies would leave this test green while the dot disappeared. That is KG-5, filed for a build-level fix as TI-1; the standing evidence remains the one-off 04-09-26 `pnpm build` + bundle grep recorded in D1′.
+- The §V.6 mutations prove the two assertions **can** fail on those two specific edits. They do not prove the assertions catch every possible way to break the dot (for example, a change to `bg-current` or to the `content:` value's meaning).
+- `pnpm check` proves the `Dialog` type compiles and that a nameless dialog is rejected. It does not prove the rendered `aria-label` / `aria-labelledby` output is unchanged at runtime — only `git diff` scope (AC-7) covers that, and a diff is not a render.
+- `grep -rn "New timesheet"` proves the string is gone from `src/` and `tests/`. It does not prove the dialog is still reachable by accessible name in a real browser — that is KG-1, mitigated by Playwright's documented case-insensitive default (neither locator sets `exact`) and by CI's own e2e job.
+- The §V.3 / §V.4 re-derivation commands prove the **numbers**. They do not prove the surrounding prose is non-contradictory — that is the Agent-Probe on AC-10, AC-14, AC-15, AC-16, AC-18, AC-19, AC-20, and an agent read is judgment, not a gate.
+- `pnpm test` (vitest) executes no CSS and renders no component. It cannot see a visual regression at all.
+- This contract validated the **amendment**. F2, F3 and F4-F11's substance were verified in the first pass and were stated as verbatim-unchanged; they were re-anchored here but not re-litigated on substance.
 
-Gate: BLOCKED (2 unresolved FAILs — F1's stated premise is factually false and reverses the visual
-impact of Step 1; AC-1's negative control cannot fail)
-Accepted by: — (BLOCKED; no concerns accepted)
+Gate: CONDITIONAL (0 FAILs — both prior FAILs cleared and re-verified; 3 CONCERNs, all accepted and carried as execute-agent instructions E1-E3; 5 known gaps documented)
+Accepted by: session — owner standing go-ahead to EXECUTE once validation is clean. Accepted concerns: CONCERN-A (X1 line-vs-occurrence prose framing → E1), CONCERN-B (stale "1 major, 11 minor" half-sentence → E2), CONCERN-C (`tones` const needs hoisting for reuse → E3). Known gaps KG-1 through KG-5 accepted as named residuals; none is a proving strategy.
+
+## Autonomous Goal Block
+
+```
+SESSION GOAL
+Execute process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/coderabbit-pr12-remediation_PLAN_04-09-26.md
+in full: four commits (C1 code F2+F3, C2 report corrections F4-F7, C3 note/plan corrections
+F8-F11+X1, C4 the F1 rejection record A1 plus the guard test A2) on branch feat/uiux-phase-3.
+
+CONTRACT SUMMARY
+Validate-contract: CONDITIONAL, 2026-09-04, second outer-PVL pass. 0 FAILs. Three accepted
+concerns carried as execute instructions E1-E3 in the contract's Execute-agent instructions
+table — read them before Steps 13, 14 and 16. Five known gaps (KG-1..KG-5) are named residuals.
+
+AUTONOMY RULES
+- Read "What changed in this amendment and why" FIRST. If you conclude the badge dot is dead
+  code, you have re-derived the false premise: stop and re-read D1'.
+- src/app.css is READ-ONLY except for the two temporary V.6 mutations, which must be reverted.
+  AC-1 fails if git diff c030e7f -- src/app.css is non-empty.
+- D1 is VOID. D2 is settled. Do not re-open either.
+- Run the full CI gate set (pnpm format:check, pnpm lint, pnpm check, pnpm test) on the untouched
+  tree first and record the baseline, then at every commit boundary. Stop at the first red.
+- Re-run the V.4 commands and write what they RETURN. Never copy a number out of the plan.
+- Never git checkout a file on a dirty tree. Review git diff and revert by hand.
+- No Co-Authored-By, no AI attribution footer.
+
+HARD STOPS
+- Do not push, do not open a PR, do not force-push. Ask the owner.
+- Do not start ./start.sh, vite, or the veent-db-5434 container. The owner starts servers.
+- Do not run pnpm test:e2e locally (KG-1) unless the owner asks and seeds first.
+- If a gate goes red and the fix needs a behavioural or server-side change, stop and write a
+  backlog stub in this task folder.
+
+NEXT PHASE
+EXECUTE, then EVL, then a phase report in this task folder.
+
+EXECUTE START COMMAND
+Spawn vc-execute-agent with primary anchor:
+process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/coderabbit-pr12-remediation_PLAN_04-09-26.md
+```
