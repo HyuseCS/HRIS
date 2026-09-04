@@ -141,6 +141,8 @@
 		PAGIBIG: 'Pag-IBIG'
 	}
 	const uploadDocument = submitFeedback({ error: null })
+	// Shared by every onboarding row: the rows submit one at a time, same as the per-row forms above.
+	const toggleOnboardingStep = submitFeedback({ error: null })
 
 	const DONE: Record<string, string> = {
 		setSupervisors: 'Supervisors saved.',
@@ -225,14 +227,19 @@
 							<li class="mb-2.5 flex items-start gap-2 break-inside-avoid text-sm">
 								{#if step.manual}
 									<!-- Manual step: HR ticks it off (equipment issued, NDA signed, …). #116 -->
-									<form method="POST" action="?/toggleOnboardingStep" use:enhance>
+									<form
+										method="POST"
+										action="?/toggleOnboardingStep"
+										use:enhance={toggleOnboardingStep.enhance}
+									>
 										<input type="hidden" name="itemId" value={step.id} />
 										<input type="hidden" name="done" value={(!step.done).toString()} />
 										<button
 											type="submit"
+											disabled={toggleOnboardingStep.busy}
 											aria-pressed={step.done}
 											aria-label="{step.done ? 'Uncheck' : 'Check'} {step.label}"
-											class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-bold transition-colors {step.done
+											class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-bold transition-colors disabled:pointer-events-none disabled:opacity-50 {step.done
 												? 'bg-green-500 text-white hover:bg-green-600'
 												: 'border border-muted-foreground/40 text-transparent hover:border-primary hover:text-muted-foreground'}"
 										>
