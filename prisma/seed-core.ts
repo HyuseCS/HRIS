@@ -736,50 +736,6 @@ export async function seedE2E(db: PrismaClient) {
 		number: 'EMP-903'
 	})
 
-	// Payroll Officer + Finance: the two back-office accounts the dev login switcher offers.
-	// Same shape as the sign-off pair above — single role, roles re-asserted on update so a
-	// drifted row is corrected, and an employee profile so their Profile page resolves.
-	//
-	// No fixed employee number. The 900 band is NOT reserved: `nextEmployeeNumber` issues
-	// highest+1, so once EMP-903 exists every employee the app or the E2E suite creates
-	// continues from 904. A hardcoded number here collides with that residue on the
-	// (organizationId, employeeNumber) unique index — on 04-09-26 EMP-904 and EMP-905 were both
-	// held by e2e fixtures. Omitting `number` lets ensureEmployeeProfile take the next free one.
-	const payrollHash = await bcrypt.hash('Payroll@1234', 12)
-	const payrollUser = await db.user.upsert({
-		where: { email: 'payroll@veent.ph' },
-		update: { roles: ['PAYROLL_OFFICER'] },
-		create: {
-			organizationId: org.id,
-			email: 'payroll@veent.ph',
-			passwordHash: payrollHash,
-			roles: ['PAYROLL_OFFICER']
-		}
-	})
-	await ensureEmployeeProfile(db, payrollUser, {
-		firstName: 'Paolo',
-		lastName: 'Payroll',
-		jobTitle: 'Payroll Officer',
-		departmentId: dept.id
-	})
-	const financeHash = await bcrypt.hash('Finance@1234', 12)
-	const financeUser = await db.user.upsert({
-		where: { email: 'finance@veent.ph' },
-		update: { roles: ['FINANCE'] },
-		create: {
-			organizationId: org.id,
-			email: 'finance@veent.ph',
-			passwordHash: financeHash,
-			roles: ['FINANCE']
-		}
-	})
-	await ensureEmployeeProfile(db, financeUser, {
-		firstName: 'Fiona',
-		lastName: 'Finance',
-		jobTitle: 'Finance Officer',
-		departmentId: dept.id
-	})
-
 	// --- Manager (direct supervisor; approves the employee's timesheets in the E2E suite) ---
 	const managerHash = await bcrypt.hash('Manager@1234', 12)
 	const managerUser = await db.user.upsert({
@@ -841,6 +797,55 @@ export async function seedE2E(db: PrismaClient) {
 			reportsToId: managerEmployee.id,
 			discordId: '123456789012345678'
 		}
+	})
+
+	// Payroll Officer + Finance: the two back-office accounts the dev login switcher offers.
+	// Same shape as the sign-off pair above — single role, roles re-asserted on update so a
+	// drifted row is corrected, and an employee profile so their Profile page resolves.
+	//
+	// Seeded AFTER the roster accounts on purpose. No fixed employee number, and the block must
+	// stay below manager (EMP-003) and employee (EMP-004), which hardcode theirs: on a fresh DB
+	// only EMP-001/002 exist earlier, so auto-assigning here would take 003/004 and the later
+	// upserts would die on the unique index. CI caught exactly that; a populated dev DB hides it.
+	//
+	// The 900 band is NOT reserved either: the app's `nextEmployeeNumber` issues
+	// highest+1, so once EMP-903 exists every employee the app or the E2E suite creates
+	// continues from 904. A hardcoded number here collides with that residue on the
+	// (organizationId, employeeNumber) unique index — on 04-09-26 EMP-904 and EMP-905 were both
+	// held by e2e fixtures. Omitting `number` lets ensureEmployeeProfile take the next free one.
+	const payrollHash = await bcrypt.hash('Payroll@1234', 12)
+	const payrollUser = await db.user.upsert({
+		where: { email: 'payroll@veent.ph' },
+		update: { roles: ['PAYROLL_OFFICER'] },
+		create: {
+			organizationId: org.id,
+			email: 'payroll@veent.ph',
+			passwordHash: payrollHash,
+			roles: ['PAYROLL_OFFICER']
+		}
+	})
+	await ensureEmployeeProfile(db, payrollUser, {
+		firstName: 'Paolo',
+		lastName: 'Payroll',
+		jobTitle: 'Payroll Officer',
+		departmentId: dept.id
+	})
+	const financeHash = await bcrypt.hash('Finance@1234', 12)
+	const financeUser = await db.user.upsert({
+		where: { email: 'finance@veent.ph' },
+		update: { roles: ['FINANCE'] },
+		create: {
+			organizationId: org.id,
+			email: 'finance@veent.ph',
+			passwordHash: financeHash,
+			roles: ['FINANCE']
+		}
+	})
+	await ensureEmployeeProfile(db, financeUser, {
+		firstName: 'Fiona',
+		lastName: 'Finance',
+		jobTitle: 'Finance Officer',
+		departmentId: dept.id
 	})
 
 	// --- Leave balances (current year) so leave-filing E2E validates. Org-wide rather than
