@@ -188,19 +188,9 @@
 	</PageHeader>
 
 	{#if loose?.error}
-		<div
-			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
-			role="alert"
-		>
-			{loose.error}
-		</div>
+		<Banner kind="error" message={String(loose.error)} />
 	{:else if loose?.success}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-			role="status"
-		>
-			{DONE[form!.action as string] ?? 'Saved.'}
-		</div>
+		<Banner kind="success" message={DONE[form!.action as string] ?? 'Saved.'} />
 	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-2">
