@@ -21,7 +21,8 @@ change stayed reviewable. This is the carry-forward list, copied from the phase 
   toasts the server's own `saved` string on success and `data.error` on failure, and it still calls
   `update()` so the page's own banner keeps rendering. `ConfirmButton` does the same internally.
 - **Redirect-after-success:** `setFlash(cookies, …)` before `redirect()`; the `(app)` layout renders
-  it. This is the only path that survives a 302 and works with no JS.
+  it. This is the only path that survives a 302. It does **not** currently work with no JS — see
+  the F3 section at the bottom of this note.
 - **Scoped slots:** on a multi-action page, each card renders only its own action's error —
   `{#if form?.action === '<name>' && form?.error}`. `employees/[id]` has the reference
   implementation (one `actionError` snippet + a source-sweep test that pins it).
@@ -51,3 +52,21 @@ Adopting a site is therefore: name the action, return a `saved` string, swap
 |---|---|---|
 | `employees/[id]` success signals. Phase 04 gave all 21 actions a scoped ERROR slot; ~15 of them still return `{ action, success: true }`, which carries no message, so a successful loan add or document upload is still silent. Give each a `saved` string — the client side already handles it | §E P2, discovered while building P0-7 | small, mechanical |
 | The 4 `e.message` forwards at `api/v1/leave/[id]:64,65` and `api/v1/timesheets/[id]:60,61` | tracked separately in `api-v1-raw-error-message-leak_NOTE_03-09-26.md` | small |
+
+## F3 — the flash does not render without JavaScript (open)
+
+From the CodeRabbit review of PR #13, graded **VALID (low)**. Recorded here on 04-09-26 because the
+review file it lived in was deleted, and this was its only home. Every other PR #13 finding is
+closed: F4/F6/F7 fixed and pushed, F5 filed as issue #21, F1/F2/F8 rejected with reasons.
+
+`src/routes/(app)/+layout.svelte:104` returns early on `if (!browser)`, so a redirect-carried flash
+never renders server-side. The `(app)` layout load reads **and clears** the cookie either way
+(`takeFlash` at `+layout.server.ts:17`), so a visitor without JavaScript loses the message
+silently — and the cookie is spent, so it cannot reappear on the next page either.
+
+**Fix if wanted:** render a `<noscript>` status block from `data.flash` in the layout markup,
+alongside the existing `addToast` path.
+
+**Why it was not fixed:** the app has no stated no-JS support target. File, do not block. Note the
+same `if (!browser) return` guard also sits at `:83` — check whether that one has the same problem
+before writing a fix that only covers one.
