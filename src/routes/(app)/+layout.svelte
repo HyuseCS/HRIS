@@ -349,7 +349,10 @@
 		{/if}
 
 		<!-- Nav -->
-		<nav aria-label="Main" class="flex-1 overflow-y-auto px-3 py-4">
+		<!-- `overscroll-contain`: the nav holds more links than fit, so it scrolls internally.
+	     Without this its scroll chains into the document and the page starts moving the moment
+	     the nav reaches its end, which reads as the sidebar scrolling with the page. -->
+		<nav aria-label="Main" class="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
 			{#each navSections as section (section.label)}
 				{@const headerId = `nav-section-${section.label.toLowerCase().replace(/\s+/g, '-')}`}
 				<div role="group" aria-labelledby={headerId} class="space-y-0.5">
