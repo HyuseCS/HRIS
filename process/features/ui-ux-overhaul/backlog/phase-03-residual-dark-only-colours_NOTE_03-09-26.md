@@ -10,7 +10,9 @@ phase: "03"
 
 **TL;DR.** Phase 03 fixed light mode wherever it touched a file. 24 colour occurrences across
 6 files were left alone because no section of the phase edits those files. They are a named
-residual under AC-7's scope note, not a failure of the gate. None of them is a status pill.
+residual under AC-7's scope note, not a failure of the gate. **Most of them ARE status pills** —
+16 of the 24 (measured at the S5 commit, the same basis as the table below) carry the pill shape
+`bg-{tone}-500/15 text-{tone}-400`. Only the `dashboard` remainder is decorative.
 
 ## Why this exists
 
@@ -32,13 +34,25 @@ Pattern: `text-green-400|text-yellow-400|text-gray-400|text-blue-400` with no `d
 | `src/routes/(app)/settings/onboarding/+page.svelte` | 1 |
 | **Total** | **24** |
 
-## Correction to the plan's figure
+## Reconciliation with the plan's figure
 
-The plan's AC-7 scope note said **31 occurrences across 11 files**. The re-count finds **24 across 6**.
-Five of the named files carry an occurrence that ALREADY has a `dark:` pair and was therefore never
-a defect: `payroll/config`, `payroll/statutory-rates`, `reports`, `settings/company` (1 each), and
-`lib/components/recruitment/ApplicantKanban.svelte` (0 dark-only — its stage map is already paired).
-The plan counted total occurrences, not unpaired ones.
+**Both numbers are right.** They measure two different things, and the difference closes exactly.
+The plan's AC-7 scope note counted **all 31 matching occurrences** across its 11 named files. The
+table above counts only the **24 unpaired** ones, because a colour that already has a `dark:` pair
+was never a defect. Neither figure is a correction of the other.
+
+The seven already-paired occurrences are:
+
+```
+24 unpaired (the table above)
++ 4 already-paired, one each in payroll/config, payroll/statutory-rates, reports, settings/company
++ 3 already-paired in lib/components/recruitment/ApplicantKanban.svelte
+= 31
+```
+
+`ApplicantKanban.svelte` is the one that makes this look like a discrepancy: it contributes **0**
+to the table, so it is easy to read as contributing nothing at all — but its stage map holds **3**
+already-paired occurrences, and those are part of the plan's 31.
 
 ## What is NOT in this residual
 
@@ -56,5 +70,9 @@ Mechanical: give each occurrence a light-mode pair on the same step the badge to
 comment above the `.badge-*` block in `src/app.css`). Measure the composited ratio before accepting
 any pair; the badge work found `green-700` at 4.40:1, under the 4.5:1 floor for 12px text.
 
-Most of these are decorative or muted-icon uses rather than status pills, so a `<Badge>` conversion
-is probably the wrong tool for them — pair the colours, do not force the component.
+Most of these ARE status pills — 16 of the 24 (measured at the S5 commit, the same basis as the
+table above), spread across all six files. **Convert those to `<Badge>`.** The component already
+carries theme-paired tones and the leading dot, so it fixes light mode and the duplication in one
+step; hand-pairing a pill would leave the duplication behind. The hand-pairing advice above applies
+only to the genuinely decorative remainder, all of which is in `dashboard/+page.svelte`: the large
+metric numbers, an icon tile, a section eyebrow, and an outline button.

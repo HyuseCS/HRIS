@@ -1,5 +1,5 @@
 ---
-name: plan:phase-03-responsive-sweep
+name: note:phase-03-responsive-sweep
 description: "Backlog stub — responsive verification at 390px across the phase-03 design-system sweep was never run; the gate stays CONDITIONAL"
 date: 03-09-26
 feature: ui-ux-overhaul
@@ -24,10 +24,17 @@ Responsive behaviour at 390px viewport width across every file phase 03 touched:
   gives the Back cluster `basis-full` below `sm`, so it takes a row of its own — that path
   now runs on 39 pages instead of 20, and on eight of them the cluster carries a status
   Badge or a count pill as well as the Back button.
-- **S14/S15 action relocations** — 29 pages moved an action cluster off the title row. Ten
-  of those landed at the right-hand end of an existing filter toolbar via `ml-auto`
-  (`employees`, `team`, `attendance`). Below `sm` those toolbars wrap, and `ml-auto` on a
-  wrapped flex line behaves differently from what the desktop layout implies. Unmeasured.
+- **S14/S15 action relocations, pattern 1 — `ml-auto` onto an existing toolbar. Three pages:
+  `employees`, `team`, `attendance`.** 29 pages in total moved an action cluster off the title
+  row, but only these three landed at the right-hand end of an existing filter/view-toggle
+  toolbar. Below `sm` those toolbars wrap, and `ml-auto` on a wrapped flex line behaves
+  differently from what the desktop layout implies. **The wrapped-`ml-auto` risk this note warns
+  about applies only to these three** — look at them first. Unmeasured.
+- **S14/S15 action relocations, pattern 3 — a new bare right-aligned row. Ten pages:**
+  `timesheets`, `benefits`, `departments`, `requests`, `complaints`, `separations`,
+  `recruitment`, `payroll`, `payroll/[id]`, `leave`. These sit above the thing they act on
+  rather than on an existing toolbar, so there is no wrapping toolbar to fight. A separate and
+  lower-risk shape than pattern 1. Unmeasured.
 - **S16** — 24 `EmptyState` sites. Most sit inside a `<td colspan=…>` in a table that is
   itself inside `overflow-x-auto`, so the empty state can end up wider than the viewport and
   centre itself off-screen. Unmeasured.
