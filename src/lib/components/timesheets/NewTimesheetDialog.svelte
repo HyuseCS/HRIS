@@ -48,7 +48,7 @@
 		transition:fade={{ duration: 100 }}
 	>
 		<div
-			class="w-full max-w-lg rounded-xl border bg-card p-8 shadow-2xl"
+			class="relative w-full max-w-lg rounded-xl border bg-card p-8 shadow-2xl"
 			onclick={(e) => e.stopPropagation()}
 			onkeydown={onKeydown}
 			role="dialog"
@@ -57,6 +57,28 @@
 			tabindex="-1"
 			transition:scale={{ duration: 120, start: 0.96 }}
 		>
+			<!-- The detail that used to sit under the heading as three lines of prose. Hover OR
+			     keyboard focus reveals it, and `aria-describedby` keeps it on the button for a
+			     screen reader whether or not it is visible. -->
+			<div class="group absolute right-4 top-4">
+				<button
+					type="button"
+					aria-describedby="nt-help"
+					aria-label="About new timesheets"
+					class="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-medium text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					?
+				</button>
+				<p
+					id="nt-help"
+					role="tooltip"
+					class="pointer-events-none absolute right-0 top-8 z-10 w-72 rounded-md border bg-card p-3 text-left text-xs text-muted-foreground opacity-0 shadow-lg transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+				>
+					Hours are seeded from the employee's recorded attendance punches — adjust them afterward
+					from the timesheet's row. The sheet is saved as a draft; submit it for review separately.
+				</p>
+			</div>
+
 			<div class="space-y-2 text-center">
 				<div
 					class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
@@ -77,9 +99,7 @@
 				</div>
 				<h2 class="text-xl font-bold tracking-tight">New Timesheet</h2>
 				<p class="mx-auto max-w-md text-sm text-muted-foreground">
-					Pick an employee and a standard pay period. Hours are seeded from that employee's recorded
-					attendance punches — adjust them afterward from the timesheet's row. The sheet is saved as
-					a draft; submit it for review separately.
+					Pick an employee and a standard pay period.
 				</p>
 			</div>
 
@@ -125,7 +145,7 @@
 						{/each}
 					</select>
 				</div>
-				<PeriodPicker />
+				<PeriodPicker compact />
 				<div class="flex gap-3">
 					<button
 						type="button"
