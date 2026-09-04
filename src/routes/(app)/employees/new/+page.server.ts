@@ -6,6 +6,7 @@ import { requireAnyCapability } from '$lib/server/rbac'
 import { createEmployee } from '$lib/server/services/employees'
 import { sendWelcomeEmail } from '$lib/server/notifications'
 import { govIdSchema } from '$lib/utils/gov-ids'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { isRateBasisAllowed, RATE_BASIS_MISMATCH } from '$lib/utils/rate-basis'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -89,7 +90,11 @@ const createSchema = z
 		tinNumber: govIdSchema('tinNumber'),
 		emergencyContactName: z.string().optional(),
 		emergencyContactRelation: z.string().optional(),
-		emergencyContactPhone: z.string().optional(),
+		// #24: format-checked; blank is still "not provided", not a failure.
+		emergencyContactPhone: z
+			.string()
+			.optional()
+			.refine(isValidPhone, phoneError('Emergency contact phone')),
 		bankName: z.string().optional(),
 		bankAccountName: z.string().optional(),
 		bankAccountNumber: govIdSchema('bankAccountNumber'),

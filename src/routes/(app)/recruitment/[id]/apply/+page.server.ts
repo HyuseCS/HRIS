@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
 import { applyToPosting } from '$lib/server/services/recruitment'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, params }) => {
@@ -21,7 +22,8 @@ const applySchema = z.object({
 	firstName: z.string().min(1, 'First name is required'),
 	lastName: z.string().min(1, 'Last name is required'),
 	email: z.string().email('A valid email address is required'),
-	phone: z.string().optional(),
+	// #24: optional, so an omitted phone stays valid — but a supplied one must look like a number.
+	phone: z.string().optional().refine(isValidPhone, phoneError('Phone number')),
 	coverLetter: z.string().optional(),
 	resumeUrl: z
 		.string()
