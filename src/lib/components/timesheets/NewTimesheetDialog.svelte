@@ -34,7 +34,7 @@
 	})
 </script>
 
-<Dialog bind:open title="New timesheet" size="lg" padding="lg" zIndex={70}>
+<Dialog bind:open title="New Timesheet" size="lg" padding="lg" zIndex={70}>
 	<!-- The detail that used to sit under the heading as three lines of prose. Hover OR
 	     keyboard focus reveals it, and `aria-describedby` keeps it on the button for a
 	     screen reader whether or not it is visible. -->

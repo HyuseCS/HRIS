@@ -76,7 +76,7 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	await login(page, USERS.manager)
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 
-	const dialog = page.getByRole('dialog', { name: 'New timesheet' })
+	const dialog = page.getByRole('dialog', { name: 'New Timesheet' })
 	await expect(async () => {
 		await page.getByRole('button', { name: 'New Timesheet' }).click()
 		await expect(dialog).toBeVisible({ timeout: 1000 })

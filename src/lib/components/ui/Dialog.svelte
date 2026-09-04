@@ -13,12 +13,8 @@
 	import type { Snippet } from 'svelte'
 	import { fade, scale } from 'svelte/transition'
 
-	interface Props {
+	interface BaseProps {
 		open: boolean
-		/** Accessible name. Ignored when `labelledBy` is given. Never rendered. */
-		title?: string
-		/** id of the consumer's own heading, used as `aria-labelledby` instead of `title`. */
-		labelledBy?: string
 		size?: 'sm' | 'md' | 'lg' | 'wide' | 'full'
 		padding?: 'none' | 'sm' | 'md' | 'lg'
 		/** Column layout with a capped height, for a panel with its own scrolling body. */
@@ -34,6 +30,21 @@
 		onclose?: () => void
 		children: Snippet
 	}
+
+	// At least one accessible name is required — a dialog with neither is unreachable by name.
+	type Props = BaseProps &
+		(
+			| {
+					/** Accessible name. Ignored when `labelledBy` is given. Never rendered. */
+					title: string
+					labelledBy?: never
+			  }
+			| {
+					/** id of the consumer's own heading, used as `aria-labelledby` instead of `title`. */
+					labelledBy: string
+					title?: never
+			  }
+		)
 
 	let {
 		open = $bindable(),
