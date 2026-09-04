@@ -354,6 +354,11 @@ never launch them. Drive with Playwright MCP + `POST /api/v1/_dev/login-as`.
   already on the branch, **all 17 sections are committed.** Not pushed.
 - **Verified:** the four automated CI gates at every one of the five section boundaries; all four
   phase exit greps; e2e 141/141 at both the S15 and S17 boundaries.
+> **Superseded 04-09-26.** Items A, B and C below were run live and are recorded in
+> `phase-03-design-system-hybrid-gates_REPORT_04-09-26.md`. They found two defects (Tailwind's
+> `darkMode` was never set; three `.badge-*` classes were purged), both fixed. Item D is partly
+> covered there; item E stays a filed Known-Gap.
+
 - **Unverified:** items A through E above — every colour, contrast, focus, coherence and viewport
   claim the phase makes.
 - **Remaining:** the owner's manual pass, then phase 04.
