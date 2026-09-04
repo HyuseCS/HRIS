@@ -7,33 +7,11 @@
 - Date: 2026-09-04
 
 Two passes ran over the same diff and produced overlapping sets. Merged and de-duplicated:
-**12 unique findings** — 1 major, 11 minor. Every finding below was checked against source
-before being written down. One is rejected with evidence.
+**12 unique findings raised, 2 rejected with evidence, 10 real.** Every finding below was checked
+against source before being written down. After the F1 rejection there is no major/Warning-severity
+finding left: all 10 real findings are Info.
 
-Severity map: **Critical** none. **Warning** = F1. **Info** = F2-F11 (F12 rejected).
-
----
-
-## Warning
-
-### F1 — Badge variants lose the leading dot (`src/app.css:152-177`)
-
-CodeRabbit: `@apply badge` copies the declarations of `.badge`; it does not make
-`.badge-green::before` match `.badge::before`. `Badge.svelte` renders only
-`class="badge-{resolved.tone}"`, so the dot pseudo-element never applies.
-
-**VERIFIED.** `src/lib/components/ui/Badge.svelte:27` renders
-`<span class="badge-{resolved.tone}">`. `.badge::before` is a separate rule and is not
-copied by `@apply`. The in-file comment at `src/app.css:163` claims the opposite:
-"`badge` stays FIRST in each rule: it carries the pill layout and the leading dot."
-The layout declarations do carry over; the dot does not.
-
-Fix, either one:
-
-- render `class="badge badge-{resolved.tone}"` in `Badge.svelte`, or
-- widen the selector: `.badge::before, .badge-green::before, …`.
-
-The comment at `src/app.css:163` needs correcting whichever way you go.
+Severity map: **Critical** none. **Warning** none. **Info** = F2-F11. **Rejected** = F1 and F12.
 
 ---
 
@@ -114,6 +92,53 @@ The fixing advice depends on the answer.
 
 ## Rejected
 
+### F1 — "Badge variants lose the leading dot" (`src/app.css:152-177`) — FALSE
+
+CodeRabbit: `@apply badge` copies the declarations of `.badge` but does not make
+`.badge-green::before` match `.badge::before`, and `.badge` itself is purged because no literal
+`badge` exists in `src/`. So the dot never renders.
+
+**The dot ships and renders on every status pill today.** Verified on a clean build, 2026-09-04:
+
+```bash
+rm -rf build && pnpm build
+grep -o '\.badge[a-zA-Z-]*:before{' build/client/_app/immutable/assets/*.css
+```
+
+```
+.badge:before{
+.badge-green:before{
+.badge-red:before{
+.badge-yellow:before{
+.badge-blue:before{
+.badge-gray:before{
+```
+
+(The asset filename carries a content hash that changes on every build — glob it, never copy the
+name.)
+
+Both stated causes are false:
+
+1. **"`@apply` does not copy the pseudo-element."** It does. All five tone rules emit a `:before`
+   in the built CSS, above.
+2. **"`.badge` is purged — no literal `badge` in `src/`."** It is not purged.
+   `src/routes/(app)/team/+page.svelte:143` contains `{@const badge = STATUS[…] ?? NO_DATA}`.
+   Tailwind's content scanner is a naive text scan, so that bare token counts as a literal and keeps
+   `.badge` — and its `::before` — alive.
+
+The in-file comment this finding disputes, at `src/app.css:163` — "`badge` stays FIRST in each rule:
+it carries the pill layout and the leading dot" — **is accurate.** It needs no change. Nothing in
+`src/app.css`, `Badge.svelte` or any selector was changed.
+
+**How it got this far.** Three independent passes — CodeRabbit, a research agent, and the
+orchestrator — read `src/app.css` and all reached the same wrong conclusion, because the mechanism
+is invisible in the source and only appears in the built stylesheet. A fourth reader would do the
+same. That is the reason a guard test was added rather than just a note:
+`tests/unit/badge-class-literals.test.ts` now fails if `.badge::before` is deleted, or if any one
+tone rule stops starting with `@apply badge`.
+
+---
+
 ### F12 — "The e2e casing commit hash disagrees with the S1-S5 report" — FALSE
 
 CodeRabbit flagged `…s6-s12_REPORT…:86` crediting `3143112` against
@@ -130,11 +155,14 @@ The reports are consistent. No change needed.
 
 ## Suggested order
 
-1. F1 — the only user-visible defect. Fix the render or the selector, and fix the comment.
-2. F3 — one-line change plus two e2e locators, or leave it and drop the finding.
-3. F2 — a `Props` type change, no runtime effect today.
-4. F4-F11 — documentation accuracy. These reports drive your deferred owner test pass, so
+There is no user-visible defect in this set.
+
+1. F3 — one-line change plus two e2e locators, or leave it and drop the finding.
+2. F2 — a `Props` type change, no runtime effect today.
+3. F4-F11 — documentation accuracy. These reports drive your deferred owner test pass, so
    the wrong counts and the contradictory statements cost time later.
+
+F1 and F12 need no source change — see `## Rejected` above for the evidence that refutes each.
 
 ## Notes on the run
 
