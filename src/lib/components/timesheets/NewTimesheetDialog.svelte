@@ -52,8 +52,8 @@
 			role="tooltip"
 			class="pointer-events-none absolute right-0 top-8 z-10 w-72 rounded-md border bg-card p-3 text-left text-xs text-muted-foreground opacity-0 shadow-lg transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
 		>
-			Hours are seeded from the employee's recorded attendance punches — adjust them afterward
-			from the timesheet's row. The sheet is saved as a draft; submit it for review separately.
+			Hours are seeded from the employee's recorded attendance punches — adjust them afterward from
+			the timesheet's row. The sheet is saved as a draft; submit it for review separately.
 		</p>
 	</div>
 

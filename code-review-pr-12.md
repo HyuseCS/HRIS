@@ -29,6 +29,7 @@ copied by `@apply`. The in-file comment at `src/app.css:163` claims the opposite
 The layout declarations do carry over; the dot does not.
 
 Fix, either one:
+
 - render `class="badge badge-{resolved.tone}"` in `Badge.svelte`, or
 - widen the selector: `.badge::before, .badge-green::before, …`.
 
@@ -63,7 +64,8 @@ must change with it.
 ### F4 — S1-S5 report: file count does not match its own list (`…/phase-03-design-system-s1-s5_REPORT_03-09-26.md:31-37`)
 
 Heading says 36 files. The list is 6 created + `src/app.css` + 10 S4 files + 20 S5 files
-+ 9 e2e specs = **46**. **VERIFIED.**
+
+- 9 e2e specs = **46**. **VERIFIED.**
 
 ### F5 — S1-S5 report: defect 3 contradicts itself (`…s1-s5_REPORT…:100-101`)
 
