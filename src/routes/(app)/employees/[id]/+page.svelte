@@ -127,6 +127,46 @@
 		PAGIBIG: 'Pag-IBIG'
 	}
 	const uploadDocument = createSubmitGuard()
+
+	// Feedback for the actions that have no slot of their own.
+	//
+	// This page has 21 actions and only five render their own result (assignTemplate, update,
+	// changeCompensation, promote, offboard). Phase 01 gated those five on `form.action` so a
+	// failed addLoan could not paint itself into the Update Profile card, and accepted that the
+	// other sixteen would report nothing — on the stated grounds that phase 07 would give every
+	// form its own slot. It did not: phase 07 and phase 10 both still carry these same five.
+	//
+	// A page-level region cannot mis-attribute, because it belongs to no form. It restores the
+	// signal for the rest without touching the five that already work. `reveal` is excluded: it
+	// returns data, not an outcome.
+	const OWN_SLOT = [
+		'assignTemplate',
+		'update',
+		'changeCompensation',
+		'promote',
+		'offboard',
+		'reveal'
+	]
+	const DONE: Record<string, string> = {
+		setSupervisors: 'Supervisors saved.',
+		addLoan: 'Loan added.',
+		addCashAdvance: 'Cash advance added.',
+		addEarning: 'Earning added.',
+		endEarning: 'Earning ended.',
+		addDeduction: 'Deduction added.',
+		endDeduction: 'Deduction ended.',
+		toggleStatutoryExemption: 'Statutory exemption updated.',
+		toggleEmployerShareExternal: 'Employer share updated.',
+		setStatutoryAllocation: 'Statutory allocation saved.',
+		addEmergencyContact: 'Emergency contact added.',
+		deleteEmergencyContact: 'Emergency contact removed.',
+		uploadDocument: 'Document uploaded.',
+		deleteDocument: 'Document deleted.',
+		toggleOnboardingStep: 'Onboarding step updated.'
+	}
+	const loose = $derived(
+		form?.action && !OWN_SLOT.includes(form.action) ? (form as Record<string, unknown>) : null
+	)
 </script>
 
 <svelte:head>
@@ -154,6 +194,22 @@
 			/>
 		</div>
 	</div>
+
+	{#if loose?.error}
+		<div
+			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
+			role="alert"
+		>
+			{loose.error}
+		</div>
+	{:else if loose?.success}
+		<div
+			class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
+			role="status"
+		>
+			{DONE[form!.action as string] ?? 'Saved.'}
+		</div>
+	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-2">
 		<!-- Onboarding checklist (HR-only, T178) -->
