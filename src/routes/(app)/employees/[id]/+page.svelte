@@ -106,24 +106,27 @@
 	// contacts, loans, cash advances, recurring earnings/deductions, uploaded documents, or a
 	// second offboard/reveal. One guard per form; the per-row forms share the guard for their
 	// action, which is fine because those rows submit one at a time.
-	const reveal = submitFeedback()
-	const update = submitFeedback()
-	const offboard = submitFeedback()
-	const setSupervisors = submitFeedback()
-	const deleteEmergencyContact = submitFeedback()
-	const addEmergencyContact = submitFeedback()
-	const addLoan = submitFeedback()
-	const addCashAdvance = submitFeedback()
-	const endEarning = submitFeedback()
-	const addEarning = submitFeedback()
-	const endDeduction = submitFeedback()
-	const addDeduction = submitFeedback()
-	const toggleStatutory = submitFeedback()
-	const toggleErExternal = submitFeedback()
-	const setAllocation = submitFeedback()
-	const changeCompensation = submitFeedback()
-	const promote = submitFeedback()
-	const assignTemplate = submitFeedback()
+	//
+	// `error: null`: each card renders its own failure, so an error toast would repeat it. Other
+	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
+	const reveal = submitFeedback({ error: null })
+	const update = submitFeedback({ error: null })
+	const offboard = submitFeedback({ error: null })
+	const setSupervisors = submitFeedback({ error: null })
+	const deleteEmergencyContact = submitFeedback({ error: null })
+	const addEmergencyContact = submitFeedback({ error: null })
+	const addLoan = submitFeedback({ error: null })
+	const addCashAdvance = submitFeedback({ error: null })
+	const endEarning = submitFeedback({ error: null })
+	const addEarning = submitFeedback({ error: null })
+	const endDeduction = submitFeedback({ error: null })
+	const addDeduction = submitFeedback({ error: null })
+	const toggleStatutory = submitFeedback({ error: null })
+	const toggleErExternal = submitFeedback({ error: null })
+	const setAllocation = submitFeedback({ error: null })
+	const changeCompensation = submitFeedback({ error: null })
+	const promote = submitFeedback({ error: null })
+	const assignTemplate = submitFeedback({ error: null })
 	// P0-7: this page has 24 actions and used to have ONE ungated error slot, itself inside a card
 	// that is hidden for an offboarded employee — so a failed document upload or loan add rendered
 	// nowhere at all. Every card now answers only for its own actions.
@@ -137,7 +140,7 @@
 		PHILHEALTH: 'PhilHealth',
 		PAGIBIG: 'Pag-IBIG'
 	}
-	const uploadDocument = submitFeedback()
+	const uploadDocument = submitFeedback({ error: null })
 
 	const DONE: Record<string, string> = {
 		setSupervisors: 'Supervisors saved.',
