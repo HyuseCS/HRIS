@@ -12,6 +12,7 @@ import {
 import { canTouchEmployee } from '$lib/server/services/employee-access'
 import { apiError } from '$lib/server/api-error'
 import { govIdSchema } from '$lib/utils/gov-ids'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { isRateBasisAllowed, RATE_BASIS_MISMATCH } from '$lib/utils/rate-basis'
 import { EMPLOYMENT_TYPES } from '$lib/utils/employment-type'
 import { z } from 'zod'
@@ -34,7 +35,8 @@ const updateSchema = z
 		firstName: z.string().min(1).optional(),
 		lastName: z.string().min(1).optional(),
 		middleName: z.string().optional(),
-		contactPhone: z.string().optional(),
+		// #24: same rule as the employee page — a PATCH is a second door onto the same column.
+		contactPhone: z.string().optional().refine(isValidPhone, phoneError('Phone')),
 		contactAddress: z.string().optional(),
 		departmentId: z.string().optional(),
 		jobTitle: z.string().optional(),
@@ -105,7 +107,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	const parsed = updateSchema.safeParse(body)
 
 	if (!parsed.success) {
-		return apiError(400, 'Invalid request body')
+		// #24: field detail alongside the message, matching the applicants route — 'Invalid request
+		// body' alone does not tell an API caller which field was wrong or what shape it wanted.
+		return apiError(400, 'Invalid request body', parsed.error.flatten())
 	}
 
 	// #170/#222: pay and employment type must never be written straight onto the Employee row — both
