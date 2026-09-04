@@ -84,7 +84,7 @@
 	<!-- Header -->
 	<PageHeader title="{applicant.firstName} {applicant.lastName}">
 		{#snippet back()}
-			<span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+			<span class="rounded-full bg-foreground/15 px-2.5 py-1 text-xs font-medium">
 				{STAGE_LABELS[applicant.currentStage] ?? applicant.currentStage}
 			</span>
 			<BackButton
@@ -131,7 +131,7 @@
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							<div class="text-sm">
 								<span class="font-medium">{fmtDateTime(iv.scheduledAt)}</span>
-								<span class="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs"
+								<span class="ml-2 rounded-full bg-foreground/15 px-2 py-0.5 text-xs"
 									>{MODE_LABELS[iv.mode]}</span
 								>
 							</div>

@@ -340,7 +340,7 @@
 						{/if}
 
 						<div class="mt-auto flex items-center justify-between gap-2 pt-1">
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+							<span class="rounded-full bg-foreground/15 px-2 py-0.5 text-xs text-muted-foreground"
 								>Stage: {currentStageLabel(req)}</span
 							>
 							<a href="/requests/{req.id}?from=/requests/approvals" class="btn-row">View detail</a>
