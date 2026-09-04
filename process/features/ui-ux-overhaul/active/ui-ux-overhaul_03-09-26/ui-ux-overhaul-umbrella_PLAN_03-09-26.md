@@ -259,6 +259,20 @@ taken.
 
 ---
 
+### Execution status (updated 04-09-26)
+
+- **Phase 1 (`p0-fixes`): ✅ VERIFIED.** All 13 Manual Verification Checklist items ran live on
+  04-09-26 and passed. Archived to
+  `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`. Two UI defects found and
+  fixed during the pass (`1eabd4e`, `f5f0616`); the "closed by phase 07" regression claim in the
+  original report was checked against `feat/uiux-phase-7`/`feat/uiux-phase-10` and found false —
+  fixed directly instead in `8371cb8`. See its report for full detail.
+- **Phase 2 (`nav-ia`): CODE DONE, still `Keep in active/testing`.** A per-role nav live check ran
+  04-09-26 (HR_ADMIN, MANAGER, one plain-employee account — zero 403s, correct negative control on
+  `/reports/audit-log`), but the plan's own `VERIFIED` bar additionally requires a CEO role pass,
+  screenshots in the phase report, and an `impeccable` audit pass — none of those three ran. Stays
+  in `active/`.
+
 ### Phase 1 — `p0-fixes`
 
 **Plan:** `phase-01-p0-fixes_PLAN_03-09-26.md`

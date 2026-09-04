@@ -101,7 +101,7 @@ test('a granted location is captured, and a second tap inside the capture window
 	// `data-ready` says the handler is live; `data-busy` says a punch is in flight — which now
 	// starts at the tap, so this is true long before the form is submitted.
 	await expect(page.locator('form[data-busy="true"]')).toBeVisible()
-	const status = page.getByRole('status')
+	const status = page.locator('main').getByRole('status')
 	await expect(status).toContainText(/Finding your location/)
 	const punchOut = page.getByRole('button', { name: 'Punch Out' })
 	await expect(punchOut).toBeDisabled()
@@ -172,7 +172,7 @@ test('a denied permission still records the punch, driven by keyboard alone', as
 	// The punch is the assertion that matters. The location copy varies by browser (denied vs
 	// no fix), so assert that it is one of the punch-anyway states rather than pinning one.
 	await expect(page.getByRole('alert')).toContainText(/Punched out without a location\./)
-	await expect(page.getByRole('status')).toContainText(/punching without it\./)
+	await expect(page.locator('main').getByRole('status')).toContainText(/punching without it\./)
 
 	const row = page.getByRole('listitem').filter({ hasText: 'Clock out' }).first()
 	await expect(row).toContainText('No location recorded')

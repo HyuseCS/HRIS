@@ -4,6 +4,7 @@
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -50,6 +51,16 @@
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
+		</div>
+	{/if}
+
+	<!-- Page-level, like the error block above. Only ?/release and ?/void populate `saved` for
+	     now; open/import/generate/lock stay silent until the phase-04 feedback contract. -->
+	{#if form?.saved}
+		<div
+			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
+		>
+			{form.saved}
 		</div>
 	{/if}
 
@@ -180,28 +191,38 @@
 									{/if}
 									{#if p.status === 'LOCKED'}
 										{@const releaseG = guard(`${p.id}:release`)}
-										<form method="POST" action="?/release" use:enhance={releaseG.enhance}>
+										<!-- submit={releaseG.enhance} is load-bearing: ConfirmButton renders its own
+										     form, so dropping it loses the per-row #108 double-submit guard. -->
+										<ConfirmButton
+											action="?/release"
+											title="Release this period?"
+											message="Payslips for this period become visible to every employee in it, and the period leaves LOCKED."
+											confirmText="Release period"
+											triggerLabel={releaseG.busy ? 'Releasing…' : 'Release'}
+											triggerClass="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
+											disabled={releaseG.busy}
+											submit={releaseG.enhance}
+										>
 											<input type="hidden" name="id" value={p.id} />
-											<button
-												disabled={releaseG.busy}
-												class="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
-												>{releaseG.busy ? 'Releasing…' : 'Release'}</button
-											>
-										</form>
+										</ConfirmButton>
 									{/if}
 									{#if run}
 										<a href="/payroll/{run.id}" class="btn-row">Detail</a>
 									{/if}
 									{#if data.canVoid && p.status !== 'VOIDED'}
 										{@const voidG = guard(`${p.id}:void`)}
-										<form method="POST" action="?/void" use:enhance={voidG.enhance}>
+										<ConfirmButton
+											action="?/void"
+											title="Void this payroll period?"
+											message="The period is marked VOIDED. This cannot be undone, and the same exact period cannot be created again."
+											confirmText="Void period"
+											triggerLabel={voidG.busy ? 'Voiding…' : 'Void'}
+											triggerClass="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
+											disabled={voidG.busy}
+											submit={voidG.enhance}
+										>
 											<input type="hidden" name="id" value={p.id} />
-											<button
-												disabled={voidG.busy}
-												class="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
-												>{voidG.busy ? 'Voiding…' : 'Void'}</button
-											>
-										</form>
+										</ConfirmButton>
 									{/if}
 								</div>
 							</td>

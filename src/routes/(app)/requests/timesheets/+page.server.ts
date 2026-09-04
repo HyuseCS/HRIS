@@ -107,6 +107,9 @@ export const actions: Actions = {
 			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
+
+		// The page already renders `form?.saved`; the action just never populated it.
+		return { saved: approved ? 'Timesheet approved.' : 'Timesheet rejected.' }
 	},
 
 	// Bulk approve each selected (submitted) timesheet; non-submitted ones are skipped.

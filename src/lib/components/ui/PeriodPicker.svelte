@@ -19,18 +19,24 @@
 	// that range cross a month boundary, capped at one month of pay. It feeds the SAME two hidden
 	// inputs, so no consumer changes shape, and it is never pre-selected — the 15-day cutoff stays
 	// the path of least resistance.
+	//
+	// `compact` is for narrow containers (the New Timesheet dialog): Period becomes a select on
+	// its own line instead of a four-button segmented control, which needs ~545px and cannot fit
+	// beside Month and Year inside a modal.
 	let {
 		startName = 'periodStart',
 		endName = 'periodEnd',
 		year = $bindable(),
 		month0 = $bindable(),
-		kind = $bindable('FIRST_HALF')
+		kind = $bindable('FIRST_HALF'),
+		compact = false
 	}: {
 		startName?: string
 		endName?: string
 		year?: number
 		month0?: number
 		kind?: PeriodKind | 'CUSTOM'
+		compact?: boolean
 	} = $props()
 
 	// Default to the current PHT month when the parent didn't seed a value.
@@ -141,11 +147,16 @@
 <input type="hidden" name={endName} value={endValue} />
 
 <div class="space-y-3">
-	<!-- Month, Year and Period share one line. The two selects are sized to their content
-	     rather than stretched to half the panel each, which leaves Period enough room to keep
-	     all four buttons on a single row (they need ~545px once the webfont has loaded). -->
+	<!-- Month, Year and Period share one line. The selects are sized to their content rather than
+	     stretched to a third of the panel each. The full-width variant's Period is a four-button
+	     segmented control needing ~545px, so it declares that and drops to its own line when the
+	     container cannot give it (buttons wrap again below that). The `compact` variant is a single
+	     select, so all three fit one line even in the 448px the `max-w-lg` New Timesheet dialog
+	     leaves — Month and Year give up the width Period needs for `Second half (16–EOM)`. Below
+	     that, at 390px the dialog leaves 294px and the select would be squeezed to ~60px, so it
+	     declares the 200px it needs and wraps to its own line instead. -->
 	<div class="flex flex-wrap items-start gap-3">
-		<div class="w-40 space-y-1.5">
+		<div class="{compact ? 'w-32' : 'w-40'} space-y-1.5">
 			<label for="pp-month" class="block text-sm font-medium">Month</label>
 			<select id="pp-month" bind:value={month0} class={selectClass}>
 				{#each MONTHS as name, i (name)}
@@ -153,7 +164,7 @@
 				{/each}
 			</select>
 		</div>
-		<div class="w-24 space-y-1.5">
+		<div class="{compact ? 'w-20' : 'w-24'} space-y-1.5">
 			<label for="pp-year" class="block text-sm font-medium">Year</label>
 			<select id="pp-year" bind:value={year} class={selectClass}>
 				{#each YEARS as y (y)}
@@ -162,26 +173,35 @@
 			</select>
 		</div>
 
-		<div class="min-w-0 flex-1 space-y-1.5">
-			<span class="block text-sm font-medium">Period</span>
-			<div
-				class="inline-flex h-9 items-center gap-1 rounded-md border bg-muted/40 px-1"
-				role="group"
-			>
-				{#each KIND_OPTIONS as opt (opt.value)}
-					<button
-						type="button"
-						onclick={() => (kind = opt.value)}
-						aria-pressed={kind === opt.value}
-						class="flex h-7 items-center rounded px-3 text-sm font-medium transition-colors {kind ===
-						opt.value
-							? 'bg-primary text-primary-foreground'
-							: 'hover:bg-accent'}"
-					>
-						{opt.label}
-					</button>
-				{/each}
-			</div>
+		<div class="{compact ? 'min-w-[200px]' : 'min-w-0 basis-[545px]'} flex-1 space-y-1.5">
+			{#if compact}
+				<label for="pp-kind" class="block text-sm font-medium">Period</label>
+				<select id="pp-kind" bind:value={kind} class={selectClass}>
+					{#each KIND_OPTIONS as opt (opt.value)}
+						<option value={opt.value}>{opt.label}</option>
+					{/each}
+				</select>
+			{:else}
+				<span class="block text-sm font-medium">Period</span>
+				<div
+					class="flex min-h-9 flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-1"
+					role="group"
+				>
+					{#each KIND_OPTIONS as opt (opt.value)}
+						<button
+							type="button"
+							onclick={() => (kind = opt.value)}
+							aria-pressed={kind === opt.value}
+							class="flex h-7 items-center rounded px-3 text-sm font-medium transition-colors {kind ===
+							opt.value
+								? 'bg-primary text-primary-foreground'
+								: 'hover:bg-accent'}"
+						>
+							{opt.label}
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</div>
 

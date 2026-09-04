@@ -28,9 +28,15 @@ const START = '2026-12-26'
 const END = '2027-01-10'
 const PREVIEW = 'Dec 26 – Jan 10, 2027 (16 days) · statutory and loans prorated to 52% of a month'
 
-/** Switch the picker to Custom range and fill the cross-month range. Asserts no inline refusal. */
-async function fillCrossMonth(page: Page) {
-	await page.getByRole('button', { name: 'Custom range' }).click()
+/**
+ * Switch the picker to Custom range and fill the cross-month range. Asserts no inline refusal.
+ *
+ * `compact` mounts (the New Timesheet dialog) render the four kinds as a select rather than a
+ * segmented control — the buttons need ~545px and do not fit in a modal.
+ */
+async function fillCrossMonth(page: Page, compact = false) {
+	if (compact) await page.getByLabel('Period').selectOption('CUSTOM')
+	else await page.getByRole('button', { name: 'Custom range' }).click()
 	await page.getByLabel('Start date').fill(START)
 	await page.getByLabel('End date').fill(END)
 	await expect(page.locator('#pp-custom-error')).toHaveCount(0)
@@ -81,7 +87,7 @@ test('the /timesheets New Timesheet dialog accepts a cross-month range', async (
 	await login(page, USERS.admin)
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 	await page.getByRole('button', { name: 'New Timesheet' }).click()
-	await fillCrossMonth(page)
+	await fillCrossMonth(page, true)
 
 	const form = page.locator('form[action="/timesheets?/create"]')
 	await expect(form.locator('p[aria-live="polite"]')).toHaveText(PREVIEW)

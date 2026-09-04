@@ -90,7 +90,7 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	await dialog.locator('#nt-employee').selectOption(empValue as string)
 	await dialog.locator('#pp-month').selectOption({ label: monthName })
 	await dialog.locator('#pp-year').selectOption({ label: String(year) })
-	await dialog.getByRole('button', { name: 'Whole month' }).click()
+	await dialog.locator('#pp-kind').selectOption('WHOLE_MONTH')
 	await dialog.getByRole('button', { name: 'Create timesheet' }).click()
 
 	await page.waitForURL('**/timesheets')
