@@ -112,9 +112,14 @@ describe('toast store', () => {
 	it('never fires a dismissed toast’s timer at a recycled id', () => {
 		const id = addToast('one')
 		dismissToast(id)
+		// Offset the replacement so the dead toast's timer would fire at t=6000, a full
+		// second BEFORE the replacement's own. Without the offset both land together and
+		// the assertion cannot tell a stale kill from a normal expiry.
+		vi.advanceTimersByTime(1000)
 		addToast('two')
-		vi.advanceTimersByTime(6000)
-		// If the first timer had survived it would have run against a live stack.
+		vi.advanceTimersByTime(5000) // t=6000: the dead toast's timer moment
+		expect(getToasts().map((t) => t.message)).toEqual(['two'])
+		vi.advanceTimersByTime(1000) // t=7000: its own timeout
 		expect(getToasts()).toHaveLength(0)
 	})
 })

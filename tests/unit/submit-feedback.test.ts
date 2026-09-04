@@ -23,8 +23,11 @@ async function submit(
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	update: any = vi.fn()
 ) {
+	// Captured before `enhance` runs: the guard REPLACES `input.cancel` with its own wrapper, so
+	// reading it back off the input afterwards no longer sees this spy.
+	const cancel = vi.fn()
 	const input = {
-		cancel: vi.fn(),
+		cancel,
 		formData: new FormData(),
 		action: new URL('http://x/?/a'),
 		submitter: null
@@ -34,7 +37,7 @@ async function submit(
 	const busyInFlight = fb.busy
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const settle = () => (after as (o: any) => Promise<void>)({ result, update, formElement: null })
-	return { busyInFlight, settle, update }
+	return { busyInFlight, settle, update, cancel, after }
 }
 
 const texts = () => getToasts().map((t) => t.message)
@@ -179,7 +182,54 @@ describe('submitFeedback', () => {
 		const fb = submitFeedback()
 		const first = await submit(fb, { type: 'success', data: {} })
 		expect(fb.busy).toBe(true)
+
+		// The overlap is the whole point: the second submit must arrive BEFORE the first settles,
+		// or the guard's `cancel()` branch is never reached and a missing guard reads as green.
+		const second = await submit(fb, { type: 'success', data: {} })
+		expect(second.cancel).toHaveBeenCalledOnce()
+		expect(second.after).toBeUndefined()
+
 		await first.settle()
+		expect(fb.busy).toBe(false)
+		expect(second.update).not.toHaveBeenCalled()
+	})
+
+	// The `busy`-always-released invariant, one test per path that could latch the lock. A latched
+	// `busy` permanently disables the button — the user cannot retry without a page reload.
+	it('releases busy when goto() rejects on a redirect', async () => {
+		goto.mockRejectedValueOnce(new Error('navigation aborted'))
+		const fb = submitFeedback()
+		const s = await submit(fb, { type: 'redirect', location: '/x' })
+		await expect(s.settle()).rejects.toThrow('navigation aborted')
+		expect(fb.busy).toBe(false)
+	})
+
+	it('releases busy when the redirect navigation is cancelled (goto resolves early)', async () => {
+		goto.mockResolvedValueOnce(undefined)
+		const fb = submitFeedback()
+		const s = await submit(fb, { type: 'redirect', location: '/x' })
+		await s.settle()
+		expect(fb.busy).toBe(false)
+	})
+
+	it('releases busy when opts.inner throws before the request goes out', async () => {
+		const fb = submitFeedback({
+			inner: () => {
+				throw new Error('inner blew up')
+			}
+		})
+		await expect(submit(fb, { type: 'success', data: {} })).rejects.toThrow('inner blew up')
+		expect(fb.busy).toBe(false)
+	})
+
+	it('releases busy when the inner handler’s own callback throws', async () => {
+		const fb = submitFeedback({
+			inner: () => async () => {
+				throw new Error('callback blew up')
+			}
+		})
+		const s = await submit(fb, { type: 'success', data: {} })
+		await expect(s.settle()).rejects.toThrow('callback blew up')
 		expect(fb.busy).toBe(false)
 	})
 
