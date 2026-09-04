@@ -736,6 +736,50 @@ export async function seedE2E(db: PrismaClient) {
 		number: 'EMP-903'
 	})
 
+	// Payroll Officer + Finance: the two back-office accounts the dev login switcher offers.
+	// Same shape as the sign-off pair above — single role, roles re-asserted on update so a
+	// drifted row is corrected, and an employee profile so their Profile page resolves.
+	//
+	// No fixed employee number. The 900 band is NOT reserved: `nextEmployeeNumber` issues
+	// highest+1, so once EMP-903 exists every employee the app or the E2E suite creates
+	// continues from 904. A hardcoded number here collides with that residue on the
+	// (organizationId, employeeNumber) unique index — on 04-09-26 EMP-904 and EMP-905 were both
+	// held by e2e fixtures. Omitting `number` lets ensureEmployeeProfile take the next free one.
+	const payrollHash = await bcrypt.hash('Payroll@1234', 12)
+	const payrollUser = await db.user.upsert({
+		where: { email: 'payroll@veent.ph' },
+		update: { roles: ['PAYROLL_OFFICER'] },
+		create: {
+			organizationId: org.id,
+			email: 'payroll@veent.ph',
+			passwordHash: payrollHash,
+			roles: ['PAYROLL_OFFICER']
+		}
+	})
+	await ensureEmployeeProfile(db, payrollUser, {
+		firstName: 'Paolo',
+		lastName: 'Payroll',
+		jobTitle: 'Payroll Officer',
+		departmentId: dept.id
+	})
+	const financeHash = await bcrypt.hash('Finance@1234', 12)
+	const financeUser = await db.user.upsert({
+		where: { email: 'finance@veent.ph' },
+		update: { roles: ['FINANCE'] },
+		create: {
+			organizationId: org.id,
+			email: 'finance@veent.ph',
+			passwordHash: financeHash,
+			roles: ['FINANCE']
+		}
+	})
+	await ensureEmployeeProfile(db, financeUser, {
+		firstName: 'Fiona',
+		lastName: 'Finance',
+		jobTitle: 'Finance Officer',
+		departmentId: dept.id
+	})
+
 	// --- Manager (direct supervisor; approves the employee's timesheets in the E2E suite) ---
 	const managerHash = await bcrypt.hash('Manager@1234', 12)
 	const managerUser = await db.user.upsert({
