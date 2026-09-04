@@ -25,11 +25,14 @@
 		}
 	}
 
+	// A toast floats over arbitrary page content, so unlike `Banner` it cannot use a 10% tint —
+	// whatever is underneath shows through and the text stops being readable. Solid fills, and the
+	// same text steps Banner measured against the 4.5 floor.
 	const kindClass = (k: string) =>
 		k === 'success'
-			? 'border-green-500/30 bg-green-500/10 text-green-300'
+			? 'border-green-600/30 bg-green-50 text-green-800 dark:border-green-500/30 dark:bg-green-950 dark:text-green-300'
 			: k === 'error'
-				? 'border-red-500/30 bg-red-500/10 text-red-300'
+				? 'border-red-600/30 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-950 dark:text-red-300'
 				: 'border-border bg-card text-foreground'
 </script>
 
@@ -60,7 +63,7 @@
 		<div
 			aria-live={t.kind === 'error' ? 'assertive' : undefined}
 			use:pausable
-			class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg backdrop-blur {kindClass(
+			class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg {kindClass(
 				t.kind
 			)}"
 		>
