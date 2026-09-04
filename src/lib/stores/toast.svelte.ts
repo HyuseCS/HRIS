@@ -24,6 +24,8 @@ interface Timer {
 	startedAt: number
 }
 const timers = new Map<string, Timer>()
+let hovered = false
+let focused = false
 let paused = false
 
 function startTimer(id: string): void {
@@ -65,8 +67,15 @@ export function dismissAllToasts(): void {
 	for (const t of [...toasts]) dismissToast(t.id)
 }
 
-/** Hold every toast open — the Toaster calls this on hover and on focus-within. */
-export function pauseToasts(): void {
+export type PauseSource = 'hover' | 'focus'
+
+/** Hold every toast open — the Toaster calls this on hover and on focus-within. Hover and
+ * focus are tracked separately: a mouseleave must not resume a toast a keyboard user is
+ * still focused inside. */
+export function pauseToasts(source: PauseSource = 'hover'): void {
+	if (source === 'hover') hovered = true
+	else focused = true
+	if (paused) return
 	paused = true
 	for (const timer of timers.values()) {
 		if (!timer.handle) continue
@@ -76,7 +85,10 @@ export function pauseToasts(): void {
 	}
 }
 
-export function resumeToasts(): void {
+export function resumeToasts(source: PauseSource = 'hover'): void {
+	if (source === 'hover') hovered = false
+	else focused = false
+	if (hovered || focused) return
 	paused = false
 	for (const id of timers.keys()) startTimer(id)
 }

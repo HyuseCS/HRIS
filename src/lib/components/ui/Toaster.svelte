@@ -12,13 +12,15 @@
 	// Hover-to-pause is attached imperatively, not as `onmouseenter`: a toast card is a static
 	// element, and declaring mouse handlers on one earns an a11y warning that would be wrong to
 	// silence — the keyboard equivalent already lives on the region as focusin/focusout.
+	const onEnter = () => pauseToasts('hover')
+	const onLeave = () => resumeToasts('hover')
 	function pausable(node: HTMLElement) {
-		node.addEventListener('mouseenter', pauseToasts)
-		node.addEventListener('mouseleave', resumeToasts)
+		node.addEventListener('mouseenter', onEnter)
+		node.addEventListener('mouseleave', onLeave)
 		return {
 			destroy() {
-				node.removeEventListener('mouseenter', pauseToasts)
-				node.removeEventListener('mouseleave', resumeToasts)
+				node.removeEventListener('mouseenter', onEnter)
+				node.removeEventListener('mouseleave', onLeave)
 			}
 		}
 	}
@@ -41,8 +43,8 @@
 	aria-live="polite"
 	aria-atomic="false"
 	class="pointer-events-none fixed right-4 top-4 z-[100] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
-	onfocusin={pauseToasts}
-	onfocusout={resumeToasts}
+	onfocusin={() => pauseToasts('focus')}
+	onfocusout={() => resumeToasts('focus')}
 >
 	<!-- A stack this deep is hard to clear one ✕ at a time. -->
 	{#if toasts.length > 2}
