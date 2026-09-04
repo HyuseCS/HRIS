@@ -115,6 +115,24 @@ suite coexisted with a real defect:
 - **No gate typechecks `prisma/**` or `scripts/**`.** Code there has shipped broken while `check`
   was green.
 - **Real-device GPS and insecure-origin branches** in the punch flow are not provable locally.
+- **The e2e suite runs parallel workers against ONE shared dev database.**
+  `scripts/clean-e2e-employees.ts`'s own header documents the resulting race: a concurrent spec's
+  payroll compute can attach an entry to whatever employee is currently ACTIVE, and the FK is
+  `RESTRICT`, so a teardown delete can legitimately lose that race. Confirmed 04-09-26: a first run
+  failed 5 tests; sweeping stale test employees (`--apply`) plus leftover `E2E %` inventory rows
+  cleared 3 of the 5.
+- **A stale row from an earlier manual/e2e session can make a spec fail for reasons unrelated to
+  the code.** `payroll-custom-range-overlap.spec.ts` failed 04-09-26 because an APPROVED payroll
+  run left over from a prior session overlapped its date range — the spec's own header comment
+  claiming "cannot collide with the seed" was stale for that database state. When an e2e failure's
+  root cause is a pre-existing DB row, not the diff under test, say so explicitly rather than
+  treating a red spec as a code regression.
+- **Playwright's browser cache can silently drop a browser.** If `pnpm test:e2e` fails immediately
+  with `browserType.launch: Executable doesn't exist`, run `pnpm exec playwright install chromium`
+  (or the missing browser) — this is environmental, not a code failure.
+- **When a shared component's markup changes, grep the WHOLE `tests/e2e/` suite for every call
+  site, not just the spec you happened to open.** A `PeriodPicker` button-label change once broke
+  three specs in files unrelated to the change that made it (`5a1d3b0`, 04-09-26).
 
 ## Quick Routing
 

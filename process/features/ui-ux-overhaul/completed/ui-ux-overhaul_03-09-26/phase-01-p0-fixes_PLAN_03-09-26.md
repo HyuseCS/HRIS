@@ -9,7 +9,9 @@ phase: "01"
 # UI/UX Overhaul — Phase 01: P0 Showstoppers
 
 **Date**: 03-09-26
-**Status**: DRAFT — awaiting VALIDATE
+**Status**: ✅ VERIFIED (04-09-26) — see `phase-01-p0-fixes_REPORT_03-09-26.md`. All 13 Manual
+Verification Checklist items below ran live and passed; archived to
+`process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`.
 **Complexity**: SIMPLE-plus (8 independent sections, one surface each, no schema change, no new deps)
 **Feature:** `ui-ux-overhaul`
 **Source of truth:** `docs/ui-ux-audit-2026-09-03.md` §2 (P0-1..P0-3) and Addendum §B (P0-4..P0-8)
@@ -627,24 +629,35 @@ Run in this order, on a dev server the **user** starts (never launch `./start.sh
 `veent-db-5434` yourself — ask). Drive with Playwright MCP + `POST /api/v1/_dev/login-as`.
 Note that `pnpm check` kills the dev server, so run all CI gates **before** the browser pass.
 
-- [ ] 1. Visit `/approvals` → lands on `/requests/approvals`, heading reads "Request Approvals".
-- [ ] 2. As HR_ADMIN: `/reports` shows an "Audit Log" card; clicking it loads the audit log.
-- [ ] 3. As HR_ADMIN: the sidebar shows "Audit Log" nested under Reports; it navigates.
-- [ ] 4. As FINANCE (payroll-only): no Audit Log card, no Audit Log sidebar row, **but** the
-      Payroll Register card IS present (positive control).
-- [ ] 5. Template builder: "Add row" ×2 with no editing → preview still renders both new rows.
-- [ ] 6. Any toast fires → the container node has `role="status"` and `aria-live="polite"`.
-- [ ] 7. Approve a request → green banner names the decision. Reject one → banner differs.
-- [ ] 8. Approve a timesheet from `/requests/timesheets` → green banner.
-- [ ] 9. Offboard a marker employee → confirmation visible AFTER the Offboard form disappears;
+All 13 items ran live on 04-09-26 and PASSED. Full evidence and wording corrections:
+`phase-01-p0-fixes_REPORT_03-09-26.md` → "Manual Verification Checklist Results (04-09-26)".
+
+- [x] 1. Visit `/approvals` → lands on `/requests/approvals`, heading reads "Request Approvals".
+- [x] 2. As HR_ADMIN: `/reports` shows an "Audit Log" card; clicking it loads the audit log.
+- [x] 3. As HR_ADMIN: the sidebar shows "Audit Log" nested under Reports; it navigates.
+- [x] 4. As a payroll-only role: no Audit Log card, no Audit Log sidebar row, **but** the
+      Payroll Register card IS present (positive control). Ran against two dev-DB-only accounts
+      inserted to unblock this check — `payroll@veent.ph`/`finance@veent.ph` are NOT in
+      `prisma/seed-core.ts`; see backlog `dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md`.
+- [x] 5. Template builder: "Add rating row" ×2 with no editing → preview still renders both new
+      rows. (Corrected wording — the control at `RatingScaleEditor.svelte:98` is labelled
+      "Add rating row", not "Add row".)
+- [x] 6. Any toast fires → the container node has `role="status"` and `aria-live="polite"`.
+- [x] 7. Approve a request → green banner names the decision. Reject one → banner differs.
+- [x] 8. Approve a timesheet from `/requests/timesheets` → green banner. (Ordering note: an
+      HR-submitted sheet needs `verifier@veent.ph` to approve first, then `approver@veent.ph`;
+      status flips to APPROVED only after the final stage.)
+- [x] 9. Offboard a marker employee → confirmation visible AFTER the Offboard form disappears;
       `psql` shows `employmentStatus = 'OFFBOARDED'`.
-- [ ] 10. `/payroll/periods`: Void a disposable LOCKED period → confirm dialog appears; Cancel
+- [x] 10. `/payroll/periods`: Void a disposable LOCKED period → confirm dialog appears; Cancel
       leaves the status pill unchanged; Confirm shows "Period voided." and a VOIDED pill.
-- [ ] 11. Same for Release.
-- [ ] 12. `employees/[id]`: Update Profile save shows "Saved."; a failing `addLoan` shows nothing
+      **Requires SUPER_ADMIN** (`OVERRIDE_FINALIZED` is SUPER_ADMIN-only) — ran as `admin@veent.ph`.
+- [x] 11. Same for Release. Same SUPER_ADMIN requirement as item 10.
+- [x] 12. `employees/[id]`: Update Profile save shows "Saved."; a failing `addLoan` shows nothing
       in Update Profile.
-- [ ] 13. Take a screenshot of `/reports`, `/payroll/periods` and `employees/[id]` — assertions do
-      not see layout.
+- [x] 13. Take a screenshot of `/reports`, `/payroll/periods` and `employees/[id]` — assertions do
+      not see layout. Found a container-background inconsistency across the three; deliberately
+      deferred to a repo-wide fix — see backlog `surface-background-inconsistency_NOTE_04-09-26.md`.
 
 ---
 
@@ -958,7 +971,7 @@ every branch MANAGER — surfaced as OWNER-DECISION-1 and routed to phase 02, no
 ## Resume and Execution Handoff
 
 1. **Selected plan file path:**
-   `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md`
+   `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md`
 2. **Last completed phase or step:** none — PLAN written, nothing implemented.
 3. **Validate-contract status:** pending (placeholder section above). VALIDATE needs this plan
    **committed** before it can write into it.
@@ -971,7 +984,7 @@ every branch MANAGER — surfaced as OWNER-DECISION-1 and routed to phase 02, no
    cause of a surprise red.
 
 6. **Primary execute anchor:** this file is the single execute anchor for phase 01 —
-   `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md`.
+   `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md`.
    Pass exactly this path to EXECUTE.
 7. **Supporting phase files:** none yet. No umbrella plan or sibling phase files exist in this
    task folder at plan time; phases 02–07 are named in the Non-goals table but have no plan files.

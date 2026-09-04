@@ -12,6 +12,11 @@
 - **Fix options**: add both entries to `USERS` with their seeded credentials; broadens several
   existing specs' reach cheaply. Deferred out of #278's scope by that plan's own Notes section.
 - **Source**: `process/general-plans/active/payslip-draft-visibility-278_PLAN_10-08-26.md`
+- **CORRECTION 04-09-26**: this entry's premise is wrong. `grep -rn "payroll@veent.ph\|finance@veent.ph" prisma/`
+  returns zero hits — neither account exists in `prisma/seed-core.ts` or any other seed script.
+  The `DevLoginSwitcher` buttons for both roles 404 on a fresh dev DB. See
+  `process/features/ui-ux-overhaul/backlog/dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md`
+  for the confirmed state and fix.
 
 ### Repo-wide sweep for guard message strings with no test reference
 

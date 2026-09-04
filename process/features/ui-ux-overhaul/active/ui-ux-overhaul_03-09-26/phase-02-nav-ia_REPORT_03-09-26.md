@@ -1,6 +1,6 @@
 ---
 name: report:ui-ux-overhaul-phase-02-nav-ia
-description: "EXECUTE report for phase 02 (nav + IA) — six-section sidebar, src/lib/nav.ts, 23 new unit tests; CODE DONE, live verification deferred"
+description: "EXECUTE report for phase 02 (nav + IA) — six-section sidebar, src/lib/nav.ts, 23 new unit tests; CODE DONE, a partial per-role live check ran 04-09-26 but the plan's full VERIFIED bar (CEO role, screenshots, impeccable audit) is not yet met"
 date: 03-09-26
 phase: "02"
 status: COMPLETE_WITH_GAPS
@@ -17,9 +17,12 @@ metadata:
 
 **Date**: 03-09-26
 **Branch**: `feat/uiux-phase-1-2`
-**Status**: **CODE DONE**, not VERIFIED. Checklist steps 1–14 applied and the full CI gate set is
-green. The three Agent-Probe / Hybrid rows (role-matrix live check, live page loads, e2e) and the
-`impeccable` audit are deferred to the owner's manual pass, per the execute handoff.
+**Status**: **CODE DONE**, still not VERIFIED. Checklist steps 1–14 applied and the full CI gate set
+is green. **Update 04-09-26**: a per-role live check ran (see "Live check results" below) covering
+HR_ADMIN, MANAGER, and one plain-employee account, with a working negative control. That check is
+narrower than what this plan's Phase Completion Rules require for `VERIFIED`: no CEO role was
+exercised, no screenshots were attached to this report, and the `impeccable` audit did not run.
+This phase therefore stays `CODE DONE` / `Keep in active/testing`, not `VERIFIED`.
 
 **TL;DR** — The 20-row flat sidebar is now six labelled sections built by a pure, unit-tested
 `src/lib/nav.ts`. 23 new tests pin section order, per-role membership, nav/guard parity (with a
@@ -197,19 +200,52 @@ lines when this phase started. Recorded so phases 06 and 07 rebase on real numbe
 
 ## Deferred verification (why this is CODE DONE, not VERIFIED)
 
-Not run, by explicit instruction — no server, browser, or database was started this session.
+At EXECUTE time (03-09-26), not run by explicit instruction — no server, browser, or database was
+started that session. **Update 04-09-26**: the role-matrix and live-load rows below partially ran
+(see "Live check results (04-09-26)" immediately after this table) — the table itself is kept as
+a historical record of what EXECUTE deferred, with each row corrected inline for what is still
+actually true today.
 
-| Item | Strategy | Owner action needed |
+| Item | Strategy | Status as of 04-09-26 |
 |---|---|---|
-| Role-matrix live check (HR_ADMIN / MANAGER / EMPLOYEE / CEO): section headers present, zero empty headers, exactly one `aria-current="page"`, count pill shows a number, audit-log child present for HR_ADMIN and absent for EMPLOYEE | Agent-Probe | Start the app, run `POST /api/v1/_dev/login-as` per role, screenshot the sidebar, attach here |
-| Live load of `/dashboard`, `/performance/reviews`, `/reports/audit-log` | Agent-Probe | The layout compiles (`pnpm check`, 0 errors) but green unit tests never proved a page renders |
-| `pnpm test:e2e tests/e2e/settings-visibility.spec.ts` (N9) | Hybrid | Needs seeded DB + built preview |
-| `impeccable` audit of the changed sidebar | manual | Standing rule for UI work |
-| Sidebar collapse control, mobile drawer focus trap | Known-Gap | Carried to phase 08 — **may not be used to declare this phase's nav behaviour proven** |
+| Role-matrix live check (HR_ADMIN / MANAGER / EMPLOYEE / CEO): section headers present, zero empty headers, exactly one `aria-current="page"`, count pill shows a number, audit-log child present for HR_ADMIN and absent for EMPLOYEE | Agent-Probe | **Partially run.** A per-role nav link-fetch check ran for HR_ADMIN, MANAGER, and one plain-employee account (zero 403s on any visible link; correct negative control — `/reports/audit-log` is absent from the plain-employee nav and 403s if hit directly). **CEO was not tested. No screenshots were taken or attached.** Does not satisfy this plan's VERIFIED bar on its own. |
+| Live load of `/dashboard`, `/performance/reviews`, `/reports/audit-log` | Agent-Probe | Covered incidentally by the link-fetch check above (every visible link was fetched, not just clicked) for the three roles tested. Not re-verified for CEO. |
+| `pnpm test:e2e tests/e2e/settings-visibility.spec.ts` (N9) | Hybrid | Ran as part of the full `pnpm test:e2e` suite on 04-09-26 (final result 141 passed / 0 failed — see Gate results below). This spec passed. |
+| `impeccable` audit of the changed sidebar | manual | **Still not run.** |
+| Sidebar collapse control, mobile drawer focus trap | Known-Gap | Carried to phase 08 — **may not be used to declare this phase's nav behaviour proven**. Unchanged. |
 
 Nothing in this phase's unit suite proves the sidebar *renders*: `buildNavSections` is pure and
 the component is never mounted (vitest env is `node`, no svelte-testing-library in this repo).
-`pnpm check` plus the live probe are the only cover for the render, and only the first has run.
+`pnpm check` plus the live probe are the cover for the render; the probe ran for 3 of 4 roles.
+
+### Live check results (04-09-26)
+
+Per-role nav check: every visible sidebar link was fetched for each logged-in role, asserting no
+403.
+
+| Role | Account used | Visible links fetched | Result |
+|---|---|---|---|
+| HR_ADMIN | (seeded HR_ADMIN account) | 30 | zero 403s |
+| MANAGER | (seeded MANAGER account) | 28 | zero 403s |
+| Plain employee | `benjie@jojo.ph` | 10 | zero 403s |
+
+**Account drift note:** the plain-employee lane could not use the seed's intended
+`employee@veent.ph` — that account currently holds `PAYROLL_OFFICER` in this dev DB, not
+`EMPLOYEE`, even though `prisma/seed-core.ts` seeds it with `roles: ['EMPLOYEE']`. Root cause and
+fix options: `process/features/ui-ux-overhaul/backlog/employee-veent-ph-role-drift_NOTE_04-09-26.md`.
+
+**Negative control:** the plain-employee account received a 403 when the Audit Log route was hit
+directly, and the Audit Log row is correctly absent from that role's 10-link nav. Working guard.
+
+**OWNER-DECISION-1 note (inherited from phase 01):** this check did not separately record whether
+`/reports/audit-log` was among MANAGER's 28 fetched links. Phase 01's OWNER-DECISION-1 (a branch
+MANAGER can now discover the Audit Log via `MANAGE_HR`, not just type its URL) is **still not
+explicitly confirmed live** by this check — the link count matching pre-change expectations is not
+the same as confirming the row is visible and reachable for MANAGER specifically. Treat as open.
+
+**What's still missing for this phase's own `VERIFIED` bar:** a CEO role pass, screenshots attached
+to this report, and the `impeccable` audit. None of these ran on 04-09-26. This phase stays
+`CODE DONE` / `Keep in active/testing`.
 
 ---
 
@@ -258,14 +294,34 @@ created.
 
 ---
 
+## Gate results on this branch, 04-09-26
+
+| Gate | Result |
+|---|---|
+| `pnpm format:check` | clean |
+| `pnpm lint` | 0 errors, 1 pre-existing warning (`CalculatorWindow.svelte:82`, untouched by phase 02) |
+| `pnpm check` | 1094 files, 0 errors |
+| `pnpm test` | 197 files, 2208 passed |
+| `pnpm test:e2e` | **141 passed / 0 failed**, one run, exit 0. An earlier run was 140/1 on
+  `payroll-custom-range-overlap.spec.ts:36`; that was a stale APPROVED July 2026 payroll run in the
+  dev DB overlapping the spec's own range, not a code defect. The run was deleted (backup kept) and
+  the whole suite then passed in a single pass. See
+  `process/general-plans/backlog/payroll-custom-range-overlap-stale-dev-fixture_NOTE_04-09-26.md`. |
+
 ## Closeout packet
 
 - **Selected plan:** `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-02-nav-ia_PLAN_03-09-26.md`
 - **Finished:** checklist steps 1–14, three commits, four CI gates green, 23 new tests.
-- **Verified:** every Fully-Automated gate in the validate contract.
-- **Still unverified:** all Agent-Probe and Hybrid gates (role-matrix, live loads, e2e) and the
-  `impeccable` audit. No screenshots exist.
-- **Remaining cleanup:** none in code. O2 needs an owner answer before phase 08.
-- **Best next state:** **Keep in active/testing.** The plan's own Phase Completion Rules make
-  VERIFIED require the live role-matrix pass with screenshots; until the owner's manual pass runs,
-  this phase is CODE DONE and the plan stays active.
+- **Verified:** every Fully-Automated gate in the validate contract. A partial per-role live check
+  ran 04-09-26 (HR_ADMIN, MANAGER, plain employee — zero 403s, working negative control).
+- **Still unverified:** CEO role pass; screenshots (none attached); the `impeccable` audit;
+  OWNER-DECISION-1's specific MANAGER-sees-Audit-Log confirmation.
+- **Remaining cleanup:** none in code. O2 needs an owner answer before phase 08. Open follow-ups:
+  `employee-veent-ph-role-drift_NOTE_04-09-26.md`,
+  `dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md` (shared with phase 01),
+  `payroll-custom-range-overlap-stale-dev-fixture_NOTE_04-09-26.md` (environmental, not phase 02's
+  fault).
+- **Best next state:** **Keep in active/testing.** The plan's own Phase Completion Rules require
+  ALL of: full CI gate set green (done), the four-role live check with screenshots (three of four
+  roles done, no screenshots), the `impeccable` audit (not done), and the backlog stub (done). Not
+  archivable yet — stays in `active/ui-ux-overhaul_03-09-26/`.

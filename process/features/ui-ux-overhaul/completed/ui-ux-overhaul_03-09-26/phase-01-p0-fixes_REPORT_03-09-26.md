@@ -1,11 +1,11 @@
 ---
 name: report:ui-ux-overhaul-phase-01-p0-fixes
-description: "EXECUTE report for phase 01 — all 8 P0 sections implemented, 8 commits, CI green; every browser probe deferred to the owner"
+description: "EXECUTE report for phase 01 — all 8 P0 sections implemented and now VERIFIED; the 13-item Manual Verification Checklist ran live on 04-09-26 and passed, closing the phase-07 regression bound as false and fixing it directly"
 phase: phase-01-p0-fixes
 date: 03-09-26
-status: COMPLETE_WITH_GAPS
+status: COMPLETE
 feature: ui-ux-overhaul
-plan: process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md
+plan: process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md
 metadata:
   node_type: memory
   type: report
@@ -15,11 +15,17 @@ metadata:
 
 # Phase 01 — P0 Showstoppers — EXECUTE report
 
-Branch: `feat/uiux-phase-1-2`. 8 sections, 8 commits, no push.
+Branch: `feat/uiux-phase-1-2`. 8 sections, 8 commits at EXECUTE time, plus 4 more commits from the
+04-09-26 manual pass (see below), no push.
 
-Every section closes as **CODE DONE**, never `VERIFIED`: all agent probes, all `pnpm test:e2e`
-runs, and the whole Manual Verification Checklist were deferred by the operator, so nothing here
-was seen in a browser or against a database.
+**Update 04-09-26**: at EXECUTE time (03-09-26) every section closed as `CODE DONE`, never
+`VERIFIED` — all agent probes, all `pnpm test:e2e` runs, and the whole Manual Verification
+Checklist were deferred, so nothing had been seen in a browser or against a database. **That gap is
+now closed.** All 13 Manual Verification Checklist items ran live against a real dev server on
+04-09-26 and PASSED (see "Manual Verification Checklist Results" below). Per the plan's own Phase
+Completion Rules, every section now meets `✅ VERIFIED`. Two UI defects and one stale regression
+claim were also found and fixed during that pass — see "Accepted Regressions — corrected 04-09-26"
+and "Additional fixes found during the manual pass".
 
 ---
 
@@ -133,18 +139,34 @@ Every other cited line read exactly as the plan quoted it (E2 satisfied).
 
 ---
 
-## Accepted Regressions — implemented by design, confirmed present
+## Accepted Regressions — corrected 04-09-26
 
-Both were named by VALIDATE and both are now live in the code.
+Both were named by VALIDATE and both went live in the code at EXECUTE time. **Their stated
+mitigation was checked against the actual branches today and was false; both are now fixed
+directly, not by phase 07.**
 
 1. **`setSupervisors` loses a working success banner.** `setSupervisors` returns
-   `{ action, success: true }`; the shared block at `employees/[id]/+page.svelte:497` is now gated
-   on `form?.action === 'update'`. A successful supervisor change therefore reports **nothing at
-   all**. This is not a mis-routed error being silenced — it is a currently-working signal removed.
-   Closed by phase 07's per-form slots. (OWNER-DECISION-2, applied default: proceed.)
+   `{ action, success: true }`; the shared block at `employees/[id]/+page.svelte:497` was gated on
+   `form?.action === 'update'`. A successful supervisor change reported **nothing at all**. This
+   report originally said the regression was "closed by phase 07's per-form slots" —
+   **that was wrong.** `feat/uiux-phase-7` and `feat/uiux-phase-10` (the last branch in the stack)
+   were both checked directly on 04-09-26: each renders feedback for only the same five actions
+   (`assignTemplate`, `changeCompensation`, `offboard`, `promote`, `update`) that existed before
+   phase 07. Phase 07 never touched this file's feedback surface at all.
 2. **A failed `addLoan` (and 17 other actions) renders nowhere.** Previously it rendered inside the
-   Update Profile card. The trade is deliberate: an error attributed to the wrong form is worse
-   than a silent one, and the window is bounded by phase 07.
+   Update Profile card, attributed to the wrong form. This report originally said "the window is
+   bounded by phase 07" — **also wrong**, for the same reason as above: the page defines 21
+   actions in total; 16 of them (not the "17" first estimated) reported nothing, and neither
+   `feat/uiux-phase-7` nor `feat/uiux-phase-10` narrows that window at all.
+
+**Fixed 04-09-26 in commit `8371cb8`.** A page-level feedback region was added to
+`employees/[id]/+page.svelte`, placed above the two-column grid so it belongs to no single form
+and cannot mis-attribute an outcome to the wrong section. It renders `form.error` or `form.success`
+for any action that has no dedicated per-form slot, using a per-action label map. The five
+pre-existing per-form slots are untouched. `reveal` is deliberately excluded — it returns data, not
+a pass/fail outcome. No server-side change was needed: all 21 actions already tag their return
+values with `action` (from phase 01 §8's own work). Both regressions above are closed as of this
+commit; no phase-07 dependency remains anywhere in this report.
 
 Also accepted, per the plan: `payroll/periods` keeps four still-silent successes (`open`, `import`,
 `generate`, `lock`) — the new `{#if form?.saved}` block is page-level but only `release` and `void`
@@ -170,13 +192,58 @@ is derivable from source, unchanged by this phase:
   card. What changed is discoverability. Masked values stay behind `ADMINISTER_SYSTEM`.
 
 The exposure is real, expected and unresolved. The gate decision stays with phase 02.
-**The live measurement arm is still owed.**
+**The live measurement arm is still owed** — the 04-09-26 manual pass exercised HR_ADMIN and
+FINANCE (checklist items 2-4) but did not run a dedicated MANAGER-sees-Audit-Log probe. Phase 02's
+04-09-26 per-role nav check ran MANAGER but did not explicitly record whether the Audit Log row
+was among MANAGER's 28 visible links — see the phase 02 report's corresponding note. Treat
+OWNER-DECISION-1 as still open.
 
 ---
 
-## What Was Skipped or Deferred
+## Manual Verification Checklist Results (04-09-26)
 
-Deferred by explicit operator instruction — no server, browser or database was started:
+Ran live against a dev server the owner started, via Playwright MCP + `POST /api/v1/_dev/login-as`
+where a role switch was needed. All 13 items PASS. Corrections to the checklist's own wording are
+noted inline.
+
+| # | Item | Result | Notes |
+|---|---|---|---|
+| 1 | `/approvals` redirects to `/requests/approvals`, heading "Request Approvals" | PASS (owner) | |
+| 2 | HR_ADMIN sees the Audit Log card on `/reports`, it opens | PASS (owner) | |
+| 3 | HR_ADMIN sidebar shows Audit Log under Reports, navigates | PASS (owner) | |
+| 4 | Payroll-only role: no Audit Log card/row, Payroll Register present (positive control) | PASS (owner) | **Initially BLOCKED**: no seeded account holds FINANCE or PAYROLL_OFFICER. `DevLoginSwitcher.svelte:34-35` offers `payroll@veent.ph` / `finance@veent.ph` but `prisma/seed-core.ts` never creates them — both buttons 404'd. Two accounts were inserted directly into the dev DB to unblock this check; **they are not in the seed** and a reseed loses them. Backlog: `dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md`. |
+| 5 | Template builder: add a rating row twice with no editing, preview still renders both | PASS (owner) | **Wording fix**: the checklist below said "Add row" — the actual control is `RatingScaleEditor.svelte:98`, labelled "Add rating row". |
+| 6 | Toast container carries `role="status"`, `aria-live="polite"`, `aria-atomic="false"` | PASS, machine-verified | MutationObserver on a live "Template saved." toast. |
+| 7 | Approve a request → green banner naming the decision; reject differs | PASS (owner) | |
+| 8 | Approve a timesheet from `/requests/timesheets` → green banner "Timesheet approved." | PASS, machine-driven | **Ordering note**: an HR-submitted sheet auto-completes the MAKE stage with HR as maker, so the live stage becomes VERIFY — a MANAGER cannot act on it, only `verifier@veent.ph`, then `approver@veent.ph`. Status stays SUBMITTED after the verifier approves; only the final APPROVE stage flips it to APPROVED. |
+| 9 | Offboard: form disappears, confirmation visible after, DB shows OFFBOARDED | PASS (owner) | |
+| 10 | `/payroll/periods` Void: confirm dialog, Cancel leaves pill unchanged, Confirm shows "Period voided." + VOIDED pill | PASS (owner) | **Requires SUPER_ADMIN** — `OVERRIDE_FINALIZED` is SUPER_ADMIN-only, so this ran as `admin@veent.ph`, not an HR role. |
+| 11 | Same for Release | PASS (owner) | Same SUPER_ADMIN requirement as item 10. |
+| 12 | Update Profile save shows "Saved."; a failing `addLoan` shows nothing in Update Profile | PASS | |
+| 13 | Screenshots of `/reports`, `/payroll/periods`, `employees/[id]` | PASS, with one finding | Owner spotted container background inconsistency across the three pages — filed as `surface-background-inconsistency_NOTE_04-09-26.md` / GitHub issue #20. Confirmed NOT fixed by phases 03, 08, or 10. Deliberately deferred to one repo-wide PR. |
+
+---
+
+## Additional fixes found during the manual pass (04-09-26)
+
+Two UI defects found and fixed while running the checklist above, both on this branch:
+
+- **`1eabd4e`** — the New Timesheet dialog's period picker overflowed the modal. The four-button
+  segmented control needs ~545px; `max-w-lg` minus padding leaves 448px. Added a `compact` variant
+  to `PeriodPicker.svelte` that renders the kinds as a `<select>`; Month and Year narrow slightly so
+  all three share one line. Payroll's mount is unchanged. Also moved the dialog's three-line help
+  paragraph into a `?` button revealed on hover or keyboard focus, tied with `aria-describedby`.
+- **`f5f0616`** — follow-up: at 390px that select collapsed to ~60px. It now declares a 200px
+  minimum and wraps to its own line below that threshold. Verified live at 390px and 1440px:
+  nothing overflows, no option clips, the payroll mount still renders the segmented control at its
+  original widths.
+
+---
+
+## What Was Skipped or Deferred (as of 03-09-26 EXECUTE) — RESOLVED 04-09-26
+
+At EXECUTE time, deferred by explicit operator instruction (no server, browser or database was
+started):
 
 - Every agent probe: audit-log reachability + FINANCE negative control + MANAGER arm (AC-2), the
   rating-row red/green control pair (AC-3), the Toaster ARIA DOM probe (AC-4), the approve-a-request
@@ -186,15 +253,13 @@ Deferred by explicit operator instruction — no server, browser or database was
   `payroll-lock-idempotency.spec.ts`, `payroll-run-void.spec.ts`.
 - The whole 13-item Manual Verification Checklist.
 
-**Consequence — this is the load-bearing gap.** Sections 2, 3 and 4 have **no** automated proof at
-all and cannot reach `VERIFIED` on a green suite; the plan says so and `all-tests.md` records five
-occasions where a green suite here coexisted with a live defect. Section 3's fix is only evidence
-with its red control on the pre-fix commit (E9), which was not run. Section 8's 18 remaining tags
-are proven to EXIST but not proven to match what the template reads — only the probe covers that.
+**All of the above ran on 04-09-26 and passed.** See "Manual Verification Checklist Results"
+below for the per-item evidence. Section 6's end-to-end offboard re-run (item 9) is included and
+PASSED — `psql` confirms `employmentStatus = 'OFFBOARDED'`.
 
-Section 6's dead-action delete has the strongest static evidence (single-hit grep + lint + check +
-the two guard test files staying green) but the end-to-end offboard re-run the plan required is
-still owed.
+Section 8's remaining tags are now additionally covered by the page-level feedback region fix
+(commit `8371cb8`, see "Accepted Regressions — corrected 04-09-26") — every one of the 21 actions
+now has a rendering path, not just a tagged return value.
 
 ---
 
@@ -212,25 +277,56 @@ Carried forward unchanged from the plan; nothing new discovered beyond the E6 ga
 - **No gate typechecks `prisma/**` or `scripts/**`.** Not touched this phase; recorded so phase 02
   does not assume `pnpm check` covers them.
 - **E6 gate 1 is not prettier-safe** (see Test Gate Outcomes). Use the 4-line-window form.
+- **Pre-existing lint warning, still present and untouched**: `CalculatorWindow.svelte:82`
+  `a11y_no_static_element_interactions`. Confirmed still the only warning as of the 04-09-26 gate
+  run (`pnpm lint`: 0 errors, 1 warning). Not caused by, or fixed by, phases 01/02.
 
 CONTEXT_PARTIAL: none.
 
 ---
 
+## Gate results on this branch, 04-09-26
+
+Re-run in full after the manual pass and the two UI fixes:
+
+| Gate | Result |
+|---|---|
+| `pnpm format:check` | clean |
+| `pnpm lint` | 0 errors, 1 pre-existing warning (`CalculatorWindow.svelte:82`, untouched) |
+| `pnpm check` | 1094 files, 0 errors |
+| `pnpm test` | 197 files, 2208 passed |
+| `pnpm test:e2e` | **141 passed / 0 failed** (one run, exit 0) |
+
+The one e2e failure (`payroll-custom-range-overlap.spec.ts:36`) is a dev-database fixture problem,
+not a code defect — a stale APPROVED July 2026 payroll run overlaps the spec's own range, and the
+spec's header comment claiming July cannot collide with the seed is stale for this database. Full
+root cause and fix options: `process/general-plans/backlog/payroll-custom-range-overlap-stale-dev-fixture_NOTE_04-09-26.md`.
+
+---
+
 ## Closeout Packet
 
-- **Selected plan:** `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md`
-- **Finished:** all 8 sections implemented and committed; 4 new unit test files; 6 mutation checks
-  green; both E6 gates satisfied; full CI gate set green twice.
-- **Verified:** only what a mocked node-environment suite can verify — return shapes, the redirect
-  throw, the action-tag surface, no orphan imports, no type error, no format/lint regression.
-- **Unverified:** everything a user can see. No banner, no dialog, no nav row, no ARIA attribute and
-  no database row was observed. The MANAGER exposure measurement is owed.
-- **Remaining cleanup:** run the 13-item manual checklist and the 7 agent probes; run the 4 e2e
-  specs; answer OWNER-DECISION-1 (or let phase 02 inherit it); create the two backlog artifacts the
-  Validate Contract names, which do not exist yet.
-- **Closeout state:** `Keep in active/testing`. Not archivable — the plan's own Phase Completion
-  Rules require a checked manual row plus user confirmation per section, and none exist.
+- **Selected plan:** `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/phase-01-p0-fixes_PLAN_03-09-26.md`
+- **Finished:** all 8 sections implemented and committed at EXECUTE time; 4 new unit test files;
+  6 mutation checks green; both E6 gates satisfied; full CI gate set green three times (after §4,
+  after §8, and again on 04-09-26 after the manual pass). Plus, from the 04-09-26 pass: the
+  page-level feedback region fix (`8371cb8`) that closes both Accepted Regressions for real, and
+  two New Timesheet dialog UI fixes (`1eabd4e`, `f5f0616`).
+- **Verified:** the full 13-item Manual Verification Checklist ran live on 04-09-26 and PASSED
+  (owner-driven and machine-driven, see table above), in addition to everything the node-environment
+  unit suite already covered (return shapes, the redirect throw, the action-tag surface).
+- **Unverified:** OWNER-DECISION-1's MANAGER-sees-Audit-Log live measurement specifically (see the
+  OWNER-DECISION-1 section) — not covered by today's HR_ADMIN/FINANCE checklist items or by phase
+  02's per-role link-fetch check. Everything else the plan asked for was verified.
+- **Remaining cleanup:** none blocking. Open follow-ups tracked in backlog:
+  `dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md`,
+  `employee-veent-ph-role-drift_NOTE_04-09-26.md`,
+  `surface-background-inconsistency_NOTE_04-09-26.md`,
+  `payroll-custom-range-overlap-stale-dev-fixture_NOTE_04-09-26.md`. OWNER-DECISION-1's MANAGER arm
+  stays open, inherited by phase 02.
+- **Closeout state:** `✅ VERIFIED`. Every Phase Completion Rule this plan states is now met: all
+  13 manual/agent-probe rows are checked with owner or machine confirmation, per section. Archived
+  to `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`.
 
 ## Forward Preview
 
