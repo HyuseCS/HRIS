@@ -235,8 +235,9 @@ Constraints on this step:
   error.
 
 **Step 2 — F2: prove all 7 consumers still compile untouched.** Run `pnpm check`. Zero new errors
-against the report's recorded baseline (1099 files, 0 errors, 1 pre-existing `CalculatorWindow.svelte`
-a11y warning). If any of the 7 consumers now errors: **the type is wrong, not the consumer.** Fix
+against the baseline measured on this tree (1102 files, 0 errors, 1 pre-existing
+`CalculatorWindow.svelte` a11y warning). The S1-S5 report records 1099 — that was true when it was
+written; the phase added files after it. Measure, do not copy the older figure. If any of the 7 consumers now errors: **the type is wrong, not the consumer.** Fix
 the type and re-run. Do not edit a consumer to satisfy the type. Note the corrected consumer path:
 `src/lib/components/timesheets/PunchMapDialog.svelte:122`.
 
@@ -627,8 +628,9 @@ pnpm test
 ```
 
 Run them **once on the untouched tree before Step 1** and record the result. A pre-existing red must
-be known before it is blamed on this work. Expected baseline from the S1-S5 report: `pnpm check` =
-1099 files, 0 errors, 1 warning (`CalculatorWindow.svelte` a11y, pre-existing).
+be known before it is blamed on this work. Measured baseline on this tree: `pnpm check` = 1102 files,
+0 errors, 1 warning (`CalculatorWindow.svelte` a11y, pre-existing). The S1-S5 report's 1099 is not
+wrong, it is older — the file count grew during the phase. Take the number from your own run.
 
 C2 and C3 change only Markdown, so `format:check` is the gate that actually bites there — Prettier
 formats `.md`. Do not skip it on a docs-only commit. C4 changes Markdown **and** a `.ts` test, so all
