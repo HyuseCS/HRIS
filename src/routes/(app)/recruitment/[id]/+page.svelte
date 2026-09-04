@@ -57,7 +57,7 @@
 	<div class="rounded-lg border p-6 space-y-4">
 		<div class="space-y-2">
 			<PageHeader title={posting.title}>
-				{#snippet back()}
+				{#snippet badge()}
 					<span
 						class="rounded-full px-2.5 py-0.5 text-xs font-medium {statusBadgeClass(
 							posting.status

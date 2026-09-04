@@ -181,8 +181,10 @@
 
 <div class="space-y-6">
 	<PageHeader title="{employee.lastName}, {employee.firstName}">
-		{#snippet back()}
+		{#snippet badge()}
 			<Badge status={employee.employmentStatus} domain="employment" />
+		{/snippet}
+		{#snippet back()}
 			<BackButton
 				fallback={canManage ? '/employees' : '/team'}
 				label={canManage ? 'Employees' : 'Team'}

@@ -91,11 +91,13 @@
 			run.periodEnd
 		)} days)"
 	>
-		{#snippet back()}
+		{#snippet badge()}
 			<Badge status={run.status} domain="payrollRun" />
 			{#if run.hasOverride}
 				<span class="text-xs text-yellow-600 font-medium dark:text-yellow-500">Has overrides</span>
 			{/if}
+		{/snippet}
+		{#snippet back()}
 			<BackButton fallback="/payroll" label="Payroll" />
 		{/snippet}
 	</PageHeader>

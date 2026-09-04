@@ -83,10 +83,12 @@
 <div class="space-y-6">
 	<!-- Header -->
 	<PageHeader title="{applicant.firstName} {applicant.lastName}">
-		{#snippet back()}
+		{#snippet badge()}
 			<span class="rounded-full bg-foreground/15 px-2.5 py-1 text-xs font-medium">
 				{STAGE_LABELS[applicant.currentStage] ?? applicant.currentStage}
 			</span>
+		{/snippet}
+		{#snippet back()}
 			<BackButton
 				fallback={'/recruitment/' + applicant.jobPosting.id}
 				label={applicant.jobPosting.title}
