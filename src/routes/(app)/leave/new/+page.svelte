@@ -26,7 +26,7 @@
 	<title>New Leave Request — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6 max-w-xl">
+<div class="mx-auto max-w-3xl space-y-6">
 	<PageHeader title="New Leave Request">
 		{#snippet back()}
 			<a href="/leave" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>

@@ -123,6 +123,8 @@ const formEvent = (fields: Record<string, string>) => {
 		request: { formData: async () => body },
 		locals: { user: HR },
 		params: { id: 'emp-1' },
+		// Phase 04 gave the create actions a redirect flash, so they call `cookies.set`.
+		cookies: { set: () => {}, get: () => undefined, delete: () => {} },
 		getClientAddress: () => '127.0.0.1'
 	} as never
 }
