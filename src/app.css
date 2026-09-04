@@ -173,8 +173,13 @@
 	.badge-blue {
 		@apply badge bg-blue-500/15 text-blue-700 dark:text-blue-400;
 	}
+	/* `bg-muted` is 96% in light and 14% in dark — two to four points from the card and the page
+	   behind it, so the gray pill had a fill nobody could see. Every other variant here is a tint
+	   of its own hue; gray has no hue, which is how it ended up transparent. A tint of the
+	   foreground is the neutral equivalent and needs no dark twin: it composites to ~#E6E6E6 on a
+	   light card and ~#3A3A3A on a dark one, and the text step clears 4.5:1 over both. */
 	.badge-gray {
-		@apply badge bg-muted text-foreground/70;
+		@apply badge bg-foreground/15 text-foreground/70;
 	}
 
 	/* Input base style */

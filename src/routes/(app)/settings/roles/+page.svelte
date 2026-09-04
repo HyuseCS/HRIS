@@ -10,6 +10,7 @@
 	import Info from 'lucide-svelte/icons/info'
 	import Pencil from 'lucide-svelte/icons/pencil'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { Role } from '@prisma/client'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -24,8 +25,8 @@
 	// #108: every user row has its own `?/setActive` form, so each gets its own guard — a shared
 	// one would disable the whole table while one row is in flight. Plain objects, not `$state`:
 	// each guard holds its own reactive `busy`, the maps only memoise identity.
-	const setActiveGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const setActiveGuard = (id: string) => (setActiveGuards[id] ??= createSubmitGuard())
+	const setActiveGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const setActiveGuard = (id: string) => (setActiveGuards[id] ??= submitFeedback())
 	const setRoleGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
 	// The refusal message, focused after a rejected save — see the guard below.
 	let errorEl = $state<HTMLElement>()

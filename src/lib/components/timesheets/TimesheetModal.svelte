@@ -5,6 +5,7 @@
 	import { formatShortDate } from '$lib/utils/format'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -266,6 +267,12 @@
 		}
 	}
 
+	// The modal closes on success, taking its own banner with it, so the outcome has to survive
+	// as a toast. ConfirmButton brings its own feedback layer, so it keeps the RAW inner below —
+	// wrapping there would toast twice.
+	const closeFb = submitFeedback({ inner: closeOnSuccess })
+	const keepOpenFb = submitFeedback({ inner: keepOpen })
+
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
 	const inputClass =
 		'h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -501,7 +508,7 @@
 				bind:this={rejectFormEl}
 				method="POST"
 				action="?/review"
-				use:enhance={closeOnSuccess}
+				use:enhance={closeFb.enhance}
 				class="hidden"
 			>
 				<input type="hidden" name="id" value={ts.id} />
@@ -537,7 +544,7 @@
 
 			<div class="flex flex-wrap items-center gap-2">
 				{#if canEdit}
-					<form method="POST" action="?/saveEntries" use:enhance={keepOpen}>
+					<form method="POST" action="?/saveEntries" use:enhance={keepOpenFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<input type="hidden" name="entries" value={JSON.stringify(entriesPayload)} />
 						<button disabled={busy} class={btnGhost}>Save entries</button>
@@ -551,7 +558,7 @@
 						class="rounded-md border border-red-500/20 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50"
 						>Reject…</button
 					>
-					<form method="POST" action="?/review" use:enhance={closeOnSuccess}>
+					<form method="POST" action="?/review" use:enhance={closeFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<input type="hidden" name="approved" value="true" />
 						<button
@@ -562,7 +569,7 @@
 					</form>
 				{/if}
 				{#if canSync}
-					<form method="POST" action="?/syncAttendance" use:enhance={closeOnSuccess}>
+					<form method="POST" action="?/syncAttendance" use:enhance={closeFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<button
 							disabled={busy}
@@ -572,7 +579,7 @@
 					</form>
 				{/if}
 				{#if canSubmit}
-					<form method="POST" action="?/submit" use:enhance={closeOnSuccess}>
+					<form method="POST" action="?/submit" use:enhance={closeFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<button
 							disabled={busy}
@@ -582,7 +589,7 @@
 					</form>
 				{/if}
 				{#if canSubmitForEmployee}
-					<form method="POST" action="?/submitDraft" use:enhance={closeOnSuccess}>
+					<form method="POST" action="?/submitDraft" use:enhance={closeFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<button
 							disabled={busy}

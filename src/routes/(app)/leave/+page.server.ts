@@ -63,7 +63,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		requests,
 		leaveTypes,
-		balances,
+		// Same shape as /leave/new so both pages render the one BalanceSummary component.
+		balances: balances.map((b) => ({
+			...b,
+			allocated: Number(b.allocated),
+			used: Number(b.used),
+			remaining: Number(b.remaining)
+		})),
 		myEmployeeId: myEmployee?.id,
 		isManager,
 		canViewOrgBalances,
@@ -93,7 +99,7 @@ export const actions: Actions = {
 			.split(',')
 			.map((s) => s.trim())
 			.filter(Boolean)
-		if (!ids.length) return fail(400, { error: 'No leave requests selected' })
+		if (!ids.length) return fail(400, { action: 'deleteMany', error: 'No leave requests selected' })
 
 		const org = event.locals.user!.organizationId
 		const ctx = ctxOf(event)
@@ -108,6 +114,7 @@ export const actions: Actions = {
 			}
 		}
 		return {
+			action: 'deleteMany',
 			saved: `Deleted ${deleted} leave request${deleted === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}
 	}

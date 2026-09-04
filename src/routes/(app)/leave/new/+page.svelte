@@ -26,7 +26,7 @@
 	<title>New Leave Request — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6 max-w-xl">
+<div class="space-y-6">
 	<PageHeader title="New Leave Request">
 		{#snippet back()}
 			<a href="/leave" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</a>
@@ -45,35 +45,36 @@
 		method="POST"
 		action="?/create"
 		use:enhance={create.enhance}
-		class="space-y-4 rounded-lg border p-5"
+		class="space-y-4 rounded-lg border bg-card p-5"
 	>
-		<div class="space-y-1">
-			<label for="leaveTypeId" class="text-sm font-medium">Leave Type</label>
-			<select
-				id="leaveTypeId"
-				name="leaveTypeId"
-				required
-				bind:value={selectedLeaveTypeId}
-				class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">Select leave type…</option>
-				{#each data.leaveTypes as lt (lt.id)}
-					<option value={lt.id} disabled={!lt.eligible}>
-						{lt.name}{lt.eligible
-							? ''
-							: ` — available after ${tenureRequirement(lt.minMonthsOfService)}`}
-					</option>
-				{/each}
-			</select>
-			{#if selectedBalance}
-				<p class="text-xs text-muted-foreground mt-1">
-					Available: <span class="font-medium">{Number(selectedBalance.remaining)} days</span>
-					of {Number(selectedBalance.allocated)} allocated
-				</p>
-			{/if}
-		</div>
+		<!-- One row on a wide screen: a full-width select reads as broken at 1200px. -->
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<div class="space-y-1 lg:col-span-2">
+				<label for="leaveTypeId" class="text-sm font-medium">Leave Type</label>
+				<select
+					id="leaveTypeId"
+					name="leaveTypeId"
+					required
+					bind:value={selectedLeaveTypeId}
+					class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<option value="">Select leave type…</option>
+					{#each data.leaveTypes as lt (lt.id)}
+						<option value={lt.id} disabled={!lt.eligible}>
+							{lt.name}{lt.eligible
+								? ''
+								: ` — available after ${tenureRequirement(lt.minMonthsOfService)}`}
+						</option>
+					{/each}
+				</select>
+				{#if selectedBalance}
+					<p class="text-xs text-muted-foreground mt-1">
+						Available: <span class="font-medium">{Number(selectedBalance.remaining)} days</span>
+						of {Number(selectedBalance.allocated)} allocated
+					</p>
+				{/if}
+			</div>
 
-		<div class="grid grid-cols-2 gap-4">
 			<div class="space-y-1">
 				<label for="startDate" class="text-sm font-medium">Start Date</label>
 				<input

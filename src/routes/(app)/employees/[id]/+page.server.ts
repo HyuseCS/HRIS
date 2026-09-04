@@ -18,6 +18,7 @@ import { getEmployeeOnboarding, setManualCompletion } from '$lib/server/services
 import { listAssignableBranches, selectableBranches } from '$lib/server/services/branches'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { govIdSchema } from '$lib/utils/gov-ids'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { LOAN_TYPES } from '$lib/utils/loan-types'
 import { EMPLOYMENT_TYPES } from '$lib/utils/employment-type'
 import {
@@ -276,7 +277,8 @@ const statutoryAllocationSchema = z.object({
 const updateSchema = z.object({
 	jobTitle: z.string().min(1).optional(),
 	departmentId: z.string().optional(),
-	contactPhone: z.string().optional(),
+	// #24: format-checked. Blank stays valid — an empty field here means "unchanged", not "bad".
+	contactPhone: z.string().optional().refine(isValidPhone, phoneError('Phone')),
 	contactAddress: z.string().optional(),
 	// Company email (#186) — HR sets the real address once provisioned. Empty clears it.
 	companyEmail: z
@@ -306,7 +308,10 @@ const updateSchema = z.object({
 	// Emergency contact (personal — visible to the employee's managers).
 	emergencyContactName: z.string().optional(),
 	emergencyContactRelation: z.string().optional(),
-	emergencyContactPhone: z.string().optional(),
+	emergencyContactPhone: z
+		.string()
+		.optional()
+		.refine(isValidPhone, phoneError('Emergency contact phone')),
 	// Position from the catalog. Empty string clears the assignment.
 	positionId: z
 		.string()
@@ -392,9 +397,12 @@ const promoteSchema = z.object({
 })
 
 const emergencyContactSchema = z.object({
-	name: z.string().trim().min(1),
-	relationship: z.string().trim().min(1),
-	phone: z.string().trim().min(1)
+	name: z.string().trim().min(1, 'Name is required.'),
+	relationship: z.string().trim().min(1, 'Relationship is required.'),
+	// #24: required AND format-checked. Every message is written out so the action can surface
+	// zod's first issue verbatim without leaking a raw "String must contain at least 1
+	// character(s)" at the user.
+	phone: z.string().trim().min(1, 'Phone is required.').refine(isValidPhone, phoneError('Phone'))
 })
 
 /**
@@ -860,8 +868,15 @@ export const actions: Actions = scopedToEmployee({
 		const action = 'addEmergencyContact'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const parsed = emergencyContactSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success)
-			return fail(400, { action, error: 'Name, relationship, and phone are required.' })
+		if (!parsed.success) {
+			// #24: the phone is now format-checked as well as required, so the generic "are required"
+			// text would name the wrong problem. Every field in the schema carries its own message.
+			const message = parsed.error.errors[0]?.message
+			return fail(400, {
+				action,
+				error: message ?? 'Name, relationship, and phone are required.'
+			})
+		}
 		try {
 			await addEmergencyContact(
 				params.id,

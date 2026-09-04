@@ -5,27 +5,27 @@
 	import ApplicantKanban from '$lib/components/recruitment/ApplicantKanban.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { canAny } from '$lib/rbac'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
 	// #108: the three status forms are mutually exclusive branches, so only one is ever
 	// mounted — a guard each is enough to stop a double-click re-firing the same transition.
-	const closePosting = createSubmitGuard()
-	const publishPosting = createSubmitGuard()
-	const reopenPosting = createSubmitGuard()
+	const closePosting = submitFeedback()
+	const publishPosting = submitFeedback()
+	const reopenPosting = submitFeedback()
 
 	// #108: each hired applicant row is its own `?/convert` form and a double-click here creates a
 	// duplicate employee. A shared guard would disable the whole list while any one row is in
 	// flight, so create one lazily per applicant id. Plain object, not `$state` — each guard owns
 	// its own reactive `busy`, this map only memoises identity.
-	const convertGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const convertGuard = (id: string) => (convertGuards[id] ??= createSubmitGuard())
+	const convertGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const convertGuard = (id: string) => (convertGuards[id] ??= submitFeedback())
 
 	// One guard per board row (#117) so saving one channel doesn't freeze the others.
-	const channelGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const channelGuard = (id: string) => (channelGuards[id] ??= createSubmitGuard())
+	const channelGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const channelGuard = (id: string) => (channelGuards[id] ??= submitFeedback())
 
 	const { posting, applicants, userRoles, boards, postedCount, boardCount, stillLive } =
 		$derived(data)
@@ -57,7 +57,7 @@
 	<div class="rounded-lg border p-6 space-y-4">
 		<div class="space-y-2">
 			<PageHeader title={posting.title}>
-				{#snippet back()}
+				{#snippet badge()}
 					<span
 						class="rounded-full px-2.5 py-0.5 text-xs font-medium {statusBadgeClass(
 							posting.status
@@ -80,6 +80,12 @@
 					{/if}
 				</div>
 			</div>
+
+			<!-- Only `setChannel` errors used to render (down in the boards list), so a publish or
+			     a stage move that a server rule refused read as a no-op. -->
+			{#if (form?.action === 'updateStatus' || form?.action === 'advanceStage') && form?.error}
+				<Banner kind="error" message={form.error} />
+			{/if}
 
 			<!-- The posting actions sit under the summary they act on, not on the title row. -->
 			<div class="flex flex-wrap justify-end gap-2">
@@ -217,6 +223,9 @@
 	{#if isHrAdmin && hiredApplicants.length > 0}
 		<div class="rounded-lg border p-4 space-y-3">
 			<h2 class="text-sm font-semibold">Hired Applicants — Convert to Employee</h2>
+			{#if form?.action === 'convert' && form?.error}
+				<Banner kind="error" message={form.error} />
+			{/if}
 			<div class="space-y-2">
 				{#each hiredApplicants as applicant (applicant.id)}
 					<div class="flex items-center justify-between rounded-md border px-4 py-2">

@@ -5,6 +5,7 @@
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { addToast } from '$lib/stores/toast.svelte'
@@ -228,5 +229,7 @@
 				</tbody>
 			</table>
 		</div>
+	{:catch}
+		<LoadError what="the payroll runs" />
 	{/await}
 </div>

@@ -119,9 +119,11 @@
 
 <div class="mx-auto max-w-2xl space-y-6">
 	<PageHeader title={typeLabels[req.type] ?? req.type}>
+		{#snippet badge()}
+			<Badge status={req.status} domain="request" />
+		{/snippet}
 		{#snippet back()}
 			<BackButton fallback="/requests" label="Requests" />
-			<Badge status={req.status} domain="request" />
 		{/snippet}
 	</PageHeader>
 

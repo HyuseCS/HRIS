@@ -8,11 +8,15 @@
 	let {
 		title,
 		description,
+		badge,
 		back
 	}: {
 		title: string
 		/** One line under the title. Say what the page is for, not what it is called. */
 		description?: string
+		/** A status pill for the record the page is about. Sits beside the title, because it
+		 *  qualifies the name — it is not a navigation control like Back. */
+		badge?: Snippet
 		/** A BackButton, rendered on the right edge of the title row — the side opposite the sidebar. */
 		back?: Snippet
 	} = $props()
@@ -26,7 +30,10 @@
      it takes a full-width row of its own so a long title is never squeezed against it. -->
 <div class="flex flex-wrap items-start justify-between gap-3">
 	<div class="min-w-0 flex-1 space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
+		<div class="flex flex-wrap items-center gap-2">
+			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
+			{#if badge}{@render badge()}{/if}
+		</div>
 		{#if description}
 			<p class="max-w-2xl text-sm text-muted-foreground">{description}</p>
 		{/if}

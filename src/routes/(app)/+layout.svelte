@@ -52,11 +52,14 @@
 				body: JSON.stringify({ organizationId })
 			})
 			if (!res.ok) {
-				addToast('Could not switch organization.')
+				addToast('Could not switch organization.', { kind: 'error' })
 				return
 			}
 			orgMenuOpen = false
 			await invalidateAll()
+		} catch {
+			// Offline, or the request threw. Without this the switcher just silently gave up.
+			addToast('Could not switch organization.', { kind: 'error' })
 		} finally {
 			switchingOrg = false
 		}
@@ -84,7 +87,25 @@
 			seenNotifications.add(n.id)
 			addToast(n.message, { link: n.link })
 		}
-		fetch('/api/v1/notifications/read', { method: 'POST' })
+		// Exactly the ids just toasted, never "all": `listUnread` caps at 10, so a mark-all
+		// consumed the overflow without it ever being shown.
+		fetch('/api/v1/notifications/read', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ ids: fresh.map((n) => n.id) })
+		})
+	})
+
+	// A redirect-after-success parks its message in the flash cookie; the layout load reads and
+	// clears it. Dedupe on the nonce exactly like the notifications above: this load's payload
+	// stays cached between re-runs, so without it an invalidateAll() would re-toast a stale flash.
+	const seenFlashes = new Set<string>()
+	$effect(() => {
+		if (!browser) return
+		const flash = data.flash
+		if (!flash || seenFlashes.has(flash.id)) return
+		seenFlashes.add(flash.id)
+		addToast(flash.message, { kind: flash.kind })
 	})
 
 	// Same capability table the server enforces with ($lib/rbac) — a nav item shown to
@@ -328,7 +349,10 @@
 		{/if}
 
 		<!-- Nav -->
-		<nav aria-label="Main" class="flex-1 overflow-y-auto px-3 py-4">
+		<!-- `overscroll-contain`: the nav holds more links than fit, so it scrolls internally.
+	     Without this its scroll chains into the document and the page starts moving the moment
+	     the nav reaches its end, which reads as the sidebar scrolling with the page. -->
+		<nav aria-label="Main" class="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
 			{#each navSections as section (section.label)}
 				{@const headerId = `nav-section-${section.label.toLowerCase().replace(/\s+/g, '-')}`}
 				<div role="group" aria-labelledby={headerId} class="space-y-0.5">

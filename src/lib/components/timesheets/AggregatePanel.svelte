@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
@@ -51,7 +52,7 @@
 	}
 
 	// Capture the preview payload into local state on success; clear it on failure. Keep inputs.
-	const capturePreview: SubmitFunction = () => {
+	const capturePreviewInner: SubmitFunction = () => {
 		busy = true
 		return async ({ result, update }) => {
 			await update({ reset: false })
@@ -59,13 +60,16 @@
 			preview = result.type === 'success' ? ((result.data?.preview as Preview) ?? null) : null
 		}
 	}
-	const keepInputs: SubmitFunction = () => {
+	const keepInputsInner: SubmitFunction = () => {
 		busy = true
 		return async ({ update }) => {
 			await update({ reset: false })
 			busy = false
 		}
 	}
+	// Both callbacks swallowed `result.type === 'error'` entirely — the panel just sat there.
+	const capturePreview = submitFeedback({ success: null, inner: capturePreviewInner })
+	const keepInputs = submitFeedback({ inner: keepInputsInner })
 
 	const canRun = $derived(Boolean(employeeId) && Boolean(weekOf))
 	// Only commit what was actually previewed: the preview must match the current selection.
@@ -110,7 +114,7 @@
 			/>
 		</div>
 
-		<form method="POST" action="?/previewAggregate" use:enhance={capturePreview}>
+		<form method="POST" action="?/previewAggregate" use:enhance={capturePreview.enhance}>
 			<input type="hidden" name="employeeId" value={employeeId} />
 			<input type="hidden" name="weekOf" value={weekOf} />
 			<button
@@ -119,7 +123,7 @@
 				>Preview</button
 			>
 		</form>
-		<form method="POST" action="?/aggregate" use:enhance={keepInputs}>
+		<form method="POST" action="?/aggregate" use:enhance={keepInputs.enhance}>
 			<input type="hidden" name="employeeId" value={employeeId} />
 			<input type="hidden" name="weekOf" value={weekOf} />
 			<button
