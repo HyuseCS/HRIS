@@ -152,7 +152,9 @@
 	     segmented control needing ~545px, so it declares that and drops to its own line when the
 	     container cannot give it (buttons wrap again below that). The `compact` variant is a single
 	     select, so all three fit one line even in the 448px the `max-w-lg` New Timesheet dialog
-	     leaves — Month and Year give up the width Period needs for `Second half (16–EOM)`. -->
+	     leaves — Month and Year give up the width Period needs for `Second half (16–EOM)`. Below
+	     that, at 390px the dialog leaves 294px and the select would be squeezed to ~60px, so it
+	     declares the 200px it needs and wraps to its own line instead. -->
 	<div class="flex flex-wrap items-start gap-3">
 		<div class="{compact ? 'w-32' : 'w-40'} space-y-1.5">
 			<label for="pp-month" class="block text-sm font-medium">Month</label>
@@ -171,7 +173,7 @@
 			</select>
 		</div>
 
-		<div class="min-w-0 flex-1 {compact ? '' : 'basis-[545px]'} space-y-1.5">
+		<div class="{compact ? 'min-w-[200px]' : 'min-w-0 basis-[545px]'} flex-1 space-y-1.5">
 			{#if compact}
 				<label for="pp-kind" class="block text-sm font-medium">Period</label>
 				<select id="pp-kind" bind:value={kind} class={selectClass}>
