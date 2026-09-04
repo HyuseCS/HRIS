@@ -2,6 +2,7 @@ import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
+import { setFlash } from '$lib/server/flash'
 import {
 	getApplicant,
 	scheduleInterview,
@@ -196,7 +197,7 @@ export const actions: Actions = {
 		return { success: true }
 	},
 
-	convert: async ({ locals, params, getClientAddress }) => {
+	convert: async ({ locals, params, getClientAddress, cookies }) => {
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		let employee
 		try {
@@ -209,6 +210,12 @@ export const actions: Actions = {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
 		}
+		// The redirect throws the action payload away, so without this the 201 file just appears
+		// with no sign that the conversion is what put it there.
+		setFlash(cookies, {
+			kind: 'success',
+			message: `${employee.firstName} ${employee.lastName} was converted to an employee. Onboarding has started.`
+		})
 		return redirect(302, `/employees/${employee.id}`)
 	}
 }
