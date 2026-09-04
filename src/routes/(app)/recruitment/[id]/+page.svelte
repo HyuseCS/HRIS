@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import ApplicantKanban from '$lib/components/recruitment/ApplicantKanban.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { canAny } from '$lib/rbac'
@@ -53,10 +55,9 @@
 <div class="space-y-6">
 	<!-- Posting Header -->
 	<div class="rounded-lg border p-6 space-y-4">
-		<div class="flex items-start justify-between gap-4">
-			<div class="space-y-1">
-				<div class="flex items-center gap-3">
-					<h1 class="text-2xl font-bold tracking-tight">{posting.title}</h1>
+		<div class="space-y-2">
+			<PageHeader title={posting.title}>
+				{#snippet back()}
 					<span
 						class="rounded-full px-2.5 py-0.5 text-xs font-medium {statusBadgeClass(
 							posting.status
@@ -64,7 +65,9 @@
 					>
 						{posting.status}
 					</span>
-				</div>
+				{/snippet}
+			</PageHeader>
+			<div class="space-y-1">
 				<div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
 					{#if posting.department}
 						<span>{posting.department.name}</span>
@@ -78,7 +81,8 @@
 				</div>
 			</div>
 
-			<div class="flex shrink-0 gap-2">
+			<!-- The posting actions sit under the summary they act on, not on the title row. -->
+			<div class="flex flex-wrap justify-end gap-2">
 				{#if posting.status === 'OPEN'}
 					<a
 						href="/recruitment/{posting.id}/apply"
@@ -148,13 +152,11 @@
 
 			<!-- Close-the-loop: a CLOSED role still live somewhere needs a takedown. -->
 			{#if stillLive.length > 0}
-				<div
-					class="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-400"
-				>
+				<Banner kind="warning">
 					This posting is <span class="font-medium">closed</span> but still live on
 					{stillLive.map((b) => b.name).join(', ')}. Take it down there so a filled role stops
 					collecting applicants.
-				</div>
+				</Banner>
 			{/if}
 
 			{#if boards.length === 0}

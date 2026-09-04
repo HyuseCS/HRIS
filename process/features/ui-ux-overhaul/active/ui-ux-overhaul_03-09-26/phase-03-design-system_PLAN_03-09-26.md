@@ -592,14 +592,26 @@ Each criterion names its proving scenario and strategy (REQ-TEST-LINK). The gate
 | AC-9 | The full CI gate set is green at every one of the 17 section boundaries, relative to the recorded pre-phase baseline | `pnpm format:check && pnpm lint && pnpm check && pnpm test` per section, plus the §Verification 8.2 baseline record | Fully-Automated |
 | AC-10 | Each swept route family still reads as one coherent screen, and every `EmptyState` uses `no-results` when a filter is active and `empty` when nothing exists | screenshot review per route family + filter-applied empty-state judgement (Agent-Probe rows in §Verification Evidence) | Agent-Probe |
 
-**AC-7 scope note (VALIDATE V2, measured).** There are 135 `text-{green,yellow,gray,blue}-400`
-occurrences across 36 files, and **0** of them currently carry a `dark:` pair. 104 sit in the 30 files
-S4/S5/S13 name; **31 sit in 11 files no section of this phase touches**:
+**AC-7 scope note (re-measured 04-09-26 at the pre-phase baseline `7742e59` over `src/**/*.svelte`).**
+There are **137** `text-{green,yellow,gray,blue}-400` occurrences across **37** files. **21** of them
+are the `dark:` half of a pair, so **116** are bare. Of those 116 bare occurrences, **92** sit in the
+files S4/S5/S13 name and **24** sit in the 11 files no section of this phase touches — `92 + 24 = 116`.
+
+Those same 11 files hold **31 matching lines** — 24 bare and 7 already `dark:`-paired; each line
+carries exactly one match, so 31 is also the occurrence total for that subset. The 11 files are:
 `benefits`, `dashboard`, `payroll/config`, `payroll/statutory-rates`, `recruitment/[id]`, `reports`,
 `requests/approvals`, `settings/company`, `settings/holidays`, `settings/onboarding`, and
-`lib/components/recruitment/ApplicantKanban.svelte`. Most are decorative or muted-icon uses, not status
-pills. An unscoped "grep returns zero" gate could therefore never go green inside this phase, so AC-7 is
-scoped to the touched files and the 31 remaining occurrences get a backlog stub
+`lib/components/recruitment/ApplicantKanban.svelte`. The 31-vs-24 difference is reconciled in
+`phase-03-residual-dark-only-colours_NOTE_03-09-26.md`.
+
+(The figures this note carried before 04-09-26 — 135 occurrences, 36 files, 0 paired, 104 in the
+touched files — were wrong. The `104` was simply `135 − 31`: a subtraction from a wrong total, so the
+addition closed by construction and never measured anything.)
+
+**Most of these are status pills**, not decorative uses — 16 of the 24 residual bare occurrences carry
+the pill shape `bg-{tone}-500/15 text-{tone}-400`; the decorative remainder is all in `dashboard`. An
+unscoped "grep returns zero" gate could never go green inside this phase, so AC-7 is scoped to the
+touched files and the residual gets a backlog stub
 (`phase-03-residual-dark-only-colours_NOTE_03-09-26.md`) written during EXECUTE. **OWNER-DECISION OD-2**
 below may widen this.
 

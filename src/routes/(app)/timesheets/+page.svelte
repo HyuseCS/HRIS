@@ -1,5 +1,8 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
@@ -9,6 +12,7 @@
 	import NewTimesheetDialog from '$lib/components/timesheets/NewTimesheetDialog.svelte'
 	import AggregatePanel from '$lib/components/timesheets/AggregatePanel.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -55,12 +59,6 @@
 	}
 
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
-	const statusClass: Record<string, string> = {
-		APPROVED: 'badge-green',
-		REJECTED: 'badge-red',
-		SUBMITTED: 'badge-blue',
-		DRAFT: 'badge-gray'
-	}
 	const btnPrimary =
 		'rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
 </script>
@@ -146,7 +144,8 @@
 							<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 						{/if}
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
-						<th class="w-40 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th
+							class="w-40 px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap"
 							>Total Hours</th
 						>
 						<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
@@ -177,16 +176,14 @@
 							<td class="px-4 py-3 whitespace-nowrap"
 								>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</td
 							>
-							<td class="px-4 py-3">{Number(ts.totalHours).toFixed(2)} hrs</td>
-							<td class="px-4 py-3"
-								><span class={statusClass[ts.status] ?? 'badge-gray'}>{ts.status}</span></td
+							<td class="px-4 py-3 text-right tabular-nums"
+								>{Number(ts.totalHours).toFixed(2)} hrs</td
 							>
+							<td class="px-4 py-3"><Badge status={ts.status} domain="timesheet" /></td>
 						</tr>
 					{:else}
 						<tr>
-							<td colspan={cols} class="px-4 py-8 text-center text-muted-foreground"
-								>No timesheets found</td
-							>
+							<td colspan={cols} class="p-0"><EmptyState title="No timesheets found" /></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -196,24 +193,23 @@
 {/snippet}
 
 <div class="space-y-8">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Timesheets</h1>
-		{#if data.canCreate}
+	<PageHeader title="Timesheets" />
+
+	<!-- The create action sits above the lists it adds to, not on the title row. It cannot go on
+	     a section heading: `canCreate` is independent of which of the two sections render. -->
+	{#if data.canCreate}
+		<div class="flex justify-end">
 			<button
 				onclick={() => (showCreate = true)}
 				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 			>
 				New Timesheet
 			</button>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if data.isHrAdmin}

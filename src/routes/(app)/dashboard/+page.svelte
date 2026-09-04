@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { regularizationStatus, tenureLabel } from '$lib/utils/dates'
 	import { employmentTypeLabel, contractRenewalStatus } from '$lib/utils/employment'
@@ -103,9 +105,7 @@
 </svelte:head>
 
 <div class="flex flex-1 flex-col gap-6">
-	<div class="page-header">
-		<h1 class="page-title">Dashboard</h1>
-	</div>
+	<PageHeader title="Dashboard" />
 
 	<!-- Attendance and the metric cards stack in the left two thirds; Upcoming Events fills the
 	     right third across both of their rows. Keeping attendance narrower than full width stops
@@ -202,7 +202,9 @@
 							<p class="flex items-center gap-2 text-xs text-muted-foreground">
 								<span>{formatShortDate(metrics.lastPayrollRun.periodEnd)}</span>
 								<span
-									class="badge-{metrics.lastPayrollRun.status === 'APPROVED' ? 'green' : 'yellow'}"
+									class={metrics.lastPayrollRun.status === 'APPROVED'
+										? 'badge-green'
+										: 'badge-yellow'}
 								>
 									{metrics.lastPayrollRun.status}
 								</span>
@@ -326,18 +328,10 @@
 			</div>
 
 			{#if form?.posted}
-				<div
-					class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs text-green-400"
-				>
-					Announcement posted.
-				</div>
+				<Banner kind="success" message="Announcement posted." />
 			{/if}
 			{#if form?.awarded}
-				<div
-					class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
-				>
-					Award given.
-				</div>
+				<Banner kind="success" message="Award given." />
 			{/if}
 
 			{#if showAward && data.canPost}

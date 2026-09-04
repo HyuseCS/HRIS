@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import ReviewFormRender from '$lib/components/performance/ReviewFormRender.svelte'
 	import { answerDraft, serialiseAnswers } from '$lib/components/performance/answer-draft'
@@ -7,6 +9,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { formatDate } from '$lib/utils/format'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	/**
 	 * The evaluator's real review form (#178 item 131) — the surface this whole feature exists to
@@ -85,13 +88,6 @@
 	// wrong. `releasedAt` is the switch — the same field the server gate reads.
 	const subjectOnly = $derived(data.isSubject && !data.isReviewer)
 	const released = $derived(r.releasedAt != null)
-
-	function statusClass(s: string) {
-		if (s === 'ACKNOWLEDGED') return 'bg-green-500/15 text-green-400'
-		if (s === 'COMPLETED') return 'bg-blue-500/15 text-blue-400'
-		if (s === 'PENDING') return 'bg-gray-500/15 text-gray-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 </script>
 
 <svelte:head>
@@ -99,34 +95,18 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="min-w-0 flex-1 space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">
-				{r.employee.firstName}
-				{r.employee.lastName}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				{r.cycle.name} · Reviewer: {r.reviewer.firstName}
-				{r.reviewer.lastName}
-			</p>
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<PageHeader
+		title="{r.employee.firstName} {r.employee.lastName}"
+		description="{r.cycle.name} · Reviewer: {r.reviewer.firstName} {r.reviewer.lastName}"
+	>
+		{#snippet back()}
 			<BackButton fallback="/performance" label="Performance" />
-			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(r.status)}"
-				>{r.status.replace('_', ' ')}</span
-			>
-		</div>
-	</div>
+			<Badge status={r.status} domain="review" />
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-			role="alert"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<!-- Self-assessment — employee-authored, its own column, never inside `answers`. -->

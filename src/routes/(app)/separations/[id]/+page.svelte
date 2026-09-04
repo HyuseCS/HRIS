@@ -1,10 +1,13 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { CLEARANCE_AREA_LABELS } from '$lib/utils/clearance-area'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -47,12 +50,6 @@
 		)
 			input.cancel()
 	})
-
-	function statusClass(st: string) {
-		if (st === 'FINALIZED') return 'bg-gray-500/15 text-gray-400'
-		if (st === 'CLEARED') return 'bg-green-500/15 text-green-400'
-		return 'bg-yellow-500/15 text-yellow-400'
-	}
 </script>
 
 <svelte:head>
@@ -61,23 +58,15 @@
 
 <div class="mx-auto max-w-3xl space-y-6">
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 	{#if form?.undone}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
-		>
+		<Banner kind="success">
 			Finalization undone. The case is back to {form.status} and the employee's login is enabled again.
-		</div>
+		</Banner>
 	{/if}
 	{#if data.partiallyRestored}
-		<div
-			class="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400"
-		>
+		<Banner kind="warning">
 			<p class="font-semibold">Partially restored</p>
 			<!-- {@const} must be an immediate child of a block tag, never inside a plain element. -->
 			{#if data.writeOff !== null}
@@ -93,38 +82,31 @@
 					finalized and could not be restored automatically — re-enter them manually.
 				</p>
 			{/if}
-		</div>
+		</Banner>
 	{/if}
 	{#if form?.finalized}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
-		>
-			Separation finalized. The employee is now offboarded and their login is disabled.
-		</div>
+		<Banner
+			kind="success"
+			message="Separation finalized. The employee is now offboarded and their login is disabled."
+		/>
 	{/if}
 
 	<!-- Header -->
-	<div class="flex flex-wrap items-start justify-between gap-4 rounded-lg border bg-card p-4">
-		<div class="min-w-0 flex-1">
-			<h1 class="text-xl font-bold tracking-tight">
-				{s.employee.lastName}, {s.employee.firstName}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				{s.employee.jobTitle} · {s.employee.department?.name ?? '—'} · #{s.employee.employeeNumber}
-			</p>
-			<p class="mt-2 text-sm">
-				<span class="font-medium">{s.type}</span> · effective {formatShortDate(s.effectiveDate)}
-			</p>
-			{#if s.reason}<p class="mt-1 text-sm text-muted-foreground">{s.reason}</p>{/if}
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
+	<div class="space-y-2 rounded-lg border bg-card p-4">
+		<PageHeader
+			title="{s.employee.lastName}, {s.employee.firstName}"
+			description="{s.employee.jobTitle} · {s.employee.department?.name ?? '—'} · #{s.employee
+				.employeeNumber}"
 		>
-			<BackButton fallback="/separations" label="Separations" />
-			<span class="rounded-full px-2.5 py-1 text-xs font-medium {statusClass(s.status)}"
-				>{s.status}</span
-			>
-		</div>
+			{#snippet back()}
+				<BackButton fallback="/separations" label="Separations" />
+				<Badge status={s.status} domain="separation" />
+			{/snippet}
+		</PageHeader>
+		<p class="text-sm">
+			<span class="font-medium">{s.type}</span> · effective {formatShortDate(s.effectiveDate)}
+		</p>
+		{#if s.reason}<p class="text-sm text-muted-foreground">{s.reason}</p>{/if}
 	</div>
 
 	<!-- Clearance checklist -->
@@ -151,11 +133,7 @@
 						<p class="text-xs text-muted-foreground">{CLEARANCE_AREA_LABELS[item.area]}</p>
 					</div>
 					{#if isFinalized}
-						<span
-							class="rounded-full px-2 py-0.5 text-xs font-medium {item.status === 'CLEARED'
-								? 'bg-green-500/15 text-green-400'
-								: 'bg-yellow-500/15 text-yellow-400'}">{item.status}</span
-						>
+						<Badge status={item.status} domain="clearance" />
 					{:else}
 						{@const toggle = clearanceGuard(item.id)}
 						<form method="POST" action="?/toggleClearance" use:enhance={toggle.enhance}>

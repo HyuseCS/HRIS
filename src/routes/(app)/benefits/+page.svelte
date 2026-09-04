@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -28,15 +30,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Benefits</h1>
-		<button
-			onclick={() => (showCreate = !showCreate)}
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			Add Plan
-		</button>
-	</div>
+	<PageHeader title="Benefits" />
 
 	<!-- Top level, not inside the collapsible create form: enroll and setEnrollmentStatus
 	     are submitted from the plan list below, and their failures must surface too. -->
@@ -45,6 +39,16 @@
 			{form.error}
 		</div>
 	{/if}
+
+	<!-- The create toggle sits directly above the form it opens and the plan list it adds to. -->
+	<div class="flex justify-end">
+		<button
+			onclick={() => (showCreate = !showCreate)}
+			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+		>
+			Add Plan
+		</button>
+	</div>
 
 	<!-- Create form -->
 	{#if showCreate}
@@ -154,10 +158,10 @@
 						<td class="px-4 py-3 font-medium">{plan.name}</td>
 						<td class="px-4 py-3 text-muted-foreground">{plan.type.replace('_', ' ')}</td>
 						<td class="px-4 py-3 text-muted-foreground">{plan.provider ?? '—'}</td>
-						<td class="px-4 py-3 text-right"
+						<td class="px-4 py-3 text-right tabular-nums"
 							>{plan.employeeCost != null ? formatCurrency(Number(plan.employeeCost)) : '—'}</td
 						>
-						<td class="px-4 py-3 text-right"
+						<td class="px-4 py-3 text-right tabular-nums"
 							>{plan.employerCost != null ? formatCurrency(Number(plan.employerCost)) : '—'}</td
 						>
 						<td class="px-4 py-3">
@@ -172,8 +176,11 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-							>No benefit plans found</td
+						<td colspan="6" class="p-0"
+							><EmptyState
+								title="No benefit plans yet"
+								description="Add a plan to start enrolling employees."
+							/></td
 						>
 					</tr>
 				{/each}
@@ -261,7 +268,7 @@
 							<td class="px-4 py-3">{en.employee.lastName}, {en.employee.firstName}</td>
 							<td class="px-4 py-3 text-muted-foreground">{en.plan.name}</td>
 							<td class="px-4 py-3 text-muted-foreground">{en.coverageLevel ?? '—'}</td>
-							<td class="px-4 py-3 text-right"
+							<td class="px-4 py-3 text-right tabular-nums"
 								>{en.plan.employeeCost != null
 									? formatCurrency(Number(en.plan.employeeCost))
 									: '—'}</td
@@ -302,11 +309,7 @@
 							</td>
 						</tr>
 					{:else}
-						<tr
-							><td colspan="6" class="px-4 py-8 text-center text-muted-foreground"
-								>No enrollments yet.</td
-							></tr
-						>
+						<tr><td colspan="6" class="p-0"><EmptyState title="No enrollments yet" /></td></tr>
 					{/each}
 				</tbody>
 			</table>

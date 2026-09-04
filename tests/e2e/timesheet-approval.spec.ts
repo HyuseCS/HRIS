@@ -112,7 +112,7 @@ test('HR submits an employee draft, the chain signs off, and the employee sees A
 
 	const draftRow = hrPage
 		.locator('tr', { hasText: 'Employee, Elena' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: HOURS_TABLE })
 	await expect(draftRow).toHaveCount(1)
 
@@ -139,7 +139,7 @@ test('HR submits an employee draft, the chain signs off, and the employee sees A
 	await empPage.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 	const approvedRow = empPage
 		.locator('tr')
-		.filter({ hasText: 'APPROVED' })
+		.filter({ hasText: /approved/i })
 		.filter({ hasText: HOURS_TABLE })
 	await expect(approvedRow).toBeVisible()
 	await empCtx.close()

@@ -1,7 +1,11 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
+	import Badge from '$lib/components/ui/Badge.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import type { PageData, ActionData } from './$types'
@@ -76,16 +80,6 @@
 		{ label: 'This month', kind: 'WHOLE_MONTH' },
 		{ label: 'Prev month', kind: 'WHOLE_MONTH', monthsBack: 1 }
 	]
-
-	const badge: Record<string, string> = {
-		PRESENT: 'bg-green-500/15 text-green-400',
-		LATE: 'bg-yellow-500/15 text-yellow-400',
-		ABSENT: 'bg-red-500/15 text-red-400',
-		INCOMPLETE: 'bg-orange-500/15 text-orange-400',
-		ON_LEAVE: 'bg-purple-500/15 text-purple-400',
-		HOLIDAY: 'bg-blue-500/15 text-blue-400',
-		REST_DAY: 'bg-gray-500/15 text-gray-400'
-	}
 
 	const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY']
 
@@ -207,23 +201,12 @@
 {/snippet}
 
 <div class="space-y-6">
-	<div class="flex items-start justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Attendance</h1>
-			{#if data.canManage}
-				<p class="text-sm text-muted-foreground">
-					Daily records &amp; corrections. For a multi-day team matrix, see Team Attendance.
-				</p>
-			{/if}
-		</div>
-		{#if data.canManage && data.view === 'team'}
-			<a
-				href="/team"
-				class="whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-				>Multi-day matrix →</a
-			>
-		{/if}
-	</div>
+	<PageHeader
+		title="Attendance"
+		description={data.canManage
+			? 'Daily records & corrections. For a multi-day team matrix, see Team Attendance.'
+			: undefined}
+	/>
 
 	{#if form?.error}
 		<div
@@ -233,33 +216,39 @@
 		</div>
 	{/if}
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-600"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if data.canManage}
-		<!-- View toggle: one employee's range vs the whole team on a day -->
-		<div class="inline-flex rounded-lg border p-1 text-sm">
-			<a
-				href="?view=employee&employeeId={data.selectedEmployeeId ??
-					''}&from={data.from}&to={data.to}"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				By employee
-			</a>
-			<a
-				href="?view=team&date={data.date}"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				Whole team (day)
-			</a>
+		<!-- View toggle: one employee's range vs the whole team on a day. The cross-link to the
+		     multi-day matrix sits here, level with the control it relates to, not on the title row. -->
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<div class="inline-flex rounded-lg border p-1 text-sm">
+				<a
+					href="?view=employee&employeeId={data.selectedEmployeeId ??
+						''}&from={data.from}&to={data.to}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					By employee
+				</a>
+				<a
+					href="?view=team&date={data.date}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					Whole team (day)
+				</a>
+			</div>
+			{#if data.view === 'team'}
+				<a
+					href="/team"
+					class="ml-auto whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+					>Multi-day matrix →</a
+				>
+			{/if}
 		</div>
 	{/if}
 
@@ -617,10 +606,7 @@
 											>{/each}
 									</select>
 								{:else if d}
-									<span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {badge[d.status] ??
-											'bg-gray-500/15 text-gray-400'}">{d.status}</span
-									>
+									<Badge status={d.status} domain="attendance" />
 									{#if d.isLocked}<span
 											title="locked"
 											class="ml-1 inline-flex align-middle text-muted-foreground"
@@ -715,12 +701,14 @@
 						</tr>
 					{:else}
 						<tr
-							><td
-								colspan={data.showAmPm ? 12 : 8}
-								class="px-3 py-8 text-center text-muted-foreground"
-								>{exceptionsOnly
-									? 'No exceptions — everyone is accounted for.'
-									: 'No active employees.'}</td
+							><td colspan={data.showAmPm ? 12 : 8} class="p-0"
+								><EmptyState
+									variant={exceptionsOnly ? 'no-results' : 'empty'}
+									title={exceptionsOnly ? 'No exceptions today' : 'No active employees'}
+									description={exceptionsOnly
+										? 'Everyone is accounted for. Clear the exceptions filter to see the whole roster.'
+										: undefined}
+								/></td
 							></tr
 						>
 					{/each}
@@ -775,10 +763,7 @@
 											>{/each}
 									</select>
 								{:else}
-									<span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {badge[d.status] ??
-											'bg-gray-500/15 text-gray-400'}">{d.status}</span
-									>
+									<Badge status={d.status} domain="attendance" />
 								{/if}
 							</td>
 							<td class="px-3 py-2 text-muted-foreground"
@@ -887,11 +872,18 @@
 						</tr>
 					{:else}
 						<tr
-							><td
-								colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)}
-								class="px-3 py-8 text-center text-muted-foreground"
-								>{#if exceptionsOnly}No exceptions in this range.{:else}No attendance for this range{#if data.canManage}
-										— no punches yet, or use Refresh{/if}.{/if}</td
+							><td colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)} class="p-0"
+								><EmptyState
+									variant={exceptionsOnly ? 'no-results' : 'empty'}
+									title={exceptionsOnly
+										? 'No exceptions in this range'
+										: 'No attendance for this range'}
+									description={exceptionsOnly
+										? 'Everyone in this range is accounted for. Clear the exceptions filter to see every day.'
+										: data.canManage
+											? 'No punches yet, or use Refresh.'
+											: undefined}
+								/></td
 							></tr
 						>
 					{/each}

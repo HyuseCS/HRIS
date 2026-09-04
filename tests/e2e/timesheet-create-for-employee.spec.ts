@@ -71,7 +71,7 @@ test.afterAll(dropFixture)
 
 /** Open the dialog, retrying until hydration lands (a pre-hydration click is dropped). */
 async function openDialog(page: import('@playwright/test').Page) {
-	const dialog = page.getByRole('dialog', { name: 'New timesheet' })
+	const dialog = page.getByRole('dialog', { name: 'New Timesheet' })
 	await expect(async () => {
 		await page.getByRole('button', { name: 'New Timesheet' }).click()
 		await expect(dialog).toBeVisible({ timeout: 1000 })
@@ -112,7 +112,7 @@ test('HR creates a timesheet for another employee in a period with no punches', 
 	await page.waitForURL('**/timesheets')
 	const row = page
 		.locator('tr', { hasText: 'Employee, Elena' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: '0.00 hrs' })
 	await expect(row).toHaveCount(1)
 

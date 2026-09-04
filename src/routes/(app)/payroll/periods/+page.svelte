@@ -1,5 +1,7 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -7,6 +9,7 @@
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showOpen = $state(false)
@@ -22,16 +25,6 @@
 		let g = guards.get(key)
 		if (!g) guards.set(key, (g = createSubmitGuard()))
 		return g
-	}
-
-	// Theme-aware status pills (#76) — see the .badge-* classes in app.css.
-	const badge: Record<string, string> = {
-		OPEN: 'badge-gray',
-		IMPORTED: 'badge-blue',
-		GENERATED: 'badge-blue',
-		LOCKED: 'badge-yellow',
-		RELEASED: 'badge-green',
-		VOIDED: 'badge-red'
 	}
 </script>
 
@@ -57,11 +50,7 @@
 	<!-- Page-level, like the error block above. Only ?/release and ?/void populate `saved` for
 	     now; open/import/generate/lock stay silent until the phase-04 feedback contract. -->
 	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			{form.saved}
-		</div>
+		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if showOpen}
@@ -134,11 +123,11 @@
 							<td class="px-4 py-3 text-muted-foreground"
 								>{formatShortDate(p.startDate)} – {formatShortDate(p.endDate)}</td
 							>
-							<td class="px-4 py-3 text-right font-mono"
+							<td class="px-4 py-3 text-right font-mono tabular-nums"
 								>{run ? formatCurrency(Number(run.totalNet)) : '—'}</td
 							>
 							<td class="px-4 py-3">
-								<span class={badge[p.status] ?? 'badge-gray'}>{p.status}</span>
+								<Badge status={p.status} domain="payrollPeriod" />
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex flex-wrap items-center justify-end gap-2">
@@ -229,9 +218,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No payroll periods yet</td
-							>
+							<td colspan="5" class="p-0"><EmptyState title="No payroll periods yet" /></td>
 						</tr>
 					{/each}
 				</tbody>

@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -23,21 +25,16 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div>
-		<h1 class="text-2xl font-bold tracking-tight">Payroll Configuration</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
-			Configure payroll frequency and cutoff dates. Statutory rate tables live under
-			<a href="/payroll/statutory-rates" class="underline hover:text-foreground">Statutory Rates</a
-			>.
-		</p>
-	</div>
+	<!-- The description carries a link, which PageHeader's string `description` cannot, so it
+	     stays its own paragraph directly under the title. -->
+	<PageHeader title="Payroll Configuration" />
+	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
+		Configure payroll frequency and cutoff dates. Statutory rate tables live under
+		<a href="/payroll/statutory-rates" class="underline hover:text-foreground">Statutory Rates</a>.
+	</p>
 
 	{#if form?.success}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-600 dark:text-green-400"
-		>
-			Payroll configuration saved successfully.
-		</div>
+		<Banner kind="success" message="Payroll configuration saved successfully." />
 	{/if}
 
 	{#if form?.error}

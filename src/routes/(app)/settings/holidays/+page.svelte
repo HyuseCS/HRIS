@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -273,9 +274,9 @@
 						{/if}
 					{:else}
 						<tr>
-							<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-								No public holidays configured yet.
-							</td>
+							<td colspan="4" class="p-0"
+								><EmptyState title="No public holidays configured yet" /></td
+							>
 						</tr>
 					{/each}
 				</tbody>

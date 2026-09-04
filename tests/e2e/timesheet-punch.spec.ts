@@ -97,7 +97,7 @@ test('signed punch → aggregate → approve', async ({ browser, request }) => {
 	// Disambiguate from the approval spec's current-week row by the unique 7.00 total.
 	const draftRow = page
 		.locator('tr', { hasText: 'Employee, Elena' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: '7.00 hrs' })
 	await expect(draftRow).toHaveCount(1)
 
@@ -121,7 +121,7 @@ test('signed punch → aggregate → approve', async ({ browser, request }) => {
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 	const approvedRow = page
 		.locator('tr', { hasText: 'Employee, Elena' })
-		.filter({ hasText: 'APPROVED' })
+		.filter({ hasText: /approved/i })
 		.filter({ hasText: '7.00 hrs' })
 	await expect(approvedRow).toHaveCount(1)
 	await ctx.close()

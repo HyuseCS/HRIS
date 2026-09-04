@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { tenureLabel, tenureRequirement, monthsOfService } from '$lib/utils/dates'
@@ -16,6 +18,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import MaskedField from '$lib/components/ui/MaskedField.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -174,41 +177,20 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold">{employee.lastName}, {employee.firstName}</h1>
-			<span
-				class="rounded-full px-2.5 py-1 text-xs font-medium {employee.employmentStatus === 'ACTIVE'
-					? 'bg-green-500/15 text-green-400'
-					: 'bg-gray-500/15 text-gray-400'}"
-			>
-				{employee.employmentStatus}
-			</span>
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<PageHeader title="{employee.lastName}, {employee.firstName}">
+		{#snippet back()}
+			<Badge status={employee.employmentStatus} domain="employment" />
 			<BackButton
 				fallback={canManage ? '/employees' : '/team'}
 				label={canManage ? 'Employees' : 'Team'}
 			/>
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
 
 	{#if loose?.error}
-		<div
-			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
-			role="alert"
-		>
-			{loose.error}
-		</div>
+		<Banner kind="error" message={String(loose.error)} />
 	{:else if loose?.success}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-			role="status"
-		>
-			{DONE[form!.action as string] ?? 'Saved.'}
-		</div>
+		<Banner kind="success" message={DONE[form!.action as string] ?? 'Saved.'} />
 	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-2">
@@ -327,12 +309,12 @@
 						{#if band}
 							{#if band.status === 'within'}
 								<span
-									class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-400"
+									class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-700 dark:text-green-400"
 									title="Within the {band.name} band">✓ {grade?.name}</span
 								>
 							{:else}
 								<span
-									class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-400"
+									class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-700 dark:text-amber-400"
 									title="{band.name}: {formatCurrency(band.min)}–{formatCurrency(band.max)}"
 								>
 									⚠ {band.status === 'below' ? 'Below' : 'Above'}
@@ -487,11 +469,7 @@
 			<div class="rounded-lg border bg-card p-6 space-y-4">
 				<h2 class="font-semibold">Evaluation Template</h2>
 				{#if form?.action === 'assignTemplate' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'assignTemplate' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -557,11 +535,7 @@
 					nowhere, which is the lesser harm.
 				-->
 				{#if form?.action === 'update' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'update' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -882,14 +856,7 @@
 										{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}
 									</td>
 									<td class="px-3 py-2">
-										<span
-											class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {b.status ===
-											'ACTIVE'
-												? 'bg-green-500/15 text-green-400'
-												: b.status === 'WAIVED'
-													? 'bg-yellow-500/15 text-yellow-400'
-													: 'bg-gray-500/15 text-gray-400'}">{b.status}</span
-										>
+										<Badge status={b.status} domain="benefitEnrollment" />
 									</td>
 								</tr>
 							{/each}
@@ -1027,15 +994,7 @@
 													>/ {formatCurrency(Number(l.installment))}·pd</span
 												></td
 											>
-											<td class="py-1.5 text-right"
-												><span
-													class="rounded-full px-2 py-0.5 text-xs {l.status === 'PAID'
-														? 'bg-green-500/15 text-green-400'
-														: l.status === 'CANCELLED'
-															? 'bg-gray-500/15 text-gray-400'
-															: 'bg-blue-500/15 text-blue-400'}">{l.status}</span
-												></td
-											>
+											<td class="py-1.5 text-right"><Badge status={l.status} domain="loan" /></td>
 										</tr>
 									{/each}
 								</tbody>
@@ -1099,15 +1058,7 @@
 													>/ {formatCurrency(Number(a.installment))}·pd</span
 												></td
 											>
-											<td class="py-1.5 text-right"
-												><span
-													class="rounded-full px-2 py-0.5 text-xs {a.status === 'PAID'
-														? 'bg-green-500/15 text-green-400'
-														: a.status === 'CANCELLED'
-															? 'bg-gray-500/15 text-gray-400'
-															: 'bg-blue-500/15 text-blue-400'}">{a.status}</span
-												></td
-											>
+											<td class="py-1.5 text-right"><Badge status={a.status} domain="loan" /></td>
 										</tr>
 									{/each}
 								</tbody>
@@ -1183,9 +1134,7 @@
 												>
 											</form>
 										{:else}
-											<span class="rounded-full bg-gray-500/15 px-2 py-0.5 text-xs text-gray-400"
-												>ENDED</span
-											>
+											<Badge status="ENDED" tone="gray" />
 										{/if}
 									</td>
 								</tr>
@@ -1375,9 +1324,7 @@
 												>
 											</form>
 										{:else}
-											<span class="rounded-full bg-gray-500/15 px-2 py-0.5 text-xs text-gray-400"
-												>ENDED</span
-											>
+											<Badge status="ENDED" tone="gray" />
 										{/if}
 									</td>
 								</tr>
@@ -1555,17 +1502,9 @@
 					>
 				</h2>
 				{#if form?.action === 'changeCompensation' && form?.notice}
-					<div
-						class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
-					>
-						{form.notice}
-					</div>
+					<Banner kind="warning" message={form.notice} />
 				{:else if form?.action === 'changeCompensation' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Saved.
-					</div>
+					<Banner kind="success" message="Saved." />
 				{:else if form?.action === 'changeCompensation' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1657,17 +1596,9 @@
 					>
 				</h2>
 				{#if form?.action === 'promote' && form?.notice}
-					<div
-						class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
-					>
-						{form.notice}
-					</div>
+					<Banner kind="warning" message={form.notice} />
 				{:else if form?.action === 'promote' && form?.success}
-					<div
-						class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400"
-					>
-						Promotion recorded.
-					</div>
+					<Banner kind="success" message="Promotion recorded." />
 				{:else if form?.action === 'promote' && form?.error}
 					<div
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
@@ -1848,11 +1779,7 @@
 			read. Gated on form.action so it only answers the offboard form.
 		-->
 		{#if form?.action === 'offboard' && form?.saved}
-			<div
-				class="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-400 lg:col-span-2"
-			>
-				{form.saved}
-			</div>
+			<Banner kind="success" class="lg:col-span-2" message={form.saved} />
 		{:else if form?.action === 'offboard' && form?.error}
 			<div
 				class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400 lg:col-span-2"

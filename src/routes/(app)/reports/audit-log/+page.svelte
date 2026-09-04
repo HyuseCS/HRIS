@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { advanceTo } from '$lib/actions/dateRange'
 	import type { ActionData, PageData } from './$types'
@@ -38,7 +39,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold tracking-tight">Audit Log</h1>
+	<PageHeader title="Audit Log" />
 
 	{#if failure}
 		<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -182,13 +183,13 @@
 							<td class="px-4 py-3 whitespace-nowrap">
 								<span
 									class="rounded px-2 py-0.5 text-xs font-medium {log.action === 'CREATE'
-										? 'bg-green-500/15 text-green-400'
+										? 'bg-green-500/15 text-green-800 dark:text-green-400'
 										: log.action === 'DELETE'
-											? 'bg-red-500/15 text-red-400'
+											? 'bg-red-500/15 text-red-700 dark:text-red-400'
 											: log.action === 'UPDATE'
-												? 'bg-blue-500/15 text-blue-400'
+												? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
 												: log.action === 'LOGIN_FAILED'
-													? 'bg-amber-500/15 text-amber-400'
+													? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
 													: 'bg-muted text-muted-foreground'}"
 								>
 									{log.action}

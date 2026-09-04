@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
@@ -7,6 +9,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { addToast } from '$lib/stores/toast.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -52,8 +55,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Payroll Runs</h1>
+	<PageHeader title="Payroll Runs" />
+
+	<!-- The run actions sit above the list they add to, not on the title row. -->
+	<div class="flex items-center justify-end">
 		{#if data.canManage}
 			<div class="flex items-center gap-2">
 				<a
@@ -148,28 +153,19 @@
 							{#if crossTenant}
 								<td class="px-4 py-3 text-muted-foreground">{run.organization?.name ?? '—'}</td>
 							{/if}
-							<td class="px-4 py-3 text-right font-mono"
+							<td class="px-4 py-3 text-right font-mono tabular-nums"
 								>{formatCurrency(Number(run.totalGross))}</td
 							>
-							<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+							<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 								>{formatCurrency(Number(run.totalDeductions))}</td
 							>
-							<td class="px-4 py-3 text-right font-mono font-medium"
+							<td class="px-4 py-3 text-right font-mono font-medium tabular-nums"
 								>{formatCurrency(Number(run.totalNet))}</td
 							>
 							<td class="px-4 py-3">
-								<span
-									class={run.status === 'APPROVED'
-										? 'badge-green'
-										: run.status === 'COMPUTED'
-											? 'badge-blue'
-											: run.status === 'VOIDED'
-												? 'badge-red'
-												: 'badge-gray'}
-								>
-									{run.status}
-									{#if run.hasOverride}<span class="ml-1 text-yellow-500">*</span>{/if}
-								</span>
+								<Badge status={run.status} domain="payrollRun" />
+								{#if run.hasOverride}<span class="ml-1 text-yellow-600 dark:text-yellow-500">*</span
+									>{/if}
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex items-center justify-end gap-2">
@@ -224,8 +220,8 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan={crossTenant ? 7 : 6} class="px-4 py-8 text-center text-muted-foreground"
-								>No payroll runs yet</td
+							<td colspan={crossTenant ? 7 : 6} class="p-0"
+								><EmptyState title="No payroll runs yet" /></td
 							>
 						</tr>
 					{/each}

@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -24,30 +26,23 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="min-w-0 flex-1 space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">Onboarding Checklist</h1>
-			<p class="max-w-2xl text-sm text-muted-foreground">
-				The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps
-				tick themselves off from the employee record (position, salary, government IDs, contract…);
-				you can reorder, rename, or hide them but not delete them.
-				<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
-				are ticked off by HR per employee.
-			</p>
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+	<!-- The description carries emphasis markup, which PageHeader's string `description` cannot,
+	     so it stays its own paragraph directly under the title. -->
+	<PageHeader title="Onboarding Checklist">
+		{#snippet back()}
 			<BackButton fallback="/settings" label="Settings" preferFallback />
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
+	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
+		The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps tick
+		themselves off from the employee record (position, salary, government IDs, contract…); you can
+		reorder, rename, or hide them but not delete them.
+		<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
+		are ticked off by HR per employee.
+	</p>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} />
 	{/if}
 
 	<!-- Add manual step -->
