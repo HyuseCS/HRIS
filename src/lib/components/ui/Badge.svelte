@@ -22,7 +22,19 @@
 		tone?: BadgeTone
 	} = $props()
 
+	// COMPLETE and STATIC class strings, the same rule `Banner.svelte` states for its tones:
+	// Tailwind scans literal strings in the source, so `badge-{tone}` compiled to nothing for
+	// every tone no other file happened to spell out. Only green and gray survived — red, yellow
+	// and blue were purged, and those statuses rendered as unstyled text. Never interpolate here.
+	const TONE_CLASS: Record<BadgeTone, string> = {
+		green: 'badge-green',
+		red: 'badge-red',
+		yellow: 'badge-yellow',
+		blue: 'badge-blue',
+		gray: 'badge-gray'
+	}
+
 	const resolved = $derived(badgeFor(status, { domain, tone, label }))
 </script>
 
-<span class="badge-{resolved.tone}">{resolved.label}</span>
+<span class={TONE_CLASS[resolved.tone]}>{resolved.label}</span>

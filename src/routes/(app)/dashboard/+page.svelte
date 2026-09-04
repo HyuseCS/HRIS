@@ -202,7 +202,9 @@
 							<p class="flex items-center gap-2 text-xs text-muted-foreground">
 								<span>{formatShortDate(metrics.lastPayrollRun.periodEnd)}</span>
 								<span
-									class="badge-{metrics.lastPayrollRun.status === 'APPROVED' ? 'green' : 'yellow'}"
+									class={metrics.lastPayrollRun.status === 'APPROVED'
+										? 'badge-green'
+										: 'badge-yellow'}
 								>
 									{metrics.lastPayrollRun.status}
 								</span>
