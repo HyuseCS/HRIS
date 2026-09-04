@@ -15,7 +15,9 @@ describe('toast store', () => {
 	beforeEach(() => {
 		vi.useFakeTimers()
 		dismissAllToasts()
-		resumeToasts()
+		// Release BOTH pause sources — a leaked `focused` would silently hold the next test.
+		resumeToasts('hover')
+		resumeToasts('focus')
 	})
 
 	afterEach(() => {
@@ -59,6 +61,38 @@ describe('toast store', () => {
 	it('does not start the timer for a toast added while paused', () => {
 		pauseToasts()
 		addToast('arrived mid-hover')
+		vi.advanceTimersByTime(60_000)
+		expect(getToasts()).toHaveLength(1)
+		resumeToasts()
+		vi.advanceTimersByTime(6000)
+		expect(getToasts()).toHaveLength(0)
+	})
+
+	// Hover and focus are separate holds. Releasing one while the other is still on must NOT
+	// resume — either order used to kill a toast the user was reading or tabbing through.
+	it('stays paused when the mouse leaves but focus is still inside', () => {
+		addToast('kbd')
+		pauseToasts('focus')
+		pauseToasts('hover')
+		resumeToasts('hover')
+		vi.advanceTimersByTime(60_000)
+		expect(getToasts()).toHaveLength(1)
+	})
+
+	it('stays paused when focus leaves but the mouse is still over', () => {
+		addToast('mouse')
+		pauseToasts('hover')
+		pauseToasts('focus')
+		resumeToasts('focus')
+		vi.advanceTimersByTime(60_000)
+		expect(getToasts()).toHaveLength(1)
+	})
+
+	it('holds the remaining toast when one is dismissed while paused', () => {
+		const first = addToast('one')
+		addToast('two')
+		pauseToasts()
+		dismissToast(first)
 		vi.advanceTimersByTime(60_000)
 		expect(getToasts()).toHaveLength(1)
 		resumeToasts()
