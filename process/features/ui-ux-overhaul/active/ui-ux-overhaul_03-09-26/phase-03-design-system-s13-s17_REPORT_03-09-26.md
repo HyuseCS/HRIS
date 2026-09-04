@@ -108,7 +108,7 @@ page; the posting-status pill on `recruitment/[id]`; and the "N awaiting you" co
 reworded so it no longer contains those two strings — otherwise the exit grep would match its own
 prose forever and never read clean.
 
-### S16 — EmptyState across 22 files
+### S16 — EmptyState across 23 files
 
 24 sites: 19 bare `colspan` "no rows" cells, four bordered "nothing here" divs, one dashed
 paragraph. Each had its own padding and wording; three ended in a period and the rest did not.
@@ -276,11 +276,14 @@ and **AC-6** (PageHeader adoption complete, no legacy classes) are all proven by
 
 | Kit component | Before phase 03 | Now |
 |---|---|---|
-| `PageHeader` | 20 of 61 `(app)` pages | **59 files** (every page, plus nested users) |
+| `PageHeader` | 20 of 61 `(app)` pages | **59 of 61** `(app)` route pages[^ph] |
 | `EmptyState` | 5 files | **28 files** |
 | `Banner` | did not exist | **52 sites in 35 files** |
 | `Dialog` | did not exist | 7 consumers, and the only `fixed inset-0` modal left |
 | `tabular-nums` | 9 files | **18 files** |
+
+[^ph]: All 59 are route pages — there are no non-route consumers. The two holdouts are
+    `src/routes/(app)/approvals/+page.svelte` and `src/routes/(app)/payslips/[id]/+page.svelte`.
 
 ### Consolidated deferred-verification list for the owner
 

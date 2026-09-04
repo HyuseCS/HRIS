@@ -28,7 +28,7 @@ DEFERRED — they need a running server, which the owner starts.
 `pnpm check`: 1099 files, **0 errors**, 1 warning (`CalculatorWindow.svelte` a11y — pre-existing,
 present in the baseline).
 
-### Files changed (36, all presentation-layer)
+### Files changed (46, all presentation-layer)
 
 Created: `src/lib/labels.ts`, `src/lib/components/ui/badge.ts`,
 `src/lib/components/ui/Badge.svelte`, `tests/unit/labels.test.ts`,
@@ -97,8 +97,11 @@ All of the above are Hybrid-tier and stay unmeasured until the owner's pass.
    `PENDING`/`SCORED`/`SIGNING`/`COMPLETED`/`ACKNOWLEDGED`; a cycle is `DRAFT`/`ACTIVE`/`CLOSED`, so
    every cycle fell through to the blue else-branch. Now uses the `reviewCycle` domain. Not in the
    plan.
-3. **`RETURNED` was two different colours** for the same `RequestStatus` — orange on `/leave`,
-   orange on `/requests`, and the detail page's own copy. All now one tone.
+3. **`RETURNED` carried three separate hand-rolled copies of the same mapping** — `/leave`,
+   `/requests` and `/requests/[id]` each held their own `bg-orange-500/15 text-orange-400`, all
+   three identical. One status, three places to change: exactly the duplication S4/S5 exist to
+   remove. There is no `.badge-orange` and S1 forbids new class names, so all three now resolve to
+   **yellow** through the shared tone map. Same fold as item 1 under "Plan Deviations" below.
 
 ## Plan Deviations
 
