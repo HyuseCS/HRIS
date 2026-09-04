@@ -14,7 +14,7 @@
 
 <div class="flex flex-wrap gap-3">
 	{#each balances as balance (balance.id)}
-		<div class="rounded-lg border bg-background p-4 min-w-[160px]">
+		<div class="rounded-lg border bg-card p-4 min-w-[160px]">
 			<div class="flex items-center gap-2 mb-1">
 				<span class="text-sm font-medium text-foreground">{balance.leaveType.name}</span>
 				{#if balance.leaveType.isPaid}
