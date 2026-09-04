@@ -11,10 +11,13 @@
 	// this project has no `safelist` in `tailwind.config` to rescue it. Never build one of these
 	// out of fragments.
 	const TONE = {
+		// Light-mode steps measured over the composited tint on a card: `text-red-600` gave 4.24:1
+		// and `text-green-600` only 3.03:1, both under the 4.5 floor. These are the same steps the
+		// `.badge-*` tokens landed on for the same reason. Dark was already clear at 5.59 and 8.32.
 		error:
-			'rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400',
+			'rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400',
 		success:
-			'rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400',
+			'rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-800 dark:text-green-400',
 		warning:
 			'rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400',
 		info: 'rounded-md border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-400'
