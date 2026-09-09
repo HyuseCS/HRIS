@@ -89,7 +89,7 @@
 					title="Delete selected leave requests?"
 					message="Selected leave requests will be permanently deleted. Approved requests, and any you're not allowed to remove, are skipped."
 					triggerLabel="Delete selected"
-					triggerClass="rounded-md border border-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+					triggerClass="rounded-md border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/20 disabled:opacity-50 dark:text-red-400"
 					disabled={busy}
 					submit={clearOnSuccess}
 				>

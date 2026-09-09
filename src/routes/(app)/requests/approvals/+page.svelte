@@ -221,7 +221,7 @@
 	{/if}
 
 	{#if data.pendingRequests.length === 0}
-		<div class="rounded-md border bg-muted/50">
+		<div class="rounded-lg border bg-card">
 			<EmptyState title="No requests awaiting your decision" />
 		</div>
 	{:else}
