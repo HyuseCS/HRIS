@@ -79,13 +79,13 @@ the #302 UI audit.
 
 ## Accessibility Floors Already In Place
 
-- **Touch targets:** a `@media (pointer: coarse)` block in `src/app.css` sets a 44px floor on
+- **Touch targets:** a `@media (pointer: coarse)` block in `src/app.css` sets a 24px floor on
   BOTH axes for `button`, `[role=button]`, `select`, `textarea`, checkboxes/inputs (radio still
   excluded — it's the one control this floor doesn't apply to, on purpose, per the #a11y-approvals
   fix), and the `.btn-row`/`.btn-row-positive`/`.btn-row-warning`/`.btn-row-danger` anchor classes
   specifically (a bare `a` selector was rejected — it would also floor prose links). Mouse/desktop
   density is untouched. Verify a touch-target CSS change live under `pointer: coarse` emulation —
-  a box can measure 44px because the control was naturally that wide, not because the rule fired.
+  a box can measure 24px because the control was naturally that wide, not because the rule fired.
 - **Contrast:** "go one shade darker" is not a fix — compute the ratio. `orange-500 → orange-600`
   still failed AA at 3.56:1 on the approvals Return button; only `orange-700` (5.18:1) cleared it.
   When auditing a row of sibling controls (e.g. 3 filled buttons), **measure every one of them
