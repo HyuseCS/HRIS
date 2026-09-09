@@ -113,14 +113,17 @@
 	   Both axes: a height-only floor left narrow text buttons — the login page's
 	   16 px "Change" — tall but still too thin to hit. `min-width` rather than
 	   `min-inline-size` only because every other rule in this file is physical.
-	   ponytail: checkbox/radio excluded — they are square, and a floor on one
-	   axis alone stretches them into a broken control. */
+	   ponytail: radio stays excluded — the audit finding names checkboxes only. */
 	@media (pointer: coarse) {
 		button,
 		[role='button'],
 		select,
 		textarea,
-		input:not([type='hidden']):not([type='checkbox']):not([type='radio']) {
+		a.btn-row,
+		a.btn-row-positive,
+		a.btn-row-warning,
+		a.btn-row-danger,
+		input:not([type='hidden']):not([type='radio']) {
 			min-height: 44px;
 			min-width: 44px;
 		}
