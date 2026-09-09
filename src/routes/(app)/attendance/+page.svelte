@@ -281,7 +281,9 @@
 				</form>
 			{/if}
 			{#if data.canManage}
-				<div class="flex flex-wrap items-center gap-3 pt-5">
+				<div
+					class="order-first flex w-full flex-wrap items-center gap-3 sm:order-none sm:w-auto sm:pt-5"
+				>
 					<div class="inline-flex rounded-lg border p-1 text-sm">
 						<a
 							href="?view=employee&employeeId={data.selectedEmployeeId ??
