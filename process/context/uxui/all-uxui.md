@@ -3,7 +3,7 @@ name: context:all-uxui
 description: "Svelte 5 runes, the HSL token system, button/dialog conventions, and the accessibility floors — the uxui group entrypoint/router"
 keywords: ui, ux, svelte, runes, component, tailwind, design tokens, dark mode, dialog, modal, button, form, accessibility, a11y, touch target, focus trap, table, snippet, layout
 related: [context:all-auth]
-date: 17-08-26
+date: 09-09-26
 ---
 
 # UX/UI Context
@@ -80,13 +80,50 @@ the #302 UI audit.
 ## Accessibility Floors Already In Place
 
 - **Touch targets:** a `@media (pointer: coarse)` block in `src/app.css` sets a 44px floor on
-  BOTH axes for `button`, `[role=button]`, `select`, `textarea`, and non-hidden inputs.
-  Checkbox/radio are excluded on purpose — they are square, and a one-axis floor deforms them.
-  Mouse/desktop density is untouched.
+  BOTH axes for `button`, `[role=button]`, `select`, `textarea`, checkboxes/inputs (radio still
+  excluded — it's the one control this floor doesn't apply to, on purpose, per the #a11y-approvals
+  fix), and the `.btn-row`/`.btn-row-positive`/`.btn-row-warning`/`.btn-row-danger` anchor classes
+  specifically (a bare `a` selector was rejected — it would also floor prose links). Mouse/desktop
+  density is untouched. Verify a touch-target CSS change live under `pointer: coarse` emulation —
+  a box can measure 44px because the control was naturally that wide, not because the rule fired.
+- **Contrast:** "go one shade darker" is not a fix — compute the ratio. `orange-500 → orange-600`
+  still failed AA at 3.56:1 on the approvals Return button; only `orange-700` (5.18:1) cleared it.
+  When auditing a row of sibling controls (e.g. 3 filled buttons), **measure every one of them
+  individually** — a partial sweep reads as a complete one. The approvals audit measured Return
+  (2.80:1) and Reject (4.83:1) but never measured Approve, which was silently failing at 3.30:1
+  and only surfaced later, during planning, when replacement shades were being computed.
+- **Contrast checkers must composite alpha.** A translucent fill (`bg-foreground/15`) and
+  translucent text (`text-muted-foreground` at partial opacity) resolve to the same raw luminance
+  if you don't composite each over its actual backdrop first — an uncomposited check silently
+  returns a meaningless ratio (observed: 1.0) instead of failing loudly. Always composite against
+  the real rendered background before computing WCAG contrast.
 - **Dialogs:** the house pattern is a hand-rolled modal, not native `<dialog>`. See
   `ui/ConfirmDialog.svelte` and `timesheets/PunchMapDialog.svelte`. A dialog is expected to:
   close on backdrop click and Escape, take focus on open, **trap Tab and Shift+Tab inside itself**,
   and **restore focus to the trigger** on close. `aria-modal` alone does not trap Tab.
+- **Skip links and focus order must be verified against a production build, not just `pnpm dev`.**
+  `DevLoginSwitcher.svelte` renders a real focusable floating button ahead of the skip link
+  whenever `dev && !navigator.webdriver` — true in exactly the environment (`pnpm dev`, live
+  browser) a focus-order check would naturally run in. The fix verified correctly only against
+  `pnpm build && node build/index.js`. Name the build mode explicitly in any focus-order
+  verification step; a claim proven in dev can be false in prod, and vice versa.
+
+## Svelte 5 Binding Gotchas
+
+- **`bind:indeterminate` cannot target a `$derived` (read-only) value.** Even though the binding
+  itself is supported by the installed Svelte version, `bind:indeterminate={someDerivedValue}`
+  fails at lint time (`Cannot bind to constant`). Fall back to `bind:this` on the element plus an
+  `$effect` that sets `.indeterminate` imperatively.
+- **A native checkbox click flips its own `.checked` DOM property before `onchange` fires.** This
+  can leave a one-way `checked={someState}` binding stale: if the state diff sees no change,
+  Svelte won't re-sync the DOM, and the box can render checked when its bound state says it isn't
+  (or vice versa). If you're setting `.indeterminate` imperatively in an `$effect`, set `.checked`
+  imperatively in the same effect and drop the declarative `checked={...}` attribute — don't mix
+  imperative and declarative sync on the same control.
+- Controls with internal DOM state (indeterminate, checked, open/closed) need a **live
+  state-transition walk** — click through every state in a real browser — not just a render check.
+  Both bugs above were found only by clicking through empty→some→all→empty in a live browser; a
+  static read of the source or a single render assertion would have missed both.
 
 ## Verification Expectation
 

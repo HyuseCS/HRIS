@@ -1,7 +1,7 @@
 ---
 name: protocol:implementation-standards
 description: "Durable implementation standards, file-size guidance, error-handling preferences, quality gates, and commit hygiene."
-date: 09-06-26
+date: 09-09-26
 metadata:
   node_type: memory
   type: protocol
@@ -65,6 +65,13 @@ See skill: invoke `vc-risk-evidence-pack` for the full 6-class definitions, 5-ar
   when the user asks for a commit. Do NOT create a feature branch first — this overrides the generic
   "if on the default branch, branch first" harness default. Only branch when the user explicitly asks
   for a feature branch or PR.
+- **Pre-commit comment check.** If the owner's standing instruction is "no explanatory comments in
+  code," that instruction does not reliably hold under delegation — a subagent added a 4-line
+  explanatory comment despite an explicit, capitalised no-comments instruction (uiux-approvals-a11y,
+  09-09-26), and it had to be trimmed after the fact. Treat it as a diff check before commit, not
+  only a prompt line: `git diff --cached` (or the equivalent staged diff) and scan added lines for
+  new `//` / `/* */` comments explaining *why* rather than a short marker; trim or flag before
+  committing.
 - **Pre-commit format check.** Before proposing a commit message or creating a commit, run
   `pnpm format:check` (the exact command CI's "Format Check" job runs — `prettier --check . --ignore-unknown`).
   If it fails, run `pnpm format` (`prettier --write .`) and include the reformatted files in the

@@ -3,12 +3,12 @@ name: context:all-tests
 description: "Vitest/Playwright commands, the gate order, and the five ways a green suite has hidden a real hole here — the tests group entrypoint/router"
 keywords: test, testing, vitest, playwright, e2e, unit, verification, mutation, gate, coverage, flaky, mock, live verification, negative control, regression
 related: [context:all-cicd]
-date: 24-08-26
+date: 09-09-26
 ---
 
 # Veent HRIS - All Tests
 
-Last updated: 2026-08-24
+Last updated: 2026-09-09
 
 Attach this file first when the task involves testing, verification, or test debugging.
 
@@ -106,6 +106,13 @@ suite coexisted with a real defect:
   correctly), that split needs two files, not one `vi.mock` call — mocking the service to satisfy
   one test can silently break every other test in the same file that depended on the real behavior
   (#112 VALIDATE caught this before EXECUTE started, not after).
+
+- **A cleanup that selects by actor, not by the specific record it created, can delete other
+  people's data.** Cancelling `employee@veent.ph`'s pending requests to remove a test-seeded row
+  also cancelled that employee's unrelated pre-existing seeded request — "Cancel" is a hard
+  delete in this app, not a soft one, and there's no undo. Plant a marker (a distinctive title,
+  date, or amount) and clean up by matching that marker, never by "everything this account
+  currently has pending."
 
 ## Known Gaps
 

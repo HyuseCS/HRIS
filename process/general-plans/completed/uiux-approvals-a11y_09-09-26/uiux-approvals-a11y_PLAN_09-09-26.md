@@ -9,7 +9,7 @@ feature: general
 
 
 **Date**: 09-09-26
-**Status**: DRAFT — pending VALIDATE
+**Status**: COMPLETE — archived, all 8 checklist items shipped
 **Complexity**: SIMPLE (single page + one shared-layout edit, 7 findings, no schema/API/auth surface)
 
 ## Context
@@ -26,13 +26,13 @@ below are committed, each verification gate in Verification Evidence has been ru
 
 ## Acceptance Criteria
 
-- [ ] A2: stage badge text/background composite measures ≥4.5:1 in both themes.
-- [ ] A5: card grid exposes `list`/`listitem` roles; card heading is `h2` with no skipped level; `back-navigation.spec.ts` still passes.
-- [ ] A1/A8: Approve and Return buttons (base + hover) measure ≥4.5:1 white-on-fill; Reject unchanged at 4.83:1.
-- [ ] A3: checkboxes and `.btn-row`-family anchors measure 44×44px under `pointer: coarse`; no dense-table regression on attendance/timesheets.
-- [ ] A4: select-all checkbox is tri-state (empty→select-all, some→clear, all→clear); Clear button removed; `approval-chain`/`multi-role-sod` e2e specs still pass.
-- [ ] A6: select-all label text on `bg-muted/50` measures ≥4.5:1 in both themes.
-- [ ] A7: skip link is the first focusable element app-wide; Tab+Enter moves focus to `<main>`; verified in ≥1 browser engine.
+- [x] A2: stage badge text/background composite measures ≥4.5:1 in both themes.
+- [x] A5: card grid exposes `list`/`listitem` roles; card heading is `h2` with no skipped level; `back-navigation.spec.ts` still passes.
+- [x] A1/A8: Approve and Return buttons (base + hover) measure ≥4.5:1 white-on-fill; Reject unchanged at 4.83:1.
+- [x] A3: checkboxes and `.btn-row`-family anchors measure 44×44px under `pointer: coarse`; no dense-table regression on attendance/timesheets.
+- [x] A4: select-all checkbox is tri-state (empty→select-all, some→clear, all→clear); Clear button removed; `approval-chain`/`multi-role-sod` e2e specs still pass.
+- [x] A6: select-all label text on `bg-muted/50` measures ≥4.5:1 in both themes.
+- [x] A7: skip link is the first focusable element app-wide; Tab+Enter moves focus to `<main>`; verified in ≥1 browser engine.
 
 ## Overview
 
@@ -660,16 +660,56 @@ Accepted by: session (autonomous validate pass) — concerns are non-blocking do
 
 ## Implementation Checklist (Execution Checklist)
 
-- [ ] 1. A2 — `+page.svelte:335` swap `text-muted-foreground` → `text-foreground/70`; verify contrast; commit.
-- [ ] 2. A5 — `+page.svelte:230,235-239,375,376` div→ul/li retag; `:261-263` p→h2 retag; run `back-navigation.spec.ts`; verify a11y tree; commit.
-- [ ] 3. A1+A8 — `+page.svelte:357` green-600→green-700 / hover green-700→green-800; `:364` orange-500→orange-700 / hover orange-600→orange-800; `:415` confirmClass same orange shades; verify all 3 button fills+hovers; commit.
-- [ ] 4. A3 — `app.css:110-127` remove checkbox exclusion, add scoped `.btn-row`-family anchor selectors; run mandatory before/after touch-target screenshot check on attendance/timesheets; commit (or rollback per A3 rollback note if it fails).
-- [ ] 5. A4 — confirm `bind:indeterminate` support via docs-seeker/version check; `+page.svelte:17-27` state changes; `:186-207` markup changes incl. Clear removal; manual tri-state verification; run `approval-chain`/`multi-role-sod` regression; commit.
-- [ ] 6. A6 — `+page.svelte:187-189` label `text-muted-foreground` → `text-foreground/70`; independently verify contrast on `bg-muted/50` (not A2's number); commit.
-- [ ] 7. A7 — `+layout.svelte:194` insert skip link before `<header>`; `:622` add `id="main-content" tabindex="-1"` to `<main>`; verify Tab→Enter focus move, both themes, 2 browsers if available; commit.
-- [ ] 8. Run `pnpm lint`, `pnpm exec prettier --check`, and (with owner warning, dev server may stop) `pnpm check` before opening/updating the PR.
+- [x] 1. A2 — `+page.svelte:335` swap `text-muted-foreground` → `text-foreground/70`; verify contrast; commit.
+- [x] 2. A5 — `+page.svelte:230,235-239,375,376` div→ul/li retag; `:261-263` p→h2 retag; run `back-navigation.spec.ts`; verify a11y tree; commit.
+- [x] 3. A1+A8 — `+page.svelte:357` green-600→green-700 / hover green-700→green-800; `:364` orange-500→orange-700 / hover orange-600→orange-800; `:415` confirmClass same orange shades; verify all 3 button fills+hovers; commit.
+- [x] 4. A3 — `app.css:110-127` remove checkbox exclusion, add scoped `.btn-row`-family anchor selectors; run mandatory before/after touch-target screenshot check on attendance/timesheets; commit (or rollback per A3 rollback note if it fails).
+- [x] 5. A4 — confirm `bind:indeterminate` support via docs-seeker/version check; `+page.svelte:17-27` state changes; `:186-207` markup changes incl. Clear removal; manual tri-state verification; run `approval-chain`/`multi-role-sod` regression; commit.
+- [x] 6. A6 — `+page.svelte:187-189` label `text-muted-foreground` → `text-foreground/70`; independently verify contrast on `bg-muted/50` (not A2's number); commit.
+- [x] 7. A7 — `+layout.svelte:194` insert skip link before `<header>`; `:622` add `id="main-content" tabindex="-1"` to `<main>`; verify Tab→Enter focus move, both themes, 2 browsers if available; commit.
+- [x] 8. Run `pnpm lint`, `pnpm exec prettier --check` — both green. `pnpm check` intentionally NOT run per the hard constraint to avoid stopping the owner's dev server (see report's Test Gate Outcomes); `pnpm test` (208 files / 2427 tests) run instead as the available automated proxy.
 
 **Next:** Say "ENTER VALIDATE MODE" when ready to proceed to plan validation (required before implementation).
+
+## Reconciliation (UPDATE PROCESS, 09-09-26)
+
+All 8 checklist items shipped as 9 commits (7 section commits + 1 doc-fix commit for the
+branch-text CONCERN + 1 follow-up style trim), plus the execution report commit. Full detail in
+`uiux-approvals-a11y_REPORT_09-09-26.md` in this same folder. Deviations from the plan text, not
+guesses — verified against the report and `git show`:
+
+1. **Approve button was never measured by the original audit.** Only Return (2.80:1) and Reject
+   (4.83:1) were audited; Approve was failing at 3.30:1 the whole time and surfaced only during
+   this plan's own contrast-table pass, not the audit. Folded into A1/A8 as written — no plan
+   change needed, but the audit process that fed this plan had a gap.
+2. **A4 needed an undocumented second fix.** `bind:indeterminate={someSelected}` failed lint
+   (`Cannot bind to constant` — `someSelected` is `$derived`), so EXECUTE used the plan's own
+   named fallback (`bind:this` + `$effect`). Live testing then found a second bug not named in the
+   plan: a native checkbox click flips its own `.checked` before `onchange` fires, leaving the
+   declarative `checked={allSelected}` binding stale. Fixed by also setting `.checked`
+   imperatively in the same effect.
+3. **Test-data mistake and recovery.** Seeding a 2nd pending request to test A4's "some selected"
+   state, then cleaning it up by cancelling "Cancel" on the employee's whole request list, also
+   hard-deleted that employee's unrelated pre-existing seeded request (cancel has no undo).
+   Recovered by refiling an equivalent request — same employee, same date — but it is a new DB row
+   with a new ID, not the original record.
+4. **A stray explanatory comment was added despite an explicit no-comments instruction**, then
+   trimmed to a one-line marker by a follow-up commit (`6f01f87`) after the fact rather than caught
+   pre-commit.
+5. **A7 required a production-build check the plan's own verification steps under-specified for
+   dev mode.** `DevLoginSwitcher` intercepts the first Tab stop under `pnpm dev`; the skip-link
+   fix verified correctly only against `pnpm build && node build/index.js`.
+
+Lessons from 1-5 above are now written into `process/context/uxui/all-uxui.md` (accessibility
+floors, Svelte binding gotchas), `process/context/tests/all-tests.md` (cleanup-by-marker
+discipline, alpha-compositing), and `process/development-protocols/implementation-standards.md`
+(pre-commit comment diff check).
+
+**Known accepted gap:** cross-browser (Firefox/Safari) verification of A7 was not done —
+Chromium-only was available in this environment. Anticipated by the plan itself; not a new gap.
+
+**Archive disposition:** Ready for archival. All acceptance criteria met with passing evidence;
+no material deviation left unresolved; `pnpm check` substitution is documented above, not silent.
 
 ## Autonomous Goal Block
 
