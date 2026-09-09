@@ -8,7 +8,7 @@
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
 	import Pagination from '$lib/components/Pagination.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -55,19 +55,23 @@
 
 	// #108: a double-click would file the same request twice (and re-upload its attachments).
 	// The existing close-on-success handler is wrapped so it still runs.
-	const create = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
-		if (result.type === 'success') showForm = false
+	const create = submitFeedback({
+		inner:
+			() =>
+			async ({ update, result }) => {
+				await update()
+				if (result.type === 'success') showForm = false
+			}
 	})
 
 	// Row actions live inside an `{#each}`, so each row needs its own guard — one shared guard
 	// would grey out every row's button while a single row is in flight.
 	function rowGuards() {
-		const map = new Map<string, ReturnType<typeof createSubmitGuard>>()
+		const map = new Map<string, ReturnType<typeof submitFeedback>>()
 		return (id: string) => {
 			let g = map.get(id)
 			if (!g) {
-				g = createSubmitGuard()
+				g = submitFeedback()
 				map.set(id, g)
 			}
 			return g
@@ -99,13 +103,6 @@
 				{showForm ? 'Close' : 'New Request'}
 			</button>
 		</div>
-	{/if}
-
-	{#if form?.error}
-		<Banner kind="error" message={form.error} />
-	{/if}
-	{#if form?.message}
-		<Banner kind="success" message={form.message} />
 	{/if}
 
 	{#if !data.hasEmployee}

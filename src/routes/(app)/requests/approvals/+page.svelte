@@ -2,7 +2,6 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
 	import { slide } from 'svelte/transition'
@@ -10,9 +9,9 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
-	import type { PageData, ActionData } from './$types'
+	import type { PageData } from './$types'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { data }: { data: PageData } = $props()
 
 	// ─── Bulk selection ───────────────────────────────────────────────────────
 	// Reject many pending requests at once with one shared note (reject requires a note).
@@ -38,6 +37,7 @@
 			}
 		}
 	}
+	const bulk = submitFeedback({ inner: clearOnSuccess })
 
 	const typeLabels: Record<string, string> = {
 		LEAVE: 'Leave',
@@ -182,14 +182,6 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if form?.error}
-		<Banner kind="error" message={form.error} />
-	{/if}
-
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
-	{/if}
-
 	{#if data.pendingRequests.length > 0}
 		<label class="flex w-fit items-center gap-2 text-sm text-muted-foreground">
 			<input
@@ -213,7 +205,7 @@
 					onclick={() => (selected = [])}
 					class="text-sm text-muted-foreground hover:underline">Clear</button
 				>
-				<form bind:this={bulkForm} method="POST" action="?/rejectMany" use:enhance={clearOnSuccess}>
+				<form bind:this={bulkForm} method="POST" action="?/rejectMany" use:enhance={bulk.enhance}>
 					<input type="hidden" name="ids" value={selected.join(',')} />
 					<input type="hidden" name="note" value={bulkNote} />
 					<button

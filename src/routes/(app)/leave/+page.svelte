@@ -2,7 +2,6 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
@@ -10,9 +9,9 @@
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
-	import type { PageData, ActionData } from './$types'
+	import type { PageData } from './$types'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { data }: { data: PageData } = $props()
 
 	// Leave type name lives in the unified Request payload (leaveTypeId).
 	const leaveName = (payload: unknown) => {
@@ -71,15 +70,6 @@
 	{/if}
 	{#if data.balances.length > 0}
 		<BalanceSummary balances={data.balances} />
-	{/if}
-
-	<!-- `deleteMany` can fail per item; without this slot the page rendered nothing at all. -->
-	{#if form?.error}
-		<Banner kind="error" message={form.error} />
-	{/if}
-
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	<!-- Bulk actions; appear once rows are selected -->

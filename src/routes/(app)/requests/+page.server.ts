@@ -150,7 +150,7 @@ export const actions: Actions = {
 				})
 			throw e
 		}
-		return { message: 'Request submitted.' }
+		return { saved: 'Request submitted.' }
 	},
 
 	cancel: async ({ request, locals, getClientAddress }) => {
@@ -172,7 +172,7 @@ export const actions: Actions = {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
 		}
-		return { message: 'Request cancelled.' }
+		return { saved: 'Request cancelled.' }
 	},
 
 	resubmit: async ({ request, locals, getClientAddress }) => {
@@ -194,6 +194,6 @@ export const actions: Actions = {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
 		}
-		return { message: 'Request re-submitted.' }
+		return { saved: 'Request re-submitted.' }
 	}
 }
