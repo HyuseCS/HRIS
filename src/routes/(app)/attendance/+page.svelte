@@ -6,6 +6,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
@@ -18,12 +19,6 @@
 		() =>
 		async ({ update }) =>
 			update({ reset: false })
-
-	// Reset discards the manual correction and re-derives from punches — confirm first.
-	const confirmReset: SubmitFunction = ({ cancel }) => {
-		if (!confirm('Discard the manual edit for this day and re-derive it from punches?')) cancel()
-		return async ({ update }) => update({ reset: false })
-	}
 
 	// #108: these bulk actions rewrite whole ranges/days — a double-click re-runs the derive or
 	// re-locks mid-flight. One guard per singleton form.
@@ -669,7 +664,6 @@
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
 									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
-									{@const reset = rowGuard(`resetDay:${d.id}`, confirmReset)}
 									<div class="flex items-center gap-1">
 										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
 											<input type="hidden" name="id" value={d.id} />
@@ -680,18 +674,19 @@
 												>{save.busy ? 'Saving…' : 'Save'}</button
 											>
 										</form>
-										{#if d.manuallyEdited}
-											<form method="POST" action="?/resetDay" use:enhance={reset.enhance}>
-												<input type="hidden" name="id" value={d.id} />
-												<button
-													type="submit"
-													title="Discard manual edit and re-derive from punches"
-													disabled={reset.busy}
-													class="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-													>{reset.busy ? 'Resetting…' : 'Reset'}</button
-												>
-											</form>
-										{/if}
+										<ConfirmButton
+											action="?/resetDay"
+											title="Discard the manual edit?"
+											message="This day goes back to the values derived from its punch records. The manual correction is lost."
+											confirmText="Reset"
+											triggerLabel="Reset"
+											disabled={!d.manuallyEdited}
+											triggerTitle="Discard manual edit and re-derive from punches"
+											triggerClass="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+											submit={keepValues}
+										>
+											<input type="hidden" name="id" value={d.id} />
+										</ConfirmButton>
 									</div>
 								{:else if d?.isLocked}
 									<span class="inline-flex h-7 items-center text-xs text-muted-foreground"
@@ -838,7 +833,6 @@
 										>
 									{:else}
 										{@const save = rowGuard(`correct:${d.id}`, keepValues)}
-										{@const reset = rowGuard(`resetDay:${d.id}`, confirmReset)}
 										<div class="flex items-center gap-1">
 											<form
 												id="c-{d.id}"
@@ -854,18 +848,19 @@
 													>{save.busy ? 'Saving…' : 'Save'}</button
 												>
 											</form>
-											{#if d.manuallyEdited}
-												<form method="POST" action="?/resetDay" use:enhance={reset.enhance}>
-													<input type="hidden" name="id" value={d.id} />
-													<button
-														type="submit"
-														title="Discard manual edit and re-derive from punches"
-														disabled={reset.busy}
-														class="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-														>{reset.busy ? 'Resetting…' : 'Reset'}</button
-													>
-												</form>
-											{/if}
+											<ConfirmButton
+												action="?/resetDay"
+												title="Discard the manual edit?"
+												message="This day goes back to the values derived from its punch records. The manual correction is lost."
+												confirmText="Reset"
+												triggerLabel="Reset"
+												disabled={!d.manuallyEdited}
+												triggerTitle="Discard manual edit and re-derive from punches"
+												triggerClass="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+												submit={keepValues}
+											>
+												<input type="hidden" name="id" value={d.id} />
+											</ConfirmButton>
 										</div>
 									{/if}
 								</td>
