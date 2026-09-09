@@ -192,6 +192,12 @@
 <DevLoginSwitcher />
 
 <div class="flex min-h-screen bg-background" style={themeStyle}>
+	<a
+		href="#main-content"
+		class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+	>
+		Skip to main content
+	</a>
 	<!-- Mobile top bar (hamburger) — hidden on lg+ -->
 	<header
 		class="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4 lg:hidden"
@@ -619,7 +625,7 @@
 	<!-- Main content — offset by sidebar on lg+, cleared by the mobile top bar below lg.
 	     min-w-0 lets this flex child shrink below its content so inner overflow-x-auto works. -->
 	<div class="flex min-w-0 flex-1 flex-col lg:pl-60">
-		<main class="flex flex-1 flex-col p-4 pt-20 lg:p-8 lg:pt-8">
+		<main id="main-content" tabindex="-1" class="flex flex-1 flex-col p-4 pt-20 lg:p-8 lg:pt-8">
 			{@render children()}
 		</main>
 	</div>
