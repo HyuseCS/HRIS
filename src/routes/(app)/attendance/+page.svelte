@@ -136,10 +136,11 @@
 		return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 	}
 
-	// Editable cells that read as plain text until focused, then reveal an input affordance.
+	// Editable cells carry a visible border and field background at rest, so a row reads as
+	// editable before it is clicked — a borderless cell looked like printed text.
 	// Content-sized (not w-full) so the table columns spread evenly instead of one ballooning.
 	const CELL =
-		'h-7 rounded border border-transparent bg-transparent px-1 text-xs hover:bg-muted/40 focus:border-input focus:bg-background focus:outline-none focus:ring-1 focus:ring-ring'
+		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
 	const CELL_NUM =
 		CELL +
 		' w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
