@@ -197,7 +197,7 @@
 		{#if data.pendingRequests.length > 0}
 			<div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2">
 				<label
-					class="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground"
+					class="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-foreground/70"
 				>
 					<input
 						bind:this={selectAllCheckbox}
