@@ -30,7 +30,7 @@
 <a
 	href={target}
 	aria-label={text === 'Back' ? 'Back' : `Back to ${label}`}
-	class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+	class="inline-flex items-center gap-1.5 rounded-md border border-muted-foreground/30 bg-secondary px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
 >
 	<svg
 		xmlns="http://www.w3.org/2000/svg"
