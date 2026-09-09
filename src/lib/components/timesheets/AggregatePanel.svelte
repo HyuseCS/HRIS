@@ -89,7 +89,7 @@
 	</div>
 
 	<div class="flex flex-wrap items-end gap-3">
-		<div class="min-w-56 flex-1">
+		<div class="min-w-56 max-w-lg flex-1">
 			<label for="agg-employee" class="text-sm font-medium">Employee</label>
 			<select
 				id="agg-employee"
