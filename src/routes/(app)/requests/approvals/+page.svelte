@@ -353,14 +353,14 @@
 									name="decision"
 									value="APPROVED"
 									disabled={approve.busy}
-									class="flex-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
+									class="flex-1 rounded-md bg-green-700 px-2 py-1 text-xs font-medium text-white hover:bg-green-800 disabled:pointer-events-none disabled:opacity-50"
 									>{approve.busy ? 'Approving…' : 'Approve'}</button
 								>
 								<button
 									type="button"
 									disabled={decide.busy}
 									onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'RETURNED' })}
-									class="flex-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white hover:bg-orange-600 disabled:pointer-events-none disabled:opacity-50"
+									class="flex-1 rounded-md bg-orange-700 px-2 py-1 text-xs font-medium text-white hover:bg-orange-800 disabled:pointer-events-none disabled:opacity-50"
 									>Return…</button
 								>
 								<button
@@ -411,7 +411,7 @@
 		? 'Return'
 		: 'Reject'}
 	confirmClass={noteTarget?.kind !== 'bulk' && noteTarget?.decision === 'RETURNED'
-		? 'bg-orange-500 text-white hover:bg-orange-600'
+		? 'bg-orange-700 text-white hover:bg-orange-800'
 		: 'bg-red-600 text-white hover:bg-red-700'}
 	onconfirm={submitWithNote}
 />
