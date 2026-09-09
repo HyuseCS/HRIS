@@ -2,7 +2,6 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -136,8 +135,6 @@
 		return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 	}
 
-	// Editable cells carry a visible border and field background at rest, so a row reads as
-	// editable before it is clicked — a borderless cell looked like printed text.
 	// Content-sized (not w-full) so the table columns spread evenly instead of one ballooning.
 	const CELL =
 		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
@@ -204,17 +201,6 @@
 			? 'Daily records & corrections. For a multi-day team matrix, see Team Attendance.'
 			: undefined}
 	/>
-
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
-		>
-			{form.error}
-		</div>
-	{/if}
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
-	{/if}
 
 	{#if data.canManage}
 		<!-- View toggle: one employee's range vs the whole team on a day. The cross-link to the
@@ -683,7 +669,7 @@
 											triggerLabel="Reset"
 											disabled={!d.manuallyEdited}
 											triggerTitle="Discard manual edit and re-derive from punches"
-											triggerClass="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+											triggerClass="rounded-md border bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"
 											submit={keepValues}
 										>
 											<input type="hidden" name="id" value={d.id} />
@@ -857,7 +843,7 @@
 												triggerLabel="Reset"
 												disabled={!d.manuallyEdited}
 												triggerTitle="Discard manual edit and re-derive from punches"
-												triggerClass="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+												triggerClass="rounded-md border bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"
 												submit={keepValues}
 											>
 												<input type="hidden" name="id" value={d.id} />

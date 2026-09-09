@@ -213,6 +213,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'correct', saved: 'Attendance day saved.' }
 	},
 
 	// Discard a manual override on a day and re-derive it from punches.
