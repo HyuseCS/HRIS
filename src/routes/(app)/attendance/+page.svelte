@@ -669,7 +669,7 @@
 											triggerLabel="Reset"
 											disabled={!d.manuallyEdited}
 											triggerTitle="Discard manual edit and re-derive from punches"
-											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50"
+											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
 											submit={keepValues}
 										>
 											<input type="hidden" name="id" value={d.id} />
@@ -843,7 +843,7 @@
 												triggerLabel="Reset"
 												disabled={!d.manuallyEdited}
 												triggerTitle="Discard manual edit and re-derive from punches"
-												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50"
+												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
 												submit={keepValues}
 											>
 												<input type="hidden" name="id" value={d.id} />
