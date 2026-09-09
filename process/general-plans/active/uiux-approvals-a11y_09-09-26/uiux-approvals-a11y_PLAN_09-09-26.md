@@ -567,7 +567,94 @@ Tests routed via `process/context/tests/all-tests.md`: `pnpm test:e2e` runner co
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 09-09-26
+date: 2026-09-09
+generated-by: outer-pvl
+
+Parallel strategy: sequential
+Rationale: 1 signal present (S7: 7 files in the informational blast-radius list, direct edits only 3) — single-page SIMPLE plan, no auth/schema/API surface, one vc-agent validated it end-to-end against source; no fan-out needed.
+
+Test gates (C3 5-column table):
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| A2 | Stage badge text/bg composite clears 4.5:1 both themes | Agent-Probe | DevTools color picker on rendered `<span>` vs `bg-card`, both themes, 375px/1280px | A |
+| A5-auto | Card div→li retag does not break existing anchor selector | Fully-Automated | `pnpm test:e2e -- back-navigation` | A |
+| A5-a11y | Grid/card expose `list`/`listitem` roles; h2 has no skipped level | Agent-Probe | DevTools Accessibility panel role + heading-level check | A |
+| A1/A8 | Approve/Return base+hover fills clear 4.5:1 white-on-fill | Agent-Probe | DevTools color picker on rendered buttons, base + forced `:hover` state | A |
+| A3 | Checkboxes + `.btn-row`-family anchors reach 44×44px, no dense-table break | Agent-Probe | Before/after screenshot + px measurement under `hasTouch` emulation | A (scope gap — see Open gaps) |
+| A4-manual | Select-all reaches empty→all→some→empty correctly, Clear removed | Agent-Probe | Manual click-through, live browser | A |
+| A4-auto | Decision POST flows unaffected by select-all refactor | Fully-Automated | `pnpm test:e2e -- approval-chain multi-role-sod` | A |
+| A6 | Select-all label text clears 4.5:1 on its own `bg-muted/50` background | Agent-Probe | DevTools color picker, both themes, 375px/1280px | A |
+| A7 | Skip link is first focusable element, Tab+Enter moves focus to `<main>` | Agent-Probe | Live-browser Tab-then-Enter check, both themes | A (env gap — see Open gaps) |
+| lint/format/types | No regressions introduced by any edit | Fully-Automated | `pnpm lint`, `pnpm exec prettier --check`, `pnpm check` | A |
+
+gap-resolution legend:
+- A — proven now (gate passes in this cycle)
+- B — fixed in this plan (gate added by this plan's checklist)
+- C — deferred to a named later phase/plan
+- D — backlog test-building stub (named residual; keep-active; continue)
+
+Legacy line form:
+- A2: agent-probe: DevTools color picker, both themes
+- A5: fully-automated: `pnpm test:e2e -- back-navigation` | agent-probe: a11y tree check
+- A1/A8: agent-probe: DevTools color picker, base+hover
+- A3: agent-probe: before/after screenshot under `hasTouch` — scope should extend to `recruitment/+page.svelte` and `leave/+page.svelte` (see Open gaps)
+- A4: agent-probe: manual tri-state click-through | fully-automated: `pnpm test:e2e -- approval-chain multi-role-sod`
+- A6: agent-probe: DevTools color picker, both themes
+- A7: agent-probe: Tab-then-Enter check — verify against `pnpm build && pnpm preview` in addition to `pnpm dev` (see Open gaps)
+- lint/format/types: fully-automated: `pnpm lint && pnpm exec prettier --check . && pnpm check`
+
+Failing stub (A5-auto):
+```
+test("should keep back-navigation anchor selector working after div-to-li retag", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: back-navigation.spec.ts still passes after A5's card div->li restructure")
+})
+```
+
+Failing stub (A4-auto):
+```
+test("should leave approval-chain and multi-role-sod decision POST flows unaffected by select-all refactor", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: approval-chain.spec.ts and multi-role-sod.spec.ts still pass after A4's toggleAll/indeterminate refactor")
+})
+```
+
+Failing stub (lint/format/types):
+```
+test("should introduce no lint, format, or type regressions across the 7 sections", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: pnpm lint / pnpm exec prettier --check / pnpm check all exit 0")
+})
+```
+
+Dimension findings:
+- Infra fit: PASS — pure CSS/markup/client-state edit, no container/infra/runtime surface touched; all 3 direct-edit file paths exist and were read.
+- Test coverage: CONCERN — 2 of 11 proving gates (A2, A6) rest on live DevTools measurement with no automated contrast tool in the toolchain; this is a real, disclosed known-gap in tooling (not a plan defect) and the plan already routes it to agent-probe correctly.
+- Breaking changes: PASS — no server actions, form field names, or API contracts change; verified `?/decideRequest` / `?/rejectMany` POST targets and `ReasonDialog`'s `confirmClass` prop contract are untouched by A1/A8's edits.
+- Security surface: PASS — no auth, billing, schema, secrets, or trust-boundary surface touched.
+- A2 (stage badge): PASS — `:335` anchor confirmed exact; `.badge-gray` at `app.css:181` and its preceding comment ("composites to ~#E6E6E6 ... ~#3A3A3A ... clears 4.5:1 over both") confirmed to exist verbatim; card background confirmed `bg-card` at the card `<div>`.
+- A5 (list semantics): PASS — all 5 exact-edit line anchors confirmed except one off-by-one (see Open gaps); Tailwind preflight `ol, ul, menu { list-style: none; margin: 0; padding: 0; }` confirmed present in the installed v3.4.19 package (actual lines 305-311, plan cites 303-309 — content match confirmed, line number close but not exact); confirmed no `corePlugins`/`preflight` override in `tailwind.config.ts`; confirmed no custom `ul`/`li`/`ol` rules in `src/app.css`; `back-navigation.spec.ts:94` selector `a[href*="?from=/requests/approvals"]` confirmed href-based and unaffected by the div→li retag (plan's line range `:90-105` is close to the actual test body `86-106`, not exact, non-blocking).
+- A1+A8 (button contrast): PASS — all 3 file:line anchors (`:357`, `:364`, `:415`) confirmed exact; all 8 hex values confirmed against installed Tailwind's default palette (`node_modules/tailwindcss/src/public/colors.js`); all 8 contrast ratios (3.30, 5.02, 7.13, 2.80, 3.56, 5.18, 7.31, 4.83) independently recomputed via WCAG relative-luminance formula and matched exactly — this table is verified fact, not assumption.
+- A3 (touch targets): CONCERN — grep claims fully verified (14 checkbox files exact match, 7 `.btn-row`-family **anchor** files exact match once scoped to actual `<a>` tags — 3 additional files carry `btn-row` classes on `<button>`/`<span>` elements, already covered by the existing `button` selector or inert via `pointer-events-none`, so the plan's "7 files" claim is correct as stated); but 2 of the 14 checkbox files (`recruitment/+page.svelte:169` `<th class="w-10">`, `leave/+page.svelte:107` `<th class="w-[1%]">`) have narrow/percentage fixed-width header cells housing the checkbox, and neither is in the plan's mandatory verification list (only attendance/timesheets/approvals/dashboard are named) — see Open gaps.
+- A4 (tri-state select-all): PASS, and the plan's own open question is now RESOLVED — confirmed `bind:indeterminate` is natively supported on `<input>` in the installed Svelte 5.56.4 (`node_modules/svelte/src/compiler/phases/bindings.js:183`, `valid_elements: ['input']`, `bidirectional: true`); no fallback needed. State-edit anchor `:17-27` and markup anchors `:190-195`/`:196-198`/`:202-207` all confirmed exact.
+- A6 (panel text contrast): CONCERN — anchors confirmed exact (`:184`, `:187-189`); the plan's stated "current" ratios (4.21 dark / 4.35 light) are presented as measured fact but independent recomputation from the actual `--muted`/`--background`/`--card` HSL tokens lands in a 4.4-4.7 range depending on which layer the panel composites over — straddling both sides of 4.5:1. This does not invalidate the fix direction, and the plan's own "measure live, do not assume" instruction already covers this — but the "current" number itself is an approximation dressed as a measured fact. No plan change required; flagged so EXECUTE does not treat the pre-fix number as more certain than it is.
+- A7 (skip link): CONCERN — both anchors (`:194` root div / `:196` header, `:622` main) confirmed exact. Real gap found: `DevLoginSwitcher.svelte` (rendered as a sibling immediately before the div at `:194`, i.e. earlier in DOM order) shows a real focusable floating button whenever `dev && !navigator.webdriver` — which is true in the exact "live browser, CDP port 9222" environment the plan's own verification method specifies. `onMount` fires effectively before any human can press Tab, so in practice the skip link will NOT be the literal first focusable element during the plan's prescribed dev-mode verification, even though it will be in a production build (component is dev-gated). See Open gaps.
+
+Open gaps:
+- Branch mismatch (plan text, not code): Overview line 45 states `Branch: feat/uiux-phase-10 (current)`. The actual current branch is `feat/uiux-phase-4` (confirmed via `git branch --show-current`). Correct this line before EXECUTE opens commits — cosmetic but could mislead a fresh agent's git-state check.
+- A5 anchor off-by-one: edit #4 in the Exact Edits list says `:376` (closing grid div) → `</ul>`; the actual closing `</div>` for the grid is line 377 (376 is `{/each}`). EXECUTE should target line 377, not 376.
+- A3 verification scope gap: add `recruitment/+page.svelte` (`th.w-10` header checkbox) and `leave/+page.svelte` (`th.w-[1%]` header checkbox) to the mandatory before/after screenshot check — these 2 of the 14 blast-radius files have the narrowest fixed-width header cells and are the most likely to visually break once the checkbox grows to a 44px floor.
+- A7 environment gap: verify the skip-link-is-first-focusable claim against `pnpm build && pnpm preview` (production-like, `dev` false, no `DevLoginSwitcher`) in addition to `pnpm dev`. If only `pnpm dev` is used for the live-browser check, expect `DevLoginSwitcher`'s floating button to intercept the first Tab stop and record that as a known, dev-tooling-only caveat rather than a real regression.
+
+What this coverage does NOT prove:
+- A2/A6/A1/A8 DevTools color-picker checks prove the ratio on the specific viewport/theme combinations checked; they do not prove correctness on every possible zoom level, OS-level forced-colors/high-contrast mode, or non-Chromium rendering of the same hex values.
+- `back-navigation.spec.ts` and `approval-chain`/`multi-role-sod` regression runs prove those specific flows still pass; they do not prove no other untested e2e spec touches the same markup regions (0 of 43 e2e specs are a11y-specific, per the plan's own Test Infra Improvement Notes).
+- A3's before/after screenshot check proves the two explicitly-tested pages (plus whichever pages are added per the Open Gaps item above) don't visually break; it does not prove all 14 checkbox files or all 7 anchor files are individually screenshot-checked.
+- A7's Tab+Enter check proves keyboard-only focus movement in the browser(s) actually used; if only one Chromium-based engine is available, cross-engine (Firefox/Safari) behavior remains an accepted known gap per the plan's own instruction.
+- `pnpm lint` / `prettier --check` / `pnpm check` prove no static lint/format/type regressions; they do not prove runtime behavior or visual correctness.
+
+Gate: CONDITIONAL (no FAILs; 5 CONCERNs — branch-text mismatch, one anchor off-by-one, A3 verification-scope gap, A7 dev-environment focus-order gap, A6 pre-fix number precision — all either plan-text fixes or execute-agent instructions, none blocking)
+Accepted by: session (autonomous validate pass) — concerns are non-blocking documentation/scope corrections; EXECUTE should apply the branch-text fix, use line 377 (not 376) for A5's grid-closing edit, extend A3's screenshot list to `recruitment` and `leave`, and verify A7 against a production-like build in addition to dev mode.
 
 ---
 
@@ -583,3 +670,45 @@ Tests routed via `process/context/tests/all-tests.md`: `pnpm test:e2e` runner co
 - [ ] 8. Run `pnpm lint`, `pnpm exec prettier --check`, and (with owner warning, dev server may stop) `pnpm check` before opening/updating the PR.
 
 **Next:** Say "ENTER VALIDATE MODE" when ready to proceed to plan validation (required before implementation).
+
+## Autonomous Goal Block
+
+```
+SESSION GOAL: Ship the 7 approved a11y fixes (A2, A5, A1+A8, A3, A4, A6, A7) on
+src/routes/(app)/requests/approvals/+page.svelte, src/app.css, and
+src/routes/(app)/+layout.svelte, one commit per section, in the order fixed by the
+plan's Sequencing section.
+
+AUTONOMY RULES:
+- Fix the 4 CONCERN items from the validate-contract inline as part of the relevant
+  section's commit, do not treat them as separate work: correct the branch line in
+  Overview before the first commit; use line 377 (not 376) for A5's grid-closing
+  </div>->` </ul>` edit; add recruitment/+page.svelte and leave/+page.svelte to A3's
+  before/after screenshot check; verify A7 against `pnpm build && pnpm preview` in
+  addition to `pnpm dev`.
+- Each of the 7 sections is its own commit with the exact subject line given in the
+  plan. Do not batch sections into one commit.
+- Run each section's Verification Evidence gate before committing that section, not
+  after all 7 are done.
+
+HARD STOPS:
+- If A3's touch-target check breaks a dense table layout (rows overlap, unexpected
+  horizontal scroll) on any of the now-6 verification pages: stop, apply the A3
+  rollback (revert app.css:110-127 to its pre-change block), and report the specific
+  page/element that broke rather than silently adjusting the CSS further.
+- If A6's `text-foreground/70` substitution measures under 4.5:1 on `bg-muted/50` in
+  either theme: stop, do not substitute a darker step unreviewed — this needs a human
+  decision per the plan's own escalation instruction.
+- Do not touch `requests/proposals/+page.svelte` (explicitly out of scope per A5) or
+  the `--muted-foreground` token itself (explicitly out of scope per A6).
+
+NEXT PHASE: EXECUTE MODE, starting at Implementation Checklist item 1 (A2).
+
+CONTRACT SUMMARY: Gate CONDITIONAL, 0 FAILs / 5 CONCERNs, all non-blocking and folded
+into the checklist above. Full contract at "## Validate Contract" in this file.
+
+EXECUTE START COMMAND: "ENTER EXECUTE MODE" against
+process/general-plans/active/uiux-approvals-a11y_09-09-26/uiux-approvals-a11y_PLAN_09-09-26.md
+
+Reference for latest state: this plan file (single-plan work, no umbrella program).
+```
