@@ -21,11 +21,11 @@
 
 	// #108: these bulk actions rewrite whole ranges/days — a double-click re-runs the derive or
 	// re-locks mid-flight. One guard per singleton form.
-	const derive = createSubmitGuard()
+	const derive = submitFeedback({ success: null })
 	const lock = submitFeedback()
 	const unlock = submitFeedback()
-	const saveTimesheet = createSubmitGuard()
-	const deriveTeam = createSubmitGuard()
+	const saveTimesheet = submitFeedback({ success: null })
+	const deriveTeam = submitFeedback({ success: null })
 	const lockTeam = submitFeedback()
 	const unlockTeam = submitFeedback()
 	// #200: the backlog import writes punches for a whole file — a double-submit would re-run it.
