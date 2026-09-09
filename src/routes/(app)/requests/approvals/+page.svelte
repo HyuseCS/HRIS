@@ -26,10 +26,7 @@
 	function toggleAll() {
 		selected = selected.length > 0 ? [] : allIds
 	}
-	// ponytail: bind:indeterminate can't target a $derived (read-only) value, so both the
-	// dash and the checked state are set imperatively — the native click on an
-	// indeterminate box flips its own `checked` before onchange runs, which can leave a
-	// one-way `checked={allSelected}` binding out of sync when Svelte's diff sees no change.
+	// ponytail: indeterminate and checked set imperatively — bind: cannot target a $derived
 	let selectAllCheckbox = $state<HTMLInputElement>()
 	$effect(() => {
 		if (selectAllCheckbox) {
