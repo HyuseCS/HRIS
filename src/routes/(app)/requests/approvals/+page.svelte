@@ -182,18 +182,6 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if data.pendingRequests.length > 0}
-		<label class="flex w-fit items-center gap-2 text-sm text-muted-foreground">
-			<input
-				type="checkbox"
-				checked={allSelected}
-				onchange={(e) => toggleAll(e.currentTarget.checked)}
-				class="align-middle"
-			/>
-			Select all
-		</label>
-	{/if}
-
 	{#if selected.length}
 		<div
 			class="flex flex-wrap items-end justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3"
@@ -220,162 +208,176 @@
 		</div>
 	{/if}
 
-	{#if data.pendingRequests.length === 0}
-		<div class="rounded-lg border bg-card">
+	<div class="space-y-4 rounded-lg border bg-muted/50 p-4">
+		{#if data.pendingRequests.length > 0}
+			<label class="flex w-fit items-center gap-2 text-sm text-muted-foreground">
+				<input
+					type="checkbox"
+					checked={allSelected}
+					onchange={(e) => toggleAll(e.currentTarget.checked)}
+					class="align-middle"
+				/>
+				Select all
+			</label>
+		{/if}
+
+		{#if data.pendingRequests.length === 0}
 			<EmptyState title="No requests awaiting your decision" />
-		</div>
-	{:else}
-		<!-- A real grid, so cards align in columns and share a row height instead of each
+		{:else}
+			<!-- A real grid, so cards align in columns and share a row height instead of each
 		     being pinned to a hardcoded h-72. Details clip inside (reason is clamped, full
 		     text lives on the detail page) and the decision buttons pin to the bottom. -->
-		<div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-			{#each data.pendingRequests as req (req.id)}
-				{@const approve = approveGuard(req.id)}
-				{@const leave = data.leaveContext[req.id]}
-				{@const picked = selected.includes(req.id)}
-				<div
-					class="flex flex-col rounded-lg border bg-card transition-colors {picked
-						? 'border-primary ring-1 ring-primary'
-						: 'hover:border-muted-foreground/30'}"
-				>
-					<div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
-						<!-- Person first: approvers scan by who, then by what. -->
-						<div class="flex items-start gap-3">
-							<input
-								type="checkbox"
-								checked={picked}
-								onchange={() => toggle(req.id)}
-								aria-label="Select request"
-								class="mt-1 align-middle"
-							/>
-							<div
-								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold {typeAccent(
-									req.type
-								)}"
-								aria-hidden="true"
-							>
-								{initials(req.employee.firstName, req.employee.lastName)}
-							</div>
-							<div class="min-w-0 flex-1">
-								<!-- The full name gets the header width to itself; the type badge sits in the
+			<div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
+				{#each data.pendingRequests as req (req.id)}
+					{@const approve = approveGuard(req.id)}
+					{@const leave = data.leaveContext[req.id]}
+					{@const picked = selected.includes(req.id)}
+					<div
+						class="flex flex-col rounded-lg border bg-card transition-colors {picked
+							? 'border-primary ring-1 ring-primary'
+							: 'hover:border-muted-foreground/30'}"
+					>
+						<div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
+							<!-- Person first: approvers scan by who, then by what. -->
+							<div class="flex items-start gap-3">
+								<input
+									type="checkbox"
+									checked={picked}
+									onchange={() => toggle(req.id)}
+									aria-label="Select request"
+									class="mt-1 align-middle"
+								/>
+								<div
+									class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold {typeAccent(
+										req.type
+									)}"
+									aria-hidden="true"
+								>
+									{initials(req.employee.firstName, req.employee.lastName)}
+								</div>
+								<div class="min-w-0 flex-1">
+									<!-- The full name gets the header width to itself; the type badge sits in the
 								     meta row below, where truncating it costs nothing. -->
-								<p class="font-medium leading-tight break-words">
-									{req.employee.lastName}, {req.employee.firstName}
-								</p>
-								<p class="mt-0.5 text-xs text-muted-foreground">
-									Waiting {waitingFor(req.createdAt)}
-									{#if isStale(req.createdAt)}
-										<span class="ml-1 font-medium text-amber-500">· overdue</span>
-									{/if}
-								</p>
+									<p class="font-medium leading-tight break-words">
+										{req.employee.lastName}, {req.employee.firstName}
+									</p>
+									<p class="mt-0.5 text-xs text-muted-foreground">
+										Waiting {waitingFor(req.createdAt)}
+										{#if isStale(req.createdAt)}
+											<span class="ml-1 font-medium text-amber-500">· overdue</span>
+										{/if}
+									</p>
+								</div>
 							</div>
-						</div>
 
-						<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {typeAccent(req.type)}"
-								>{leave?.typeName ?? typeLabel(req.type)}</span
-							>
-							{#if req.dateFrom}<span>{formatDateRange(req.dateFrom, req.dateTo)}</span>{/if}
-							{#if leave?.totalDays != null}
-								<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
-									>{leave.totalDays}
-									{leave.totalDays === 1 ? 'day' : 'days'}</span
+							<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+								<span class="rounded-full px-2 py-0.5 text-xs font-medium {typeAccent(req.type)}"
+									>{leave?.typeName ?? typeLabel(req.type)}</span
 								>
-							{/if}
-							{#if req.hours}
-								<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
-									>{req.hours} hrs</span
-								>
-							{/if}
-						</div>
-
-						<!-- The decision-critical number: can this request actually be covered? -->
-						{#if leave && leave.remaining != null}
-							{@const short = leave.totalDays != null && leave.remaining < leave.totalDays}
-							<p
-								class="rounded-md px-2 py-1 text-xs {short
-									? 'bg-red-500/10 font-medium text-red-500'
-									: 'bg-muted/60 text-muted-foreground'}"
-							>
-								{leave.remaining.toFixed(1)} of {leave.typeName} remaining
-								{#if short}· not enough to cover this request{/if}
-							</p>
-						{/if}
-
-						{#if req.reason}
-							<p class="line-clamp-2 text-xs text-muted-foreground">{req.reason}</p>
-						{/if}
-
-						<!-- #299/AC-8: liveDocuments, not documents. The server splits the two (P-5) because
-						`documents` still carries tombstones for the F3 bar; this chip counts what the
-						approver can actually open. -->
-						{#if req.liveDocuments.length}
-							{@const unverified = unverifiedCount(req.liveDocuments)}
-							<p class="text-xs">
-								<span class="text-muted-foreground"
-									>📎 {req.liveDocuments.length} document{req.liveDocuments.length === 1
-										? ''
-										: 's'}</span
-								>
-								{#if unverified}
-									<span
-										class="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 font-medium text-yellow-400"
-										>{unverified} unverified</span
-									>
-								{:else}
-									<span
-										class="ml-1 rounded-full bg-green-500/15 px-2 py-0.5 font-medium text-green-400"
-										>all verified</span
+								{#if req.dateFrom}<span>{formatDateRange(req.dateFrom, req.dateTo)}</span>{/if}
+								{#if leave?.totalDays != null}
+									<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
+										>{leave.totalDays}
+										{leave.totalDays === 1 ? 'day' : 'days'}</span
 									>
 								{/if}
-							</p>
-						{/if}
+								{#if req.hours}
+									<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
+										>{req.hours} hrs</span
+									>
+								{/if}
+							</div>
 
-						<div class="mt-auto flex items-center justify-between gap-2 pt-1">
-							<span class="rounded-full bg-foreground/15 px-2 py-0.5 text-xs text-muted-foreground"
-								>Stage: {currentStageLabel(req)}</span
-							>
-							<a href="/requests/{req.id}?from=/requests/approvals" class="btn-row">View detail</a>
+							<!-- The decision-critical number: can this request actually be covered? -->
+							{#if leave && leave.remaining != null}
+								{@const short = leave.totalDays != null && leave.remaining < leave.totalDays}
+								<p
+									class="rounded-md px-2 py-1 text-xs {short
+										? 'bg-red-500/10 font-medium text-red-500'
+										: 'bg-muted/60 text-muted-foreground'}"
+								>
+									{leave.remaining.toFixed(1)} of {leave.typeName} remaining
+									{#if short}· not enough to cover this request{/if}
+								</p>
+							{/if}
+
+							{#if req.reason}
+								<p class="line-clamp-2 text-xs text-muted-foreground">{req.reason}</p>
+							{/if}
+
+							<!-- #299/AC-8: liveDocuments, not documents. The server splits the two (P-5) because
+						`documents` still carries tombstones for the F3 bar; this chip counts what the
+						approver can actually open. -->
+							{#if req.liveDocuments.length}
+								{@const unverified = unverifiedCount(req.liveDocuments)}
+								<p class="text-xs">
+									<span class="text-muted-foreground"
+										>📎 {req.liveDocuments.length} document{req.liveDocuments.length === 1
+											? ''
+											: 's'}</span
+									>
+									{#if unverified}
+										<span
+											class="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 font-medium text-yellow-400"
+											>{unverified} unverified</span
+										>
+									{:else}
+										<span
+											class="ml-1 rounded-full bg-green-500/15 px-2 py-0.5 font-medium text-green-400"
+											>all verified</span
+										>
+									{/if}
+								</p>
+							{/if}
+
+							<div class="mt-auto flex items-center justify-between gap-2 pt-1">
+								<span
+									class="rounded-full bg-foreground/15 px-2 py-0.5 text-xs text-muted-foreground"
+									>Stage: {currentStageLabel(req)}</span
+								>
+								<a href="/requests/{req.id}?from=/requests/approvals" class="btn-row">View detail</a
+								>
+							</div>
 						</div>
-					</div>
-					<!-- Approve posts directly; Return/Reject collect their required note in
+						<!-- Approve posts directly; Return/Reject collect their required note in
 					     a popup (ReasonDialog) and submit through the hidden decide form. -->
-					<form
-						method="POST"
-						action="?/decideRequest"
-						use:enhance={approve.enhance}
-						class="flex shrink-0 gap-2 border-t bg-muted/20 p-3"
-					>
-						<input type="hidden" name="id" value={req.id} />
-						<button
-							type="submit"
-							name="decision"
-							value="APPROVED"
-							disabled={approve.busy}
-							class="flex-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
-							>{approve.busy ? 'Approving…' : 'Approve'}</button
+						<form
+							method="POST"
+							action="?/decideRequest"
+							use:enhance={approve.enhance}
+							class="flex shrink-0 gap-2 border-t bg-muted/20 p-3"
 						>
-						<button
-							type="button"
-							disabled={decide.busy}
-							onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'RETURNED' })}
-							class="flex-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white hover:bg-orange-600 disabled:pointer-events-none disabled:opacity-50"
-							>Return…</button
-						>
-						<button
-							type="button"
-							disabled={decide.busy}
-							onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'REJECTED' })}
-							class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-							>Reject…</button
-						>
-					</form>
-				</div>
-			{/each}
-		</div>
+							<input type="hidden" name="id" value={req.id} />
+							<button
+								type="submit"
+								name="decision"
+								value="APPROVED"
+								disabled={approve.busy}
+								class="flex-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
+								>{approve.busy ? 'Approving…' : 'Approve'}</button
+							>
+							<button
+								type="button"
+								disabled={decide.busy}
+								onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'RETURNED' })}
+								class="flex-1 rounded-md bg-orange-500 px-2 py-1 text-xs font-medium text-white hover:bg-orange-600 disabled:pointer-events-none disabled:opacity-50"
+								>Return…</button
+							>
+							<button
+								type="button"
+								disabled={decide.busy}
+								onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'REJECTED' })}
+								class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
+								>Reject…</button
+							>
+						</form>
+					</div>
+				{/each}
+			</div>
 
-		<Pagination meta={data.pagination} />
-	{/if}
+			<Pagination meta={data.pagination} />
+		{/if}
+	</div>
 </div>
 
 <!-- Submission target for popup-collected Return/Reject notes. -->
