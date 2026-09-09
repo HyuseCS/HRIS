@@ -19,12 +19,24 @@
 	let busy = $state(false)
 	const allIds = $derived(data.pendingRequests.map((r) => r.id))
 	const allSelected = $derived(allIds.length > 0 && allIds.every((id) => selected.includes(id)))
+	const someSelected = $derived(selected.length > 0 && !allSelected)
 	function toggle(id: string) {
 		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
 	}
-	function toggleAll(on: boolean) {
-		selected = on ? allIds : []
+	function toggleAll() {
+		selected = selected.length > 0 ? [] : allIds
 	}
+	// ponytail: bind:indeterminate can't target a $derived (read-only) value, so both the
+	// dash and the checked state are set imperatively — the native click on an
+	// indeterminate box flips its own `checked` before onchange runs, which can leave a
+	// one-way `checked={allSelected}` binding out of sync when Svelte's diff sees no change.
+	let selectAllCheckbox = $state<HTMLInputElement>()
+	$effect(() => {
+		if (selectAllCheckbox) {
+			selectAllCheckbox.indeterminate = someSelected
+			selectAllCheckbox.checked = allSelected
+		}
+	})
 	const clearOnSuccess: SubmitFunction = () => {
 		busy = true
 		return async ({ result, update }) => {
@@ -188,9 +200,9 @@
 					class="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground"
 				>
 					<input
+						bind:this={selectAllCheckbox}
 						type="checkbox"
-						checked={allSelected}
-						onchange={(e) => toggleAll(e.currentTarget.checked)}
+						onchange={toggleAll}
 						class="cursor-pointer align-middle"
 					/>
 					<span aria-live="polite"
@@ -199,12 +211,6 @@
 				</label>
 
 				<div class="flex items-center gap-2">
-					<button
-						onclick={() => (selected = [])}
-						disabled={!selected.length}
-						class="cursor-pointer text-sm text-muted-foreground hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40"
-						>Clear</button
-					>
 					<form bind:this={bulkForm} method="POST" action="?/rejectMany" use:enhance={bulk.enhance}>
 						<input type="hidden" name="ids" value={selected.join(',')} />
 						<input type="hidden" name="note" value={bulkNote} />
