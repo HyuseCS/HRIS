@@ -184,7 +184,7 @@
 			{:else}
 				<span class="block text-sm font-medium">Period</span>
 				<div
-					class="flex min-h-9 flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-1"
+					class="flex min-h-9 w-fit flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-1"
 					role="group"
 				>
 					{#each KIND_OPTIONS as opt (opt.value)}
