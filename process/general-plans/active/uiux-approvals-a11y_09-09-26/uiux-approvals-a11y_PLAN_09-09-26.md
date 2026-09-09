@@ -42,7 +42,7 @@ Fix 7 approved accessibility findings from an impeccable audit of
 requirements, not options. One new finding (A8, folded into A1's section) surfaced during
 this planning pass: the Approve button also fails contrast.
 
-**Branch:** `feat/uiux-phase-10` (current). Work happens as new commits on top; no rebase needed.
+**Branch:** `feat/uiux-phase-4` (current). Work happens as new commits on top; no rebase needed.
 
 ## Goals
 
