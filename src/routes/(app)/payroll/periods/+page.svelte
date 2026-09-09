@@ -66,20 +66,23 @@
 						class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 				</div>
-				<PeriodPicker startName="start" endName="end" />
-			</div>
-			<div class="flex justify-end gap-2">
-				<button
-					type="button"
-					onclick={() => (showOpen = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-				<button
-					type="submit"
-					disabled={openPeriod.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{openPeriod.busy ? 'Opening…' : 'Open'}</button
-				>
+				<PeriodPicker startName="start" endName="end">
+					{#snippet actions()}
+						<div class="flex gap-2">
+							<button
+								type="button"
+								onclick={() => (showOpen = false)}
+								class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
+							>
+							<button
+								type="submit"
+								disabled={openPeriod.busy}
+								class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+								>{openPeriod.busy ? 'Opening…' : 'Open'}</button
+							>
+						</div>
+					{/snippet}
+				</PeriodPicker>
 			</div>
 		</form>
 	{/if}

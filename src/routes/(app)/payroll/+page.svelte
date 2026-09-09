@@ -103,24 +103,23 @@
 			{#if form?.error}<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
 					{form.error}
 				</div>{/if}
-			<!-- #163: wide enough that Month, Year and all four period buttons sit on one row
-			     and the two date fields keep their two-column grid instead of stacking. -->
-			<div class="max-w-4xl">
-				<PeriodPicker />
-			</div>
-			<div class="flex items-center gap-2">
-				<button
-					type="submit"
-					disabled={create.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{create.busy ? 'Creating…' : 'Create'}</button
-				>
-				<button
-					type="button"
-					onclick={() => (showCreate = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-			</div>
+			<PeriodPicker>
+				{#snippet actions()}
+					<div class="flex gap-2">
+						<button
+							type="button"
+							onclick={() => (showCreate = false)}
+							class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
+						>
+						<button
+							type="submit"
+							disabled={create.busy}
+							class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+							>{create.busy ? 'Creating…' : 'Create'}</button
+						>
+					</div>
+				{/snippet}
+			</PeriodPicker>
 		</form>
 	{/if}
 
