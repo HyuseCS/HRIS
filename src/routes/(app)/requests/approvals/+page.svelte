@@ -227,12 +227,12 @@
 				<!-- A real grid, so cards align in columns and share a row height instead of each
 		     being pinned to a hardcoded h-72. Details clip inside (reason is clamped, full
 		     text lives on the detail page) and the decision buttons pin to the bottom. -->
-				<div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
+				<ul class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{#each data.pendingRequests as req (req.id)}
 						{@const approve = approveGuard(req.id)}
 						{@const leave = data.leaveContext[req.id]}
 						{@const picked = selected.includes(req.id)}
-						<div
+						<li
 							class="flex flex-col rounded-lg border bg-card transition-colors {picked
 								? 'border-primary ring-1 ring-primary'
 								: 'hover:border-muted-foreground/30'}"
@@ -258,9 +258,9 @@
 									<div class="min-w-0 flex-1">
 										<!-- The full name gets the header width to itself; the type badge sits in the
 								     meta row below, where truncating it costs nothing. -->
-										<p class="font-medium leading-tight break-words">
+										<h2 class="font-medium leading-tight break-words">
 											{req.employee.lastName}, {req.employee.firstName}
-										</p>
+										</h2>
 										<p class="mt-0.5 text-xs text-muted-foreground">
 											Waiting {waitingFor(req.createdAt)}
 											{#if isStale(req.createdAt)}
@@ -371,9 +371,9 @@
 									>Reject…</button
 								>
 							</form>
-						</div>
+						</li>
 					{/each}
-				</div>
+				</ul>
 
 				<Pagination meta={data.pagination} />
 			{/if}
