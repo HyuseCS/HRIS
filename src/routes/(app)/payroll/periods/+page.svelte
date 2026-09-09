@@ -1,7 +1,6 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -41,16 +40,11 @@
 
 	{#if form?.error}
 		<div
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
 		</div>
-	{/if}
-
-	<!-- Page-level, like the error block above. Only ?/release and ?/void populate `saved` for
-	     now; open/import/generate/lock stay silent until the phase-04 feedback contract. -->
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if showOpen}
@@ -61,9 +55,9 @@
 			class="rounded-lg border p-4 space-y-3"
 		>
 			<h2 class="font-semibold">Open a Payroll Period</h2>
-			<div class="grid gap-4 sm:grid-cols-2">
-				<div class="space-y-1.5">
-					<label for="name" class="text-sm font-medium">Name</label>
+			<div class="space-y-4">
+				<div class="max-w-sm space-y-1.5">
+					<label for="name" class="block text-sm font-medium">Name</label>
 					<input
 						id="name"
 						name="name"
