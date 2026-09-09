@@ -207,7 +207,7 @@
 											message="The run is marked VOIDED and any amortization it collected is credited back. This cannot be undone, and the same exact period cannot be created again."
 											confirmText="Void run"
 											triggerLabel="Void"
-											triggerClass="btn-row text-destructive"
+											triggerClass="btn-row-danger"
 										>
 											<input type="hidden" name="id" value={run.id} />
 										</ConfirmButton>
