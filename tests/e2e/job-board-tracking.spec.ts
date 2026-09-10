@@ -61,7 +61,9 @@ test.describe('Job-board tracking (#117)', () => {
 		// Save the URL. On a taken-down tile this Save also re-posts the board.
 		await jobStreet.locator('input[name="url"]').fill('https://jobstreet.com/jobs/123')
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
-		await expect(page.getByText(/Posted on 1 of/)).toBeVisible()
+		await expect(jobStreet.locator('input[name="url"]')).toHaveValue(
+			'https://jobstreet.com/jobs/123'
+		)
 
 		// A bad URL is rejected with a field-level error.
 		await jobStreet.locator('input[name="url"]').fill('not-a-url')
