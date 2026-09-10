@@ -69,3 +69,28 @@ test('the removed Goals API route is gone', async ({ request }) => {
 	const res = await request.get('/api/v1/performance/goals')
 	expect(res.status()).toBe(404)
 })
+
+// The posting detail page rendered a refusal twice; the banner is gone, so the toast is the
+// only proof a refused status change is reported at all.
+test('a refused status change on a posting reports once, as a toast', async ({ page }) => {
+	await login(page, USERS.admin)
+	await page.goto('/recruitment/jp_seed_demo', { waitUntil: 'domcontentloaded' })
+	await page.waitForLoadState('networkidle')
+
+	const reopen = page.getByRole('button', { name: 'Reopen' })
+	if (await reopen.count()) {
+		await reopen.click()
+		await expect(page.getByRole('button', { name: 'Close Posting' })).toBeVisible()
+	}
+
+	const form = page.locator('form[action*="updateStatus"]')
+	await form.locator('input[name="status"]').evaluate((el: HTMLInputElement) => {
+		el.value = 'BOGUS'
+	})
+	await form.getByRole('button', { name: /Close Posting|Publish|Reopen/ }).click()
+
+	const toast = page.locator('[role="status"] [aria-live="assertive"]')
+	await expect(toast).toHaveText(/Invalid status/)
+	await expect(toast).toHaveCount(1)
+	await expect(page.getByRole('alert')).toHaveCount(0)
+})

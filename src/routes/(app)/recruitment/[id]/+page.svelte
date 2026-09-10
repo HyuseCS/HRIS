@@ -81,12 +81,6 @@
 				</div>
 			</div>
 
-			<!-- Only `setChannel` errors used to render (down in the boards list), so a publish or
-			     a stage move that a server rule refused read as a no-op. -->
-			{#if (form?.action === 'updateStatus' || form?.action === 'advanceStage') && form?.error}
-				<Banner kind="error" message={form.error} />
-			{/if}
-
 			<!-- The posting actions sit under the summary they act on, not on the title row. -->
 			<div class="flex flex-wrap justify-end gap-2">
 				{#if posting.status === 'OPEN'}
