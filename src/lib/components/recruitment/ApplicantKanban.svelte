@@ -25,10 +25,12 @@
 	// lands in the applicant's stage history.
 	let pending = $state<{ applicant: Applicant; from: Stage; to: Stage } | null>(null)
 
-	const closeAfterAnswer: SubmitFunction = () => async ({ update }) => {
-		await update()
-		pending = null
-	}
+	const closeAfterAnswer: SubmitFunction =
+		() =>
+		async ({ update }) => {
+			await update()
+			pending = null
+		}
 	const move = submitFeedback({ inner: closeAfterAnswer })
 
 	const STAGES = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED'] as const
@@ -189,12 +191,7 @@
 			{target.applicant.firstName}
 			{target.applicant.lastName}: {STAGE_LABELS[target.from]} → {STAGE_LABELS[target.to]}
 		</p>
-		<form
-			method="POST"
-			action="?/advanceStage"
-			use:enhance={move.enhance}
-			class="mt-4 space-y-4"
-		>
+		<form method="POST" action="?/advanceStage" use:enhance={move.enhance} class="mt-4 space-y-4">
 			<input type="hidden" name="applicantId" value={target.applicant.id} />
 			<input type="hidden" name="stage" value={target.to} />
 			<div>
