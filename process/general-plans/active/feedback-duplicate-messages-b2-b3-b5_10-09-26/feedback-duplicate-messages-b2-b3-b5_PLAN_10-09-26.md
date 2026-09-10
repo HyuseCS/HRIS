@@ -870,7 +870,7 @@ Four commits, in this order. Conventional. **No attribution trailer, no `Co-Auth
 4. **Supporting context loaded**: `process/context/all-context.md`, `process/context/tests/all-tests.md`; both backlog notes (`settings-roles-duplicate-refusal_NOTE_10-09-26.md`, `timesheet-review-surface_NOTE_10-09-26.md`); the archived precedent plan `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/`; source read in full for all five touchpoint files plus `submit-feedback.svelte.ts`, `ConfirmButton.svelte`, `Toaster.svelte`, `toast.svelte.ts`, `+page.server.ts`, and `tests/unit/request-decide-feedback.test.ts`.
 5. **Next step for a fresh agent**: re-run VALIDATE from V1 against this amended plan. On approval, execute §1 first (fully self-contained, lowest risk, proves the probe harness works before the harder sections). Then §2, then §3 — **that ordering is a hard dependency, not a preference**. §4 any time. Commit per section; do not batch. If resuming mid-plan, `git log --oneline -4` against the four commit subjects above tells you exactly where you are; if `TimesheetModal.svelte` or `requests/timesheets/+page.svelte` has already changed, re-grep before trusting any line number in this plan.
 
-## Validate Contract
+## Validate Contract — Run 1 (SUPERSEDED, retained as the audit record)
 
 Status: BLOCKED
 Date: 10-09-26
@@ -1012,7 +1012,7 @@ Open gaps: see Open gaps above.
 Gate: BLOCKED — 2 unresolved FAILs (F1: the new e2e cannot run and its stated justification is false; F2: probe R2 names an account for which the tested control never renders). §1, §2 and §4 are independently committable and are CLEAR to execute now; only §3 is blocked. Both FAILs are one-paragraph plan amendments, not design changes — none of the three surface rulings needs reopening.
 Accepted by: not accepted — BLOCKED. Return to PLAN for the §3 amendments (F1, F2), then re-run VALIDATE from V1.
 
-## Autonomous Goal Block
+## Autonomous Goal Block — Run 1 (SUPERSEDED)
 
 **Superseded 10-09-26 by the Amendment log.** The block below reflects the AMENDED plan. The previous version (which said "do not start §3 until F1 and F2 are amended") is obsolete — F1, F2 and all five CONCERNs are now amended in. A fresh VALIDATE run from V1 is still required before EXECUTE.
 
@@ -1027,3 +1027,191 @@ HARD STOPS: do not run any e2e without first telling the owner it will delete ti
 NEXT PHASE: VALIDATE from V1 against this amended plan. Then EXECUTE §1 (settings/roles strip, delete lines 156-164 exactly), §2 (bulk toast + two unit tests + backlog note), §4 (six labels), §3 (banners + modal strip; probes before e2e).
 
 EXECUTE START COMMAND: start with process/general-plans/active/feedback-duplicate-messages-b2-b3-b5_10-09-26/feedback-duplicate-messages-b2-b3-b5_PLAN_10-09-26.md Section 1, following Execute-agent instructions E1, E2, E9 and E13 in the Validate Contract, as amended by the Amendment log at the top of this plan.
+
+---
+
+## Validate Contract
+
+Status: CONDITIONAL
+Date: 10-09-26
+date: 2026-09-10
+generated-by: outer-pvl
+supersedes: 2026-09-10 (outer-pvl) — run 2 re-validates the amended plan at `b886a4d`; the run-1 contract above is retained as the audit record
+
+Parallel strategy: sequential (one deep source-verification pass)
+Rationale: 2/7 signals — S5 (owner explicitly asked for adversarial depth on an amendment) and S7 (5 source + 2 test files). Same call as run 1, same reason: the work is reading each cited line and its neighbours in order, plus three live DB queries. A fan-out would have split the one thing that mattered.
+
+### Verdict in one line
+
+Both FAILs are genuinely fixed and every line number in the amendment is exact. **Zero FAILs remain.** One material CONCERN survives: the D2 lint carve-out cascades one file further than the plan admits, and §3 step 3 explicitly forbids the follow-on edit — so §3 as written cannot satisfy Acceptance Criterion 12. It is resolved by execute-agent instruction E1 below, not by returning to PLAN.
+
+### What was RE-VERIFIED and now holds (run 1's FAILs)
+
+| # | Amendment claim | Source evidence | Verdict |
+|---|---|---|---|
+| F1 | The new e2e seeds its own SUBMITTED timesheet, cleans up by id, and fails rather than skips | `tests/e2e/timesheet-approval.spec.ts:42-70` is a plain `PrismaClient` upsert with no fixture-harness dependency — copyable into `form-errors.spec.ts`, which today imports only `./helpers` (`:1-2`) and needs one added import. `prisma/schema.prisma:676` gives `TimesheetEntry.timesheet` `onDelete: Cascade`, so `db.timesheet.delete({ where: { id } })` removes exactly the seeded row and its entries and nothing else. `tests/e2e/global-setup.ts:81-82` runs ONCE in `globalSetup`, before any test file, so it cannot race a `beforeEach` seed. `playwright.config.ts:23` sets `workers: 1` under `CI`, and the plan mandates `CI=1`, so no sibling spec runs concurrently | **FIXED** |
+| F1b | The seeded card actually reaches the review queue (so the test can pass at all) | A raw-seeded SUBMITTED timesheet has no `approvalSteps`; `approvals.ts:41` returns `null` from `liveChain([])`, and `requests/timesheets/+page.server.ts:52-54` then falls to the legacy branch `return canAny(roles, 'VIEW_TEAM')`. `USERS.admin` is `SUPER_ADMIN`, which holds both `MANAGE_HR` and `VIEW_TEAM` (`src/lib/rbac.ts:26,48`), so the card renders | **HOLDS** |
+| F1c | The negative controls are real | The toast node `[role="status"] [aria-live="assertive"]` is produced only by `Toaster.svelte:45,64`; a corrupted expected string makes `toHaveText` red, and `toHaveCount(2)` is red because exactly one toast node exists. Neither can pass vacuously | **REAL** |
+| F2 | R2 as `manager@veent.ph` on `cmtuzqmq9001h61zqc4bk89aj` satisfies `canEdit` | DB: that row is `status = REJECTED`, `employeeId = cmszfa1u5004g11747nfo70q9` (Maria Manager), whose `userId` is the `manager@veent.ph` user; that user's `roles` is `{MANAGER}`. `src/lib/rbac.ts:48` puts `MANAGER` in `VIEW_TEAM`; `timesheets/+page.server.ts:39,45` sets `isManager = canAny(roles,'VIEW_TEAM')` and `canModify = isManager`; both are passed at `timesheets/+page.svelte:255,257`. `TimesheetModal.svelte:88-90` then yields `canEdit = true` — `REJECTED` is not `APPROVED`, and no other gate applies | **FIXED** |
+| F2b | The R2 precondition is satisfiable, not a permanent BLOCKED | `TimesheetModal.svelte:546-547` renders `<form action="?/saveEntries">` inside `{#if canEdit}` — exactly one instance, since only one modal is mounted. Its button is `disabled={busy}` with `busy = $state(false)` (`:69`), so it is visible and enabled at rest. The row is reachable: Maria's own sheet lists in the "mine" table and `timesheets/+page.svelte:155` makes each `<tr>` open the modal via `openReview(ts)` | **SATISFIABLE** |
+| F2c | The forced `?/saveEntries` failure produces a toast | `timesheets/+page.server.ts:337-357` returns `fail(400, { error })` or `toFail(e)`; `submit-feedback.svelte.ts:83-87` toasts `data.error`, and `:91-92` toasts `FRIENDLY_ERROR` even on a raw `error` result. No path is mute | **HOLDS** |
+| Reorder | Probes at step 8, e2e at step 9 — fixtures survive | §3 steps 1-7 are file edits plus `format:check` / `lint` / `check` / `test`. `vitest.config.ts` scopes `pnpm test` to `tests/unit/**` with no `dotenv` wrapper, and the Prisma references in those files are `PrismaClientKnownRequestError` constructions, not live clients. Nothing between step 1 and step 8 touches the database | **SOUND** |
+| D1 / D2 | Stated as authorised steps with measurable preconditions, not questions | Both appear as `**D1 = YES**` / `**D2 = YES, conditionally**` in the Amendment log, in Phase Completion Rules, in Scope, and in Public Contracts. D2's precondition is `pnpm lint` output, read alone. `timesheets/+page.svelte:259` is verified to be exactly the `{form}` line inside the `<TimesheetModal>` tag opened at `:252` — the carve-out is genuinely one line | **HOLDS** |
+| C4 | Line numbers fixed throughout | Every number verified exact: `+page.server.ts:118` and `:147` are the two `fail(403,…)`; `:124` and `:155-156` are the three `fail(400,…)`; `:137-139` and `:169-171` are the two `saved:` returns. On `requests/timesheets/+page.svelte`: `:101` form + `use:enhance`, `:104` `disabled`, `:109` form open, `:113` `use:enhance`, `:119` `disabled`, `:122` `Reject selected…`. §2 step 3 AND checklist item 8 both instruct EXECUTE to locate the two bulk forms by `action=` attribute | **EXACT** |
+| C5 | 5a / 5b split | Both greps present in §4 step 5 and both return **0 hits** today, re-run and confirmed | **HOLDS** |
+| C1 / C2 / C3 | corrections | C1: `form` in `TimesheetModal.svelte` appears only at `:44`, `:52`, `:347`, `:351` — zero readers after §3. C2: `timesheets/+page.svelte:92` is `use:enhance={clearOnSuccess('mine')}` and `:215` carries `&& !openTs` while `:219` does not — restated claim is accurate. C3: six form actions verified at `:510`, `:547`, `:561`, `:572`, `:582`, `:592` plus `ConfirmButton action="?/delete"` at `:533` | **HOLD** |
+| §1 execution | The committed diff matches §1 | `a4b3dcd` deletes exactly the comment + `{#if form?.error}` block (old `:156-164`) and, per the Public Contracts §1 carve-out, drops `form` from `$props()` and `ActionData` from the type import. `grep -c "form?.error\|form\.error\|form?.saved"` on that file = **0**. The `#283` in-dialog surface survives at `:318-325` with `role="alert"` at `:321` | **CORRECT, NO REGRESSION** |
+| Lint gate | `pnpm lint` is usable again | Ran it: **0 errors, 1 warning** (`CalculatorWindow.svelte:82`, pre-existing a11y warning). `ab695c5` added `playwright-report/` and `test-results/` to `eslint.config.js` ignores | **USABLE GATE** |
+
+### Claims REFUTED / gaps found in the amendment
+
+| # | Finding | Source evidence | Severity |
+|---|---|---|---|
+| **N1** | **The D2 lint carve-out stops one file short, and §3 step 3 forbids the follow-on edit.** §3 step 3 says "Keep the `form` prop destructure at `:14` … Do not delete it", while Public Contracts D2 authorises removing `{form}` from `requests/timesheets/+page.svelte:172`. Those two cannot both hold | `grep -n "form\b\|ActionData" "src/routes/(app)/requests/timesheets/+page.svelte"` → `form` occurs at `:12` (type import), `:14` (`$props()`), `:66`, `:67`, `:70`, `:71` (the Banners §3 step 1 deletes) and `:172` (`{form}`) — **and nowhere else**. So once step 1 deletes `:66-72` and D2 deletes `{form}` at `:172`, the destructured `form` at `:14` and the `ActionData` import at `:12` are both orphaned. `a4b3dcd` is empirical proof that eslint DOES flag an orphaned `$props()` destructure in a `.svelte` file — that is exactly why `form`/`ActionData` were removed from `settings/roles/+page.svelte`. §3 as written therefore cannot satisfy Acceptance Criterion 12 ("lint green after every section"). Resolved by E1 | CONCERN |
+| **N2** | The e2e seed shape is under-specified in two ways that decide whether the test passes. The plan says "Create one SUBMITTED timesheet with a distinctive hours label" but names neither the labels already in play nor `submittedAt` | `requests/timesheets/+page.server.ts:47` orders by `submittedAt: 'asc'` — a `null` sorts last in Postgres but the field should be set anyway for realism. And `helpers.ts:73-75` filters review cards by `hoursLabel`; the dev DB and the sibling specs already use `0.00`, `3.00` and `7.00` totals. A seed reusing one of those is ambiguous on sight and in query. Resolved by E2 | CONCERN |
+| **N3** | The plan never tells EXECUTE to confirm the dev server is up before a probe block. `pnpm check` is `svelte-kit sync && svelte-check` (`package.json:20`), and this repo's own working lesson is that running it kills the owner's dev server. §1/§2/§3/§4 each run the full gate set immediately BEFORE their probe block, and every probe drives `http://localhost:5173` | `package.json:20`; §1 step 4→5, §2 step 7→8, §3 step 7→8, §4 step 6→8. A probe that silently hits a dead server reads as "no toast" — the same false-negative class F2 was. Resolved by E3 | CONCERN |
+| **N4** | §3 success criterion 3.3 still describes the e2e precondition as "needs build+preview + **a pending timesheet**", which reads as an external precondition. After the amendment the test seeds its own | Plan §3 success-criteria table, row 3.3, vs §3 step 6 ("it seeds its own fixture"). Cosmetic staleness only; the step text governs | minor |
+| **N5** | C3's table puts the hidden reject form's `?/review` at `:511`; the `action` attribute is at `:510` (the `<form>` tag opens at `:507`) | `grep -n 'action="?/' src/lib/components/timesheets/TimesheetModal.svelte` → `510`. Orientation-only reference; §3 does not edit that form | minor |
+
+Nothing else the amendment touched broke. §2's and §4's rulings, orderings, and success criteria are unchanged by the reorder; the Amendment log's seven rows each describe a change that is actually present in the file.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| 1.1 / 2.1 / 3.1 / 3.2 / 4.1 / 4.2 | the named surface is actually gone / actually wired | Fully-Automated | `grep -c "form?.error\|form\.error\|form?.saved" "src/routes/(app)/settings/roles/+page.svelte"` = 0 (**already 0 at `a4b3dcd`**); `grep -c "Banner" "src/routes/(app)/requests/timesheets/+page.svelte"` = 0; `grep -c "form?.error" src/lib/components/timesheets/TimesheetModal.svelte` = 0; `grep -c "bulkFb.enhance" "src/routes/(app)/requests/timesheets/+page.svelte"` = 2; ellipsis per-file counts 1/1/2/2 | A |
+| 4.3 (half) | no `exact: true` locator newly matches a renamed button | Fully-Automated | `grep -rn "exact: true" tests/e2e/ \| grep -iE "reject\|return"` = 0 — **re-verified 0 at `b886a4d`** | A |
+| 4.3 (other half) | no locator naming the OLD ellipsis string newly MISSES | Fully-Automated | `grep -rniE "Reject…\|Return…" tests/` = 0 — **re-verified 0** | A |
+| 1.5 / 2.5 / 3.9 / 4.5 | nothing else broke | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` after each section. `pnpm lint` is a REAL gate again: 0 errors / 1 pre-existing warning at `ab695c5` | A |
+| Public Contracts / D2 / **E1** | the orphaned `form` props and their type imports do not leave the lint gate red | Fully-Automated | `pnpm lint` run ALONE immediately after each deletion, output read. Cascade to `requests/timesheets/+page.svelte:12,14` is in scope per E1 | B |
+| 2.2 | every bulk outcome carries a non-empty string the toast can read | Fully-Automated | new `describe` in `tests/unit/request-decide-feedback.test.ts`, run by `pnpm test` | B |
+| 3.3 / Goal 6 | a bulk 400 shows exactly ONE visible message and it is the toast | Hybrid | new test in `tests/e2e/form-errors.spec.ts`, run by `CI=1 pnpm test:e2e -- form-errors`. Precondition is now INTERNAL — the test seeds its own SUBMITTED timesheet (`beforeEach`) and deletes it by id (`afterEach`). No `test.skip()`. Both negative controls must be fired and recorded | B |
+| 3.7 | the three `getByRole('main')` specs on `/timesheets` are unaffected | Hybrid | `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets` | A |
+| 4.3 | the renamed buttons are still reachable by every existing locator | Hybrid | `CI=1 pnpm test:e2e -- approval-chain multi-role-sod timesheet-approval` | A |
+| 1.2 / 1.3 / 1.4 | a refused `setActive` reports once; the success path still speaks; the `#283` in-dialog refusal is untouched | Agent-Probe | §1 probes P1, P2, N1, N2, R1. **§1 is committed but NOT yet probed — it is CODE DONE, not VERIFIED** | C |
+| 2.3 / 2.4 | the bulk string reaches the screen; the double-submit lock survives | Agent-Probe | §2 probes P1, P2, P3 + N1/N2 | A |
+| 3.4 / 3.5 / 3.8 | a rejection reports once and not in green; a failed review is visible above the modal; the stored-reason panel survives | Agent-Probe | §3 probes P1, P2, P3, R1, R3 — run BEFORE the §3 e2e | A |
+| 3.6 | `/timesheets` (shared modal) is not silenced | Agent-Probe | §3 probe R2 as `manager@veent.ph` on `cmtuzqmq9001h61zqc4bk89aj`, precondition asserted first — **re-verified satisfiable against source + DB** | A |
+| 4.4 | every renamed button still opens its dialog | Agent-Probe | §4 probes P1-P4 + N1 | A |
+| — | the `skipped` counter returns a green success toast for a total failure | — | named residual: backlog note at `process/features/ui-ux-overhaul/backlog/bulk-timesheet-skipped-counter_NOTE_10-09-26.md`; owner has not ruled | D |
+
+gap-resolution legend: A — proven now. B — gate added/corrected by this plan. C — deferred to a named later step. D — backlog residual.
+
+Legacy line form (retained for existing consumers):
+- settings/roles: [Fully-automated: `grep -c` = 0, already true at `a4b3dcd`] + [agent-probe: P1/P2/N1/N2/R1 — still owed]
+- requests/timesheets bulk: [Fully-automated: new unit tests via `pnpm test`] + [hybrid: `CI=1 pnpm test:e2e -- form-errors`, precondition self-seeded] + [agent-probe: P1/P2/P3]
+- TimesheetModal strip: [Fully-automated: `grep -c "form?.error"` = 0 + `pnpm lint` alone] + [agent-probe: P3, R2, R3]
+- B5 labels: [Fully-automated: per-file ellipsis counts + both locator greps] + [hybrid: three named e2e specs] + [agent-probe: P1-P4]
+- `skipped` counter semantics: [known-gap: documented, backlog note, owner has not ruled]
+
+### Execute-agent instructions (binding — read before Section 2)
+
+| # | Instruction | Trigger condition |
+|---|---|---|
+| E1 | **The D2 cascade.** After §3's deletions, run `pnpm lint` ALONE and read it. If it flags the orphaned `form` prop in `TimesheetModal.svelte`, D2 fires: delete the prop at `:44`/`:52` and the `{form}` at BOTH call sites (`requests/timesheets/+page.svelte:172`, `timesheets/+page.svelte:259` — locate by the `<TimesheetModal` tag). Then run `pnpm lint` AGAIN: `form` at `requests/timesheets/+page.svelte:14` and `ActionData` at `:12` are now orphaned too. **Removing those two is IN SCOPE for §3 and overrides §3 step 3's "keep the destructure at `:14`", which was written before D2 existed.** Make the same shape of edit `a4b3dcd` made on `settings/roles`: `let { data }: { data: PageData } = $props()` and `import type { PageData } from './$types'`. `timesheets/+page.svelte` keeps its own `form` — it is still read at `:215` and `:219`; the `{form}` at `:259` is the only permitted edit there. If lint is green at any stage, stop and change nothing further; record that it was green | §3 step 7 |
+| E2 | **Seed shape for the new e2e.** Set `status: 'SUBMITTED'` and `submittedAt: new Date()` (the queue orders by `submittedAt asc`, `+page.server.ts:47`). Do NOT create `approvalSteps` — the empty chain is what routes the card down the legacy `VIEW_TEAM` branch (`+page.server.ts:52-54`) and makes it visible to `USERS.admin`. Pick a total-hours value that is NOT `0.00`, `3.00` or `7.00`; those three are already in the dev DB and in `helpers.ts:73-75`'s `hoursLabel` filter. Use a period well away from `timesheet-approval.spec.ts`'s "three months out, first of month" so the `@@unique([employeeId, periodStart])` constraint cannot collide | §3 step 6 |
+| E3 | **Confirm the dev server before every probe block.** `pnpm check` (`package.json:20`) has killed the owner's dev server in this repo before. After each section's gate set and BEFORE its probes, confirm `http://localhost:5173` answers. If it does not, ASK the owner to restart it — do not start it yourself, and do not record a probe against a dead server. A dead server reads as "no toast", which is the same false-negative class that made §3's revert rule dangerous | §1 step 5, §2 step 8, §3 step 8, §4 step 8 |
+| E4 | **§1 is CODE DONE, not VERIFIED.** `a4b3dcd` is committed and its grep guard is green, but probes P1, P2, N1, N2, R1 have not run. Run them before the plan is called complete; they may be run at any point (the surface is stable) | before plan close |
+| E5 | Run the e2e suite ONLY as `CI=1 pnpm test:e2e -- <specs>`. `playwright.config.ts:23` sets `workers: 1` under CI, which is what removes the cross-file fixture race between the new `form-errors` seed and `timesheet-approval.spec.ts`. Without `CI=1` the suite runs `fullyParallel` with default workers and the seeds can collide | §3 step 9, §4 step 7 |
+| E6 | `form-errors.spec.ts` today imports only `{ test, expect }` from `@playwright/test` and `{ login, USERS }` from `./helpers` (`:1-2`). The seed needs `import { PrismaClient } from '@prisma/client'` added — mirror `timesheet-approval.spec.ts:1-3`. Do not import the app's `$lib/server/db` singleton into a spec | §3 step 6 |
+| E7 | The bare `getByRole('alert')).toHaveCount(0)` in the new e2e is verified safe on `/requests/timesheets` specifically: `Banner.svelte:42` is the only `role="alert"` producer in play on that route and §3 step 1-2 removes it entirely. No dialog or toast component emits `role="alert"`. Do NOT copy this bare assertion to any other route without re-checking | §3 step 6 |
+| E8 | Record §3 success criterion 3.3's wording as stale (N4) and C3's `:511` as `:510` (N5) in the phase report. Do not amend the plan mid-execution for either — both are orientation-only | §3 report |
+
+### Dimension findings
+
+- Infra fit: **PASS** — the `.env.dev` / shared-database coupling that failed run 1 is now handled correctly. `global-setup.ts:81-82` runs once in `globalSetup`, before any spec, so it cannot race a `beforeEach` seed; the probes run before the e2e (step 8 before step 9) so nothing destroys its own fixture; `CI=1` pins `workers: 1` (`playwright.config.ts:23`) so no sibling spec contends. `TimesheetEntry` cascades (`schema.prisma:676`) so a delete-by-id is exact. Carried CONCERN: N3 (dev server after `pnpm check`).
+- Test coverage: **CONCERN** — the `test.skip()` is gone, the seed pattern exists and is copyable, and both negative controls are real and can genuinely go red. Remaining gap is shape-level only (N2): the plan does not name `submittedAt`, the empty approval chain, or the hours values already taken. E2 closes it.
+- Breaking changes: **PASS** — unchanged from run 1. No server logic, schema, API, or auth. `Banner kind="error"`'s `role="alert"` (`Banner.svelte:42`) is replaced by the toast's `aria-live="assertive"` (`Toaster.svelte:64`); the two hand-rolled strips carry no ARIA role at all. Accessibility net-neutral at worst. One newly-surfaced contract ripple: N1, the `form` prop cascade, which is a lint/type surface only and reaches no runtime behavior.
+- Security surface: **PASS** — no auth, identity, billing, secrets, migration, or trust boundary. No high-risk class. No evidence pack required. The one privileged action the plan takes is DB seeding, and D1 bounds it: seed only, delete by recorded id, never touch a row the agent did not create.
+- Section §1 (B2, `/settings/roles`): **PASS** — executed at `a4b3dcd`, diff matches the plan exactly, grep guard 0, `#283` surface intact. Not yet VERIFIED (probes owed, E4).
+- Section §2 (B3 part 1, bulk voice): **PASS** — every line reference now exact, the `submitFeedback({ inner })` non-double-`update()` claim re-checked against `submit-feedback.svelte.ts:70,82,90`, the shared-guard rationale holds. `?/rejectMany`'s button is `type="button"` and opens the dialog, so probe P2's forced-400 must go through the `?/approveMany` form, as the plan says.
+- Section §3 (B3 part 2, delete banners + modal strip): **CONCERN** — both run-1 FAILs are genuinely fixed and re-proved against source and the live DB. One material CONCERN (N1) plus two procedural ones (N2, N3), all resolved by E1/E2/E3. Highest-risk edit: the D2 lint cascade, because the plan text explicitly contradicts it — sequence it as E1 describes and let `pnpm lint` decide each step.
+- Section §4 (B5, six labels): **PASS** — all twelve ellipsis line numbers re-verified exact (targets 559 / 122 / 213 / 219 / 367 / 374; exclusions 522 / 178 / 240 / 202 / 412 / 360), both locator greps return 0, the 5a/5b split closes run 1's C5.
+
+### Net gate derivation
+
+| Layer 1 dimensions | Status |
+|---|---|
+| Infra fit | PASS |
+| Test coverage | CONCERN |
+| Breaking changes | PASS |
+| Security surface | PASS |
+
+| Layer 2 sections | Status |
+|---|---|
+| §1 — B2 `/settings/roles` | PASS (executed, probes owed) |
+| §2 — B3 part 1, bulk voice | PASS |
+| §3 — B3 part 2, banners + modal strip | CONCERN |
+| §4 — B5, six labels | PASS |
+
+**Totals: 0 FAILs / 2 CONCERNs / 6 PASSes**
+
+**→ Net Gate: CONDITIONAL**
+
+Open gaps:
+- N1 — the D2 lint cascade contradicts §3 step 3. Carried as binding instruction E1 rather than a plan rewrite; `pnpm lint` is the arbiter at each step, so the instruction cannot be followed on a false premise.
+- N2 — e2e seed shape under-specified. Carried as E2.
+- N3 — no dev-server liveness check before the probe blocks. Carried as E3.
+- N4, N5 — cosmetic staleness in §3's criterion 3.3 and C3's `:511`. Recorded, not fixed (E8).
+- `skipped` counter semantics: known-gap: documented as owner-unruled; backlog note is a §2 deliverable.
+
+What this coverage does NOT prove:
+- The grep guards prove a string is absent from a file. They do not prove the right block was cut, that the page still renders, or that anything reaches a screen. Only the probes do that.
+- `pnpm lint` / `pnpm check` / `pnpm test` prove no dangling symbol and no broken type. They cannot see a DOM, so they prove nothing about duplication, colour, stacking, or visibility. `pnpm test` in particular runs `tests/unit/**` in a `node` environment with every Prisma call mocked (`vitest.config.ts`) — it touches no database and renders no component.
+- The new unit tests prove the server hands back a non-empty, distinct string on all five bulk paths. They do NOT prove that string reaches the screen, that it reaches it once, or that the `skipped` counter's green-success-for-total-failure case is acceptable.
+- The new e2e proves message COUNT on `/requests/timesheets` for one deterministic 400 path. It does not prove the success paths, does not prove colour (a green box containing a rejection would still pass a count assertion), does not cover `/timesheets`, and does not cover the review modal.
+- `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets` proves those three specs still pass. It does not prove the `getByRole('main')` scoping is still CORRECT — only that it has not started failing.
+- Probe R2 proves the shared modal is not silenced on `/timesheets` for ONE account, ONE action (`?/saveEntries`), and ONE timesheet. The other five modal actions and the `ConfirmButton` delete are proven by source reading only.
+- Nothing here proves the pre-existing attendance e2e failure is unrelated. It is recorded as pre-existing on the owner's word and this branch's history, not measured.
+- Nothing proves the plan's four commits will be free of an attribution trailer — that is a human check on `git log`.
+
+Gate: CONDITIONAL — 0 FAILs; 2 CONCERNs accepted with the gaps on record and closed by binding execute-agent instructions E1-E8. §2, §3 and §4 may execute. §1 is already committed at `a4b3dcd` and only owes its probes.
+Accepted by: session (run 2 of outer PVL, one recorded validate-fix cycle) — accepted concerns: N1 (D2 lint cascade contradicts §3 step 3 — closed by E1), N2 (e2e seed shape under-specified — closed by E2), N3 (no dev-server liveness check before probe blocks — closed by E3). Residuals N4, N5 recorded as cosmetic. `skipped`-counter semantics remain a documented known-gap pending an owner ruling.
+
+## Autonomous Goal Block
+
+```
+SESSION GOAL
+Execute the B2/B3/B5 feedback-contract plan at
+process/general-plans/active/feedback-duplicate-messages-b2-b3-b5_10-09-26/feedback-duplicate-messages-b2-b3-b5_PLAN_10-09-26.md
+on branch feat/uiux-phase-4. Section 1 is already committed as a4b3dcd. Deliver Sections 2, 3
+and 4 as three further commits, plus Section 1's owed live probes.
+
+CONTRACT SUMMARY
+Validate Contract run 2: Gate CONDITIONAL. 0 FAILs, 2 CONCERNs, both closed by binding
+execute-agent instructions E1-E8 in that contract. Read E1, E2, E3 and E5 before touching
+Section 2. Run-1's BLOCKED contract is retained above as an audit record only.
+
+AUTONOMY RULES
+- Sections are independently committable. Order: 2, then 3 (hard dependency), 4 any time.
+- Commit per section. Conventional messages, exactly as written in the plan. No attribution
+  trailer of any kind. No push unless the owner asks.
+- Run the full gate set after every section: pnpm format:check && pnpm lint && pnpm check &&
+  pnpm test. pnpm lint is a real gate again (0 errors / 1 pre-existing warning).
+- E2E only as CI=1 pnpm test:e2e -- <named specs>.
+- Fixture seeding is authorised (D1): seed with the Prisma-upsert pattern at
+  tests/e2e/timesheet-approval.spec.ts:42-70, record every id, delete every id. Never touch a
+  row you did not create.
+- A section is CODE DONE on green gates; VERIFIED only with recorded DOM evidence and both
+  negative controls fired. Green tests never promote a section.
+
+HARD STOPS
+- Do not start or restart the dev server or the database. Ask the owner (E3).
+- Do not push, do not open a GitHub issue, do not run db:seed:e2e.
+- Section 3 step 9 deletes Elena's SUBMITTED timesheet cmtuzqmpk001561zqp6z2trxk. Warn the
+  owner before running it.
+- If probe P3 shows the toast is not above the open modal, revert Section 3 — do not patch it.
+- If probe R2's precondition fails (no ?/saveEntries control rendered), record
+  BLOCKED — control not rendered. Do NOT revert Section 3 on a false negative.
+- Do not touch app.css or any button class list (issue #27), any +page.server.ts, or
+  src/routes/(app)/timesheets/+page.svelte beyond the single {form} line at :259 under D2.
+- No explanatory comments in source.
+
+NEXT PHASE
+EXECUTE.
+
+EXECUTE START COMMAND
+Start with Section 2 of
+process/general-plans/active/feedback-duplicate-messages-b2-b3-b5_10-09-26/feedback-duplicate-messages-b2-b3-b5_PLAN_10-09-26.md,
+following execute-agent instructions E1, E2, E3, E5, E6 and E7 in the run-2 Validate Contract.
+```
