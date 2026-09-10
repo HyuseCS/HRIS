@@ -33,6 +33,12 @@
 	const channelInputClass =
 		'h-8 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
+	function boardRowClass(b: { status: string }) {
+		if (b.status === 'TAKEN_DOWN')
+			return 'border-l-4 border-yellow-600/50 dark:border-yellow-500/60'
+		return ''
+	}
+
 	// Mirror the server guard (MANAGE_HR) so promoted Managers (#133) see the HR controls
 	// they're actually allowed to use, not just HR_ADMIN/SUPER_ADMIN.
 	const isHrAdmin = $derived(canAny(userRoles, 'MANAGE_HR'))
@@ -169,7 +175,7 @@
 				<ul class="space-y-2">
 					{#each boards as b (b.boardId)}
 						{@const guard = channelGuard(b.boardId)}
-						<li>
+						<li class="rounded-md border px-3 py-2 {boardRowClass(b)}">
 							<form method="POST" action="?/setChannel" use:enhance={guard.enhance}>
 								<input type="hidden" name="boardId" value={b.boardId} />
 								<div class="flex flex-wrap items-center gap-2">
@@ -178,7 +184,7 @@
 										type="checkbox"
 										name="posted"
 										checked={b.live}
-										class="peer align-middle"
+										class="peer align-middle accent-primary"
 									/>
 									<label for="ch-{b.boardId}" class="text-sm font-medium">{b.name}</label>
 									{#if b.live && b.postedAt}
@@ -186,21 +192,23 @@
 											>· posted {formatShortDate(b.postedAt)}</span
 										>
 									{:else if b.status === 'TAKEN_DOWN'}
-										<span class="text-xs text-muted-foreground">· taken down</span>
+										<span class="badge-yellow">Taken down</span>
 									{/if}
-									<!-- URL field: a following sibling of the checkbox, revealed once ticked. -->
-									<input
-										name="url"
-										value={b.url ?? ''}
-										placeholder="https://…"
-										class="order-last hidden w-full flex-1 peer-checked:block sm:order-none sm:w-auto sm:max-w-md {channelInputClass}"
-									/>
-									<button
-										type="submit"
-										disabled={guard.busy}
-										class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-										>{guard.busy ? '…' : 'Save'}</button
+									<div
+										class="order-last invisible grid w-full grid-rows-[0fr] peer-checked:visible peer-checked:grid-rows-[1fr] motion-safe:transition-[grid-template-rows] motion-safe:duration-200 sm:order-none sm:w-auto sm:flex-1"
 									>
+										<div class="flex min-h-0 items-center gap-2 overflow-hidden">
+											<input
+												name="url"
+												value={b.url ?? ''}
+												placeholder="https://…"
+												class="w-full sm:max-w-md {channelInputClass}"
+											/>
+											<button type="submit" disabled={guard.busy} class="btn-row shrink-0"
+												>{guard.busy ? '…' : 'Save'}</button
+											>
+										</div>
+									</div>
 								</div>
 								{#if form && 'channelBoardId' in form && form.channelBoardId === b.boardId}
 									<p class="mt-1 text-xs text-red-600 dark:text-red-400">{form.error}</p>
