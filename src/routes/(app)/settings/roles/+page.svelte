@@ -12,10 +12,10 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { Role } from '@prisma/client'
-	import type { PageData, ActionData } from './$types'
+	import type { PageData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { data }: { data: PageData } = $props()
 
 	// CEO manages roles; Super Admin manages account status. The page opens for either,
 	// so each control is shown only to the capability that owns it (#132).
@@ -152,16 +152,6 @@
 			<BackButton fallback="/settings" label="Settings" preferFallback />
 		{/snippet}
 	</PageHeader>
-
-	<!-- `?/setActive` errors only: a rejected role save renders inside the dialog, where the person
-	     who pressed Save is looking. -->
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
-		>
-			{form.error}
-		</div>
-	{/if}
 
 	<div class="overflow-x-auto rounded-lg border">
 		<table class="w-full min-w-max text-sm">
