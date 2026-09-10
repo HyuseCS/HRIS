@@ -86,10 +86,10 @@
 </script>
 
 <div class="overflow-x-auto pb-4">
-	<div class="flex gap-4 min-w-max">
+	<div class="flex w-full min-w-max gap-4">
 		{#each STAGES as stage}
 			{@const stageApplicants = applicantsInStage(stage)}
-			<div class="w-60 flex-shrink-0">
+			<div class="w-60 shrink-0 grow">
 				<!-- Column Header -->
 				<div
 					class="mb-2 flex items-center justify-between rounded-md px-3 py-2 {STAGE_HEADER_COLORS[
