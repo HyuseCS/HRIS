@@ -107,3 +107,42 @@ describe('requests/timesheets ?/review success feedback', () => {
 		await expect(review(true)).rejects.toThrow('already reviewed')
 	})
 })
+
+describe('requests/timesheets bulk feedback payloads', () => {
+	/**
+	 * `?/approveMany` and `?/rejectMany` had no test at any layer. Phase 04 puts both on
+	 * `submitFeedback`, which reads the action's own `saved` / `error` string, so these pin the
+	 * payload SHAPE the toast depends on: five paths, five non-empty strings, the two successes
+	 * distinct. They do NOT prove the string reaches the screen — that is the e2e and the probe —
+	 * and they say nothing about the `skipped` counter's semantics, which the owner has not ruled on.
+	 */
+	const bulk = (
+		action: 'approveMany' | 'rejectMany',
+		fields: Record<string, string>,
+		roles?: Role[]
+	) =>
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		timesheets.actions[action](event(fields, roles)) as Promise<any>
+
+	it('returns a distinct non-empty saved string for approve and reject', async () => {
+		const approved = await bulk('approveMany', { ids: 'a,b' })
+		const rejected = await bulk('rejectMany', { ids: 'a,b', rejectionReason: 'fix it' })
+
+		expect(typeof approved?.saved).toBe('string')
+		expect(approved.saved.trim().length).toBeGreaterThan(0)
+		expect(typeof rejected?.saved).toBe('string')
+		expect(rejected.saved.trim().length).toBeGreaterThan(0)
+		expect(approved.saved).not.toBe(rejected.saved)
+	})
+
+	it('returns a non-empty error string on each of the three refusal paths', async () => {
+		const noIds = await bulk('approveMany', { ids: '' })
+		const noReason = await bulk('rejectMany', { ids: 'a', rejectionReason: '  ' })
+		const forbidden = await bulk('approveMany', { ids: 'a' }, ['EMPLOYEE'])
+
+		expect(noIds?.data?.error).toBe('No timesheets selected')
+		expect(noReason?.data?.error).toBe('A reason is required to reject.')
+		expect(forbidden?.data?.error).toBe('Insufficient permissions')
+		expect(forbidden?.status).toBe(403)
+	})
+})

@@ -9,6 +9,7 @@
 	import { formatShortDate } from '$lib/utils/format'
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -38,6 +39,8 @@
 			}
 		}
 	}
+
+	const bulkFb = submitFeedback({ inner: clearOnSuccess })
 
 	const allIds = $derived(data.pendingTimesheets.map((t) => t.id))
 	const allSelected = $derived(allIds.length > 0 && allIds.every((id) => selected.includes(id)))
@@ -98,7 +101,7 @@
 						onclick={() => (selected = [])}
 						class="text-sm text-muted-foreground hover:underline">Clear</button
 					>
-					<form method="POST" action="?/approveMany" use:enhance={clearOnSuccess}>
+					<form method="POST" action="?/approveMany" use:enhance={bulkFb.enhance}>
 						<input type="hidden" name="ids" value={selected.join(',')} />
 						<button
 							disabled={busy}
@@ -110,7 +113,7 @@
 						bind:this={rejectForm}
 						method="POST"
 						action="?/rejectMany"
-						use:enhance={clearOnSuccess}
+						use:enhance={bulkFb.enhance}
 					>
 						<input type="hidden" name="ids" value={selected.join(',')} />
 						<input type="hidden" name="rejectionReason" value={bulkReason} />
