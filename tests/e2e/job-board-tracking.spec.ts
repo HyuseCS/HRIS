@@ -60,14 +60,16 @@ test.describe('Job-board tracking (#117)', () => {
 
 		// Save the URL. On a taken-down tile this Save also re-posts the board.
 		await jobStreet.locator('input[name="url"]').fill('https://jobstreet.com/jobs/123')
+		const savedOk = page.waitForResponse((r) => r.url().includes('setChannel'))
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
-		await expect(jobStreet.locator('input[name="url"]')).toHaveValue(
-			'https://jobstreet.com/jobs/123'
-		)
+		await savedOk
+		await expect(jobStreet.getByText(/^Posted /)).toBeVisible()
 
 		// A bad URL is rejected with a field-level error.
 		await jobStreet.locator('input[name="url"]').fill('not-a-url')
+		const savedBad = page.waitForResponse((r) => r.url().includes('setChannel'))
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
+		await savedBad
 		await expect(jobStreet.getByText(/valid URL/)).toBeVisible()
 
 		// Close the posting → the still-live board is surfaced for takedown.
