@@ -1,9 +1,9 @@
 ---
 name: context:all-uxui
 description: "Svelte 5 runes, the HSL token system, button/dialog conventions, and the accessibility floors — the uxui group entrypoint/router"
-keywords: ui, ux, svelte, runes, component, tailwind, design tokens, dark mode, dialog, modal, button, form, accessibility, a11y, touch target, focus trap, table, snippet, layout
+keywords: ui, ux, svelte, runes, component, tailwind, design tokens, dark mode, dialog, modal, button, form, accessibility, a11y, touch target, focus trap, table, snippet, layout, toast, banner, feedback, aria-live, error surface
 related: [context:all-auth]
-date: 09-09-26
+date: 10-09-26
 ---
 
 # UX/UI Context
@@ -107,6 +107,35 @@ the #302 UI audit.
   browser) a focus-order check would naturally run in. The fix verified correctly only against
   `pnpm build && node build/index.js`. Name the build mode explicitly in any focus-order
   verification step; a claim proven in dev can be false in prod, and vice versa.
+
+## Feedback Surfaces — One Message Per Action
+
+The phase-04 rule, applied six times now: **one message per action, whichever surface sits
+NEAREST THE BUTTON.** It is not "delete the banner" — both directions have shipped:
+
+- `661719d`, `1a17ebd`, `a4b3dcd` — the message sat in a page header or scrolled off the top of a
+  `size="full"` dialog while the button was in the footer. Banner/strip deleted, toast kept.
+- `0a2f11d` — the inline error sat physically ON the row beside its own button. Inline kept, toast
+  suppressed with `submitFeedback({ error: null })`.
+
+Selector facts, and they decide whether any assertion means anything:
+
+- **`getByRole('alert')` matches the `Banner` component ONLY**, for `kind="error"` and
+  `kind="warning"` (`Banner.svelte:42`). The toast is not `role="alert"`.
+- The toast region is `div[role="status"]` (`Toaster.svelte:48`).
+- **Success toasts carry NO `aria-live`.** `Toaster.svelte:64` sets `aria-live="assertive"` only
+  when `kind === 'error'`; every other kind gets `undefined`. So a probe selecting
+  `[role="status"] [aria-live]` sees **error toasts only** and reports zero for every success
+  toast that is plainly on screen. Distrust a "no toast" result from that selector before
+  reporting it as a product failure (hit 10-09-26; the agent correctly re-checked instead of
+  filing a bug).
+- Hand-rolled `bg-destructive` strips carry **no ARIA role at all** — they match neither locator.
+  Assert on their class scoped to a container, never on a role.
+
+A rejection currently reports through the `saved` key (`?/review`, and recruitment's
+`Posting sent back to draft.`), so `submitFeedback` dispatches `kind: 'success'` and announces a
+rejection in **green**. Owner ruling owed —
+`process/features/ui-ux-overhaul/backlog/rejection-toast-is-green_NOTE_10-09-26.md`.
 
 ## Svelte 5 Binding Gotchas
 

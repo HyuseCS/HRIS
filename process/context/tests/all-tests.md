@@ -1,14 +1,14 @@
 ---
 name: context:all-tests
 description: "Vitest/Playwright commands, the gate order, and the five ways a green suite has hidden a real hole here — the tests group entrypoint/router"
-keywords: test, testing, vitest, playwright, e2e, unit, verification, mutation, gate, coverage, flaky, mock, live verification, negative control, regression
+keywords: test, testing, vitest, playwright, e2e, unit, verification, mutation, gate, coverage, flaky, mock, live verification, negative control, regression, spec filter, skipped test, probe, agent probe
 related: [context:all-cicd]
-date: 09-09-26
+date: 10-09-26
 ---
 
 # Veent HRIS - All Tests
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 Attach this file first when the task involves testing, verification, or test debugging.
 
@@ -59,6 +59,23 @@ It does not cover CI pipeline shape — that is `process/context/cicd/all-cicd.m
 | Lint | `pnpm lint` | |
 | Format | `pnpm format:check` | |
 
+**`pnpm test:e2e -- <specs>` DOES NOT FILTER. It silently runs all 143 tests.** The script
+(`package.json:15`) is `dotenv -e .env.dev -- playwright test`, which already ends in a `--`
+passthrough, so `pnpm test:e2e -- form-errors` becomes `... playwright test -- form-errors`.
+Playwright ignores the stray `--` and everything after it, runs the whole suite, and says nothing.
+**Anyone who has ever run a scoped e2e in this repo actually ran all 143 tests** — every earlier
+gate log claiming a small filtered count is suspect, and a failure may have been mis-attributed to
+the specs named on the command line. The working form is:
+
+```
+CI=1 pnpm exec dotenv -e .env.dev -- playwright test <specs>
+```
+
+`CI=1` is still required: `playwright.config.ts:23` sets `workers: 1` under CI, which is what
+removes the cross-spec fixture race on the shared `.env.dev` database. Found 10-09-26 when a
+"scoped" 3-spec run re-triggered the unrelated pre-existing attendance failure. Backlog note:
+`process/features/ui-ux-overhaul/backlog/e2e-spec-filter-silently-ignored_NOTE_10-09-26.md`.
+
 **Run `pnpm prisma generate` before believing a red `pnpm check`.** A stale generated client
 produces phantom type errors that do not match the code on disk. This has been misdiagnosed at
 least three times.
@@ -98,6 +115,18 @@ suite coexisted with a real defect:
    that wide, not because the rule applied. Assert the **computed style**, not the box.
 5. **The locator was wrong, not the code.** A probe reported a control missing because the regex
    was `/AM\/PM/` and the label is `AM / PM break length`.
+6. **A test that SKIPS is not a test that passes.** A planned e2e carried a `test.skip()` on the
+   false premise that no pending-timesheet fixture helper existed (it does —
+   `timesheet-approval.spec.ts:42-70`). The suite shares `.env.dev` with the dev server and
+   `global-setup.ts:81-82` wipes that queue before any spec runs, so the guard would have skipped
+   silently and forever while the suite reported green. VALIDATE caught it before EXECUTE.
+   **A skip is a hole with a green tick on it** — a spec that can skip must fail instead, or seed
+   its own fixture.
+7. **A probe pointed at the wrong account reads as a product failure.** A mandatory regression
+   probe was written against a non-manager account for a control gated on `isManager`, and the plan
+   said to REVERT the change if the probe showed no toast. It would have reverted good work on a
+   false negative. **Assert the control is PRESENT before measuring it**, and make a failed
+   precondition `BLOCKED`, never a revert trigger.
 
 ### What to do instead
 
@@ -106,6 +135,13 @@ suite coexisted with a real defect:
 - **Verify live, before AND after,** with the same script, keeping negative controls on both sides.
 - **Name the control exactly and assert something positive.** "The card is absent" proves nothing —
   it is equally consistent with a typo in your selector.
+- **Prove a zero is not vacuous.** Before trusting any `toHaveCount(0)` / "there are no green
+  boxes" claim, inject a matching node into the live DOM, confirm the selector returns it, then
+  remove it. A zero from a selector that can never return one is not evidence. (Done 10-09-26 with
+  a fake green banner while proving the timesheet-review surface.)
+- **Assert the precondition before the measurement.** Every probe should first prove the control
+  it is about to drive is rendered and enabled. A dead dev server, a wrong account, or a scrolled
+  container all read identically to "the feature is broken".
 - **Plant a marker** so you can find the record you created, and assert against the **database
   row**, not against a value you injected.
 - **After adding a production dependency, load an affected page in a real browser** before calling
@@ -148,6 +184,16 @@ suite coexisted with a real defect:
 - **Playwright's browser cache can silently drop a browser.** If `pnpm test:e2e` fails immediately
   with `browserType.launch: Executable doesn't exist`, run `pnpm exec playwright install chromium`
   (or the missing browser) — this is environmental, not a code failure.
+- **A local gate that is red for irrelevant reasons is a gate nobody reads.** `pnpm lint` was red
+  with 475 errors from bundled `playwright-report/` files after any e2e run, while CI stayed green
+  because it lints a fresh checkout. Fixed 10-09-26 (`ab695c5`) by adding `playwright-report/` and
+  `test-results/` to `eslint.config.js` ignores. If a local gate disagrees with CI, check what the
+  gate is reading before believing either.
+- **There is still no shared "exactly one visible message" e2e helper.** Three plans in a row have
+  hand-written the `[role="status"] [aria-live="assertive"]` + `toHaveCount(1)` +
+  `getByRole('alert')` count-0 triple. `getByRole('alert')` matches `Banner` only; the toast is
+  never `role="alert"`. Every banner-to-toast migration silently narrows what that selector can
+  catch.
 - **When a shared component's markup changes, grep the WHOLE `tests/e2e/` suite for every call
   site, not just the spec you happened to open.** A `PeriodPicker` button-label change once broke
   three specs in files unrelated to the change that made it (`5a1d3b0`, 04-09-26).
