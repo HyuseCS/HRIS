@@ -113,8 +113,10 @@ describe('requests/timesheets bulk feedback payloads', () => {
 	 * `?/approveMany` and `?/rejectMany` had no test at any layer. Phase 04 puts both on
 	 * `submitFeedback`, which reads the action's own `saved` / `error` string, so these pin the
 	 * payload SHAPE the toast depends on: five paths, five non-empty strings, the two successes
-	 * distinct. They do NOT prove the string reaches the screen — that is the e2e and the probe —
-	 * and they say nothing about the `skipped` counter's semantics, which the owner has not ruled on.
+	 * distinct. They do NOT prove the string reaches the screen — that is the e2e and the probe.
+	 * The `skipped` counter's semantics are now ruled: a batch where nothing succeeded returns
+	 * `fail(400, { error })`, and any batch with at least one success keeps the green `saved`
+	 * string, skipped count and all.
 	 */
 	const bulk = (
 		action: 'approveMany' | 'rejectMany',
@@ -144,5 +146,39 @@ describe('requests/timesheets bulk feedback payloads', () => {
 		expect(noReason?.data?.error).toBe('A reason is required to reject.')
 		expect(forbidden?.data?.error).toBe('Insufficient permissions')
 		expect(forbidden?.status).toBe(403)
+	})
+
+	it('returns fail(400) when every row of an approve batch failed', async () => {
+		reviewTimesheetMock.mockRejectedValue(new Error('x'))
+		const res = await bulk('approveMany', { ids: 'a,b,c' })
+
+		expect(res?.status).toBe(400)
+		expect(typeof res?.data?.error).toBe('string')
+		expect(res.data.error.trim().length).toBeGreaterThan(0)
+	})
+
+	it('keeps the green saved string with its skipped count on a partial approve batch', async () => {
+		reviewTimesheetMock.mockRejectedValueOnce(new Error('x'))
+		const res = await bulk('approveMany', { ids: 'a,b,c' })
+
+		expect(res?.status).toBeUndefined()
+		expect(res?.saved).toMatch(/, 1 skipped\.$/)
+	})
+
+	it('returns fail(400) when every row of a reject batch failed', async () => {
+		reviewTimesheetMock.mockRejectedValue(new Error('x'))
+		const res = await bulk('rejectMany', { ids: 'a,b,c', rejectionReason: 'fix it' })
+
+		expect(res?.status).toBe(400)
+		expect(typeof res?.data?.error).toBe('string')
+		expect(res.data.error.trim().length).toBeGreaterThan(0)
+	})
+
+	it('keeps the green saved string with its skipped count on a partial reject batch', async () => {
+		reviewTimesheetMock.mockRejectedValueOnce(new Error('x'))
+		const res = await bulk('rejectMany', { ids: 'a,b,c', rejectionReason: 'fix it' })
+
+		expect(res?.status).toBeUndefined()
+		expect(res?.saved).toMatch(/, 1 skipped\.$/)
 	})
 })

@@ -134,6 +134,11 @@ export const actions: Actions = {
 				skipped++
 			}
 		}
+		if (done === 0)
+			return fail(400, {
+				error:
+					'No timesheets were approved. They may already have been reviewed, or they are not yours to act on.'
+			})
 		return {
 			saved: `Approved ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}
@@ -166,6 +171,11 @@ export const actions: Actions = {
 				skipped++
 			}
 		}
+		if (done === 0)
+			return fail(400, {
+				error:
+					'No timesheets were rejected. They may already have been reviewed, or they are not yours to act on.'
+			})
 		return {
 			saved: `Rejected ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}
