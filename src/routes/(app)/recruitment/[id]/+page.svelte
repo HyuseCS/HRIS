@@ -254,7 +254,8 @@
 									<button
 										type="submit"
 										disabled={guard.busy}
-										class="btn-row-positive bg-green-600/10">{guard.busy ? '…' : 'Save'}</button
+										class="btn-row-positive bg-green-600/10 hover:bg-green-600/25"
+										>{guard.busy ? '…' : 'Save'}</button
 									>
 								</div>
 							</form>
