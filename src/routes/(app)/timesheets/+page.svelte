@@ -256,7 +256,6 @@
 	isHrAdmin={data.isHrAdmin}
 	canModify={data.canModify}
 	myEmployeeId={data.myEmployeeId}
-	{form}
 />
 
 {#if data.canCreate}

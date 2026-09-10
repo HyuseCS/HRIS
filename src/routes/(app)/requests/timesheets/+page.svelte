@@ -2,7 +2,6 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
 	import { slide } from 'svelte/transition'
@@ -10,9 +9,9 @@
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
-	import type { PageData, ActionData } from './$types'
+	import type { PageData } from './$types'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { data }: { data: PageData } = $props()
 
 	// Read-only review modal (approve/reject only).
 	type Timesheet = PageData['pendingTimesheets'][number]
@@ -65,14 +64,6 @@
 
 <div class="space-y-6">
 	<PageHeader title="Timesheet Approvals" description="Review and approve submitted timesheets." />
-
-	{#if form?.error}
-		<Banner kind="error" message={form.error} />
-	{/if}
-
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
-	{/if}
 
 	{#if data.pendingTimesheets.length === 0}
 		<div class="rounded-md border bg-muted/50">
@@ -172,7 +163,7 @@
 	{/if}
 </div>
 
-<TimesheetModal bind:ts={openTs} mode="review" isManager={true} {form} />
+<TimesheetModal bind:ts={openTs} mode="review" isManager={true} />
 
 <ReasonDialog
 	bind:open={rejectDialogOpen}

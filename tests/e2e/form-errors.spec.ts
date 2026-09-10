@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { PrismaClient } from '@prisma/client'
 import { login, USERS } from './helpers'
 
 // #106: both pages returned fail(..., { error }) from their actions, but neither
@@ -87,4 +88,127 @@ test('a refused status change on a posting reports once, as a toast', async ({ p
 	await expect(toast).toHaveText(/Invalid status/)
 	await expect(toast).toHaveCount(1)
 	await expect(page.getByRole('alert').filter({ hasText: /Invalid status/ })).toHaveCount(0)
+})
+
+// The approvals queue had zero coverage at any layer: nothing asserted approveMany or
+// rejectMany reported anything at all. Phase 04 deleted both page banners there, so the
+// toast is now the only voice, and this pins that it speaks exactly once.
+//
+// The queue is empty by the time this file runs (global-setup clears the employee's
+// timesheets), so the test seeds the card it needs and deletes it again.
+test.describe('the approvals queue bulk actions', () => {
+	const SEED_HOURS = 6.5
+	const SEED_CARD = '6.5 hrs'
+
+	function seedPeriod() {
+		const d = new Date()
+		const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 7, 5))
+		const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 4))
+		return { start, end }
+	}
+
+	const { start: SEED_START, end: SEED_END } = seedPeriod()
+	let seededTimesheetId = ''
+
+	test.beforeEach(async () => {
+		const db = new PrismaClient()
+		try {
+			const employee = await db.employee.findFirstOrThrow({
+				where: { user: { email: USERS.employee.email } },
+				select: { id: true }
+			})
+			const ts = await db.timesheet.upsert({
+				where: {
+					employeeId_periodStart: { employeeId: employee.id, periodStart: SEED_START }
+				},
+				create: {
+					employeeId: employee.id,
+					periodStart: SEED_START,
+					periodEnd: SEED_END,
+					status: 'SUBMITTED',
+					submittedAt: new Date(),
+					totalHours: SEED_HOURS,
+					entries: {
+						create: [
+							{
+								date: SEED_START,
+								hoursWorked: SEED_HOURS,
+								otHours: 0,
+								notes: 'e2e bulk-feedback fixture'
+							}
+						]
+					}
+				},
+				update: {
+					periodEnd: SEED_END,
+					status: 'SUBMITTED',
+					submittedAt: new Date(),
+					reviewedAt: null,
+					reviewedById: null,
+					rejectionReason: null,
+					totalHours: SEED_HOURS,
+					entries: {
+						deleteMany: {},
+						create: [
+							{
+								date: SEED_START,
+								hoursWorked: SEED_HOURS,
+								otHours: 0,
+								notes: 'e2e bulk-feedback fixture'
+							}
+						]
+					}
+				},
+				select: { id: true }
+			})
+			seededTimesheetId = ts.id
+			// An empty approval chain routes the card down the legacy VIEW_TEAM branch, which is
+			// what makes it visible to the admin account this test uses.
+			await db.approvalStep.deleteMany({ where: { timesheetId: seededTimesheetId } })
+		} finally {
+			await db.$disconnect()
+		}
+	})
+
+	test.afterEach(async () => {
+		if (!seededTimesheetId) return
+		const db = new PrismaClient()
+		try {
+			await db.timesheet.delete({ where: { id: seededTimesheetId } })
+		} finally {
+			await db.$disconnect()
+		}
+		seededTimesheetId = ''
+	})
+
+	test('a refused bulk approve on the timesheet queue reports exactly once, as a toast', async ({
+		page
+	}) => {
+		await login(page, USERS.admin)
+		await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
+
+		const card = page
+			.locator('[role="button"]', { hasText: 'Employee, Elena' })
+			.filter({ hasText: SEED_CARD })
+		await expect(card).toHaveCount(1)
+
+		// Selecting the card is what renders the bulk bar; retry until hydration lands.
+		const bulkForm = page.locator('form[action*="approveMany"]')
+		await expect(async () => {
+			await card.getByRole('checkbox', { name: 'Select timesheet' }).check()
+			await expect(bulkForm).toBeVisible({ timeout: 1000 })
+		}).toPass({ timeout: 15000 })
+
+		await bulkForm.locator('input[name="ids"]').evaluate((el: HTMLInputElement) => {
+			el.value = ''
+		})
+		await bulkForm.getByRole('button', { name: 'Approve selected' }).click()
+
+		const toast = page.locator('[role="status"] [aria-live="assertive"]')
+		await expect(toast).toHaveText(/No timesheets selected/)
+		await expect(toast).toHaveCount(1)
+		// Safe on this route specifically: Banner was the only role="alert" producer here and
+		// phase 04 removed it entirely.
+		await expect(page.getByRole('alert')).toHaveCount(0)
+	})
 })

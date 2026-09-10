@@ -41,7 +41,6 @@
 		/** #165: false makes the edit surface strictly read-only (Employee role on /timesheets). */
 		canModify?: boolean
 		myEmployeeId?: string | null
-		form?: { error?: string } | null
 	}
 
 	let {
@@ -50,8 +49,7 @@
 		isManager,
 		isHrAdmin = false,
 		canModify = true,
-		myEmployeeId = null,
-		form = null
+		myEmployeeId = null
 	}: Props = $props()
 
 	type Row = {
@@ -343,14 +341,6 @@
 					<p class="text-lg font-semibold">{canEdit ? entries.length : ts.entries.length}</p>
 				</div>
 			</div>
-
-			{#if form?.error}
-				<div
-					class="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive"
-				>
-					{form.error}
-				</div>
-			{/if}
 
 			{#if ts.status === 'REJECTED' && ts.rejectionReason}
 				<div class="rounded-md border border-red-500/20 bg-red-500/5 px-4 py-2 text-sm">
