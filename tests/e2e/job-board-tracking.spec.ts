@@ -53,7 +53,7 @@ test.describe('Job-board tracking (#117)', () => {
 		const jobStreet = page.locator('[data-board="JobStreet"]')
 		if ((await jobStreet.count()) === 0) {
 			await page.getByRole('button', { name: 'Add board' }).click()
-			await page.getByLabel('Board').selectOption({ label: 'JobStreet' })
+			await page.getByLabel('Board', { exact: true }).selectOption({ label: 'JobStreet' })
 			await page.getByRole('button', { name: 'Add', exact: true }).click()
 			await expect(jobStreet).toBeVisible()
 		}

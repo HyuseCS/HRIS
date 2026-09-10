@@ -24,7 +24,7 @@
 	const derive = submitFeedback({ success: null })
 	const lock = submitFeedback()
 	const unlock = submitFeedback()
-	const saveTimesheet = submitFeedback({ success: null })
+	const saveTimesheet = submitFeedback()
 	const deriveTeam = submitFeedback({ success: null })
 	const lockTeam = submitFeedback()
 	const unlockTeam = submitFeedback()
