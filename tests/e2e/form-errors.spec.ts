@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
-import { login, USERS } from './helpers'
+import { findTimesheetCard, login, USERS } from './helpers'
 
 // #106: both pages returned fail(..., { error }) from their actions, but neither
 // rendered it — benefits never destructured `form` at all, and performance nested the
@@ -94,8 +94,9 @@ test('a refused status change on a posting reports once, as a toast', async ({ p
 // rejectMany reported anything at all. Phase 04 deleted both page banners there, so the
 // toast is now the only voice, and this pins that it speaks exactly once.
 //
-// The queue is empty by the time this file runs (global-setup clears the employee's
-// timesheets), so the test seeds the card it needs and deletes it again.
+// Global-setup clears this employee's timesheets, so the test seeds the card it needs and
+// deletes it again. Other people's rows stay, and the queue paginates at 10, so the seeded
+// card is reached through the shared page-walk rather than by landing on page 1.
 test.describe('the approvals queue bulk actions', () => {
 	const SEED_HOURS = 6.5
 	const SEED_CARD = '6.5 hrs'
@@ -185,24 +186,29 @@ test.describe('the approvals queue bulk actions', () => {
 		page
 	}) => {
 		await login(page, USERS.admin)
-		await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
 
-		const card = page
-			.locator('[role="button"]', { hasText: 'Employee, Elena' })
-			.filter({ hasText: SEED_CARD })
+		const card = await findTimesheetCard(page, SEED_CARD)
 		await expect(card).toHaveCount(1)
 
-		// Selecting the card is what renders the bulk bar; retry until hydration lands.
+		// The bar is present whenever the queue has rows; selecting is what ENABLES it.
 		const bulkForm = page.locator('form[action*="approveMany"]')
+		const approveSelected = bulkForm.getByRole('button', { name: 'Approve selected' })
+		await expect(bulkForm).toBeVisible()
+		await expect(approveSelected).toBeDisabled()
+
+		// Retry until hydration lands, as before — what is waited on moves from *appears* to
+		// *enables*.
 		await expect(async () => {
 			await card.getByRole('checkbox', { name: 'Select timesheet' }).check()
-			await expect(bulkForm).toBeVisible({ timeout: 1000 })
+			await expect(approveSelected).toBeEnabled({ timeout: 1000 })
 		}).toPass({ timeout: 15000 })
 
+		// Order matters: the button is disabled until something is selected, so the ids are
+		// blanked only after the box is checked.
 		await bulkForm.locator('input[name="ids"]').evaluate((el: HTMLInputElement) => {
 			el.value = ''
 		})
-		await bulkForm.getByRole('button', { name: 'Approve selected' }).click()
+		await approveSelected.click()
 
 		const toast = page.locator('[role="status"] [aria-live="assertive"]')
 		await expect(toast).toHaveText(/No timesheets selected/)

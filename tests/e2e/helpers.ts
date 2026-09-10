@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from '@playwright/test'
+import { expect, type Browser, type Locator, type Page } from '@playwright/test'
 
 export const USERS = {
 	admin: { email: 'admin@veent.ph', password: 'Admin@1234' },
@@ -57,6 +57,32 @@ export async function login(page: Page, user: { email: string; password: string 
 }
 
 /**
+ * Locate one review card in the /requests/timesheets queue, walking `Next →` until it is
+ * found. The queue paginates at 10 and is ordered `submittedAt asc`, so a freshly seeded
+ * fixture is the newest row and lands on the LAST page — not page 1.
+ */
+export async function findTimesheetCard(
+	page: Page,
+	hoursLabel: string,
+	employeeName = 'Employee, Elena'
+): Promise<Locator> {
+	await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
+	// The walk always advances 1 → 2 → 3…, so the next page number is known; waiting on a
+	// bare /page=\d+/ would match the page already in the URL and return before the nav lands.
+	for (let next = 2; next <= 20; next++) {
+		const card = page
+			.locator('[role="button"]', { hasText: employeeName })
+			.filter({ hasText: hoursLabel })
+		if (await card.count()) return card
+		const link = page.getByRole('link', { name: 'Next →' })
+		if (!(await link.count())) break
+		await link.click()
+		await page.waitForURL(new RegExp(`[?&]page=${next}(&|$)`), { waitUntil: 'domcontentloaded' })
+	}
+	throw new Error(`no timesheet card matching ${hoursLabel} on any page`)
+}
+
+/**
  * Advance a SUBMITTED timesheet past its VERIFY and APPROVE stages (#134) by logging in
  * as the verifier then the approver and approving the matching review card. `hoursLabel`
  * (e.g. '0.0 hrs' / '7.0 hrs') disambiguates concurrent specs' cards in the shared queue.
@@ -66,10 +92,7 @@ export async function verifyAndApproveTimesheet(browser: Browser, hoursLabel: st
 		const ctx = await browser.newContext()
 		const page = await ctx.newPage()
 		await login(page, user)
-		await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
-		const card = page
-			.locator('[role="button"]', { hasText: 'Employee, Elena' })
-			.filter({ hasText: hoursLabel })
+		const card = await findTimesheetCard(page, hoursLabel)
 		await expect(card).toBeVisible()
 		const dialog = page.getByRole('dialog', { name: 'Timesheet review' })
 		await expect(async () => {
@@ -77,7 +100,15 @@ export async function verifyAndApproveTimesheet(browser: Browser, hoursLabel: st
 			await expect(dialog).toBeVisible({ timeout: 1000 })
 		}).toPass({ timeout: 15000 })
 		await dialog.getByRole('button', { name: 'Approve' }).click()
+		// Page-local: proves the card left THIS page. Once the queue paginates that is no longer
+		// the same claim as leaving the queue, so re-walk every page and require the helper's
+		// named miss — a card that merely moved pages would resolve here instead.
 		await expect(card).toHaveCount(0)
+		const afterApproval = await findTimesheetCard(page, hoursLabel).then(
+			() => 'the card is still in the queue',
+			(e: Error) => e.message
+		)
+		expect(afterApproval).toMatch(/no timesheet card matching/)
 		await ctx.close()
 	}
 }
