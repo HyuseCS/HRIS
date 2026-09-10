@@ -23,7 +23,9 @@ The job posting detail page reports a refused status change twice: once as a pag
 2. Forcing `status=BOGUS` on `?/updateStatus` shows exactly ONE error toast reading `Invalid status`, and zero `role="alert"` nodes **on a posting that is OPEN or has no still-live boards** (see the `role="alert"` precondition below).
 3. A valid status change still shows a success toast (feedback path intact).
 4. The board-row inline error and the `convert` banner both still render on the same page.
-5. `pnpm format:check && pnpm lint && pnpm check && pnpm test` all green, plus `pnpm test:e2e -- form-errors`. `format:check` is RED at the baseline — checklist step 0 clears it first.
+5. `pnpm format:check && pnpm lint && pnpm check && pnpm test` all green, plus
+   `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors`. `format:check` is RED at
+   the baseline — checklist step 0 clears it first.
 6. One commit, conventional message, no attribution trailer.
 
 ## Phase Completion Rules
@@ -135,7 +137,7 @@ Accessibility contract is preserved: the deleted `Banner kind="error"` carried `
 
 5. **Run the new e2e** (build + preview tier):
    ```
-   pnpm test:e2e -- form-errors
+   CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors
    ```
 
 6. **Run the live probe** (section below) before committing.
@@ -248,7 +250,7 @@ Test gates:
 | AC5c | no unit/component test depended on the banner | Fully-Automated | `pnpm test` — 208 files / 2427 tests pass (measured green at `10faabc`) | A |
 | AC5d | the deletion leaves no type or svelte-check error | Fully-Automated | `pnpm check` — NOT RUN in VALIDATE: it runs `svelte-kit sync`, which rewrites `.svelte-kit/` and stops the owner's dev server on 5173 | C |
 | AC1 | exactly two `<Banner` tags remain | Fully-Automated | `grep -c "<Banner" "src/routes/(app)/recruitment/[id]/+page.svelte"` returns 2 | B |
-| AC2 | a refused `updateStatus` reports once, as one assertive toast, and the header banner is gone | Hybrid | new `tests/e2e/form-errors.spec.ts` case via `pnpm test:e2e -- form-errors` — precondition: build+preview on 4173 + seeded DB + posting OPEN | B |
+| AC2 | a refused `updateStatus` reports once, as one assertive toast, and the header banner is gone | Hybrid | new `tests/e2e/form-errors.spec.ts` case via `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors` — precondition: build+preview on 4173 + seeded DB + posting OPEN | B |
 | AC3 | a valid status change still toasts success (feedback path intact) | Agent-Probe | live probe N2 on 5173 — submit the untouched form, assert one `[role="status"] > div` carrying the server's own words, then restore the status | B |
 | AC2/AC3 | the assertions can go red (negative control) | Agent-Probe | live probe N1 — assert `Invalid stAAAtus`; it MUST fail | B |
 | AC4a | the board-row inline error still renders and still does not toast | Agent-Probe | live probe R1 — malformed `?/setChannel` URL; `p.text-red-600` inside that row's form only, no toast (`channelGuard` is `submitFeedback({ error: null })`) | B |
@@ -266,7 +268,7 @@ test("should leave exactly two Banner tags in the recruitment detail page", () =
 Legacy line form:
 - lint/format/type: [Fully-automated: `pnpm lint`] | [Fully-automated: `pnpm format:check`] | [deferred: `pnpm check`, kills the owner's dev server]
 - unit: [Fully-automated: `pnpm test`]
-- e2e: [hybrid: `pnpm test:e2e -- form-errors` + precondition build+preview on 4173, seeded DB, posting OPEN]
+- e2e: [hybrid: `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors` + precondition build+preview on 4173, seeded DB, posting OPEN]
 - live behaviour: [agent-probe: positive + N1 + N2 + R1 on 5173]
 - convert banner: [known-gap: R2 documented, no hired-applicant fixture]
 
@@ -319,7 +321,8 @@ including seven commits of drift this plan did not cover.
   fixture`, a documented Known-Gap, not a pass.
 - AC5 (`format:check && lint && check && test` + e2e green) — `format:check`, `lint` clean per
   commit history; `pnpm test` unit suite not re-run this session; `pnpm check` and
-  `pnpm test:e2e -- form-errors` were **never run** (owner's dev server was up throughout).
+  `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors` were **never run** (owner's
+  dev server was up throughout).
 - AC6 (one commit, conventional, no attribution) — MET for the planned change (`661719d`); the
   session as a whole is nine additional commits outside this plan's blast radius (see report).
 

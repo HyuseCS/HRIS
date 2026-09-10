@@ -396,7 +396,7 @@ at `5e5cdfe`.
     `requestSubmit()`), keeping the `aria-pressed`→`checked` intent and the existing
     `aria-label`. If a real checkbox breaks the progressive-enhancement submit, fall back to keeping
     the button and raising the box to `h-6 w-6` (24px) — record which path was taken. Note: the
-    `src/app.css` coarse-pointer 44px floor deliberately excludes checkboxes, so this is a
+    `src/app.css` coarse-pointer 24px floor deliberately excludes checkboxes, so this is a
     desktop-size fix, not a floor change.
 35. **Emoji paperclip.** `requests/approvals/+page.svelte:331` — replace the bare `📎` with an inline
     `aria-hidden="true"` paperclip `<svg>` matching the 24 existing inline icons' stroke style.

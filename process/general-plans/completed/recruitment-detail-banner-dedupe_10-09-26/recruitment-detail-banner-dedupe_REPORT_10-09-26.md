@@ -51,11 +51,12 @@ The session carried nine other commits, in this order, none of which the plan co
 - `pnpm test` (vitest) — 208 files / 2427 tests green as of the plan's baseline measurement; not
   re-run after the tile-rework commits.
 - `pnpm check` — never run (see Skipped/Deferred).
-- `pnpm test:e2e -- form-errors` — never run (see Skipped/Deferred). The new case exists in
-  `tests/e2e/form-errors.spec.ts` and forces the posting OPEN first (via `Reopen`) rather than
-  scoping the alert selector to the header card — the execute agent's E4 choice.
-- `pnpm test:e2e -- job-board-tracking` — never run; the spec was reworked mid-session for the new
-  tile UI and has no confirmed pass since.
+- `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors` — never run (see
+  Skipped/Deferred). The new case exists in `tests/e2e/form-errors.spec.ts` and forces the
+  posting OPEN first (via `Reopen`) rather than scoping the alert selector to the header card —
+  the execute agent's E4 choice.
+- `CI=1 pnpm exec dotenv -e .env.dev -- playwright test job-board-tracking` — never run; the spec
+  was reworked mid-session for the new tile UI and has no confirmed pass since.
 - Live probes (positive, N1, N2, R1) from the plan's Verification Evidence section — executed per
   the plan's checklist step 6 before the `661719d` commit; not re-verified in this UPDATE PROCESS
   pass. R2 stayed `BLOCKED — no fixture`.
@@ -128,8 +129,8 @@ gates on the final tree (see backlog), and eventually the #20 canonical-surface 
 parked tile shade.
 
 **6. Single best next valid state:** `Keep the branch active on feat/uiux-phase-4; when the
-owner's dev server is next down, run pnpm check && pnpm test:e2e -- form-errors
-job-board-tracking, then continue PR #13 review.`
+owner's dev server is next down, run pnpm check && CI=1 pnpm exec dotenv -e .env.dev --
+playwright test form-errors job-board-tracking, then continue PR #13 review.`
 
 **7. Commit-checkpoint recommendation:** Process commit belongs after UPDATE PROCESS — the
 remaining unstaged/new changes here are the plan's validate-contract section (already
@@ -167,7 +168,7 @@ fix + formatting), `scripts/seed-uiux-demo.ts` (seed tolerance fix), `tests/e2e/
 
 ```
 pnpm format:check && pnpm lint && pnpm check && pnpm test
-pnpm test:e2e -- form-errors job-board-tracking
+CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors job-board-tracking
 ```
 Run only when the owner's dev server is down.
 

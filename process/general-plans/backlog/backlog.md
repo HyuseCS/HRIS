@@ -11,8 +11,9 @@
   All three need the owner's dev server down first.
 - **Root cause**: the session ran entirely against a live dev server on 5173; `pnpm check` runs
   `svelte-kit sync` and stops it, and the e2e tier needs its own build+preview.
-- **Fix options**: with the dev server down, run `pnpm check`, then `pnpm test:e2e -- form-errors
-  job-board-tracking`; fix whatever the reworked job-board spec's new tile locators surface.
+- **Fix options**: with the dev server down, run `pnpm check`, then
+  `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors job-board-tracking`; fix
+  whatever the reworked job-board spec's new tile locators surface.
 - **Source**: `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/recruitment-detail-banner-dedupe_PLAN_10-09-26.md`
 
 ### R2 convert-banner regression check has no fixture
