@@ -173,7 +173,11 @@
 		</div>
 	{/if}
 
-	<div class="pointer-events-none relative mt-auto space-y-1">
+	<div
+		class="pointer-events-none relative mt-auto flex flex-col space-y-1 {picked.length === 0
+			? 'items-center text-center'
+			: 'items-start'}"
+	>
 		{#if rejected.length}
 			<ul class="space-y-0.5 text-xs text-red-600" role="alert">
 				{#each rejected as message (message)}
