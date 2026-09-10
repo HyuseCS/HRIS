@@ -38,3 +38,20 @@ just moves the inconsistency.
    change, wider blast radius, touches the action contract.
 
 No GitHub issue filed — do not open one without asking.
+
+## Routed to issue #27 (10-09-26)
+
+The owner asked for this to go to an issue rather than be fixed in isolation. It is now a
+section of https://github.com/HyuseCS/HRIS/issues/27, which was widened from buttons to
+semantic colour generally and retitled to match.
+
+Reason for folding it in rather than filing separately: `Toaster.svelte:31-36` hand-pins
+its green and red exactly like the twelve solid-fill buttons, and for the same reason —
+`--success` and `--warning` exist in `app.css:39-42` but were never mapped into
+`tailwind.config.ts`. Buttons and toasts have to agree on where semantic colour comes from,
+and two issues would produce two answers.
+
+`info` is already the only kind on tokens (`border-border bg-card text-foreground`), which
+is why routing rejections there is the one option that can ship before #27 lands.
+
+This note stays as the detail record. #27 carries the decision.
