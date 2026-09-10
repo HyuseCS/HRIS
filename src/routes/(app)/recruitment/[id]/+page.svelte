@@ -160,7 +160,7 @@
 
 	<!-- Posted on — manual job-board tracking (#117) -->
 	{#if isHrAdmin}
-		<div class="min-h-[16rem] space-y-3 rounded-lg border p-4">
+		<div class="min-h-[16rem] space-y-3 rounded-lg border bg-card p-4">
 			<h2 class="text-sm font-semibold">Posted on</h2>
 
 			<!-- Close-the-loop: a CLOSED role still live somewhere needs a takedown. -->
@@ -201,7 +201,7 @@
 						{@const guard = channelGuard(b.boardId)}
 						<div
 							data-board={b.name}
-							class="flex min-h-[11rem] flex-col gap-2 rounded-lg border p-3"
+							class="flex min-h-[11rem] flex-col gap-2 rounded-lg border bg-muted p-3"
 						>
 							<div class="flex items-center gap-2">
 								<span class="truncate text-sm font-medium">{b.name}</span>
@@ -251,8 +251,10 @@
 									<p class="text-xs text-red-600 dark:text-red-400">{form.error}</p>
 								{/if}
 								<div class="mt-auto flex justify-end pt-2">
-									<button type="submit" disabled={guard.busy} class="btn-row-positive"
-										>{guard.busy ? '…' : 'Save'}</button
+									<button
+										type="submit"
+										disabled={guard.busy}
+										class="btn-row-positive bg-green-600/10">{guard.busy ? '…' : 'Save'}</button
 									>
 								</div>
 							</form>
