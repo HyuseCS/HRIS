@@ -25,7 +25,7 @@
 
 	// One guard per board row (#117) so saving one channel doesn't freeze the others.
 	const channelGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
-	const channelGuard = (id: string) => (channelGuards[id] ??= submitFeedback())
+	const channelGuard = (id: string) => (channelGuards[id] ??= submitFeedback({ error: null }))
 
 	const { posting, applicants, userRoles, boards, postedCount, boardCount, stillLive } =
 		$derived(data)
@@ -199,7 +199,7 @@
 										name="url"
 										value={b.url ?? ''}
 										placeholder="https://…"
-										class="order-last hidden w-full flex-1 peer-checked:block sm:order-none sm:w-auto {channelInputClass}"
+										class="order-last hidden w-full flex-1 peer-checked:block sm:order-none sm:w-auto sm:max-w-md {channelInputClass}"
 									/>
 									<button
 										type="submit"
