@@ -18,6 +18,27 @@ fires for the same outcome. Two messages, one action.
 posting page (`661719d`) and the same call as the `/settings/roles` note filed alongside
 this one.
 
+### Confirmed live on the reject path (10-09-26)
+
+The owner raised the reject case separately. It is the same banner, and it is worse there.
+Measured on the page right after a rejection:
+
+    <div role="status"
+         class="rounded-md border border-green-500/20 bg-green-500/10 …">
+      Timesheet rejected.
+    </div>
+
+So a **rejection** is announced in a **green success banner**. `Banner kind="success"` is
+the only thing `form?.saved` can produce, and `?/review` returns its reject string through
+that same `saved` key. Redundant against the toast, and the wrong colour for the outcome.
+
+It is also the message that *survives*: the toast clears after 6 seconds, the banner stays
+until the page changes. So the last thing left on screen after rejecting a timesheet is a
+green box.
+
+Deleting the banner fixes the colour problem for free — the toast is dispatched by kind,
+not by `saved`.
+
 **Check before deleting** — this page has bulk actions (`approveMany`, and a bulk reject)
 as well as the modal. Confirm every one of them routes through a toast helper before the
 banner goes, or they lose their only voice. That exact mistake has been made here before;
