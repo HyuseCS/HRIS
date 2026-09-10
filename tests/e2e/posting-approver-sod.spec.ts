@@ -108,7 +108,7 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 
 	// Give the approver an HR hat so she can create postings at all — the two-role state this
 	// whole PR exists to make possible.
-	await ceo.goto('/settings/roles', { waitUntil: 'domcontentloaded' })
+	await ceo.goto(`/settings/roles?q=${USERS.approver.email}`, { waitUntil: 'domcontentloaded' })
 	// NB: 'approver@veent.ph' is a substring of 'verifier.approver@veent.ph', so a plain hasText
 	// row filter matches two rows. Anchor on the exact cell text instead.
 	const apRow = ceo
@@ -185,7 +185,7 @@ test.afterAll(async ({ browser }) => {
 	const page = await ctx.newPage()
 	await login(page, USERS.ceo)
 	await mapApprover(page, '')
-	await page.goto('/settings/roles', { waitUntil: 'domcontentloaded' })
+	await page.goto(`/settings/roles?q=${USERS.approver.email}`, { waitUntil: 'domcontentloaded' })
 	// Restore the role set through the v1 endpoint rather than the UI. Driving cleanup through
 	// the picker means racing hydration and enhance round-trips for something that is not under
 	// test, and it failed that way twice — reporting an afterAll fault against a test body that

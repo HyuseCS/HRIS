@@ -3,10 +3,11 @@ import { z } from 'zod'
 import { ASSIGNABLE_ROLES } from '$lib/rbac'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
+import { paginate } from '$lib/server/pagination'
 import { listOrgUsers, setUserRoles, setUserActive } from '$lib/server/services/settings/org'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	// Role-change is CEO-only (#132); account activation stays with Super Admin. The
 	// page serves both, so it opens for either capability and the UI shows only the
@@ -15,9 +16,26 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const canManageActive = canAny(user.roles, 'ADMINISTER_SYSTEM')
 	if (!canManageRoles && !canManageActive) error(403, 'Insufficient permissions')
 
-	const users = await listOrgUsers(user.organizationId)
+	const all = await listOrgUsers(user.organizationId)
 
-	return { users, canManageRoles, canManageActive }
+	const q = (url.searchParams.get('q') ?? '').trim()
+	const needle = q.toLowerCase()
+	const filtered = q
+		? all.filter(
+				(u) =>
+					u.email.toLowerCase().includes(needle) ||
+					(u.employeeName ?? '').toLowerCase().includes(needle)
+			)
+		: all
+	const pagination = paginate(url, filtered.length)
+
+	return {
+		users: filtered.slice(pagination.skip, pagination.skip + pagination.take),
+		pagination,
+		q,
+		canManageRoles,
+		canManageActive
+	}
 }
 
 const rolesSchema = z.object({

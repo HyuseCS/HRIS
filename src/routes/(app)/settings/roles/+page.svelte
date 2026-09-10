@@ -5,6 +5,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import { ROLE_DESCRIPTIONS, ROLE_GROUPS, ROLE_LABELS, canAny } from '$lib/rbac'
 	import Check from 'lucide-svelte/icons/check'
 	import Info from 'lucide-svelte/icons/info'
@@ -153,6 +154,21 @@
 		{/snippet}
 	</PageHeader>
 
+	<form method="GET" class="flex flex-wrap items-end gap-2">
+		<div>
+			<label for="roles-q" class="text-xs font-medium text-muted-foreground"
+				>Filter by email or name</label
+			>
+			<input
+				id="roles-q"
+				name="q"
+				value={data.q}
+				class="mt-1 flex h-9 w-72 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
+		</div>
+		<button type="submit" class="h-9 rounded-md border px-3 text-sm hover:bg-accent">Filter</button>
+	</form>
+
 	<div class="overflow-x-auto rounded-lg border">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
@@ -234,12 +250,29 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="5" class="p-0"><EmptyState title="No users found" /></td>
+						<td colspan="5" class="p-0">
+							{#if data.q}
+								<EmptyState variant="no-results" title="No users match ‘{data.q}’.">
+									{#snippet action()}
+										<a
+											href="/settings/roles"
+											class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+										>
+											Clear filter
+										</a>
+									{/snippet}
+								</EmptyState>
+							{:else}
+								<EmptyState title="No users found" />
+							{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
 	</div>
+
+	<Pagination meta={data.pagination} />
 </div>
 
 {#if editing}
