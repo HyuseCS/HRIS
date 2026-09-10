@@ -11,8 +11,10 @@
 		title?: string
 		message?: string
 		confirmText?: string
-		/** Trigger button label + styling. */
-		triggerLabel?: string
+		/** Trigger button label + styling. A snippet for an icon-only trigger. */
+		triggerLabel?: string | Snippet
+		/** Accessible name for the trigger. Required when `triggerLabel` renders an icon. */
+		triggerAriaLabel?: string
 		triggerClass?: string
 		disabled?: boolean
 		/** Optional enhance handler (e.g. to clear a selection / close a modal on success). */
@@ -31,6 +33,7 @@
 		message = 'This action cannot be undone.',
 		confirmText = 'Delete',
 		triggerLabel = 'Delete',
+		triggerAriaLabel,
 		triggerClass = 'text-sm font-medium text-destructive hover:underline',
 		disabled = false,
 		submit,
@@ -79,9 +82,12 @@
 		type="button"
 		disabled={disabled || fb.busy}
 		title={triggerTitle}
+		aria-label={triggerAriaLabel}
 		onclick={() => (open = true)}
-		class={triggerClass}>{triggerLabel}</button
+		class={triggerClass}
 	>
+		{#if typeof triggerLabel === 'string'}{triggerLabel}{:else}{@render triggerLabel()}{/if}
+	</button>
 </form>
 
 <ConfirmDialog

@@ -4,7 +4,12 @@ import { requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
 import { db } from '$lib/server/db'
 import { advanceApplicant, convertApplicantToEmployee } from '$lib/server/services/recruitment'
-import { getPostingBoards, liveChannels, setChannel } from '$lib/server/services/job-boards'
+import {
+	getPostingBoards,
+	liveChannels,
+	removeChannel,
+	setChannel
+} from '$lib/server/services/job-boards'
 import { setFlash } from '$lib/server/flash'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -183,6 +188,58 @@ export const actions: Actions = {
 		}
 		// `success: true` was a dead flag — nothing rendered it.
 		return { action: 'setChannel', saved: 'Channel updated.' }
+	},
+
+	addChannel: async ({ request, locals, params, getClientAddress }) => {
+		const user = locals.user!
+		requireAnyCapability(user.roles, 'MANAGE_HR')
+
+		const data = await request.formData()
+		const boardId = data.get('boardId') as string
+		if (!boardId) return fail(400, { action: 'addChannel', error: 'Missing board id' })
+
+		try {
+			await setChannel(
+				user.organizationId,
+				params.id,
+				boardId,
+				{ posted: true, url: null },
+				{
+					organizationId: user.organizationId,
+					actorId: user.id,
+					actorRoles: user.roles,
+					ipAddress: getClientAddress()
+				}
+			)
+		} catch (e: unknown) {
+			if (isHttpError(e))
+				return fail(e.status, { action: 'addChannel', error: String(e.body.message) })
+			throw e
+		}
+		return { action: 'addChannel', saved: 'Board added.' }
+	},
+
+	removeChannel: async ({ request, locals, params, getClientAddress }) => {
+		const user = locals.user!
+		requireAnyCapability(user.roles, 'MANAGE_HR')
+
+		const data = await request.formData()
+		const boardId = data.get('boardId') as string
+		if (!boardId) return fail(400, { action: 'removeChannel', error: 'Missing board id' })
+
+		try {
+			await removeChannel(user.organizationId, params.id, boardId, {
+				organizationId: user.organizationId,
+				actorId: user.id,
+				actorRoles: user.roles,
+				ipAddress: getClientAddress()
+			})
+		} catch (e: unknown) {
+			if (isHttpError(e))
+				return fail(e.status, { action: 'removeChannel', error: String(e.body.message) })
+			throw e
+		}
+		return { action: 'removeChannel', saved: 'Board removed.' }
 	},
 
 	convert: async ({ request, locals, getClientAddress, cookies }) => {
