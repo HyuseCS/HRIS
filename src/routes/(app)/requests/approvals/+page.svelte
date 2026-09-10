@@ -243,13 +243,6 @@
 							<div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
 								<!-- Person first: approvers scan by who, then by what. -->
 								<div class="flex items-start gap-3">
-									<input
-										type="checkbox"
-										checked={picked}
-										onchange={() => toggle(req.id)}
-										aria-label="Select request"
-										class="mt-1 align-middle"
-									/>
 									<div
 										class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold {typeAccent(
 											req.type
@@ -271,6 +264,14 @@
 											{/if}
 										</p>
 									</div>
+									<input
+										type="checkbox"
+										checked={picked}
+										onchange={() => toggle(req.id)}
+										onclick={(e) => e.stopPropagation()}
+										aria-label="Select request"
+										class="mt-1 shrink-0 cursor-pointer align-middle"
+									/>
 								</div>
 
 								<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
