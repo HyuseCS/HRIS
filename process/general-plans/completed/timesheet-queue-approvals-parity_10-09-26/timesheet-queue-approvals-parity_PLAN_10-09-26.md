@@ -4,13 +4,19 @@ description: "PLAN — bring /requests/timesheets (page B) to /requests/approval
 date: 10-09-26
 branch: feat/uiux-phase-4
 complexity: SIMPLE
-status: VALIDATED — CONDITIONAL, ready for EXECUTE
+status: EXECUTED — S1/S2/S4 CODE DONE, S3 CONDITIONAL (inline footer has no automated spec)
 ---
 
 # PLAN — `/requests/timesheets` parity with `/requests/approvals`
 
 **Date**: 10-09-26 · **Branch**: `feat/uiux-phase-4` @ `222d976` (tree clean) · **Complexity**: SIMPLE
 **Status**: VALIDATED — gate CONDITIONAL. See `## Validate Contract`; E1–E10 are binding on EXECUTE.
+
+**Closeout (10-09-26)**: all four sections landed. S1 `7dc0764`, S2 `5ca5374`, S3 `2cc895f`,
+S4 `3aa9fb7`. S1, S2, S4 are `CODE DONE` on green automated gates. **S3 stays `CONDITIONAL`** per
+`## Phase Completion Rules` — the inline Approve/Reject footer has no automated spec and needs the
+owner's manual pass before it can be called `VERIFIED`. See `## Closeout — deviations`,
+`## Closeout — Known Gaps` and `## Closeout — lessons learned` below.
 
 **TL;DR.** Four sections, strictly sequential, on two source files plus three test files. Page B is
 **already a card grid** — this is not a rebuild. S1 adds pagination and restores the live approval
@@ -331,7 +337,7 @@ One EXECUTE agent, four commits, in order.
 
 ---
 
-# SECTION 1 — server: pagination + the stage label restored
+# SECTION 1 — server: pagination + the stage label restored ✅ CODE DONE (`7dc0764`)
 
 **File**: `src/routes/(app)/requests/timesheets/+page.server.ts` (plus one new unit test).
 
@@ -405,7 +411,7 @@ feat(timesheets): paginate the review queue and carry the live stage
 
 ---
 
-# SECTION 2 — chrome: one container, an always-present bulk bar, pagination
+# SECTION 2 — chrome: one container, an always-present bulk bar, pagination ✅ CODE DONE (`5ca5374`)
 
 **File**: `src/routes/(app)/requests/timesheets/+page.svelte` (chrome only; the card is S3).
 
@@ -486,7 +492,7 @@ feat(timesheets): match the approvals queue chrome and paginate it
 
 ---
 
-# SECTION 3 — card: full parity plus an inline action footer
+# SECTION 3 — card: full parity plus an inline action footer ⚠️ CODE DONE, CONDITIONAL (`2cc895f`) — see AC3.13/AC3.14
 
 **File**: `src/routes/(app)/requests/timesheets/+page.svelte` (the `{#each}` block only, plus the
 script additions the card needs).
@@ -653,7 +659,7 @@ feat(timesheets): give review cards the approvals card shape and inline actions
 
 ---
 
-# SECTION 4 — e2e repair
+# SECTION 4 — e2e repair ✅ CODE DONE (`3aa9fb7`)
 
 **Four** specs touch this page (corrected per validate finding C2 / instruction E3 — the plan
 originally said three and omitted `timesheet-punch.spec.ts`). Each is handled explicitly below.
@@ -750,10 +756,10 @@ red. AC4.1 names the exact scoped command.
 |---|---|---|
 | AC4.1 | **Both** helper consumers pass | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/timesheet-approval.spec.ts tests/e2e/timesheet-punch.spec.ts` exits 0. Never `pnpm test:e2e -- <specs>` — it silently ignores the filter |
 | AC4.2 | The form-errors spec passes with the new premise | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/form-errors.spec.ts` exits 0 |
-| AC4.3 | `findTimesheetCard` actually walks past page 1 | **The seeded gate from E2, not a grep.** Run the new page-walk spec: it seeds 11 step-less SUBMITTED timesheets for `employee@veent.ph` with ascending `submittedAt` (`approvalStep.deleteMany` per row — the trick at `form-errors.spec.ts:168-171` that makes them visible to `USERS.admin`), gives the newest a distinctive hours label, logs in as admin, calls the helper, and asserts it resolves **and** `page.url()` ends in `page=2`. Model: `tests/e2e/pagination.spec.ts:14-81`. Teardown deletes all 11 in `afterAll`. **The old `grep -c 'Next →'` check is withdrawn — it asserts a string was typed and cannot fail on a broken walk.** If E2 is refused, AC4.3 must be re-labelled `known-gap` with a backlog note; it may not be reported as a passing gate |
+| AC4.3 | `findTimesheetCard` actually walks past page 1 | **The seeded gate from E2, not a grep.** Run the new page-walk spec: it seeds 11 step-less SUBMITTED timesheets for `employee@veent.ph` with ascending `submittedAt` (`approvalStep.deleteMany` per row — the trick at `form-errors.spec.ts:168-171` that makes them visible to `USERS.admin`), gives the newest a distinctive hours label, logs in as admin, calls the helper, and asserts it resolves **and** `page.url()` ends in `page=2`. Model: `tests/e2e/pagination.spec.ts:14-81`. Teardown deletes all 11 in `afterAll`. **The old `grep -c 'Next →'` check is withdrawn — it asserts a string was typed and cannot fail on a broken walk.** If E2 is refused, AC4.3 must be re-labelled `known-gap` with a backlog note; it may not be reported as a passing gate — **DEVIATION (landed as `page >= 2`, not exactly `page=2`):** `tests/e2e/timesheet-queue-page-walk.spec.ts` asserts `landedOn` is `toBeGreaterThanOrEqual(2)`. The 11 seeded rows landed on page 3, not page 2, because the shared dev DB now carries ~16 owner demo SUBMITTED rows (0 at plan-write time). The spec still pins the negative control (card absent on page 1, `Next →` present) and a real negative-control run: replacing the walk with a bare `break` went red with `no timesheet card matching 9.9 hrs on any page`. Gate intent (the walk is exercised, not dead code) is preserved; the exact page number is not |
 | AC4.4 | The page-walk is shared, not duplicated | `grep -c 'findTimesheetCard' tests/e2e/*.ts` shows the definition plus ≥ 2 call sites |
 | AC4.5 | The deleted premise is not left asserted anywhere | `grep -n 'Selecting the card is what renders' tests/e2e/form-errors.spec.ts` returns nothing |
-| AC4.6 | Nothing outside this plan's own test files changed | `git diff --stat 222d976 -- tests/e2e/helpers.ts tests/e2e/form-errors.spec.ts tests/e2e/timesheet-approval.spec.ts` plus whatever file E2 adds — **path-scoped, not a whole-`tests/` scan** (E5). A whole-tree diff is cross-lane contaminated and this plan does not own it |
+| AC4.6 | Nothing outside this plan's own test files changed | `git diff --stat 222d976 -- tests/e2e/helpers.ts tests/e2e/form-errors.spec.ts tests/e2e/timesheet-approval.spec.ts` plus whatever file E2 adds — **path-scoped, not a whole-`tests/` scan** (E5). A whole-tree diff is cross-lane contaminated and this plan does not own it — **DEVIATION: not run.** This is a `git` command and the execute agent holds no git in this repo's harness (the orchestrator holds git). Reconciled at UPDATE PROCESS instead: `git show 3aa9fb7 --stat` confirms the S4 commit touched exactly `tests/e2e/form-errors.spec.ts`, `tests/e2e/helpers.ts`, and the new `tests/e2e/timesheet-queue-page-walk.spec.ts` — no file outside this plan's scope |
 | AC4.7 | The full suite holds | `CI=1 pnpm test:e2e` — only the pre-existing `attendance-save-timesheet-custom-range` failure |
 
 **a11y — S4**: none directly, but AC3.1/AC3.2 mean any spec that locates a card by
@@ -835,6 +841,82 @@ Test routing reference: `process/context/tests/all-tests.md`.
   The inline action footer is new behaviour whose only automated coverage is a known gap, so it may
   not be declared PASS on automated gates alone.
 - S1, S2 and S4 may reach `VERIFIED` on the automated gates plus the owner's confirmation.
+
+---
+
+## Closeout — What's Functional Now
+
+- `/requests/timesheets` is server-paginated at 10 rows (`+page.server.ts`, DD-4), carries
+  `currentStageKind`/`currentStageRole` restored to the `load` payload for the stage badge, and
+  renders the same one-container chrome as `/requests/approvals` — always-present bulk bar,
+  tri-state select-all with an `aria-live` announcement, no `Clear` button, no slide transition.
+- Every card in the queue has the approvals card shape: avatar, heading, wait age with an overdue
+  marker past three days, a text stage badge, a `View detail` control, and an inline Approve/Reject
+  footer outside the `role="button"` card body (posts through the existing `?/review` action).
+- `tests/e2e/helpers.ts` exports `findTimesheetCard`, a shared page-walking locator now used by
+  three e2e specs (`verifyAndApproveTimesheet`, `form-errors.spec.ts`, and its own proving spec).
+- The bulk all-fail gate (from the separately-archived `roles-pagination-and-bulk-allfail`
+  plan, `bb7eb28`) still returns `fail(400)` when every row in a batch fails.
+
+## Closeout — deviations
+
+1. **AC4.3 — `page >= 2`, not exactly `page=2`.** See the AC4.3 row above for the full account.
+   Cause: 0 SUBMITTED rows measured at plan-write time vs. ~16 owner demo rows present at execute
+   time, pushing the 11-row fixture to page 3. Gate intent preserved (walk is exercised, proven by
+   a negative control), exact page number is not.
+2. **AC4.6 — not run.** `git diff --stat` is a git command; the execute agent holds no git in this
+   harness. Reconciled here at UPDATE PROCESS via `git show 3aa9fb7 --stat` (read-only) — confirms
+   no file outside this plan's own test scope changed.
+3. **S3 stays CONDITIONAL.** The inline Approve/Reject footer on the card has automated coverage at
+   the server-action boundary only (`request-decide-feedback.test.ts`); the card-level wiring
+   (per-card guard isolation, footer→action id, Reject routing to the single-target dialog) has no
+   e2e. AC3.13's agent-probe was run live 10-09-26 and passed (two chained fixtures, deleted after);
+   that is a one-off observation, not a gate. **Do not report S3 as VERIFIED.** It needs the owner's
+   manual pass; the automated-coverage gap is tracked in
+   `process/features/ui-ux-overhaul/backlog/timesheet-card-inline-actions-e2e_NOTE_10-09-26.md`
+   (already on disk, satisfies AC3.14).
+4. **The `attempted > 0` bulk-all-fail clause — not this plan's deviation.** It was planned and
+   dropped in the separately-archived `roles-pagination-and-bulk-allfail` plan (`bb7eb28`): the
+   `!ids.length` guard already returns before the loop, so `attempted > 0` could never be false. It
+   shipped as the plain `if (done === 0)`. Already documented in
+   `bulk-timesheet-skipped-counter_NOTE_10-09-26.md` — recorded here only for completeness, this
+   plan did not touch that code path.
+
+## Closeout — Known Gaps (Resolved via Backlog)
+
+- **F1 — `/timesheets` team table needs the same page-walk treatment.** NEW backlog note:
+  `process/features/ui-ux-overhaul/backlog/timesheet-team-table-pagination-row-lookup_NOTE_10-09-26.md`.
+  `timesheet-punch.spec.ts:104`/`:128`, `timesheet-create-for-employee.spec.ts:116`, and
+  `manager-org-wide-timesheets.spec.ts:100` all filter `tr` on page 1 of a table now sorted
+  `periodStart desc` and paginated at 10. `timesheet-punch.spec.ts` FAILS against the current dev DB
+  for this reason — verified live, not reasoned. Environmental, not a regression from this plan.
+- **F2 — `global-setup.ts:78-95` wipes `employee@veent.ph`'s demo data on every e2e run.** Recorded
+  as a durable Known Gap in `process/context/tests/all-tests.md` rather than a backlog note — it is
+  pre-existing, by-design behaviour, not new work. Surfaced so it is not mistaken for a code
+  regression next time the owner's demo data disappears after an e2e run.
+- **F3 — a restore-point schema `owner_bak` is still present in the dev DB.** Left in place, not
+  dropped, pending the owner's confirmation it is no longer needed. Drop command when ready:
+  `docker exec -i veent-db-5434 psql -p 5434 -U veent -d veent_hris -c "DROP SCHEMA owner_bak CASCADE;"`
+- **F4 — E10(b): `stageLabel`'s `SUPERVISOR` branch is unreachable for timesheets.**
+  `src/lib/server/.../routing.ts:37` hardcodes `'ROLE'` for this queue, so the `SUPERVISOR` branch
+  never fires here. Kept for parity with `/requests/approvals`'s shared `stageLabel`, not claimed as
+  covered by this plan. Design record only, no backlog action.
+
+## Closeout — lessons learned
+
+- **Paginating a list silently breaks every e2e that finds its row by name on page 1.** Confirmed
+  twice now on this repo (this plan's S4, and F1 above still open). Rank the fixtures against the
+  real DB *before* shipping the pagination, and reach the row by a page-walk or a `?q=` filter,
+  never by assuming page 1. Captured durably in `process/context/tests/all-tests.md`.
+- **A grep for a helper string in a spec file proves it was typed, not that it runs.** AC4.3's
+  original check (`grep -c 'Next →'`) was withdrawn during VALIDATE for exactly this reason. Prove a
+  walk with a fixture that forces it past the page boundary, plus a negative control.
+- **Owner demo data and e2e fixtures share one dev DB.** A spec written against a near-empty table
+  (0 SUBMITTED rows at plan-write time) can pass in isolation and fail once real data volume shows
+  up — AC4.3's landed-page deviation and F1 are both this same root cause.
+- **Size/existence measurements cannot see overlap or ordering.** Not newly discovered this session,
+  but reconfirmed: AC3.4's `role="button"` count check is a necessary-not-sufficient grep; the
+  Agent-Probe DOM check (zero `<button>` descendants) is what actually proves the markup shape.
 
 ---
 

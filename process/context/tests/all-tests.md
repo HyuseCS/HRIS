@@ -161,6 +161,15 @@ suite coexisted with a real defect:
   date, or amount) and clean up by matching that marker, never by "everything this account
   currently has pending."
 
+8. **Paginating a list silently breaks every e2e that finds its row by name/hours on page 1.**
+   Confirmed twice: `/requests/timesheets` (`findTimesheetCard`, 10-09-26) and the `/timesheets`
+   team table (four call sites still unfixed — see
+   `timesheet-team-table-pagination-row-lookup_NOTE_10-09-26.md`). Rank the fixtures against the
+   real DB before shipping the pagination, and reach the row by a page-walk or a `?q=` filter,
+   never by assuming page 1. A grep for the walk-helper string in a spec file proves it was typed,
+   not that the walk branch ever runs — prove it with a fixture sized past the page boundary, plus
+   a negative control that asserts the target is NOT on page 1.
+
 ## Known Gaps
 
 - **#287 — the e2e suite is flaky**: random specs time out on `page.goto('/login')`. Still a CI
@@ -197,6 +206,12 @@ suite coexisted with a real defect:
 - **When a shared component's markup changes, grep the WHOLE `tests/e2e/` suite for every call
   site, not just the spec you happened to open.** A `PeriodPicker` button-label change once broke
   three specs in files unrelated to the change that made it (`5a1d3b0`, 04-09-26).
+- **`tests/e2e/global-setup.ts:78-95` unconditionally deletes `employee@veent.ph`'s timeLogs,
+  timesheets, timesheet entries, leave requests and ALL requests on every `playwright test`
+  invocation, including scoped runs.** Any e2e run wipes that account's demo data. This is
+  pre-existing, by design (it keeps fixtures deterministic across runs) — surfacing it here so it
+  is not mistaken for a code regression when the owner's demo data on that account disappears
+  after running e2e.
 
 ## Quick Routing
 
