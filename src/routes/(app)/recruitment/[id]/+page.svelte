@@ -30,8 +30,7 @@
 	const channelGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
 	const channelGuard = (id: string) => (channelGuards[id] ??= submitFeedback({ error: null }))
 
-	const { posting, applicants, userRoles, boards, postedCount, boardCount, stillLive } =
-		$derived(data)
+	const { posting, applicants, userRoles, boards, postedCount, stillLive } = $derived(data)
 
 	const channelInputClass =
 		'h-8 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -47,12 +46,6 @@
 			addOpen = false
 		}
 	})
-
-	function tileStateClass(b: { live: boolean; status: string | null }) {
-		if (b.live) return 'border-green-600/30 bg-green-500/15'
-		if (b.status === 'TAKEN_DOWN') return 'border-yellow-600/30 bg-yellow-500/15'
-		return ''
-	}
 
 	// Mirror the server guard (MANAGE_HR) so promoted Managers (#133) see the HR controls
 	// they're actually allowed to use, not just HR_ADMIN/SUPER_ADMIN.
@@ -100,8 +93,8 @@
 					{#if posting.postedAt}
 						<span>Posted {formatShortDate(posting.postedAt)}</span>
 					{/if}
-					{#if boardCount > 0}
-						<span>Posted on {postedCount} of {boardCount} boards</span>
+					{#if channels.length > 0}
+						<span>Posted on {postedCount} of {channels.length} boards</span>
 					{/if}
 				</div>
 			</div>
@@ -186,10 +179,27 @@
 					>.
 				</p>
 			{:else}
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+					{#if addable.length === 0}
+						<div
+							class="flex min-h-[6rem] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground"
+						>
+							All boards added
+						</div>
+					{:else}
+						<button
+							type="button"
+							onclick={() => (addOpen = true)}
+							class="flex min-h-[6rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+						>
+							<span aria-hidden="true" class="text-xl leading-none">+</span>
+							Add board
+						</button>
+					{/if}
+
 					{#each channels as b (b.boardId)}
 						{@const guard = channelGuard(b.boardId)}
-						<div data-board={b.name} class="space-y-2 rounded-lg border p-3 {tileStateClass(b)}">
+						<div data-board={b.name} class="space-y-2 rounded-lg border p-3">
 							<div class="flex items-center gap-2">
 								<span class="text-sm font-medium">{b.name}</span>
 								{#if b.status === 'TAKEN_DOWN'}
@@ -238,23 +248,6 @@
 							</form>
 						</div>
 					{/each}
-
-					{#if addable.length === 0}
-						<div
-							class="flex min-h-[6rem] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground"
-						>
-							All boards added
-						</div>
-					{:else}
-						<button
-							type="button"
-							onclick={() => (addOpen = true)}
-							class="flex min-h-[6rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-						>
-							<span aria-hidden="true" class="text-xl leading-none">+</span>
-							Add board
-						</button>
-					{/if}
 				</div>
 			{/if}
 		</div>
