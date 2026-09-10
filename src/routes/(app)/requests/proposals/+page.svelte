@@ -210,7 +210,7 @@
 								noteDialogOpen = true
 							}}
 							class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-							>Reject…</button
+							>Reject</button
 						>
 					</form>
 				</div>

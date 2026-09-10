@@ -546,7 +546,7 @@
 						disabled={busy}
 						onclick={() => (rejecting = true)}
 						class="rounded-md border border-red-500/20 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50"
-						>Reject…</button
+						>Reject</button
 					>
 					<form method="POST" action="?/review" use:enhance={closeFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />

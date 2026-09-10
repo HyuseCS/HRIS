@@ -216,7 +216,7 @@
 							disabled={busy || !selected.length}
 							onclick={() => askNote({ kind: 'bulk' })}
 							class="inline-flex h-9 cursor-pointer items-center rounded-md bg-red-600 px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-							>Reject selected…</button
+							>Reject selected</button
 						>
 					</form>
 				</div>
@@ -364,14 +364,14 @@
 									disabled={decide.busy}
 									onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'RETURNED' })}
 									class="flex-1 rounded-md bg-orange-700 px-2 py-1 text-xs font-medium text-white hover:bg-orange-800 disabled:pointer-events-none disabled:opacity-50"
-									>Return…</button
+									>Return</button
 								>
 								<button
 									type="button"
 									disabled={decide.busy}
 									onclick={() => askNote({ kind: 'decide', id: req.id, decision: 'REJECTED' })}
 									class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-									>Reject…</button
+									>Reject</button
 								>
 							</form>
 						</li>
