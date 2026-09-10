@@ -10,10 +10,32 @@ feature: uiux-phase-4
 **TL;DR** — Four commits. (1) Delete the hand-rolled error strip on `/settings/roles` (9 lines) — the toast already fires. (2) Put the two bulk timesheet actions on `submitFeedback` so they have a voice BEFORE anything is deleted. (3) Delete both page banners on `/requests/timesheets` **and** the modal's own `form?.error` strip, leaving the toast as the single voice. (4) Strip `…` from six button labels. Bulk approve/reject have zero tests today — this plan adds two unit tests and one e2e that asserts "exactly one visible message", which is the whole point of phase 04.
 
 **Date**: 10-09-26
-**Status**: NOT STARTED
+**Status**: NOT STARTED — **AMENDED 10-09-26 after VALIDATE returned BLOCKED. Re-run VALIDATE from V1.**
 **Complexity**: SIMPLE (4 independently committable sections)
 **Branch**: `feat/uiux-phase-4`, clean, ahead 3 of origin
 **Risk class**: low-medium — UI only, no server logic change, no schema, no auth. The medium comes from one shared component (`TimesheetModal`) and from deleting error surfaces, which has silenced forms in this repo before.
+
+## Amendment log — 10-09-26 (post-VALIDATE)
+
+VALIDATE returned **Gate: BLOCKED** with two FAILs against §3 and five CONCERNs. This plan has been amended in place. The Validate Contract below is the PREVIOUS run's output and is retained verbatim as the audit record — its `Gate: BLOCKED` verdict refers to the pre-amendment text.
+
+| Finding | What changed |
+|---|---|
+| **F1** — the new e2e can never run; its premise is false | §3 step 6 rewritten. The `test.skip()` is GONE. The test seeds its own SUBMITTED timesheet via the repo's existing Prisma-upsert pattern (`tests/e2e/timesheet-approval.spec.ts:42-70`) and deletes it afterward, and FAILS rather than skips if the card is absent. The "first exactly-one assertion in the repo" claim is deleted — `form-errors.spec.ts:86-89` already carries that triple (`661719d`) — and replaced with an honest statement of what the test adds. Negative controls added. |
+| **F2** — probe R2 named an account whose control never renders | §3 probe R2 rewritten to `manager@veent.ph` on timesheet `cmtuzqmq9001h61zqc4bk89aj` (REJECTED, manager-owned, so `canEdit` is true). A PRECONDITION is now asserted before any measurement — the `?/saveEntries` form must be proven present — and a failed precondition is `BLOCKED`, never a revert trigger. Phase Completion Rules updated to match. |
+| **§3 destroyed its own fixture** | §3 steps 8 and 9 SWAPPED: live probes first, e2e last, with the reason written in. Chosen over per-probe self-seeding so the plan keeps exactly ONE seeding mechanism. |
+| **C1** — the "`form` prop is still read by other logic" claim was false | Public Contracts corrected: the prop has zero readers after §3. EXECUTE must MEASURE with `pnpm lint` alone, never assume. D2 folded in. |
+| **C2** — "every writer on `/timesheets` toasts" was false | Claim withdrawn and restated accurately: every writer inside the shared modal toasts; the page's own `?/submitMany` (`timesheets/+page.svelte:92`) does not, and does not need to. |
+| **C3** — the modal walk listed four actions | Corrected to a table of six form actions plus the ConfirmButton delete. None is left mute. |
+| **C4** — line drift | Fixed throughout the B3 table and the §2 checklist. EXECUTE is now instructed to locate the two bulk forms by `action=` attribute, never by line number. |
+| **C5** — incomplete locator check | §4 step 5 split into 5a (newly matches) and 5b (`grep -rniE "Reject…|Return…" tests/`, newly misses). |
+
+**Owner decisions now CLOSED — do not re-ask:**
+
+- **D1 = YES.** Fixture seeding is authorised for the §2 and §3 probes, using the e2e suite's own Prisma-upsert pattern, with mandatory cleanup. Written into Phase Completion Rules and both probe blocks.
+- **D2 = YES, conditionally.** If `pnpm lint` fails on the dead `form` prop after §3, the execute-agent may delete the `{form}` pass at `timesheets/+page.svelte:259` — **that one line only, and only if lint actually fails.** Measured, never assumed. Written into Scope and Public Contracts.
+
+Unchanged: §1, §2 and §4 keep their rulings and their steps (§2 only gained the corrected line numbers). §T2 / green buttons / `app.css` remain OUT — issue #27. Sections stay independently committable. No explanatory comments in source.
 
 ## Overview
 
@@ -39,7 +61,7 @@ Context routing was loaded via `process/context/all-context.md`; the test chain 
 **OUT — do not touch, do not mention in the diff:**
 
 - **§T2** — the hand-rolled green `bg-green-600` Approve buttons and `app.css` button tokens. That is **GitHub issue #27**. Four call sites, including two files this plan edits (`TimesheetModal.svelte:566`, `requests/timesheets/+page.svelte:105`). Edit the label, never the class list.
-- `/timesheets` (the employee edit page). It shares `TimesheetModal`, so §3 reaches it — §3 states exactly what changes there and proves nothing is silenced. No edit to `src/routes/(app)/timesheets/+page.svelte`.
+- `/timesheets` (the employee edit page). It shares `TimesheetModal`, so §3 reaches it — §3 states exactly what changes there and proves nothing is silenced. **One carve-out only (owner decision D2, APPROVED):** if — and only if — `pnpm lint` fails on the now-dead `form` prop after §3, the execute-agent may delete the `{form}` being passed to `<TimesheetModal …>` at `src/routes/(app)/timesheets/+page.svelte:259`. **That one line, nothing else in that file.** It must be MEASURED (run `pnpm lint` alone and read the output), never assumed. Lint green ⇒ no edit.
 - `src/lib/utils/submit-feedback.svelte.ts`, `submit-guard.svelte.ts`, `Banner.svelte`, `Toaster.svelte`, `toast.svelte.ts`, `ConfirmButton.svelte` — all read-only context.
 - Any server action's logic. §2 adds nothing to `+page.server.ts`.
 - Busy-state labels (`Saving…`, `Working…`, `Approving…`, `Confirming…`, `Punching in…`, a bare `…`), `<option>` text, and input placeholders. B5 is six labels, named exactly.
@@ -70,7 +92,7 @@ before closing §2 — one short note recording the `0 approved, 5 skipped` case
 3. `approveMany` and `rejectMany` each return a non-empty, **distinct** `saved` string; the three refusal paths (403, `No timesheets selected`, `A reason is required to reject.`) each return a non-empty `error` string — pinned by new unit tests in `tests/unit/request-decide-feedback.test.ts`.
 4. `src/routes/(app)/requests/timesheets/+page.svelte` contains **zero** occurrences of `Banner` — both `{#if}` blocks and the import are gone.
 5. `src/lib/components/timesheets/TimesheetModal.svelte` contains **zero** occurrences of `form?.error`. The `REJECTED` stored-reason panel and the `form` prop both survive.
-6. A bulk 400 on `/requests/timesheets` produces exactly ONE `[role="status"] [aria-live="assertive"]` node and `getByRole('alert')` count **0** — asserted by a new test in `tests/e2e/form-errors.spec.ts`.
+6. A bulk 400 on `/requests/timesheets` produces exactly ONE `[role="status"] [aria-live="assertive"]` node and `getByRole('alert')` count **0** — asserted by a new test in `tests/e2e/form-errors.spec.ts` that **seeds its own SUBMITTED timesheet, cleans it up, and contains no `test.skip()`**. The test must actually EXECUTE in the run, and both of its negative controls must have been fired.
 7. A timesheet rejection produces one toast reading `Timesheet rejected.` and **no green success box anywhere** on the page.
 8. A failed `?/review` produces exactly one message, it is the toast, and it renders above the open modal (toast container computed `z-index` 100 vs dialog 50, node inside the viewport rect).
 9. `/timesheets` (shared `TimesheetModal`) still reports a failed `?/saveEntries` — exactly one toast, modal stays open, no destructive strip.
@@ -86,8 +108,8 @@ Four sections, each its own commit and its own gate.
 - A section is **CODE DONE** when its edits are made, its `grep` guards return the stated counts, and the CI gate set (`pnpm format:check && pnpm lint && pnpm check && pnpm test`) is green.
 - A section is **VERIFIED** only when its live probes are recorded with **actual DOM evidence** (`outerHTML`, computed styles, counts) AND **both negative controls fired** AND every regression check in that section is recorded PASS / FIXED / BLOCKED with the command or step that produced it.
 - Green tests alone never promote a section to VERIFIED. A probe recorded as "it worked" is not evidence.
-- §3 additionally cannot reach VERIFIED without probe **R2** (the `/timesheets` shared-modal non-silencing check) — if R2 shows no toast, §3 is reverted, not patched.
-- A probe blocked by a missing fixture is recorded `BLOCKED — no fixture` and the section stays CODE DONE. Do not fabricate fixtures or seed the owner's dev database to manufacture a pass.
+- §3 additionally cannot reach VERIFIED without probe **R2** (the `/timesheets` shared-modal non-silencing check), run as `manager@veent.ph` on timesheet `cmtuzqmq9001h61zqc4bk89aj`. **The revert rule is conditional on the precondition:** if R2's precondition holds — the `?/saveEntries` control is proven present in the DOM — and no toast appears, §3 is reverted, not patched. If the precondition FAILS (no control rendered), R2 is `BLOCKED — control not rendered` and **§3 is not reverted**; a false negative must never trigger a revert.
+- **Fixture seeding is AUTHORISED for §2 and §3 probes (owner decision D1).** The execute-agent may seed pending timesheets using the e2e suite's own Prisma-upsert pattern (`tests/e2e/timesheet-approval.spec.ts:42-70`, driven per `tests/e2e/helpers.ts:64-82`), with distinctive hours labels, and **must delete every row it created** and record the ids. Do not run `db:seed:e2e`. Do not touch any row the agent did not create. If seeding itself fails, record `BLOCKED — no fixture` and leave the section CODE DONE. Never fabricate evidence.
 - The whole plan is complete when all four sections are VERIFIED and the four commits exist. No push unless the owner asks.
 
 ## Implementation Checklist
@@ -101,7 +123,7 @@ Ordered. §1 and §4 are order-independent; **§2 must precede §3**.
 5. §1 — commit 1.
 6. §2 step 1 — add the `submitFeedback` import to `requests/timesheets/+page.svelte`.
 7. §2 step 2 — add `const bulkFb = submitFeedback({ inner: clearOnSuccess })` after `clearOnSuccess`.
-8. §2 step 3 — swap both forms (`?/approveMany` `:100`, `?/rejectMany` `:105-109`) onto `bulkFb.enhance`.
+8. §2 step 3 — swap both forms onto `bulkFb.enhance`. **Locate them by their `action=` attribute, never by line number.** For reference only: the `?/approveMany` form and its `use:enhance` are both on `:101`; the `?/rejectMany` form opens at `:109` and its `use:enhance` is on `:113`.
 9. §2 step 4 — leave `disabled={busy}` and the page's own `busy` alone.
 10. §2 step 6 — add the two unit tests to `tests/unit/request-decide-feedback.test.ts` (no new mock wiring).
 11. §2 step 7 — run the CI gate set.
@@ -113,11 +135,11 @@ Ordered. §1 and §4 are order-independent; **§2 must precede §3**.
 17. §3 step 3 — keep the `form` prop destructure at `:14`.
 18. §3 step 4 — delete `TimesheetModal.svelte:347-353` (the `{#if form?.error}` strip).
 19. §3 step 5 — leave the `REJECTED` reason panel, all four guards, and every class list untouched.
-20. §3 step 6 — add the one e2e to `tests/e2e/form-errors.spec.ts` (bulk 400, exactly-one assertion).
-21. §3 step 7 — run the CI gate set.
-22. §3 step 8 — `CI=1 pnpm test:e2e -- form-errors`, then `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets`.
-23. §3 step 9 — run live probes P1, P2, P3, N1, R1, R2, R3. **R2 is mandatory.**
-24. §3 — commit 3.
+20. §3 step 6 — add the one e2e to `tests/e2e/form-errors.spec.ts` (bulk 400, exactly-one assertion). **It seeds its own SUBMITTED timesheet and cleans up; no `test.skip()`.** Fire its negative controls.
+21. §3 step 7 — `pnpm lint` alone first (the `form`-prop measurement, D2), then the rest of the CI gate set.
+22. §3 step 8 — **run the live probes FIRST**: P3, then P1, N1, P2, R1, R3, and **R2 (mandatory, as `manager@veent.ph` on `cmtuzqmq9001h61zqc4bk89aj`, precondition asserted first)**. Seed and clean up fixtures under D1 as needed.
+23. §3 step 9 — **e2e LAST**, after warning the owner it deletes `cmtuzqmpk001561zqp6z2trxk`: `CI=1 pnpm test:e2e -- form-errors`, then `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets`.
+24. §3 step 10 — commit 3.
 25. §4 step 1 — re-grep `'…'` across the four files; expect 12 hits, match the B5 table by label text not line number.
 26. §4 step 2 — remove the U+2026 from exactly the six named labels.
 27. §4 step 4 — `grep -c '…'` per file → 1 / 1 / 2 / 2, total `6`.
@@ -154,10 +176,10 @@ So the page banners at `:66-68` (`form?.error`) and `:70-72` (`form?.saved`) are
 
 | Outcome | Source | Today's only surface |
 |---|---|---|
-| bulk approve success | `+page.server.ts:135-137` `saved: "Approved N timesheets…"` | success banner |
-| bulk reject success | `+page.server.ts:167-169` `saved: "Rejected N timesheets…"` | success banner |
-| 403 `Insufficient permissions` | `:117`, `:148` | error banner |
-| 400 `No timesheets selected` / `A reason is required to reject.` | `:123`, `:157-159` | error banner |
+| bulk approve success | `+page.server.ts:137-139` `saved: "Approved N timesheets…"` | success banner |
+| bulk reject success | `+page.server.ts:169-171` `saved: "Rejected N timesheets…"` | success banner |
+| 403 `Insufficient permissions` | `:118`, `:147` | error banner |
+| 400 `No timesheets selected` / `A reason is required to reject.` | `:124`, `:155-156` | error banner |
 
 Deleting the banners first would reproduce the documented `removing-a-banner-can-silence-errors` defect exactly. **Owner's decision: give the bulk actions a toast FIRST (§2), then delete the banners (§3).** Two commits, in that order, never merged.
 
@@ -186,7 +208,20 @@ The toast, by contrast, is `position: fixed`, top-right, at `z-[100]` (`Toaster.
 **Blast onto `/timesheets` (edit mode) — the load-bearing check.** `TimesheetModal` is shared: `requests/timesheets/+page.svelte:172` (`mode="review"`) and `timesheets/+page.svelte:252-260` (`mode="edit"`). Deleting the strip reaches the edit page. Verified that nothing is silenced there:
 
 - `timesheets/+page.svelte:215` already reads `{#if form?.error && !openTs}` — the page banner is **deliberately suppressed while the modal is open**. Today the strip is the in-modal voice; after §3 the toast is.
-- Every writer on that page toasts on failure: `?/saveEntries` → `keepOpenFb` (`TimesheetModal.svelte:274`, bare `submitFeedback`, always toasts); `?/review` / `?/syncAttendance` → `closeFb` (`:273`, same); `?/delete` → `ConfirmButton`, which builds its **own** `submitFeedback` internally (`ConfirmButton.svelte:50-55`) with no `error` option, so it toasts too. **No surface is left mute.** §3's regression probe R2 proves this on the running app.
+- **Every writer INSIDE `TimesheetModal` toasts on failure.** The correct enumeration is **six form actions plus the ConfirmButton delete**, not four:
+
+  | Action | Line | Guard | Toasts on failure? |
+  |---|---|---|---|
+  | `?/review` (hidden reject form) | `:511` | `closeFb` (`:273`, bare `submitFeedback`) | yes |
+  | `?/review` (approve) | `:561` | `closeFb` | yes |
+  | `?/saveEntries` | `:547` | `keepOpenFb` (`:274`, bare `submitFeedback`) | yes |
+  | `?/syncAttendance` | `:572` | `closeFb` | yes |
+  | `?/submit` | `:582` | `closeFb` | yes |
+  | `?/submitDraft` | `:592` | `closeFb` | yes |
+  | `?/delete` | `:533` (`ConfirmButton`) | ConfirmButton's **own** internal `submitFeedback` (`ConfirmButton.svelte:50-55`), no `error` option | yes |
+
+  `submit-feedback.svelte.ts:84-87` always yields a string (`data.error`, falling back to `FRIENDLY_ERROR`), so **no action in the modal is left mute.** Note `?/submit` is the action `tests/e2e/timesheet-approval.spec.ts:130` depends on — §3 re-runs that spec. §3's regression probe R2 proves the toast fires on the running app.
+- **The page-level claim is narrower than the plan first said.** "Every writer on `/timesheets` toasts on failure" was FALSE: `src/routes/(app)/timesheets/+page.svelte:92` puts `?/submitMany` on a bare `use:enhance={clearOnSuccess('mine')}`, and `clearOnSuccess` (`:47-56`) is a plain `SubmitFunction` factory that calls `update()` and toasts nothing. **It is not a silencing risk from this plan** — `?/submitMany` fires with the modal closed, where the page banner at `:215` (`{#if form?.error && !openTs}`) still renders — but the blanket claim is withdrawn. The accurate statement is: *every writer inside the shared modal toasts; the page's own `?/submitMany` does not, and it does not need to, because its banner is unaffected.*
 - Known, accepted, out of scope: `timesheets/+page.svelte:219` (`form?.saved`) has no `!openTs` guard, so a *successful* modal action on the edit page still shows banner + toast. That is the same class of defect on a page this plan does not own. Record it in the report; do not fix it.
 
 **The e2e that already knows about this.** `tests/e2e/timesheet-approval.spec.ts:126-128` is scoped to `getByRole('main')` with the comment "phase 04 also toasts this message, and a page-wide locator now matches both the page banner and the toast". **It targets `/timesheets`, not `/requests/timesheets`** — `hrPage.goto('/timesheets')` at `:111`, asserting `'Timesheet submitted for review.'`, which is a `?/submit` on the edit page. This plan does not touch that page's banners, so the assertion is **unaffected**. Two sibling assertions have the same shape and are likewise unaffected: `timesheet-punch.spec.ts:95,117` and `manager-org-wide-timesheets.spec.ts:113`, all on `/timesheets`. §3 re-runs all three anyway.
@@ -232,7 +267,13 @@ Read-only context (do not edit): `src/lib/utils/submit-feedback.svelte.ts`, `src
 
 **Nothing server-side changes.** Every action keeps returning `{ error }` on failure and `{ saved }` on success. `submit-feedback.svelte.ts` keeps reading `result.data.error` / `result.data.saved`. Only the DOM node that renders those strings changes.
 
-**Component prop contract, `TimesheetModal`:** the `form?: { error?: string } | null` prop (`:44`) **stays** — it is still destructured and still passed by both call sites. §3 removes the only *render* of `form.error` inside the component but the prop is still read by other logic; do not delete the prop, do not delete the destructure. `pnpm check` will flag it if the prop genuinely becomes unused — if it does, leave it and note it, because removing it is a two-call-site change §3 does not own.
+**Component prop contract, `TimesheetModal`:** the `form?: { error?: string } | null` prop appears at `:44` (type), `:54` (destructure default), and `:347` / `:351` — the strip §3 deletes — **and nowhere else**. The earlier claim that "the prop is still read by other logic" was FALSE. After §3 the prop has **zero readers** inside the component. The same is true of `let { data, form }` at `settings/roles/+page.svelte:18` after §1.
+
+**This is a measurement, not an assumption.** `eslint.config.js` sets `no-unused-vars: ['error', …]` and it applies to `**/*.svelte`. EXECUTE must run `pnpm lint` ALONE immediately after each deletion and read the actual output. Do not pre-emptively delete anything, and do not assume the linter stays quiet.
+
+- **§1, if lint flags it:** in-scope and clean — reduce `let { data, form }: { data: PageData; form: ActionData } = $props()` at `settings/roles/+page.svelte:18` to `let { data }: { data: PageData } = $props()` and drop the now-unused `ActionData` from the type import.
+- **§3, if lint flags it (owner decision D2 — APPROVED):** delete the `form` prop at `:44` and its destructure at `:54`, and remove the `{form}` being passed at the two call sites — `requests/timesheets/+page.svelte:172` and `src/routes/(app)/timesheets/+page.svelte:259`. **That one line at `:259` is the ONLY permitted edit to `timesheets/+page.svelte` in this whole plan, and it is permitted ONLY if `pnpm lint` actually fails.** If lint is green, change nothing there. Locate it by the `<TimesheetModal` tag, not by line number.
+- **If lint is green after §3:** leave the prop exactly as it is and record that lint was green. Do not tidy it away.
 
 **Accessibility contract:** `Banner kind="error"` carries `role="alert"` (`Banner.svelte:42`). The error toast carries `aria-live="assertive"` (`Toaster.svelte:64`). The assertive announcement survives every deletion in this plan. The two hand-rolled strips (`settings/roles:156-164`, `TimesheetModal:347-353`) carry **no** role at all — deleting them is an accessibility net-neutral at worst.
 
@@ -372,13 +413,13 @@ The strip was setActive-only: a rejected role save deliberately skips update()
    ```
    No `success` option (the server's `saved` string is the message). No `error` option (the server's `error` string is the message). No new abstraction.
 
-3. Swap both forms onto the guard:
-   - `:100` `use:enhance={clearOnSuccess}` → `use:enhance={bulkFb.enhance}` (the `?/approveMany` form)
-   - `:105-109` `use:enhance={clearOnSuccess}` → `use:enhance={bulkFb.enhance}` (the `?/rejectMany` form)
+3. Swap both forms onto the guard. **Find each form by its `action=` attribute — `action="?/approveMany"` and `action="?/rejectMany"` — never by line number.** Line refs below are orientation only and will drift:
+   - the `?/approveMany` form: `use:enhance={clearOnSuccess}` → `use:enhance={bulkFb.enhance}` (both are on `:101` today)
+   - the `?/rejectMany` form: `use:enhance={clearOnSuccess}` → `use:enhance={bulkFb.enhance}` (the form opens at `:109`; its `use:enhance` is on `:113`)
 
    **One shared guard is correct here**, not one per form: only one bulk action can be in flight at a time (both submit the same selection from the same bar), so a shared busy lock is the desired behaviour, not a bug. This is the opposite of the per-row case at `settings/roles:28` where a shared guard would freeze the whole table.
 
-4. **The `busy` variable.** The page keeps its own `let busy = $state(false)` (`:23`), set by `clearOnSuccess`. Both buttons read `disabled={busy}` (`:103`, `:118`). `clearOnSuccess` still runs as `inner`, so `busy` still flips — **leave `disabled={busy}` alone**. Do NOT switch the buttons to `bulkFb.busy`; that is a second lock doing the same job and a wider diff. Confirm after the edit that a bulk submit still disables both buttons (probe P3 below).
+4. **The `busy` variable.** The page keeps its own `let busy = $state(false)` (`:23`), set by `clearOnSuccess`. Both buttons read `disabled={busy}` (`:104`, `:119`). `clearOnSuccess` still runs as `inner`, so `busy` still flips — **leave `disabled={busy}` alone**. Do NOT switch the buttons to `bulkFb.busy`; that is a second lock doing the same job and a wider diff. Confirm after the edit that a bulk submit still disables both buttons (probe P3 below).
 
 5. **Change nothing else.** Do not touch `+page.server.ts`. Do not touch the button class lists (that is issue #27). Do not touch the `ReasonDialog` wiring (`:41-55`, `:174-183`).
 
@@ -402,7 +443,7 @@ The strip was setActive-only: a rejected role save deliberately skips update()
 
 ### Live probe — §2
 
-Log in as an account that can review timesheets (`approver@veent.ph`, or `admin@veent.ph`). Go to `/requests/timesheets`. **Preconditions:** at least one pending timesheet card must be present. If the queue is empty, say so and mark the probe `BLOCKED — no fixture`; **do not fabricate timesheets to manufacture one**, and do not run `db:seed:e2e` against the owner's dev database without asking.
+Log in as an account that can review timesheets (`approver@veent.ph`, or `admin@veent.ph`). Go to `/requests/timesheets`. **Preconditions:** at least one pending timesheet card must be present. If the queue is empty, seed one under **owner decision D1** — the e2e suite's own Prisma-upsert pattern (`tests/e2e/timesheet-approval.spec.ts:42-70`), distinctive hours label, deleted again afterward, ids recorded. Do **not** run `db:seed:e2e`, and do not touch any row the agent did not create. If seeding itself fails, mark the probe `BLOCKED — no fixture`.
 
 At this point in the sequence the banners **still exist** (§3 has not run). So the assertion for §2 is "**at least one** toast, carrying the right words", and the "exactly one" assertion belongs to §3.
 
@@ -512,9 +553,21 @@ to the toast. Adds the first tests these two actions have ever had.
 
 6. **Add the e2e** to `tests/e2e/form-errors.spec.ts`, following the two existing tests in that file (`login` from `./helpers`, `USERS.admin` or `USERS.approver`, `goto(…, { waitUntil: 'domcontentloaded' })`, then a hydration retry via `expect(async () => {…}).toPass({ timeout: 15000 })` — the pattern at `:20-24`).
 
-   **One test.** Scope: the bulk 400 path, because it is deterministic, needs no seeded pending timesheet to *succeed*, and is the exact outcome §2 gave a voice to. Shape:
-   - go to `/requests/timesheets`; if the pending queue is empty, `test.skip()` with a message naming the missing fixture (the bulk bar only renders when something is selected)
-   - select one card's checkbox so the bulk bar appears
+   **One test, and it seeds its own fixture. NO `test.skip()`.**
+
+   **The earlier draft was wrong on both counts, and the corrections are load-bearing:**
+
+   - *"There is no fixture helper that guarantees a pending timesheet."* **False.** `tests/e2e/timesheet-approval.spec.ts:42-70` has `resetFixture()`, which seeds a SUBMITTED timesheet by direct Prisma upsert; `tests/e2e/helpers.ts:64-82` then drives it through `/requests/timesheets`. That is the repo's own sanctioned pattern and this test reuses it.
+   - *A `test.skip()` on an empty queue is an acceptable escape hatch.* **No — it would skip on EVERY run.** `pnpm test:e2e` is `dotenv -e .env.dev -- playwright test`, so the suite runs against the same database as the dev server, and `tests/e2e/global-setup.ts:81-82` runs `db.timesheet.deleteMany()` for `employee@veent.ph` on every run. The review queue is empty by the time `form-errors.spec.ts` executes. A gate that never runs is not a gate, and Acceptance Criterion 6 requires the assertion to actually execute.
+   - *"The first exactly-one-visible-message assertion in the repo."* **False, and the claim is deleted.** `tests/e2e/form-errors.spec.ts:86-89` already carries that exact triple — `toHaveText(/Invalid status/)`, `toHaveCount(1)`, `getByRole('alert')` `toHaveCount(0)` — added by `661719d`.
+
+   **What this test genuinely adds, stated honestly:** it is the first assertion of ANY kind on `approveMany` / `rejectMany`, which have zero coverage at every layer (`grep -rln "approveMany\|rejectMany" tests/` → 0), and the first exactly-one assertion on `/requests/timesheets`, the route §3 strips both banners from. It **reuses** the existing triple; it does not invent it.
+
+   Shape:
+   - **`beforeEach` — seed.** Create one SUBMITTED timesheet with a distinctive hours label, copying the Prisma-upsert shape at `tests/e2e/timesheet-approval.spec.ts:42-70`. Keep the returned id.
+   - **`afterEach` — clean up.** Delete exactly what was seeded, by id. Seed and remove; never leave a card behind for the owner to find.
+   - go to `/requests/timesheets`, then **assert the seeded card is present before anything else**. If it is absent the test **FAILS**. It does not skip.
+   - select that card's checkbox so the bulk bar appears
    - blank the hidden `ids` input via `.evaluate((el: HTMLInputElement) => { el.value = '' })` on `form[action*="approveMany"] input[name="ids"]` — the same hidden-input mutation trick this file already uses at `:26-29`
    - submit that form's own button
    - **ASSERT the toast:** `await expect(page.locator('[role="status"] [aria-live="assertive"]')).toHaveText(/No timesheets selected/)`
@@ -522,21 +575,38 @@ to the toast. Adds the first tests these two actions have ever had.
      `await expect(page.locator('[role="status"] [aria-live="assertive"]')).toHaveCount(1)` **and**
      `await expect(page.getByRole('alert')).toHaveCount(0)`
    - the bare `getByRole('alert')` count-0 is safe **on this route specifically**: after step 1 there is no `Banner` on the page at all, and `Banner` is the only `role="alert"` producer in play (`Banner.svelte:42` gives it to `error` AND `warning`). Confirm with the step-2 grep before trusting it.
+   - **Negative control before trusting it:** change the expected text to `No timesheets selectedAAA` and confirm the test goes RED; then change `toHaveCount(1)` to `toHaveCount(2)` and confirm RED again. Record both, then revert. A check that cannot fail is not a check.
    - one short comment at the top saying why the test exists, matching the file's existing style. Nothing else.
 
-7. Gate set: `pnpm format:check && pnpm lint && pnpm check && pnpm test`.
+7. Gate set: `pnpm format:check && pnpm lint && pnpm check && pnpm test`. Run `pnpm lint` ALONE first, immediately after the deletions — see Public Contracts for the `form`-prop measurement and the D2 carve-out.
 
-8. E2E: `CI=1 pnpm test:e2e -- form-errors`, then the three sibling specs that carry `getByRole('main')` scoping, to prove they are unaffected:
+8. **Live probe (below) — PROBES RUN BEFORE THE E2E.** This is a deliberate swap of the original step order, and the reason is that **§3 was destroying its own fixture**: `pnpm test:e2e` loads `.env.dev`, the same database the dev server uses, and `tests/e2e/global-setup.ts:81-82` deletes every timesheet belonging to `employee@veent.ph` — which is the only card in the review queue. Running the e2e first left the probes with nothing to probe.
+
+   **Why swap rather than make each probe self-seeding:** the probes are driven by hand against the owner's live app, not by the Playwright fixture harness, so a per-probe seed would be a second, hand-rolled seeding mechanism next to the one the e2e already uses. Ordering costs nothing and keeps exactly one seeding path in the plan. The probes may still seed under D1 (below) when the queue is too thin — that uses the SAME Prisma-upsert pattern, not a new one.
+
+9. **E2E, last.** Warn the owner first: this run will DELETE Elena's SUBMITTED timesheet `cmtuzqmpk001561zqp6z2trxk`. `cmtuzqmq9001h61zqc4bk89aj` (Maria's REJECTED, the R2 fixture) survives.
    ```
+   CI=1 pnpm test:e2e -- form-errors
    CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets
    ```
-   The pre-existing attendance failure is **not** in this list. If it appears in a broader run, record it as pre-existing and move on.
+   The second command is the three sibling specs that carry `getByRole('main')` scoping, proving they are unaffected. The pre-existing attendance failure is **not** in this list. If it appears in a broader run, record it as pre-existing and move on.
 
-9. Live probe (below), then commit.
+10. Commit.
 
 ### Live probe — §3
 
-Log in as a reviewer at `/requests/timesheets`. Preconditions as in §2 — at least one pending timesheet. If none, mark `BLOCKED — no fixture`; do not fabricate.
+**Run this block BEFORE the e2e (step 8 above).**
+
+Log in as a reviewer at `/requests/timesheets`. This probe set needs **at least four** pending timesheets — P1 rejects one, P2 approves another, R1 selects two for a bulk approve — and the dev DB has one.
+
+**Fixture seeding is AUTHORISED (owner decision D1, APPROVED).** The execute-agent MAY seed the pending timesheets it needs, under these rules:
+
+1. Use the e2e suite's **own existing** Prisma-upsert pattern — `tests/e2e/timesheet-approval.spec.ts:42-70`, driven the way `tests/e2e/helpers.ts:64-82` drives it. Do not invent a new seeding mechanism, and do not run `db:seed:e2e`.
+2. Give every seeded timesheet a **distinctive hours label** so it is identifiable on sight and by query.
+3. **Clean up what you create.** Delete every seeded row by id when the probe block finishes, and record the ids that were created and deleted in the report.
+4. Do not touch, mutate, or delete any row the agent did not create. `cmtuzqmpk001561zqp6z2trxk` (Elena, SUBMITTED) and `cmtuzqmq9001h61zqc4bk89aj` (Maria, REJECTED) are the owner's — leave them as found.
+
+If seeding itself fails, mark the affected probe `BLOCKED — no fixture` and record why. Do not fabricate evidence.
 
 - **P1 — a rejection reports once, and not in green.** Open a card's review modal, press `Reject`, give a reason, confirm. Assert:
   - the modal **closes**
@@ -553,7 +623,13 @@ Log in as a reviewer at `/requests/timesheets`. Preconditions as in §2 — at l
 - **N1 — negative control, string mutation.** Re-run P1's text assertion with a corrupted expected string. It MUST fail.
 - **N2 — negative control, the success path is alive.** P1 and P2 both passing IS this control — if the deletion had broken the feedback path, both would show nothing.
 - **R1 — regression, bulk still speaks (this is §2's e2e assertion, live).** Select two cards, `Approve selected`. Exactly one toast, `role="alert"` count 0.
-- **R2 — regression, `/timesheets` is not silenced.** This is the shared-component check and it is **mandatory**. Log in as `employee@veent.ph` (or `admin@veent.ph` for a draft), go to `/timesheets`, open a timesheet's modal. Force a `?/saveEntries` failure (corrupt a hidden `id`, or submit an entry the server refuses). Assert:
+- **R2 — regression, `/timesheets` is not silenced.** This is the shared-component check, it is **mandatory**, and it decides whether §3 ships or reverts — so its account and its fixture are fixed, not a choice.
+
+  **Account: `manager@veent.ph`. Timesheet: `cmtuzqmq9001h61zqc4bk89aj` (REJECTED, manager-owned).** NOT `employee@veent.ph`. `TimesheetModal.svelte:88-90` reads `canEdit = mode === 'edit' && canModify && isManager && ts != null && ts.status !== 'APPROVED'` — an Employee is not a manager, so the `?/saveEntries` form at `:547` **never renders** for that account. Running R2 as an Employee would show no toast for the trivial reason that there is no button, and the plan's own rule would then revert §3 on a false negative.
+
+  **PRECONDITION — assert this BEFORE measuring anything.** Open the modal on `/timesheets` as `manager@veent.ph` and assert the `?/saveEntries` control is actually present in the DOM: `document.querySelectorAll('form[action*="saveEntries"]').length === 1` and its submit button is visible and not `disabled`. **If the precondition fails, R2 is `BLOCKED — control not rendered`, NOT a failure, and §3 is NOT reverted.** A revert may only be triggered by a probe whose control was proven present. Record the precondition result in the report alongside the measurement.
+
+  Then force a `?/saveEntries` failure (corrupt a hidden `id`, or submit an entry the server refuses). Assert:
   - exactly one `[aria-live="assertive"]` toast with the server's message
   - the modal stays open (`keepOpen` never closes)
   - `document.querySelectorAll('[role="dialog"] [class*="bg-destructive"]').length === 0` — the strip is gone
@@ -636,11 +712,19 @@ route is left mute. Adds the queue's first error-surface e2e.
    ```
    Expected per file: `TimesheetModal` 1 (placeholder `:522`), `requests/timesheets` 1 (placeholder), `requests/proposals` 2 (`Confirming…` + placeholder), `requests/approvals` 2 (`Approving…` + placeholder). Total **6**, down from 12. Any other total means the wrong lines were cut.
 
-5. **Re-check the locator surface** — one grep, mechanical:
+5. **Re-check the locator surface — TWO greps, both mechanical, both required.** One grep alone is incomplete: it only catches a locator that newly MATCHES, never one that newly MISSES.
+
+   5a — a locator that newly **matches**:
    ```
    grep -rn "exact: true" tests/e2e/ | grep -iE "reject|return"
    ```
    Must be **0 hits**. If a hit appears (someone added one since research), stop and re-assess — an `{ exact: true, name: 'Reject' }` would newly match a button it did not match before.
+
+   5b — a locator that newly **misses**, because it names the OLD string with the ellipsis:
+   ```
+   grep -rniE "Reject…|Return…" tests/
+   ```
+   Must be **0 hits**. Verified 0 today (`grep -rn "Reject" tests/` returns only `mockRejectedValue` / `expectRejectedAt` / `PromiseRejectedResult`), so there is no live risk — but a `name: 'Reject…'` added since research would break silently, and 5a cannot see it.
 
 6. Gate set: `pnpm format:check && pnpm lint && pnpm check && pnpm test`.
 
@@ -704,8 +788,10 @@ Selector facts, fixed and verified — get these wrong and every assertion below
 | `pnpm test` green after each section | Fully-Automated | 1.5, 2.5, 3.9, 4.5 — no existing unit test depended on any deleted surface |
 | `grep -c` guards: `settings/roles` `form.error` = 0; `requests/timesheets` `Banner` = 0; `TimesheetModal` `form?.error` = 0; `bulkFb.enhance` = 2; ellipsis count 12 → 6 | Fully-Automated | 1.1, 2.1, 3.1, 3.2, 4.1, 4.2 |
 | `grep -rn "exact: true" tests/e2e/ \| grep -iE "reject\|return"` = 0 | Fully-Automated | 4.3 — no locator newly matches |
+| `grep -rniE "Reject…\|Return…" tests/` = 0 | Fully-Automated | 4.3 (missing half) — no locator naming the OLD string newly misses |
+| `pnpm lint` run ALONE immediately after each deletion, output read | Fully-Automated | Public Contracts / D2 — whether the dead `form` prop trips `no-unused-vars` is MEASURED, never assumed |
 | New unit tests: `approveMany` / `rejectMany` return distinct non-empty `saved` strings; the three refusal paths return non-empty `error` strings | Fully-Automated | 2.2 — every bulk outcome carries a string the toast can read. Goal 6 (payload half) |
-| New e2e in `form-errors.spec.ts`: bulk 400 → exactly ONE `[aria-live="assertive"]` toast reading `No timesheets selected`, and `getByRole('alert')` count 0 | Hybrid (build+preview, seeded pending timesheet) | 3.3, Goal 2, Goal 6 — the first "exactly one visible message" assertion in the repo |
+| New e2e in `form-errors.spec.ts`: bulk 400 → exactly ONE `[aria-live="assertive"]` toast reading `No timesheets selected`, and `getByRole('alert')` count 0. **Self-seeds its SUBMITTED timesheet via the Prisma-upsert pattern at `timesheet-approval.spec.ts:42-70` and cleans up; no `test.skip()`** | Hybrid (build+preview; precondition self-satisfied by the seed) | 3.3, Goal 2, Goal 6 — the first assertion of any kind on `approveMany`/`rejectMany`, and the first exactly-one assertion on `/requests/timesheets`. It REUSES the triple already at `form-errors.spec.ts:86-89` (`661719d`); it is not the repo's first |
 | `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets` green | Hybrid | 3.7 — the three `getByRole('main')` assertions on `/timesheets` are unaffected |
 | `CI=1 pnpm test:e2e -- approval-chain multi-role-sod timesheet-approval` green | Hybrid | 4.3 — the renamed buttons are still reachable by every existing locator |
 | §1 live probe P1/P2 + N1/N2 + R1 | Agent-Probe | 1.2, 1.3, 1.4, Goal 1 |
@@ -724,11 +810,11 @@ Selector facts, fixed and verified — get these wrong and every assertion below
 
 **Add one test, in §3, in a file that already exists.**
 
-RESEARCH found the gap: `approveMany` / `rejectMany` have **zero** coverage at every layer, and nothing anywhere in the repo asserts "exactly one visible message per outcome" — which is the entire premise of phase 04. After §3 the only proof a bulk refusal is reported at all is a toast that nothing asserts.
+RESEARCH found the gap: `approveMany` / `rejectMany` have **zero** coverage at every layer. After §3 the only proof a bulk refusal is reported at all is a toast that nothing asserts. Note the correction: the repo **already** asserts "exactly one visible message" — `form-errors.spec.ts:86-89`, added by `661719d`. What is missing is that assertion on *this* surface and *this* route. The new test reuses the existing triple.
 
 Proportionality, deliberately:
 
-- **One** e2e, on the deterministic 400 path. Not a happy-path bulk approve test — that needs seeded pending timesheets, mutates shared fixture state, and duplicates what `timesheet-approval.spec.ts` already drives through the modal.
+- **One** e2e, on the deterministic 400 path, **seeding its own SUBMITTED timesheet and deleting it afterward**. Not a happy-path bulk approve test — that duplicates what `timesheet-approval.spec.ts` already drives through the modal.
 - **Two** unit tests, in a file whose mocks already exist. Not a new file, not new mock wiring.
 - **Do NOT** add an e2e for §1 or §4. `/settings/roles` already has `settings-roles.spec.ts` covering the table, the probe covers the strip, and adding a self-deactivation e2e means mutating account state in a shared fixture. §4 is six characters with a mechanical grep guard.
 - **Do NOT** add a `/timesheets` e2e for R2. That route is out of scope; the probe is the right tier for a one-off cross-route check.
@@ -736,7 +822,8 @@ Proportionality, deliberately:
 ## Test Infra Improvement Notes
 
 - `tests/e2e/form-errors.spec.ts` still asserts on `getByRole('alert')`, which matches `Banner` only. Every phase-04 banner→toast migration (this plan, `661719d`, `c2e0e20`) silently narrows what that selector can catch. A shared helper — `expectExactlyOneErrorToast(page, /text/)` wrapping the `[role="status"] [aria-live="assertive"]` + `toHaveCount(1)` + `getByRole('alert')` count-0 triple — would stop each site re-deriving it. **OUT OF SCOPE here: note it, do not build it.** This is the second plan in a row to write that same triple by hand.
-- There is no fixture helper that guarantees a pending timesheet on `/requests/timesheets`, which is why both §2's and §3's probes carry a `BLOCKED — no fixture` escape hatch and the new e2e carries a `test.skip()`. A seeded always-pending timesheet would make the bulk path testable without mutating shared state. Note only.
+- **Correction to an earlier note in this plan:** the claim that "there is no fixture helper that guarantees a pending timesheet" was FALSE. `tests/e2e/timesheet-approval.spec.ts:42-70` (`resetFixture()`, a direct Prisma upsert, driven by `helpers.ts:64-82`) is exactly that helper. The real gap is narrower: the pattern is **inlined per spec** rather than shared, so every spec that needs a pending timesheet re-writes it. Lifting it into `tests/e2e/helpers.ts` would make the bulk path testable without a copy. **OUT OF SCOPE here: note it, do not build it.** §3's new e2e copies the pattern in place.
+- `pnpm test:e2e` loads `.env.dev`, so the e2e suite and the dev server share ONE database, and `global-setup.ts:81-82` wipes `employee@veent.ph`'s timesheets on every run. That coupling is why §3 must run its probes before its e2e, and why any probe fixture has to be seeded and cleaned by the agent. A separate e2e database would remove the whole class of problem. Note only.
 - The pre-existing attendance e2e failure on this branch (see the 10-09-26 handoff) is unrelated and unowned. It makes "run the e2e suite" an unreliable gate, which is why every e2e command in this plan names its specs explicitly.
 
 ## Risks
@@ -750,7 +837,7 @@ Proportionality, deliberately:
 | The `form` prop on `TimesheetModal` becomes unused and `pnpm check` complains | Stated in Public Contracts: leave it, note it. Removing it is a two-call-site change §3 does not own. |
 | `TimesheetModal` line numbers shift, and §4 edits the wrong line | §4 step 1 re-greps and matches on label text, not line number. Step 4 verifies by count. |
 | A §4 edit strays into the `bg-green-600` classes two lines away | Issue #27 owns those. §4 step 3 says label text only; the `git diff` for §4 must be six single-character deletions and nothing else. |
-| A probe mutates shared seed data (timesheet status, user active flag) | §1 N2 says restore the account. §2/§3 probes may approve/reject a real pending timesheet — record which one in the report so the owner knows. Do not create fixtures to manufacture a probe. |
+| A probe mutates shared seed data (timesheet status, user active flag) | §1 N2 says restore the account. Under D1 the agent SEEDS its own pending timesheets (distinctive hours label) and deletes them again, recording the ids — so the owner's own rows are left alone. It must not approve, reject, or delete any row it did not create. |
 | Someone "fixes" the `skipped` counter while in §2 | Explicitly out of scope, with reasons, in the Scope section. §2 step 9 files a backlog note instead. |
 
 ## Non-goals
@@ -779,10 +866,164 @@ Four commits, in this order. Conventional. **No attribution trailer, no `Co-Auth
 
 1. **Selected plan file**: `process/general-plans/active/feedback-duplicate-messages-b2-b3-b5_10-09-26/feedback-duplicate-messages-b2-b3-b5_PLAN_10-09-26.md`
 2. **Last completed phase/step**: PLAN complete. Nothing executed. Branch `feat/uiux-phase-4` at `d4c8e41`, clean, ahead 3 of origin. `pnpm format:check` verified green at this HEAD.
-3. **Validate-contract status**: pending — VALIDATE has not run.
+3. **Validate-contract status**: VALIDATE ran on 10-09-26 and returned **BLOCKED** (2 FAILs, 5 CONCERNs). All seven findings have been amended into this plan — see the Amendment log at the top. The Validate Contract section below is retained as the previous run's audit record; its verdict refers to the pre-amendment text. **Re-run VALIDATE from V1 before EXECUTE.**
 4. **Supporting context loaded**: `process/context/all-context.md`, `process/context/tests/all-tests.md`; both backlog notes (`settings-roles-duplicate-refusal_NOTE_10-09-26.md`, `timesheet-review-surface_NOTE_10-09-26.md`); the archived precedent plan `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/`; source read in full for all five touchpoint files plus `submit-feedback.svelte.ts`, `ConfirmButton.svelte`, `Toaster.svelte`, `toast.svelte.ts`, `+page.server.ts`, and `tests/unit/request-decide-feedback.test.ts`.
-5. **Next step for a fresh agent**: run VALIDATE against this plan. On approval, execute §1 first (fully self-contained, lowest risk, proves the probe harness works before the harder sections). Then §2, then §3 — **that ordering is a hard dependency, not a preference**. §4 any time. Commit per section; do not batch. If resuming mid-plan, `git log --oneline -4` against the four commit subjects above tells you exactly where you are; if `TimesheetModal.svelte` or `requests/timesheets/+page.svelte` has already changed, re-grep before trusting any line number in this plan.
+5. **Next step for a fresh agent**: re-run VALIDATE from V1 against this amended plan. On approval, execute §1 first (fully self-contained, lowest risk, proves the probe harness works before the harder sections). Then §2, then §3 — **that ordering is a hard dependency, not a preference**. §4 any time. Commit per section; do not batch. If resuming mid-plan, `git log --oneline -4` against the four commit subjects above tells you exactly where you are; if `TimesheetModal.svelte` or `requests/timesheets/+page.svelte` has already changed, re-grep before trusting any line number in this plan.
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: BLOCKED
+Date: 10-09-26
+date: 2026-09-10
+generated-by: outer-pvl
+
+Parallel strategy: sequential (one deep source-verification pass)
+Rationale: 2/7 signals — S5 (user explicitly requested adversarial depth) and S7 (5 source + 2 test files in blast radius). No S1/S2/S3/S4/S6. The blast radius is five files in one package with a shared component; a fan-out would have split the one thing that mattered — reading each cited line and its neighbours in order. PLAN's 1/7 sequential call was right on strategy; it was wrong that the sections were low-risk to verify.
+
+### Verdict in one line
+
+The three surface RULINGS survive source verification. Six of the plan's factual CLAIMS do not. §1, §2 and §4 are safe to execute as written. §3 is NOT — it carries two FAIL-grade instructions that would send an execute-agent to the wrong conclusion.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| 1.1 / 2.1 / 3.1 / 3.2 / 4.1 / 4.2 | the named surface is actually gone / actually wired | Fully-Automated | `grep -c "form?.error\|form\.error\|form?.saved" "src/routes/(app)/settings/roles/+page.svelte"` = 0; `grep -c "Banner" "src/routes/(app)/requests/timesheets/+page.svelte"` = 0; `grep -c "form?.error" src/lib/components/timesheets/TimesheetModal.svelte` = 0; `grep -c "bulkFb.enhance" "src/routes/(app)/requests/timesheets/+page.svelte"` = 2; ellipsis per-file counts 1/1/2/2 | A |
+| 4.3 (half) | no `exact: true` locator newly matches a renamed button | Fully-Automated | `grep -rn "exact: true" tests/e2e/ \| grep -iE "reject\|return"` = 0 — VERIFIED 0 today | A |
+| 4.3 (missing half) | no NON-exact locator newly MISSES a renamed button | Fully-Automated | `grep -rniE "Reject…\|Return…\|Reject selected…" tests/` = 0 — VERIFIED 0 today; ADD this grep, the plan only checks `exact: true` | B |
+| 1.5 / 2.5 / 3.9 / 4.5 | nothing else broke | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` after each section | A |
+| 1.5 / 3.9 (unused-prop risk) | the `form` prop/destructure left behind by §1 and §3 does not fail the gate | Fully-Automated | `pnpm lint` FIRST, alone, immediately after each deletion — before the rest of the gate set | B |
+| 2.2 | every bulk outcome carries a non-empty string the toast can read | Fully-Automated | new `describe` in `tests/unit/request-decide-feedback.test.ts`, run by `pnpm test` | B |
+| 3.3 / Goal 6 | a bulk 400 shows exactly ONE visible message and it is the toast | Hybrid | new test in `tests/e2e/form-errors.spec.ts`, run by `CI=1 pnpm test:e2e -- form-errors`. Precondition: a SUBMITTED timesheet in the review queue, seeded by the test itself via the Prisma-upsert pattern at `tests/e2e/timesheet-approval.spec.ts:42-70`. NOT `test.skip()` | B |
+| 3.7 | the three `getByRole('main')` specs on `/timesheets` are unaffected | Hybrid | `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets` | A |
+| 4.3 | the renamed buttons are still reachable by every existing locator | Hybrid | `CI=1 pnpm test:e2e -- approval-chain multi-role-sod timesheet-approval` | A |
+| 1.2 / 1.3 / 1.4 | a refused `setActive` reports once, the success path still speaks, the #283 in-dialog refusal is untouched | Agent-Probe | §1 probes P1, P2, N1, N2, R1 against the running dev app | A |
+| 2.3 / 2.4 | the bulk string reaches the screen; the double-submit lock survives | Agent-Probe | §2 probes P1, P2, P3 + N1/N2 | A |
+| 3.4 / 3.5 / 3.8 | a rejection reports once and not in green; a failed review is visible above the modal; the stored-reason panel survives | Agent-Probe | §3 probes P1, P2, P3, R1, R3 — **run BEFORE the §3 e2e**, see E4 | C |
+| 3.6 | `/timesheets` (shared modal) is not silenced | Agent-Probe | §3 probe R2, **as `manager@veent.ph` on timesheet `cmtuzqmq9001h61zqc4bk89aj` (REJECTED)** — see F2 | B |
+| 4.4 | every renamed button still opens its dialog | Agent-Probe | §4 probes P1-P4 + N1 | A |
+| — | the `skipped` counter returns a green toast for a total failure | — | named residual: backlog note, owner has not ruled | D |
+
+gap-resolution legend: A — proven now. B — gate added/corrected by this plan. C — deferred to a named later step. D — backlog residual.
+
+Legacy line form (retained for existing consumers):
+- settings/roles: [Fully-automated: `grep -c` = 0] + [agent-probe: P1/P2/N1/N2/R1]
+- requests/timesheets bulk: [Fully-automated: new unit tests via `pnpm test`] + [hybrid: `CI=1 pnpm test:e2e -- form-errors`, precondition = self-seeded SUBMITTED timesheet] + [agent-probe: P1/P2/P3]
+- TimesheetModal strip: [Fully-automated: `grep -c "form?.error"` = 0] + [agent-probe: P3, R2, R3]
+- B5 labels: [Fully-automated: per-file ellipsis counts + both locator greps] + [hybrid: three named e2e specs] + [agent-probe: P1-P4]
+- `skipped` counter semantics: [known-gap: documented, backlog note, owner has not ruled]
+
+### Dimension findings
+
+- Infra fit: **CONCERN** — `pnpm test:e2e` and `pnpm dev` both load `.env.dev`, so the e2e suite runs against the OWNER'S dev database. `tests/e2e/global-setup.ts:81-82` runs `db.timesheet.deleteMany({ where: { employeeId: <employee@veent.ph> } })` on every run. The only SUBMITTED timesheet in the dev DB today, `cmtuzqmpk001561zqp6z2trxk`, belongs to `employee@veent.ph` — the e2e run DELETES it. §3 runs the e2e (step 8) before the live probes (step 9), so §3 as written destroys its own probe fixture.
+- Test coverage: **FAIL** — the plan's headline new e2e opens with `test.skip()` when the review queue is empty, and the queue IS empty at the moment `form-errors.spec.ts` runs (global-setup wipes it; `timesheet-approval.spec.ts` consumes its own card before it finishes). A gate that skips on every run is not a gate. The repo already has the fixture mechanism the plan says does not exist.
+- Breaking changes: **PASS** — no server logic, no schema, no API, no auth. Every action keeps returning `{ error }` / `{ saved }`. `submitFeedback` reads the same keys. `Banner kind="error"` `role="alert"` (`Banner.svelte:42`) is replaced by the toast's `aria-live="assertive"` (`Toaster.svelte:64`) — the assertive announcement survives, and the two hand-rolled strips being deleted carry no ARIA role at all. Accessibility is net-neutral at worst, as claimed.
+- Security surface: **PASS** — no auth, identity, billing, secrets, migration, or trust boundary. No high-risk class. No evidence pack required.
+- Section §1 (B2, `/settings/roles`): **PASS** — mechanical feasibility exact; both halves of the safety claim verified against source; the delete range is right to the line. One CONCERN carried (C1).
+- Section §2 (B3 part 1, bulk voice): **CONCERN** — the premise is TRUE and the §2→§3 ordering is genuinely load-bearing. All four outcomes are covered. Line refs in the checklist are wrong (C4).
+- Section §3 (B3 part 2, delete banners + modal strip): **FAIL** — two FAIL-grade instructions (F1, F2) plus three CONCERNs. The DECISION (toast wins) is sound; the instructions that verify it are not.
+- Section §4 (B5, six labels): **PASS** — every line number, every exclusion, and both counts verified exact. Locator safety verified. One incomplete check (C2).
+
+### Claims REFUTED against source
+
+| # | Plan's claim | Source evidence | Severity |
+|---|---|---|---|
+| F1 | The new e2e is "the first 'exactly one visible message' assertion in the repo" and "there is no fixture helper that guarantees a pending timesheet … which is why the new e2e carries a `test.skip()`" | `tests/e2e/form-errors.spec.ts:86-89` already asserts the exact triple (`toHaveText(/Invalid status/)`, `toHaveCount(1)`, `getByRole('alert')…toHaveCount(0)`), added by `661719d`. And `tests/e2e/timesheet-approval.spec.ts:42-70` `resetFixture()` seeds a timesheet by direct Prisma upsert, which `helpers.ts:64-82` then drives through `/requests/timesheets`. The fixture pattern exists and is already sanctioned in this repo | **FAIL** |
+| F2 | §3 probe R2: "Log in as `employee@veent.ph` … Force a `?/saveEntries` failure" | `TimesheetModal.svelte:88-90` — `canEdit = mode === 'edit' && canModify && isManager && ts != null && ts.status !== 'APPROVED'`. An Employee is not a manager, so the `?/saveEntries` form at `:547` never renders for that account. R2 as written is impossible; an agent would read "no toast" and revert §3 per the plan's own rule | **FAIL** |
+| C1 | "the `form` prop is still read by other logic; do not delete the prop, do not delete the destructure" (Public Contracts, `TimesheetModal`) | `grep -n form src/lib/components/timesheets/TimesheetModal.svelte` → `form` appears at `:44` (type), `:54` (destructure default), `:347`, `:351` (the strip §3 deletes) and NOWHERE else. After §3 it has zero readers. The same is true of `let { data, form }` at `settings/roles/+page.svelte:18` after §1. `eslint.config.js` sets `no-unused-vars: ['error', …]` and it applies to `**/*.svelte`. The plan's mitigation ("leave it and note it") rests on a false premise and may contradict Acceptance Criterion 12 (gates green after every section) | CONCERN |
+| C2 | "every writer on `/timesheets` toasts on failure" | `src/routes/(app)/timesheets/+page.svelte:92` — `<form method="POST" action="?/submitMany" use:enhance={clearOnSuccess('mine')}>`, and `clearOnSuccess` at `:47-56` is a plain `SubmitFunction` factory that calls `update()` and toasts nothing. Not a silencing risk (it fires with the modal closed, where `:215`'s `!openTs` page banner still renders), but the blanket claim is false | CONCERN |
+| C3 | The modal walk covers `?/review`, `?/saveEntries`, `?/syncAttendance` and the ConfirmButton delete | `TimesheetModal` has SIX form actions: `?/review` twice (`:511` hidden reject form, `:561` approve), `?/saveEntries` (`:547`), `?/syncAttendance` (`:572`), `?/submit` (`:582`), `?/submitDraft` (`:592`), plus `ConfirmButton action="?/delete"` (`:533`, `submit={closeOnSuccess}` raw). The conclusion HOLDS — all six route through `closeFb`/`keepOpenFb`/ConfirmButton's own `submitFeedback`, and `submit-feedback.svelte.ts:84-87` always yields a string (`data.error` or `FRIENDLY_ERROR`) — but the enumeration was incomplete, and `?/submit` is exactly the action the existing `timesheet-approval.spec.ts:130` assertion depends on | CONCERN |
+| C4 | Line refs in the B3 outcome table and the §2 checklist | approveMany `saved` cited `:135-137`, actual `:137-139`. rejectMany `saved` cited `:167-169`, actual `:169-171`. 403 cited `:117`/`:148`, actual `:118`/`:147`. 400 cited `:123`/`:157-159`, actual `:124`/`:155-156`. Checklist "swap `:100`" — the `?/approveMany` form and its `use:enhance` are both on `:101`. Checklist "`:105-109`" — the `?/rejectMany` form opens at `:109` and its `use:enhance` is on `:113`. `disabled={busy}` cited `(:103, :118)`, actual `:104`/`:119`. Also `submit-feedback.svelte.ts` `:83-88`→`:83-87`, `:38-40`→`:38-41`, `:97-99`→`:97-100`; `TimesheetModal` `zIndex={50}` cited `:290`, actual `:291`; `settings/roles` in-dialog strip cited `:328-336`/`:327-336`, actual `:328-337`; `#283` comment cited `:32-43`, actual `:33-45`; unit-test `event()` helper cited `:39-48`, actual `:40-49` | CONCERN |
+| C5 | B5 locator safety is settled by `grep "exact: true" \| grep -iE "reject\|return"` | That grep only catches a locator that newly MATCHES. A non-exact locator naming the OLD string (`name: 'Reject…'`) would newly MISS, and the plan's check cannot see it. Verified 0 such hits today (`grep -rn "Reject" tests/` returns only `mockRejectedValue` / `expectRejectedAt` / `PromiseRejectedResult`), so there is no live risk — the stated check is simply incomplete | CONCERN |
+
+### Claims VERIFIED — do not re-derive
+
+- §1 delete range `156-164` is EXACT: the HTML comment is `156-157`, the `{#if form?.error}` block is `158-164`. No off-by-one, no orphaned comment.
+- B2's safety claim holds on BOTH halves. `setActiveGuard` (`settings/roles/+page.svelte:29`) is a bare `submitFeedback()` — no `error` option — so a `?/setActive` failure always toasts. `setRoleGuard` (`:47-65`) returns early on `result.type === 'failure'` WITHOUT calling `update()` (`:48-62`), so a rejected role save never publishes to page-level `form`; it renders in-dialog at `:328-337` on the local `saveError` with focus pulled onto it. Exactly 2 references to `form.error` on the route, both inside the deleted block.
+- §3 delete ranges are EXACT: `requests/timesheets/+page.svelte:66-72` is both `{#if}` blocks; the `Banner` import is `:5`; `TimesheetModal.svelte:347-353` is the strip; the `REJECTED` stored-reason panel at `:355-360` is safely two lines below.
+- The bulk actions have NO toast today. `clearOnSuccess` (`requests/timesheets/+page.svelte:30-40`) is a plain `SubmitFunction`, not `createSubmitGuard`, not `submitFeedback`; the page's imports (`:1-12`) include no toast helper. **The §2→§3 hard ordering is correct and necessary.**
+- §2 covers all four outcomes. Non-empty `saved` at `+page.server.ts:138` and `:170` (distinct strings); non-empty `error` at `:118`/`:147` (403), `:124`/`:155` (`No timesheets selected`), `:156` (`A reason is required to reject.`). With no `success`/`error` option `submitFeedback` uses `savedMessage` (`:77-81`) and `data.error` with a `FRIENDLY_ERROR` fallback (`:84-87`) — no failure branch can be silent.
+- No double-`update()`. `clearOnSuccess` returns its own callback, so `after` is truthy and `if (!after) await o.update()` is skipped on both branches (`submit-feedback.svelte.ts:82`, `:90`). §2's core assumption holds.
+- The stacking claim holds. Toaster container is `role="status"` with `class="… z-[100]"` (`Toaster.svelte:44-48`); an error toast is a child carrying `aria-live="assertive"` (`:64`); `TimesheetModal`'s `Dialog` is `size="full" scroll zIndex={50}` (`:284-291`) and the action buttons are in the footer at `:528-529`, in the same scroll flow as the strip at `:347`. The F3-shape reading is correct.
+- The bare `getByRole('alert')).toHaveCount(0)` is SAFE on `/requests/timesheets` after §3: no `role="alert"` exists in `src/routes/+layout.svelte`, `src/routes/(app)/+layout.svelte`, or `src/lib/components/layout/`, and `Banner.svelte:42` (which gives the role to `error` AND `warning`) is the only producer in play once the import is gone.
+- B5 is exact on every count. All six targets verified at the named lines: `TimesheetModal.svelte:559`, `requests/timesheets/+page.svelte:122`, `requests/proposals/+page.svelte:213`, `requests/approvals/+page.svelte:219`, `:367`, `:374`. All six exclusions verified: `:178`, `:202`, `:240`, `:360`, `:412`, `:522`. Current per-file counts are 2 / 2 / 3 / 5 = **12**; post-edit 1 / 1 / 2 / 2 = **6**. No `<option>` text is involved anywhere in the twelve.
+- B5 locator safety holds. `grep -rn "exact: true" tests/e2e/ | grep -iE "reject|return"` → 0 hits. No test in `tests/` selects any Reject or Return button by name. `helpers.ts:79` `dialog.getByRole('button', { name: 'Approve' })` and the two `toHaveCount(0)` siblings (`timesheet-approval.spec.ts:126`, `timesheet-punch.spec.ts:113`) are all on `Approve`, untouched by this plan.
+- No explanatory comment enters `src/`. §1 DELETES a comment, §3 deletes only, §4 changes six characters, §2 adds one line of code and zero comments. The only prose added is two short test-file headers, which match the existing style of both files (`request-decide-feedback.test.ts:4-14`, `form-errors.spec.ts:4-11`, `:73-74`). **The standing owner rule is not violated.**
+- The plan's five source paths, two test paths, and every read-only context path exist on disk. `validate-plan-artifact.mjs` returns 0 failures, 0 warnings.
+
+### Fixture reality — the dev DB right now
+
+Queried live (`docker exec veent-db-5434 psql -p 5434 -U veent -d veent_hris`):
+
+| id | status | employee | consequence |
+|---|---|---|---|
+| `cmtuzqmpk001561zqp6z2trxk` | SUBMITTED | Elena Employee (`employee@veent.ph`) | the ONLY card in `/requests/timesheets`. `approval_steps` is EMPTY, so `liveChain` returns null and the legacy `canAny(roles,'VIEW_TEAM')` branch (`+page.server.ts:56`) admits it — `admin@veent.ph` WILL see it. **Deleted by `global-setup.ts:81-82` on any e2e run.** |
+| `cmtuzqmq9001h61zqc4bk89aj` | REJECTED | Maria Manager (`manager@veent.ph`) | not in the review queue. IS editable on `/timesheets` as `manager@veent.ph` (`canEdit` needs `isManager` and `status !== 'APPROVED'`) — **this is the correct R2 fixture** |
+| `cmtux2gde0854pkkv2mcd2khu` | APPROVED | Elena Employee | not editable (`canEdit` excludes APPROVED), not in the queue |
+
+So: the §2 and §3 live probes CAN run — but on ONE card. §3's probe set needs at least four pending timesheets (P1 rejects one, P2 approves another, R1 selects two for a bulk approve). With one card, P2 and R1 are `BLOCKED — no fixture` no matter what order they run in.
+
+### Open gaps
+
+- `skipped` counter returns a green success toast for a total failure (`+page.server.ts:133-135`, `:165-167`): known-gap: documented as NEW PLAN REQUIRED — backlog note is §2 step 9, `process/features/ui-ux-overhaul/backlog/bulk-timesheet-skipped-counter_NOTE_10-09-26.md`. Owner has not ruled. Correctly out of scope.
+- `timesheets/+page.svelte:219` (`form?.saved` with no `!openTs` guard) still shows banner + toast on a successful modal action: known-gap, out of scope, record in the report.
+- §3 probe fixture depth: only 1 pending timesheet exists; §3's probes need ≥4. Owner decision required (see D1).
+- The unused-`form` gate outcome (C1) could not be measured — the linter could not be run in this session (auto-mode denied `eslint`, `pnpm exec eslint` and `node -e`). EXECUTE must measure it, not assume it.
+- Test-infra note (out of scope, do not build): a shared `expectExactlyOneErrorToast(page, /text/)` helper. This is now the THIRD site to hand-write the same triple.
+
+### What this coverage does NOT prove
+
+- `pnpm test` / `pnpm check` / `pnpm lint` / `grep` guards prove no DOM behaviour at all — not that a toast appears, not that it is on screen, not its colour, not the message count. Every "one message" claim in this plan rests on a live probe or the one new e2e.
+- The new unit tests prove only the SHAPE of the server payload (a non-empty, distinct string per path). They do not prove the string ever reaches a user, and they cannot: there is no DOM in vitest.
+- The new e2e proves the count on ONE outcome (`No timesheets selected`, the bulk 400) on ONE route. It does NOT prove the bulk approve success path, the bulk reject success path, the 403, `A reason is required to reject.`, the modal review paths, the `/timesheets` shared-modal behaviour, the rejection-is-not-green claim, or the toast's stacking above the dialog.
+- `CI=1 pnpm test:e2e -- timesheet-approval timesheet-punch manager-org-wide-timesheets` proves those three specs still pass. It does not prove they would have CAUGHT a regression on `/requests/timesheets` — all three assert against `/timesheets`, a route this plan does not edit.
+- `CI=1 pnpm test:e2e -- approval-chain multi-role-sod timesheet-approval` proves the renamed buttons are still reachable. It does not prove the labels read correctly — nothing in `tests/` asserts on a Reject or Return label at all, which is exactly why §4's probe N1 is not optional.
+- No automated tier at any level proves: the rejection is not announced in green (3.4), the toast is stacked above and inside the viewport of an open dialog (3.5), or that `/timesheets` is not silenced by the shared-component deletion (3.6). Those three are agent-probe only, and 3.6 is the one that decides whether §3 ships or reverts.
+- Nothing in this plan proves the `skipped` counter is honest. `Approved 0 timesheets, 5 skipped.` will now be delivered as a GREEN success toast — the plan moves that defect to a louder surface without fixing it. Named residual.
+- Nothing proves the probes ran against a real failure rather than a mistyped selector. That is what the N1 negative control is for, in all four sections, and a section is not VERIFIED without it firing.
+
+### Execute-agent instructions
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | §1 and §4 are clear to execute exactly as written. Every line number, range and count in both was verified against source. | §1 / §4 entry |
+| E2 | §2 is clear to execute, but IGNORE the checklist line numbers. The `?/approveMany` form and its `use:enhance` are on `:101`; the `?/rejectMany` form opens at `:109` and its `use:enhance` is on `:113`; `disabled={busy}` is at `:104` and `:119`. Locate by `action="?/approveMany"` / `action="?/rejectMany"`, never by line. | §2 step 3 |
+| E3 | **§3 is BLOCKED until F1 and F2 are amended.** Do not start §3 on the current text. | §3 entry |
+| E4 | §3: SWAP steps 8 and 9. Run the LIVE PROBES FIRST, then the e2e. `pnpm test:e2e` loads `.env.dev` — the same database the dev server uses — and `global-setup.ts:81-82` deletes every timesheet belonging to `employee@veent.ph`, which is the only card in the review queue. Running the e2e first destroys the probes' only fixture. | §3 steps 8-9 |
+| E5 | §3 probe R2: use `manager@veent.ph` and timesheet `cmtuzqmq9001h61zqc4bk89aj` (REJECTED, manager-owned, therefore `canEdit`). NOT `employee@veent.ph` — `TimesheetModal.svelte:88-90` requires `isManager`, so an Employee never sees the Save-entries button and R2 would read as a false negative. | §3 probe R2 |
+| E6 | §3 probe ordering within the probe block: run P3 (forced review failure, consumes nothing) BEFORE P1 (reject, consumes the card). With one pending timesheet, P2 and R1 are `BLOCKED — no fixture`; record them that way and do NOT seed the owner's dev DB without asking. | §3 step 9 |
+| E7 | The new e2e must NOT rely on `test.skip()`. Seed its own SUBMITTED timesheet with a distinctive hours label using the Prisma-upsert pattern at `tests/e2e/timesheet-approval.spec.ts:42-70`, and reset it in a `beforeEach`/`afterEach`. A test that skips on every run is not a gate, and AC 6 demands the assertion actually execute. | §3 step 6 |
+| E8 | Prove the new e2e can FAIL before trusting it (negative control): temporarily change the expected text to `No timesheets selectedAAA` and confirm it goes RED; then change `toHaveCount(1)` to `toHaveCount(2)` and confirm RED again. Record both. Revert. Do the same for the two new unit tests — assert the WRONG string once and watch it fail. | §2 step 6 / §3 step 6 |
+| E9 | Run `pnpm lint` ALONE, immediately after each deletion, before the rest of the gate set. If it reports `form` unused: for §1 the fix is in-scope and clean — reduce `let { data, form }: { data: PageData; form: ActionData } = $props()` at `settings/roles/+page.svelte:18` to `let { data }: { data: PageData } = $props()` and drop the now-unused `ActionData` from the type import. For §3 there is NO in-scope fix — removing the prop from `TimesheetModal` forces an edit to `src/routes/(app)/timesheets/+page.svelte:259`, which Scope forbids. STOP and ask the owner; do not silently widen §3. | §1 step 4 / §3 step 7 |
+| E10 | Add the missing half of the B5 locator check as §4 step 5b: `grep -rniE "Reject…\|Return…\|Reject selected…" tests/` must return 0. The plan's `exact: true` grep only catches a locator that newly MATCHES; this one catches a locator that newly MISSES. | §4 step 5 |
+| E11 | The §3 blast-radius walk is incomplete. `TimesheetModal` has SIX form actions, not four: `?/review` (`:511`, `:561`), `?/saveEntries` (`:547`), `?/syncAttendance` (`:572`), `?/submit` (`:582`), `?/submitDraft` (`:592`), plus `?/delete` via ConfirmButton (`:533`). All six toast on failure, so no action is left mute — but note `?/submit` is what `timesheet-approval.spec.ts:130` asserts, and it must be re-run. | §3 report |
+| E12 | Warn the owner before running any e2e: `CI=1 pnpm test:e2e` will DELETE `cmtuzqmpk001561zqp6z2trxk` (Elena's SUBMITTED timesheet from today's test pass). `cmtuzqmq9001h61zqc4bk89aj` survives. | before §3 step 8 and §4 step 7 |
+| E13 | Record the pre-existing attendance e2e failure as pre-existing in the report, with the exact spec name and the command that produced it. Do not fix it, do not let it gate §3. | §3 / §4 report |
+
+### Owner decisions required
+
+| # | Question | Options |
+|---|---|---|
+| D1 | §3's live probes need at least four pending timesheets; the dev DB has one. | **(a)** Accept `BLOCKED — no fixture` on P2 and R1; §3 lands CODE DONE, not VERIFIED. **(b)** Allow the execute-agent to seed pending timesheets with distinctive hours labels using the SAME Prisma-upsert pattern the e2e suite already uses (`timesheet-approval.spec.ts:42-70`), and delete them afterward. Recommended: **(b)** — it is the repo's own existing mechanism, not a fabricated fixture, and without it §3 can never reach VERIFIED. |
+| D2 | If `pnpm lint`/`pnpm check` flags the now-dead `form` prop on `TimesheetModal` after §3. | **(a)** Widen §3 by three lines (drop the prop at `:44`/`:54` and the `{form}` pass at `requests/timesheets/+page.svelte:172` and `timesheets/+page.svelte:259`) — clean, but touches a file Scope forbids. **(b)** Suppress with an eslint-disable — adds noise to source. Recommended: **(a)**, with the owner's explicit sign-off on the one out-of-scope line. |
+
+Open gaps: see Open gaps above.
+
+Gate: BLOCKED — 2 unresolved FAILs (F1: the new e2e cannot run and its stated justification is false; F2: probe R2 names an account for which the tested control never renders). §1, §2 and §4 are independently committable and are CLEAR to execute now; only §3 is blocked. Both FAILs are one-paragraph plan amendments, not design changes — none of the three surface rulings needs reopening.
+Accepted by: not accepted — BLOCKED. Return to PLAN for the §3 amendments (F1, F2), then re-run VALIDATE from V1.
+
+## Autonomous Goal Block
+
+**Superseded 10-09-26 by the Amendment log.** The block below reflects the AMENDED plan. The previous version (which said "do not start §3 until F1 and F2 are amended") is obsolete — F1, F2 and all five CONCERNs are now amended in. A fresh VALIDATE run from V1 is still required before EXECUTE.
+
+SESSION GOAL: land B2/B3/B5 — one message per action on /settings/roles and /requests/timesheets, and drop the ellipsis from six Reject/Return labels — as four separate conventional commits on feat/uiux-phase-4, with each section's grep guards, CI gate set, and live probes recorded before the next section starts.
+
+CONTRACT SUMMARY: the previous VALIDATE gate was BLOCKED for §3 only, on two FAILs. Both are amended: the new e2e now seeds its own SUBMITTED timesheet via the repo's existing Prisma-upsert pattern (tests/e2e/timesheet-approval.spec.ts:42-70) and has no test.skip(); probe R2 now runs as manager@veent.ph on timesheet cmtuzqmq9001h61zqc4bk89aj and asserts its precondition (the ?/saveEntries control is present) BEFORE measuring. §3's steps 8 and 9 are swapped — probes first, e2e last — because pnpm test:e2e loads .env.dev and global-setup.ts:81-82 deletes the review queue. §1, §2 and §4 passed source verification line-for-line; §2's two bulk forms must be located by action attribute, never by line number.
+
+AUTONOMY RULES: re-run VALIDATE from V1 first. On approval, execute §1, then §2, then §4, then §3. Commit each section on its own. Run pnpm lint alone straight after each deletion, before the rest of the gate set, and READ the output — the dead form prop is a measurement, not an assumption. Seed probe fixtures under D1 using the e2e suite's own Prisma-upsert pattern with distinctive hours labels, delete every seeded row afterward, and record the ids. Record every probe with actual DOM evidence (outerHTML, computed styles, counts) and confirm both negative controls fired; "it worked" is not evidence.
+
+HARD STOPS: do not run any e2e without first telling the owner it will delete timesheet cmtuzqmpk001561zqp6z2trxk. Do not touch, mutate, or delete any database row the agent did not create. Do not run db:seed:e2e. Do not edit src/routes/(app)/timesheets/+page.svelte except the single {form} pass at :259, and only if pnpm lint actually fails (owner decision D2). Do not touch any +page.server.ts, any button class list (issue #27), or submit-feedback / submit-guard / Banner / Toaster / toast / ConfirmButton / ReasonDialog. Do not add an explanatory comment to any file under src/. Do not revert §3 on an R2 whose precondition failed — that is BLOCKED, not a failure. Do not push. Do not add any attribution trailer to any commit.
+
+NEXT PHASE: VALIDATE from V1 against this amended plan. Then EXECUTE §1 (settings/roles strip, delete lines 156-164 exactly), §2 (bulk toast + two unit tests + backlog note), §4 (six labels), §3 (banners + modal strip; probes before e2e).
+
+EXECUTE START COMMAND: start with process/general-plans/active/feedback-duplicate-messages-b2-b3-b5_10-09-26/feedback-duplicate-messages-b2-b3-b5_PLAN_10-09-26.md Section 1, following Execute-agent instructions E1, E2, E9 and E13 in the Validate Contract, as amended by the Amendment log at the top of this plan.
