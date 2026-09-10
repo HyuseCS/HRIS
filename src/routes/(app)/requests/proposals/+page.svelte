@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Eye from 'lucide-svelte/icons/eye'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { tick } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -169,6 +170,18 @@
 													{MASKED_SALARY} → {MASKED_SALARY}
 												{/if}
 											</dd>
+											{#if !revealed}
+												<form method="POST" action="?/revealAmount" use:enhance>
+													<input type="hidden" name="proposalId" value={p.id} />
+													<button
+														type="submit"
+														class="flex h-6 w-6 items-center justify-center rounded-md text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+														aria-label="Reveal salary for {p.target.lastName}, {p.target.firstName}"
+													>
+														<Eye class="h-4 w-4" aria-hidden="true" />
+													</button>
+												</form>
+											{/if}
 										</div>
 									{/if}
 
@@ -182,18 +195,6 @@
 
 								{#if p.note}
 									<p class="text-xs text-muted-foreground">“{p.note}”</p>
-								{/if}
-
-								{#if p.hasAmount && !revealed}
-									<form method="POST" action="?/revealAmount" use:enhance>
-										<input type="hidden" name="proposalId" value={p.id} />
-										<button
-											type="submit"
-											class="text-xs font-medium text-primary hover:underline"
-											aria-label="Reveal salary for {p.target.lastName}, {p.target.firstName}"
-											>Reveal salary</button
-										>
-									</form>
 								{/if}
 
 								<p class="mt-auto pt-1 text-xs text-muted-foreground">
