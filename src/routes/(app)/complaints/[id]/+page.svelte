@@ -44,8 +44,10 @@
 			.employee.firstName} {complaint.employee.lastName} ({complaint.employee
 			.employeeNumber}) · Opened {formatShortDate(complaint.createdAt)}"
 	>
-		{#snippet back()}
+		{#snippet badge()}
 			<Badge status={complaint.status} domain="complaint" />
+		{/snippet}
+		{#snippet back()}
 			<a href="/complaints" class="text-sm text-muted-foreground hover:text-foreground"
 				>← Back to inquiries</a
 			>

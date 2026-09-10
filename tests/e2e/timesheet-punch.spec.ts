@@ -90,7 +90,9 @@ test('signed punch → aggregate → approve', async ({ browser, request }) => {
 	await aggregateBtn.click()
 
 	// 09:00–17:00 less the unpaid 12:00–13:00 lunch = 7.00 paid hours on one day.
-	await expect(page.getByText(/Aggregated 7\.00 hrs across 1 day/)).toBeVisible()
+	// Scoped to <main>: phase 04 also toasts this message, and a page-wide locator now matches
+	// both the page banner and the toast.
+	await expect(page.getByRole('main').getByText(/Aggregated 7\.00 hrs across 1 day/)).toBeVisible()
 
 	// --- 3. HR submits the aggregated draft on the employee's behalf ---
 	await page.reload()
@@ -111,7 +113,8 @@ test('signed punch → aggregate → approve', async ({ browser, request }) => {
 	await expect(dialog.getByRole('button', { name: 'Approve' })).toHaveCount(0)
 	await dialog.getByRole('button', { name: 'Submit for review' }).click()
 
-	await expect(page.getByText('Timesheet submitted for review.')).toBeVisible()
+	// Scoped to <main>: phase 04 also toasts this message.
+	await expect(page.getByRole('main').getByText('Timesheet submitted for review.')).toBeVisible()
 
 	// --- 4. HR submitting on the employee's behalf completed the MAKE stage (#134);
 	// the Verifier then the Approver sign off the rest of the chain. ---

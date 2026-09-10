@@ -126,7 +126,8 @@ export const actions: Actions = {
 		requireAnyCapability(user.roles, 'ADMINISTER_SYSTEM')
 
 		const parsed = revealSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { message: 'Select an audit log entry to reveal.' })
+		if (!parsed.success)
+			return fail(400, { action: 'reveal', error: 'Select an audit log entry to reveal.' })
 
 		// The organization filter belongs in the `where`. Fetching by id and comparing the org
 		// afterwards is a cross-tenant read that merely declines to print what it found.

@@ -7,28 +7,34 @@
 			leaveType: { name: string; isPaid: boolean }
 			allocated: number | string
 			used: number | string
-			remaining: number | string
 		}[]
 	} = $props()
 </script>
 
-<div class="flex flex-wrap gap-3">
+<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
 	{#each balances as balance (balance.id)}
-		<div class="rounded-lg border bg-background p-4 min-w-[160px]">
-			<div class="flex items-center gap-2 mb-1">
-				<span class="text-sm font-medium text-foreground">{balance.leaveType.name}</span>
-				{#if balance.leaveType.isPaid}
-					<span class="badge-green">Paid</span>
-				{:else}
+		{@const allocated = Number(balance.allocated)}
+		{@const remaining = Math.max(0, allocated - Number(balance.used))}
+		<div class="rounded-lg border bg-card px-3 py-2">
+			<div class="flex items-center gap-1.5">
+				<span class="truncate text-xs text-muted-foreground" title={balance.leaveType.name}>
+					{balance.leaveType.name}
+				</span>
+				<!-- Paid is the norm; only the exception is worth a badge. -->
+				{#if !balance.leaveType.isPaid}
 					<span class="badge-gray">Unpaid</span>
 				{/if}
 			</div>
-			<div class="text-3xl font-bold text-foreground">{Number(balance.remaining)}</div>
-			<div class="text-xs text-muted-foreground mt-0.5">
-				of {Number(balance.allocated)} days allocated
+			<div class="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+				{remaining}<span class="text-sm font-normal text-muted-foreground">/{allocated}</span>
 			</div>
-			<div class="text-xs text-muted-foreground">
-				{Number(balance.used)} used
+			<!-- Days LEFT, so the bar starts full and drains as leave is taken — it reads the same
+			     way as the number above it, and a nearly-spent type is a nearly-empty bar. -->
+			<div class="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+				<div
+					class="h-full rounded-full bg-primary"
+					style="width: {allocated > 0 ? Math.min(100, (remaining / allocated) * 100) : 0}%"
+				></div>
 			</div>
 		</div>
 	{:else}

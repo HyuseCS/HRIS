@@ -2,16 +2,16 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
-	import type { PageData, ActionData } from './$types'
+	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
+	import type { PageData } from './$types'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { data }: { data: PageData } = $props()
 
 	// Leave type name lives in the unified Request payload (leaveTypeId).
 	const leaveName = (payload: unknown) => {
@@ -69,19 +69,7 @@
 		</div>
 	{/if}
 	{#if data.balances.length > 0}
-		<div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-			{#each data.balances as b (b.id)}
-				<div class="rounded-lg border bg-card p-4">
-					<p class="text-xs font-medium text-muted-foreground">{b.leaveType.name}</p>
-					<p class="mt-1 text-2xl font-bold">{Number(b.remaining).toFixed(1)}</p>
-					<p class="text-xs text-muted-foreground">of {Number(b.allocated)} days</p>
-				</div>
-			{/each}
-		</div>
-	{/if}
-
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
+		<BalanceSummary balances={data.balances} />
 	{/if}
 
 	<!-- Bulk actions; appear once rows are selected -->
@@ -101,7 +89,7 @@
 					title="Delete selected leave requests?"
 					message="Selected leave requests will be permanently deleted. Approved requests, and any you're not allowed to remove, are skipped."
 					triggerLabel="Delete selected"
-					triggerClass="rounded-md border border-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+					triggerClass="rounded-md border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/20 disabled:opacity-50 dark:text-red-400"
 					disabled={busy}
 					submit={clearOnSuccess}
 				>

@@ -5,16 +5,18 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import { ROLE_DESCRIPTIONS, ROLE_GROUPS, ROLE_LABELS, canAny } from '$lib/rbac'
 	import Check from 'lucide-svelte/icons/check'
 	import Info from 'lucide-svelte/icons/info'
 	import Pencil from 'lucide-svelte/icons/pencil'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { Role } from '@prisma/client'
-	import type { PageData, ActionData } from './$types'
+	import type { PageData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
-	let { data, form }: { data: PageData; form: ActionData } = $props()
+	let { data }: { data: PageData } = $props()
 
 	// CEO manages roles; Super Admin manages account status. The page opens for either,
 	// so each control is shown only to the capability that owns it (#132).
@@ -24,8 +26,8 @@
 	// #108: every user row has its own `?/setActive` form, so each gets its own guard — a shared
 	// one would disable the whole table while one row is in flight. Plain objects, not `$state`:
 	// each guard holds its own reactive `busy`, the maps only memoise identity.
-	const setActiveGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const setActiveGuard = (id: string) => (setActiveGuards[id] ??= createSubmitGuard())
+	const setActiveGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const setActiveGuard = (id: string) => (setActiveGuards[id] ??= submitFeedback())
 	const setRoleGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
 	// The refusal message, focused after a rejected save — see the guard below.
 	let errorEl = $state<HTMLElement>()
@@ -152,15 +154,20 @@
 		{/snippet}
 	</PageHeader>
 
-	<!-- `?/setActive` errors only: a rejected role save renders inside the dialog, where the person
-	     who pressed Save is looking. -->
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
-		>
-			{form.error}
+	<form method="GET" class="flex flex-wrap items-end gap-2">
+		<div>
+			<label for="roles-q" class="text-xs font-medium text-muted-foreground"
+				>Filter by email or name</label
+			>
+			<input
+				id="roles-q"
+				name="q"
+				value={data.q}
+				class="mt-1 flex h-9 w-72 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
 		</div>
-	{/if}
+		<button type="submit" class="h-9 rounded-md border px-3 text-sm hover:bg-accent">Filter</button>
+	</form>
 
 	<div class="overflow-x-auto rounded-lg border">
 		<table class="w-full min-w-max text-sm">
@@ -243,12 +250,29 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="5" class="p-0"><EmptyState title="No users found" /></td>
+						<td colspan="5" class="p-0">
+							{#if data.q}
+								<EmptyState variant="no-results" title="No users match ‘{data.q}’.">
+									{#snippet action()}
+										<a
+											href="/settings/roles"
+											class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+										>
+											Clear filter
+										</a>
+									{/snippet}
+								</EmptyState>
+							{:else}
+								<EmptyState title="No users found" />
+							{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
 	</div>
+
+	<Pagination meta={data.pagination} />
 </div>
 
 {#if editing}

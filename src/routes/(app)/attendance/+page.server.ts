@@ -213,6 +213,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'correct', saved: 'Attendance day saved.' }
 	},
 
 	// Discard a manual override on a day and re-derive it from punches.
@@ -225,6 +226,8 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		// Several of these auto-submit on change, so the toast is the only possible cue.
+		return { action: 'resetDay', saved: 'Day reset to the derived values.' }
 	},
 
 	lock: async (event) => {
@@ -242,6 +245,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'lock', saved: 'Attendance locked for the range.' }
 	},
 
 	// Reopening locked days overrides a finalized record — Super Admin only, not the CEO (#224).
@@ -260,6 +264,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'unlock', saved: 'Attendance reopened for the range.' }
 	},
 
 	unlockTeam: async (event) => {
@@ -275,6 +280,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'unlockTeam', saved: 'Attendance reopened for the day.' }
 	},
 
 	// Persist the selected employee's range as a Timesheet record (per-employee tab only).
@@ -357,5 +363,6 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		return { action: 'lockTeam', saved: 'Attendance locked for the day.' }
 	}
 }

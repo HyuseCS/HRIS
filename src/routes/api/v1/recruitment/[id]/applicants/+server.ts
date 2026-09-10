@@ -3,6 +3,7 @@ import { requireAnyCapability } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { applyToPosting, advanceApplicant } from '$lib/server/services/recruitment'
 import { apiError, badRequest, forbidden, notFound } from '$lib/server/api-error'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { z } from 'zod'
 import type { RequestHandler } from './$types'
 
@@ -10,7 +11,8 @@ const applySchema = z.object({
 	firstName: z.string().min(1),
 	lastName: z.string().min(1),
 	email: z.string().email(),
-	phone: z.string().optional(),
+	// #24: the same rule as the /apply form — this route is a second door onto the same data.
+	phone: z.string().optional().refine(isValidPhone, phoneError('Phone number')),
 	coverLetter: z.string().optional(),
 	resumeUrl: z
 		.string()

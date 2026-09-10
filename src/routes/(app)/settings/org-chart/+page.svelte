@@ -66,7 +66,7 @@
 					{n.name}
 					{#if n.employmentStatus !== 'ACTIVE'}
 						<span
-							class="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+							class="ml-1 rounded-full bg-foreground/15 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
 							>{n.employmentStatus}</span
 						>
 					{/if}

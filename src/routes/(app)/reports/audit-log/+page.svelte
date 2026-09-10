@@ -8,7 +8,7 @@
 
 	// `fail()` contributes its own shape to the ActionData union, so narrow before reading.
 	// Without this the 400 from a reveal with no id renders as silence.
-	const failure = $derived(form && 'message' in form ? form.message : null)
+	const failure = $derived(form && 'error' in form ? form.error : null)
 
 	/**
 	 * The reveal is a full-page POST, so focus resets to the top of the document and the payload

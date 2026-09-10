@@ -2,6 +2,8 @@ import { fail, redirect } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
 import { applyToPosting } from '$lib/server/services/recruitment'
+import { setFlash } from '$lib/server/flash'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, params }) => {
@@ -21,7 +23,8 @@ const applySchema = z.object({
 	firstName: z.string().min(1, 'First name is required'),
 	lastName: z.string().min(1, 'Last name is required'),
 	email: z.string().email('A valid email address is required'),
-	phone: z.string().optional(),
+	// #24: optional, so an omitted phone stays valid — but a supplied one must look like a number.
+	phone: z.string().optional().refine(isValidPhone, phoneError('Phone number')),
 	coverLetter: z.string().optional(),
 	resumeUrl: z
 		.string()
@@ -31,7 +34,7 @@ const applySchema = z.object({
 })
 
 export const actions: Actions = {
-	apply: async ({ request, locals, params }) => {
+	apply: async ({ request, locals, params, cookies }) => {
 		const raw = Object.fromEntries(await request.formData())
 
 		// Clean up empty optional fields
@@ -73,6 +76,10 @@ export const actions: Actions = {
 
 		// HR-only "add applicant" flow — land back on the posting's board so the
 		// new card is visible, rather than an applicant-facing thank-you panel.
+		setFlash(cookies, {
+			kind: 'success',
+			message: `${parsed.data.firstName} ${parsed.data.lastName} was added to this posting.`
+		})
 		return redirect(303, `/recruitment/${params.id}`)
 	}
 }

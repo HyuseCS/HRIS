@@ -8,9 +8,10 @@
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
 	import Pagination from '$lib/components/Pagination.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import FileInput from '$lib/components/ui/FileInput.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -55,19 +56,23 @@
 
 	// #108: a double-click would file the same request twice (and re-upload its attachments).
 	// The existing close-on-success handler is wrapped so it still runs.
-	const create = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
-		if (result.type === 'success') showForm = false
+	const create = submitFeedback({
+		inner:
+			() =>
+			async ({ update, result }) => {
+				await update()
+				if (result.type === 'success') showForm = false
+			}
 	})
 
 	// Row actions live inside an `{#each}`, so each row needs its own guard — one shared guard
 	// would grey out every row's button while a single row is in flight.
 	function rowGuards() {
-		const map = new Map<string, ReturnType<typeof createSubmitGuard>>()
+		const map = new Map<string, ReturnType<typeof submitFeedback>>()
 		return (id: string) => {
 			let g = map.get(id)
 			if (!g) {
-				g = createSubmitGuard()
+				g = submitFeedback()
 				map.set(id, g)
 			}
 			return g
@@ -101,13 +106,6 @@
 		</div>
 	{/if}
 
-	{#if form?.error}
-		<Banner kind="error" message={form.error} />
-	{/if}
-	{#if form?.message}
-		<Banner kind="success" message={form.message} />
-	{/if}
-
 	{#if !data.hasEmployee}
 		<Banner
 			kind="warning"
@@ -123,242 +121,221 @@
 			use:enhance={create.enhance}
 			class="space-y-4 rounded-lg border bg-card p-4"
 		>
-			<div class="grid gap-1.5">
-				<label for="type" class="text-sm font-medium">Type</label>
-				<select
-					id="type"
-					name="type"
-					bind:value={selectedType}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-				>
-					{#each TYPES as t (t.value)}
-						<option value={t.value}>{t.label}</option>
-					{/each}
-				</select>
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<div class="space-y-4">
+					<div class="grid gap-1.5">
+						<label for="type" class="text-sm font-medium">Type</label>
+						<select
+							id="type"
+							name="type"
+							bind:value={selectedType}
+							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+						>
+							{#each TYPES as t (t.value)}
+								<option value={t.value}>{t.label}</option>
+							{/each}
+						</select>
+					</div>
+
+					{#if selectedType === 'LEAVE'}
+						<div class="grid gap-1.5">
+							<label for="leaveTypeId" class="text-sm font-medium">Leave type {@render req()}</label
+							>
+							<select
+								id="leaveTypeId"
+								name="leaveTypeId"
+								required
+								value={submitted?.leaveTypeId ?? defaultLeaveTypeId}
+								aria-invalid={invalid('leaveTypeId')}
+								aria-describedby={describedBy('leaveTypeId')}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							>
+								{#each data.leaveTypes as lt (lt.id)}
+									<option value={lt.id} disabled={!lt.eligible}>
+										{lt.name}{lt.eligible
+											? ''
+											: ` — available after ${tenureRequirement(lt.minMonthsOfService)}`}
+									</option>
+								{/each}
+							</select>
+							{@render fieldError('leaveTypeId')}
+						</div>
+					{:else if selectedType === 'OFFICIAL_BUSINESS'}
+						<div class="grid gap-1.5">
+							<label for="location" class="text-sm font-medium">Location {@render req()}</label>
+							<input
+								id="location"
+								name="location"
+								type="text"
+								required
+								value={submitted?.location ?? ''}
+								aria-invalid={invalid('location')}
+								aria-describedby={describedBy('location')}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+							{@render fieldError('location')}
+						</div>
+						<div class="grid gap-1.5">
+							<label for="purpose" class="text-sm font-medium">Purpose {@render req()}</label>
+							<input
+								id="purpose"
+								name="purpose"
+								type="text"
+								required
+								value={submitted?.purpose ?? ''}
+								aria-invalid={invalid('purpose')}
+								aria-describedby={describedBy('purpose')}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+							{@render fieldError('purpose')}
+						</div>
+					{:else if selectedType === 'INFO_UPDATE'}
+						<div class="grid gap-1.5">
+							<label for="field" class="text-sm font-medium">Field {@render req()}</label>
+							<input
+								id="field"
+								name="field"
+								type="text"
+								required
+								placeholder="e.g. contactAddress"
+								value={submitted?.field ?? ''}
+								aria-invalid={invalid('field')}
+								aria-describedby={describedBy('field')}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+							{@render fieldError('field')}
+						</div>
+						<div class="grid gap-1.5">
+							<label for="requestedValue" class="text-sm font-medium"
+								>New value {@render req()}</label
+							>
+							<input
+								id="requestedValue"
+								name="requestedValue"
+								type="text"
+								required
+								value={submitted?.requestedValue ?? ''}
+								aria-invalid={invalid('requestedValue')}
+								aria-describedby={describedBy('requestedValue')}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+							{@render fieldError('requestedValue')}
+						</div>
+					{/if}
+
+					{#if selectedType !== 'OFFICIAL_BUSINESS'}
+						<div class="grid gap-1.5">
+							<label for="reason" class="text-sm font-medium"
+								>Reason <span class="text-muted-foreground">(optional)</span></label
+							>
+							<textarea
+								id="reason"
+								name="reason"
+								rows="2"
+								value={submitted?.reason ?? ''}
+								class="rounded-md border border-input bg-background px-3 py-2 text-sm"
+							></textarea>
+						</div>
+					{/if}
+				</div>
+
+				<div class="flex flex-col gap-4">
+					{#if selectedType === 'LEAVE' || selectedType === 'OFFICIAL_BUSINESS'}
+						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<div class="grid gap-1.5">
+								<label for="startDate" class="text-sm font-medium">Start {@render req()}</label>
+								<input
+									id="startDate"
+									name="startDate"
+									type="date"
+									required
+									min={today}
+									bind:value={startDate}
+									use:advanceTo={'endDate'}
+									aria-invalid={invalid('startDate')}
+									aria-describedby={describedBy('startDate')}
+									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								/>
+								{@render fieldError('startDate')}
+							</div>
+							<div class="grid gap-1.5">
+								<label for="endDate" class="text-sm font-medium">End {@render req()}</label>
+								<input
+									id="endDate"
+									name="endDate"
+									type="date"
+									required
+									min={startDate || today}
+									value={submitted?.endDate ?? ''}
+									aria-invalid={invalid('endDate')}
+									aria-describedby={describedBy('endDate')}
+									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								/>
+								{@render fieldError('endDate')}
+							</div>
+						</div>
+					{:else if isDayHours(selectedType)}
+						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<div class="grid gap-1.5">
+								<label for="date" class="text-sm font-medium">Date {@render req()}</label>
+								<input
+									id="date"
+									name="date"
+									type="date"
+									required
+									value={submitted?.date ?? ''}
+									aria-invalid={invalid('date')}
+									aria-describedby={describedBy('date')}
+									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								/>
+								{@render fieldError('date')}
+							</div>
+							<div class="grid gap-1.5">
+								<label for="hours" class="text-sm font-medium">Hours {@render req()}</label>
+								<input
+									id="hours"
+									name="hours"
+									type="number"
+									step="0.25"
+									min="0.25"
+									max="24"
+									required
+									value={submitted?.hours ?? ''}
+									aria-invalid={invalid('hours')}
+									aria-describedby={describedBy('hours')}
+									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								/>
+								{@render fieldError('hours')}
+							</div>
+						</div>
+					{/if}
+
+					<div class="flex flex-1 flex-col gap-1.5">
+						<label for="documents" class="text-sm font-medium"
+							>Supporting documents <span class="text-muted-foreground">(optional)</span></label
+						>
+						<FileInput
+							id="documents"
+							name="documents"
+							multiple
+							accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+							maxFiles={5}
+							maxBytes={10 * 1024 * 1024}
+							hint="Up to 5 files — PDF, PNG, JPEG or WEBP, max 10 MB each."
+						/>
+					</div>
+				</div>
 			</div>
 
-			{#if selectedType === 'LEAVE'}
-				<div class="grid gap-1.5">
-					<label for="leaveTypeId" class="text-sm font-medium">Leave type {@render req()}</label>
-					<select
-						id="leaveTypeId"
-						name="leaveTypeId"
-						required
-						value={submitted?.leaveTypeId ?? defaultLeaveTypeId}
-						aria-invalid={invalid('leaveTypeId')}
-						aria-describedby={describedBy('leaveTypeId')}
-						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					>
-						{#each data.leaveTypes as lt (lt.id)}
-							<option value={lt.id} disabled={!lt.eligible}>
-								{lt.name}{lt.eligible
-									? ''
-									: ` — available after ${tenureRequirement(lt.minMonthsOfService)}`}
-							</option>
-						{/each}
-					</select>
-					{@render fieldError('leaveTypeId')}
-				</div>
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<div class="grid gap-1.5">
-						<label for="startDate" class="text-sm font-medium">Start {@render req()}</label>
-						<input
-							id="startDate"
-							name="startDate"
-							type="date"
-							required
-							min={today}
-							bind:value={startDate}
-							use:advanceTo={'endDate'}
-							aria-invalid={invalid('startDate')}
-							aria-describedby={describedBy('startDate')}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-						{@render fieldError('startDate')}
-					</div>
-					<div class="grid gap-1.5">
-						<label for="endDate" class="text-sm font-medium">End {@render req()}</label>
-						<input
-							id="endDate"
-							name="endDate"
-							type="date"
-							required
-							min={startDate || today}
-							value={submitted?.endDate ?? ''}
-							aria-invalid={invalid('endDate')}
-							aria-describedby={describedBy('endDate')}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-						{@render fieldError('endDate')}
-					</div>
-				</div>
-			{:else if selectedType === 'OFFICIAL_BUSINESS'}
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<div class="grid gap-1.5">
-						<label for="startDate" class="text-sm font-medium">Start {@render req()}</label>
-						<input
-							id="startDate"
-							name="startDate"
-							type="date"
-							required
-							min={today}
-							bind:value={startDate}
-							use:advanceTo={'endDate'}
-							aria-invalid={invalid('startDate')}
-							aria-describedby={describedBy('startDate')}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-						{@render fieldError('startDate')}
-					</div>
-					<div class="grid gap-1.5">
-						<label for="endDate" class="text-sm font-medium">End {@render req()}</label>
-						<input
-							id="endDate"
-							name="endDate"
-							type="date"
-							required
-							min={startDate || today}
-							value={submitted?.endDate ?? ''}
-							aria-invalid={invalid('endDate')}
-							aria-describedby={describedBy('endDate')}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-						{@render fieldError('endDate')}
-					</div>
-				</div>
-				<div class="grid gap-1.5">
-					<label for="location" class="text-sm font-medium">Location {@render req()}</label>
-					<input
-						id="location"
-						name="location"
-						type="text"
-						required
-						value={submitted?.location ?? ''}
-						aria-invalid={invalid('location')}
-						aria-describedby={describedBy('location')}
-						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					/>
-					{@render fieldError('location')}
-				</div>
-				<div class="grid gap-1.5">
-					<label for="purpose" class="text-sm font-medium">Purpose {@render req()}</label>
-					<input
-						id="purpose"
-						name="purpose"
-						type="text"
-						required
-						value={submitted?.purpose ?? ''}
-						aria-invalid={invalid('purpose')}
-						aria-describedby={describedBy('purpose')}
-						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					/>
-					{@render fieldError('purpose')}
-				</div>
-			{:else if isDayHours(selectedType)}
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<div class="grid gap-1.5">
-						<label for="date" class="text-sm font-medium">Date {@render req()}</label>
-						<input
-							id="date"
-							name="date"
-							type="date"
-							required
-							value={submitted?.date ?? ''}
-							aria-invalid={invalid('date')}
-							aria-describedby={describedBy('date')}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-						{@render fieldError('date')}
-					</div>
-					<div class="grid gap-1.5">
-						<label for="hours" class="text-sm font-medium">Hours {@render req()}</label>
-						<input
-							id="hours"
-							name="hours"
-							type="number"
-							step="0.25"
-							min="0.25"
-							max="24"
-							required
-							value={submitted?.hours ?? ''}
-							aria-invalid={invalid('hours')}
-							aria-describedby={describedBy('hours')}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-						{@render fieldError('hours')}
-					</div>
-				</div>
-			{:else if selectedType === 'INFO_UPDATE'}
-				<div class="grid gap-1.5">
-					<label for="field" class="text-sm font-medium">Field {@render req()}</label>
-					<input
-						id="field"
-						name="field"
-						type="text"
-						required
-						placeholder="e.g. contactAddress"
-						value={submitted?.field ?? ''}
-						aria-invalid={invalid('field')}
-						aria-describedby={describedBy('field')}
-						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					/>
-					{@render fieldError('field')}
-				</div>
-				<div class="grid gap-1.5">
-					<label for="requestedValue" class="text-sm font-medium">New value {@render req()}</label>
-					<input
-						id="requestedValue"
-						name="requestedValue"
-						type="text"
-						required
-						value={submitted?.requestedValue ?? ''}
-						aria-invalid={invalid('requestedValue')}
-						aria-describedby={describedBy('requestedValue')}
-						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					/>
-					{@render fieldError('requestedValue')}
-				</div>
-			{/if}
-
-			{#if selectedType !== 'OFFICIAL_BUSINESS'}
-				<div class="grid gap-1.5">
-					<label for="reason" class="text-sm font-medium"
-						>Reason <span class="text-muted-foreground">(optional)</span></label
-					>
-					<textarea
-						id="reason"
-						name="reason"
-						rows="2"
-						value={submitted?.reason ?? ''}
-						class="rounded-md border border-input bg-background px-3 py-2 text-sm"
-					></textarea>
-				</div>
-			{/if}
-
-			<div class="grid gap-1.5">
-				<label for="documents" class="text-sm font-medium"
-					>Supporting documents <span class="text-muted-foreground">(optional)</span></label
+			<div class="flex justify-end">
+				<button
+					type="submit"
+					disabled={create.busy}
+					class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 				>
-				<input
-					id="documents"
-					name="documents"
-					type="file"
-					multiple
-					accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
-					class="rounded-md border border-input bg-background px-3 py-1.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium"
-				/>
-				<p class="text-xs text-muted-foreground">
-					Up to 5 files — PDF, PNG, JPEG or WEBP, max 10 MB each.
-				</p>
+					{create.busy ? 'Submitting…' : 'Submit request'}
+				</button>
 			</div>
-
-			<button
-				type="submit"
-				disabled={create.busy}
-				class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-			>
-				{create.busy ? 'Submitting…' : 'Submit request'}
-			</button>
 		</form>
 	{/if}
 

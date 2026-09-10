@@ -2,11 +2,12 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import type { PageData, ActionData } from './$types'
 
@@ -18,31 +19,25 @@
 		async ({ update }) =>
 			update({ reset: false })
 
-	// Reset discards the manual correction and re-derives from punches — confirm first.
-	const confirmReset: SubmitFunction = ({ cancel }) => {
-		if (!confirm('Discard the manual edit for this day and re-derive it from punches?')) cancel()
-		return async ({ update }) => update({ reset: false })
-	}
-
 	// #108: these bulk actions rewrite whole ranges/days — a double-click re-runs the derive or
 	// re-locks mid-flight. One guard per singleton form.
-	const derive = createSubmitGuard()
-	const lock = createSubmitGuard()
-	const unlock = createSubmitGuard()
-	const saveTimesheet = createSubmitGuard()
-	const deriveTeam = createSubmitGuard()
-	const lockTeam = createSubmitGuard()
-	const unlockTeam = createSubmitGuard()
+	const derive = submitFeedback({ success: null })
+	const lock = submitFeedback()
+	const unlock = submitFeedback()
+	const saveTimesheet = submitFeedback()
+	const deriveTeam = submitFeedback({ success: null })
+	const lockTeam = submitFeedback()
+	const unlockTeam = submitFeedback()
 	// #200: the backlog import writes punches for a whole file — a double-submit would re-run it.
 	const importBacklog = createSubmitGuard()
 
 	// Per-row forms live inside {#each}, so they need a guard per row — a shared one would grey out
 	// every row's button at once. Created lazily and cached by record id.
-	const rowGuards = new Map<string, ReturnType<typeof createSubmitGuard>>()
+	const rowGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function rowGuard(key: string, inner?: SubmitFunction) {
 		let g = rowGuards.get(key)
 		if (!g) {
-			g = createSubmitGuard(inner)
+			g = submitFeedback({ inner })
 			rowGuards.set(key, g)
 		}
 		return g
@@ -140,10 +135,9 @@
 		return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 	}
 
-	// Editable cells that read as plain text until focused, then reveal an input affordance.
 	// Content-sized (not w-full) so the table columns spread evenly instead of one ballooning.
 	const CELL =
-		'h-7 rounded border border-transparent bg-transparent px-1 text-xs hover:bg-muted/40 focus:border-input focus:bg-background focus:outline-none focus:ring-1 focus:ring-ring'
+		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
 	const CELL_NUM =
 		CELL +
 		' w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
@@ -208,225 +202,230 @@
 			: undefined}
 	/>
 
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
-		>
-			{form.error}
-		</div>
-	{/if}
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
-	{/if}
-
-	{#if data.canManage}
-		<!-- View toggle: one employee's range vs the whole team on a day. The cross-link to the
-		     multi-day matrix sits here, level with the control it relates to, not on the title row. -->
-		<div class="flex flex-wrap items-center justify-between gap-3">
-			<div class="inline-flex rounded-lg border p-1 text-sm">
-				<a
-					href="?view=employee&employeeId={data.selectedEmployeeId ??
-						''}&from={data.from}&to={data.to}"
-					class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
-						? 'bg-primary text-primary-foreground'
-						: 'text-muted-foreground hover:bg-accent'}"
-				>
-					By employee
-				</a>
-				<a
-					href="?view=team&date={data.date}"
-					class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
-						? 'bg-primary text-primary-foreground'
-						: 'text-muted-foreground hover:bg-accent'}"
-				>
-					Whole team (day)
-				</a>
-			</div>
+	<div class="space-y-4 rounded-lg border bg-card p-4">
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<!-- Filters -->
 			{#if data.view === 'team'}
-				<a
-					href="/team"
-					class="ml-auto whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-					>Multi-day matrix →</a
-				>
-			{/if}
-		</div>
-	{/if}
-
-	<!-- Filters -->
-	{#if data.view === 'team'}
-		<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
-			<input type="hidden" name="view" value="team" />
-			<div class="flex flex-col gap-1">
-				<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
-				<input
-					id="date"
-					name="date"
-					type="date"
-					value={data.date}
-					onchange={(e) => e.currentTarget.form?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-				/>
-			</div>
-		</form>
-	{:else}
-		<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
-			{#if data.canManage}
-				<input type="hidden" name="view" value="employee" />
-				<div class="flex flex-col gap-1">
-					<label for="employeeId" class="text-xs font-medium text-muted-foreground">Employee</label>
-					<select
-						id="employeeId"
-						name="employeeId"
-						onchange={(e) => e.currentTarget.form?.requestSubmit()}
-						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-					>
-						{#each data.employees as e (e.id)}
-							<option value={e.id} selected={e.id === data.selectedEmployeeId}
-								>{e.lastName}, {e.firstName} ({e.employeeNumber})</option
+				<form method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+					<input type="hidden" name="view" value="team" />
+					<div class="flex flex-col gap-1">
+						<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
+						<input
+							id="date"
+							name="date"
+							type="date"
+							value={data.date}
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+						/>
+					</div>
+				</form>
+			{:else}
+				<form method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+					{#if data.canManage}
+						<input type="hidden" name="view" value="employee" />
+						<div class="flex flex-col gap-1">
+							<label for="employeeId" class="text-xs font-medium text-muted-foreground"
+								>Employee</label
+							>
+							<select
+								id="employeeId"
+								name="employeeId"
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							>
+								{#each data.employees as e (e.id)}
+									<option value={e.id} selected={e.id === data.selectedEmployeeId}
+										>{e.lastName}, {e.firstName} ({e.employeeNumber})</option
+									>
+								{/each}
+							</select>
+						</div>
+					{/if}
+					<div class="flex flex-col gap-1">
+						<label for="from" class="text-xs font-medium text-muted-foreground">From</label>
+						<input
+							id="from"
+							name="from"
+							type="date"
+							value={data.from}
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+						/>
+					</div>
+					<div class="flex flex-col gap-1">
+						<label for="to" class="text-xs font-medium text-muted-foreground">To</label>
+						<input
+							id="to"
+							name="to"
+							type="date"
+							value={data.to}
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+						/>
+					</div>
+					<div class="flex w-full flex-wrap items-center gap-1.5">
+						<span class="text-xs font-medium text-muted-foreground">Quick pick:</span>
+						{#each QUICK_PICKS as q (q.label)}
+							<button
+								type="button"
+								onclick={() => pickPeriod(q.kind, q.monthsBack)}
+								class="rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent"
+								>{q.label}</button
 							>
 						{/each}
-					</select>
+					</div>
+					<p class="w-full text-xs text-muted-foreground">
+						Range is capped at {data.maxRangeDays} days (~2 months); longer spans are trimmed automatically.
+					</p>
+				</form>
+			{/if}
+			{#if data.canManage}
+				<div
+					class="order-first flex w-full flex-wrap items-center gap-3 sm:order-none sm:w-auto sm:pt-5"
+				>
+					<div class="inline-flex rounded-lg border p-1 text-sm">
+						<a
+							href="?view=employee&employeeId={data.selectedEmployeeId ??
+								''}&from={data.from}&to={data.to}"
+							class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
+								? 'bg-primary text-primary-foreground'
+								: 'text-muted-foreground hover:bg-accent'}"
+						>
+							By employee
+						</a>
+						<a
+							href="?view=team&date={data.date}"
+							class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
+								? 'bg-primary text-primary-foreground'
+								: 'text-muted-foreground hover:bg-accent'}"
+						>
+							Whole team (day)
+						</a>
+					</div>
+					{#if data.view === 'team'}
+						<a
+							href="/team"
+							class="whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+							>Multi-day matrix →</a
+						>
+					{/if}
 				</div>
 			{/if}
-			<div class="flex flex-col gap-1">
-				<label for="from" class="text-xs font-medium text-muted-foreground">From</label>
-				<input
-					id="from"
-					name="from"
-					type="date"
-					value={data.from}
-					onchange={(e) => e.currentTarget.form?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-				/>
-			</div>
-			<div class="flex flex-col gap-1">
-				<label for="to" class="text-xs font-medium text-muted-foreground">To</label>
-				<input
-					id="to"
-					name="to"
-					type="date"
-					value={data.to}
-					onchange={(e) => e.currentTarget.form?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-				/>
-			</div>
-			<div class="flex w-full flex-wrap items-center gap-1.5">
-				<span class="text-xs font-medium text-muted-foreground">Quick pick:</span>
-				{#each QUICK_PICKS as q (q.label)}
-					<button
-						type="button"
-						onclick={() => pickPeriod(q.kind, q.monthsBack)}
-						class="rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent"
-						>{q.label}</button
-					>
-				{/each}
-			</div>
-			<p class="w-full text-xs text-muted-foreground">
-				Range is capped at {data.maxRangeDays} days (~2 months); longer spans are trimmed automatically.
-			</p>
-		</form>
-	{/if}
+		</div>
 
-	<!-- Bulk actions -->
-	{#if data.canManage && data.view === 'employee' && data.selectedEmployeeId}
-		<div class="flex flex-wrap gap-2">
-			<form method="POST" action="?/derive" use:enhance={derive.enhance}>
-				<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-				<input type="hidden" name="from" value={data.from} />
-				<input type="hidden" name="to" value={data.to} />
-				<button
-					title="Re-pull from punches (updates unlocked days)"
-					disabled={derive.busy}
-					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{@render icon(IC.refresh)}Refresh</button
-				>
-			</form>
-			<form method="POST" action="?/lock" use:enhance={lock.enhance}>
-				<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-				<input type="hidden" name="from" value={data.from} />
-				<input type="hidden" name="to" value={data.to} />
-				<button
-					disabled={lock.busy}
-					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{lock.busy ? 'Locking…' : 'Lock range'}</button
-				>
-			</form>
-			{#if data.canUnlock}
-				<form method="POST" action="?/unlock" use:enhance={unlock.enhance}>
+		<!-- Bulk actions -->
+		<div class="flex flex-wrap items-center gap-2 border-t pt-4">
+			{#if data.canManage && data.view === 'employee' && data.selectedEmployeeId}
+				<form method="POST" action="?/derive" use:enhance={derive.enhance}>
 					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
 					<input type="hidden" name="from" value={data.from} />
 					<input type="hidden" name="to" value={data.to} />
 					<button
-						title="Reopen locked days (super admin)"
-						disabled={unlock.busy}
-						class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
-						>{@render icon(IC.lockOpen)}Unlock range</button
+						title="Re-pull from punches (updates unlocked days)"
+						disabled={derive.busy}
+						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{@render icon(IC.refresh)}Refresh</button
 					>
 				</form>
-			{/if}
-			<a
-				href={exportHref}
-				class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-				>{@render icon(IC.download)}Export CSV</a
-			>
-			<form method="POST" action="?/saveTimesheet" use:enhance={saveTimesheet.enhance}>
-				<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-				<input type="hidden" name="from" value={data.from} />
-				<input type="hidden" name="to" value={data.to} />
-				<button
-					title="Persist this range as a Timesheet record"
-					disabled={saveTimesheet.busy}
-					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{@render icon(IC.document)}Save as timesheet</button
+				<form method="POST" action="?/lock" use:enhance={lock.enhance}>
+					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+					<input type="hidden" name="from" value={data.from} />
+					<input type="hidden" name="to" value={data.to} />
+					<button
+						disabled={lock.busy}
+						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{lock.busy ? 'Locking…' : 'Lock range'}</button
+					>
+				</form>
+				{#if data.canUnlock}
+					<form method="POST" action="?/unlock" use:enhance={unlock.enhance}>
+						<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+						<input type="hidden" name="from" value={data.from} />
+						<input type="hidden" name="to" value={data.to} />
+						<button
+							title="Reopen locked days (super admin)"
+							disabled={unlock.busy}
+							class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+							>{@render icon(IC.lockOpen)}Unlock range</button
+						>
+					</form>
+				{/if}
+				<a
+					href={exportHref}
+					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+					>{@render icon(IC.download)}Export CSV</a
 				>
-			</form>
-		</div>
-	{:else if data.canManage && data.view === 'team'}
-		<div class="flex flex-wrap gap-2">
-			<form method="POST" action="?/deriveTeam" use:enhance={deriveTeam.enhance}>
-				<input type="hidden" name="date" value={data.date} />
-				<button
-					title="Re-pull from punches (updates unlocked days)"
-					disabled={deriveTeam.busy}
-					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{@render icon(IC.refresh)}Refresh</button
-				>
-			</form>
-			<form method="POST" action="?/lockTeam" use:enhance={lockTeam.enhance}>
-				<input type="hidden" name="date" value={data.date} />
-				<button
-					disabled={lockTeam.busy}
-					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{lockTeam.busy ? 'Locking…' : 'Lock day'}</button
-				>
-			</form>
-			{#if data.canUnlock}
-				<form method="POST" action="?/unlockTeam" use:enhance={unlockTeam.enhance}>
+				<form method="POST" action="?/saveTimesheet" use:enhance={saveTimesheet.enhance}>
+					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+					<input type="hidden" name="from" value={data.from} />
+					<input type="hidden" name="to" value={data.to} />
+					<button
+						title="Persist this range as a Timesheet record"
+						disabled={saveTimesheet.busy}
+						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{@render icon(IC.document)}Save as timesheet</button
+					>
+				</form>
+			{:else if data.canManage && data.view === 'team'}
+				<form method="POST" action="?/deriveTeam" use:enhance={deriveTeam.enhance}>
 					<input type="hidden" name="date" value={data.date} />
 					<button
-						title="Reopen locked days (super admin)"
-						disabled={unlockTeam.busy}
-						class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
-						>{@render icon(IC.lockOpen)}Unlock day</button
+						title="Re-pull from punches (updates unlocked days)"
+						disabled={deriveTeam.busy}
+						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{@render icon(IC.refresh)}Refresh</button
 					>
 				</form>
+				<form method="POST" action="?/lockTeam" use:enhance={lockTeam.enhance}>
+					<input type="hidden" name="date" value={data.date} />
+					<button
+						disabled={lockTeam.busy}
+						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{lockTeam.busy ? 'Locking…' : 'Lock day'}</button
+					>
+				</form>
+				{#if data.canUnlock}
+					<form method="POST" action="?/unlockTeam" use:enhance={unlockTeam.enhance}>
+						<input type="hidden" name="date" value={data.date} />
+						<button
+							title="Reopen locked days (super admin)"
+							disabled={unlockTeam.busy}
+							class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+							>{@render icon(IC.lockOpen)}Unlock day</button
+						>
+					</form>
+				{/if}
+				<a
+					href={exportHref}
+					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+					>{@render icon(IC.download)}Export CSV</a
+				>
+			{:else}
+				<!-- Employees can export their own timesheet -->
+				<a
+					href={exportHref}
+					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+					>{@render icon(IC.download)}Export CSV</a
+				>
 			{/if}
-			<a
-				href={exportHref}
-				class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-				>{@render icon(IC.download)}Export CSV</a
-			>
+			{#if data.canManage}
+				<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
+				<label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+					<input
+						type="checkbox"
+						bind:checked={exceptionsOnly}
+						class="h-4 w-4 rounded border-input"
+					/>
+					<span class="font-medium">Exceptions only</span>
+					<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
+				</label>
+				<span class="ml-auto text-xs text-muted-foreground"
+					>{data.view === 'team' ? teamRows.length : dayRows.length} shown</span
+				>
+			{/if}
 		</div>
-	{:else}
-		<!-- Employees can export their own timesheet -->
-		<div class="flex gap-2">
-			<a
-				href={exportHref}
-				class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-				>{@render icon(IC.download)}Export CSV</a
-			>
-		</div>
-	{/if}
+	</div>
 
 	<!-- #200: CSV backlog import. Food-service tenants only; the action re-checks both gates. -->
 	{#if data.canManage && data.showAmPm}
@@ -533,20 +532,6 @@
 					{/if}
 				</div>
 			{/if}
-		</div>
-	{/if}
-
-	{#if data.canManage}
-		<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
-		<div class="flex items-center justify-between gap-3">
-			<label class="inline-flex cursor-pointer items-center gap-2 text-sm">
-				<input type="checkbox" bind:checked={exceptionsOnly} class="h-4 w-4 rounded border-input" />
-				<span class="font-medium">Exceptions only</span>
-				<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
-			</label>
-			<span class="text-xs text-muted-foreground"
-				>{data.view === 'team' ? teamRows.length : dayRows.length} shown</span
-			>
 		</div>
 	{/if}
 
@@ -668,7 +653,6 @@
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
 									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
-									{@const reset = rowGuard(`resetDay:${d.id}`, confirmReset)}
 									<div class="flex items-center gap-1">
 										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
 											<input type="hidden" name="id" value={d.id} />
@@ -679,18 +663,19 @@
 												>{save.busy ? 'Saving…' : 'Save'}</button
 											>
 										</form>
-										{#if d.manuallyEdited}
-											<form method="POST" action="?/resetDay" use:enhance={reset.enhance}>
-												<input type="hidden" name="id" value={d.id} />
-												<button
-													type="submit"
-													title="Discard manual edit and re-derive from punches"
-													disabled={reset.busy}
-													class="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-													>{reset.busy ? 'Resetting…' : 'Reset'}</button
-												>
-											</form>
-										{/if}
+										<ConfirmButton
+											action="?/resetDay"
+											title="Discard the manual edit?"
+											message="This day goes back to the values derived from its punch records. The manual correction is lost."
+											confirmText="Reset"
+											triggerLabel="Reset"
+											disabled={!d.manuallyEdited}
+											triggerTitle="Discard manual edit and re-derive from punches"
+											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
+											submit={keepValues}
+										>
+											<input type="hidden" name="id" value={d.id} />
+										</ConfirmButton>
 									</div>
 								{:else if d?.isLocked}
 									<span class="inline-flex h-7 items-center text-xs text-muted-foreground"
@@ -837,7 +822,6 @@
 										>
 									{:else}
 										{@const save = rowGuard(`correct:${d.id}`, keepValues)}
-										{@const reset = rowGuard(`resetDay:${d.id}`, confirmReset)}
 										<div class="flex items-center gap-1">
 											<form
 												id="c-{d.id}"
@@ -853,18 +837,19 @@
 													>{save.busy ? 'Saving…' : 'Save'}</button
 												>
 											</form>
-											{#if d.manuallyEdited}
-												<form method="POST" action="?/resetDay" use:enhance={reset.enhance}>
-													<input type="hidden" name="id" value={d.id} />
-													<button
-														type="submit"
-														title="Discard manual edit and re-derive from punches"
-														disabled={reset.busy}
-														class="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-														>{reset.busy ? 'Resetting…' : 'Reset'}</button
-													>
-												</form>
-											{/if}
+											<ConfirmButton
+												action="?/resetDay"
+												title="Discard the manual edit?"
+												message="This day goes back to the values derived from its punch records. The manual correction is lost."
+												confirmText="Reset"
+												triggerLabel="Reset"
+												disabled={!d.manuallyEdited}
+												triggerTitle="Discard manual edit and re-derive from punches"
+												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
+												submit={keepValues}
+											>
+												<input type="hidden" name="id" value={d.id} />
+											</ConfirmButton>
 										</div>
 									{/if}
 								</td>

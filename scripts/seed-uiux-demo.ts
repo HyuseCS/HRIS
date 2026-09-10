@@ -59,13 +59,17 @@ async function main() {
 			where: { id: JOB_POSTING_ID },
 			data: { status: JOB_POSTING_CLEAR_STATUS }
 		})
-		await db.timeLog.update({
+		const clearedPunches = await db.timeLog.updateMany({
 			where: { id: PUNCH_ID },
 			data: { latitude: null, longitude: null, locationAccuracyM: null, locationCapturedAt: null }
 		})
 		console.log(`✔ Cleared ${removedApplicants.count} seeded applicant(s).`)
 		console.log(`✔ Reset ${JOB_POSTING_ID} status to ${JOB_POSTING_CLEAR_STATUS}.`)
-		console.log(`✔ Cleared location on punch ${PUNCH_ID}.`)
+		console.log(
+			clearedPunches.count
+				? `✔ Cleared location on punch ${PUNCH_ID}.`
+				: `– No punch ${PUNCH_ID} to clear.`
+		)
 		return
 	}
 
@@ -84,19 +88,21 @@ async function main() {
 	})
 	if (!hrUser) throw new Error('No HR_ADMIN user found in org Veent — run `pnpm db:seed` first.')
 
-	const existingPunch = await db.timeLog.findUniqueOrThrow({
+	const existingPunch = await db.timeLog.findUnique({
 		where: { id: PUNCH_ID },
 		select: { timestamp: true }
 	})
-	await db.timeLog.update({
-		where: { id: PUNCH_ID },
-		data: {
-			latitude: 14.5995,
-			longitude: 120.9842,
-			locationAccuracyM: 12,
-			locationCapturedAt: existingPunch.timestamp
-		}
-	})
+	if (existingPunch) {
+		await db.timeLog.update({
+			where: { id: PUNCH_ID },
+			data: {
+				latitude: 14.5995,
+				longitude: 120.9842,
+				locationAccuracyM: 12,
+				locationCapturedAt: existingPunch.timestamp
+			}
+		})
+	}
 
 	await db.jobPosting.update({ where: { id: JOB_POSTING_ID }, data: { status: 'OPEN' } })
 
@@ -127,7 +133,11 @@ async function main() {
 		})
 	}
 
-	console.log(`✔ Set punch ${PUNCH_ID} location to 14.5995, 120.9842 (±12m).`)
+	console.log(
+		existingPunch
+			? `✔ Set punch ${PUNCH_ID} location to 14.5995, 120.9842 (±12m).`
+			: `– Punch ${PUNCH_ID} is not in this database; skipped the map fixture.`
+	)
 	console.log(`✔ Set ${JOB_POSTING_ID} status to OPEN.`)
 	console.log(`✔ Seeded ${APPLICANTS.length} applicant(s) at APPLIED / SCREENING / INTERVIEW.`)
 	console.log('  Open /punch and /recruitment to see both dialogs.')

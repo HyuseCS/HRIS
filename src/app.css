@@ -106,23 +106,23 @@
 		max-height: 16rem;
 	}
 
-	/* Touch targets. Buttons here are styled inline at ~36 px (`h-9`) in 250-odd
-	   places, so there is no single class to raise. A coarse pointer is the only
-	   place the 36 px actually hurts, so raise the floor there and leave mouse
-	   density alone. Rows and tables get taller on a tablet — that is the trade.
-	   Both axes: a height-only floor left narrow text buttons — the login page's
-	   16 px "Change" — tall but still too thin to hit. `min-width` rather than
-	   `min-inline-size` only because every other rule in this file is physical.
-	   ponytail: checkbox/radio excluded — they are square, and a floor on one
-	   axis alone stretches them into a broken control. */
+	/* Touch targets. The floor sits below the app's ~36 px (`h-9`) control height, so it
+	   catches only what is smaller than the norm — checkboxes and narrow text buttons like
+	   the login page's 16 px "Change" — and leaves button and row density alone. Both axes,
+	   because a height-only floor left those narrow buttons tall but still too thin to hit.
+	   ponytail: radio stays excluded — the audit finding names checkboxes only. */
 	@media (pointer: coarse) {
 		button,
 		[role='button'],
 		select,
 		textarea,
-		input:not([type='hidden']):not([type='checkbox']):not([type='radio']) {
-			min-height: 44px;
-			min-width: 44px;
+		a.btn-row,
+		a.btn-row-positive,
+		a.btn-row-warning,
+		a.btn-row-danger,
+		input:not([type='hidden']):not([type='radio']) {
+			min-height: 24px;
+			min-width: 24px;
 		}
 	}
 
@@ -173,8 +173,13 @@
 	.badge-blue {
 		@apply badge bg-blue-500/15 text-blue-700 dark:text-blue-400;
 	}
+	/* `bg-muted` is 96% in light and 14% in dark — two to four points from the card and the page
+	   behind it, so the gray pill had a fill nobody could see. Every other variant here is a tint
+	   of its own hue; gray has no hue, which is how it ended up transparent. A tint of the
+	   foreground is the neutral equivalent and needs no dark twin: it composites to ~#E6E6E6 on a
+	   light card and ~#3A3A3A on a dark one, and the text step clears 4.5:1 over both. */
 	.badge-gray {
-		@apply badge bg-muted text-foreground/70;
+		@apply badge bg-foreground/15 text-foreground/70;
 	}
 
 	/* Input base style */
@@ -212,16 +217,16 @@
 	/* Compact bordered actions for table rows — theme-aware (dark-mode safe),
 	   used instead of colored text hyperlinks (#68/#76). */
 	.btn-row {
-		@apply inline-flex items-center justify-center rounded-md border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
+		@apply inline-flex items-center justify-center rounded-md border border-muted-foreground/30 bg-secondary px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
 	}
 	.btn-row-positive {
-		@apply inline-flex items-center justify-center rounded-md border border-green-600/30 px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-green-400;
+		@apply inline-flex items-center justify-center rounded-md border border-green-600/40 px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-green-400;
 	}
 	.btn-row-warning {
-		@apply inline-flex items-center justify-center rounded-md border border-yellow-600/30 px-2.5 py-1 text-xs font-medium text-yellow-600 transition-colors hover:bg-yellow-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-yellow-500;
+		@apply inline-flex items-center justify-center rounded-md border border-yellow-600/40 px-2.5 py-1 text-xs font-medium text-yellow-600 transition-colors hover:bg-yellow-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-yellow-500;
 	}
 	.btn-row-danger {
-		@apply inline-flex items-center justify-center rounded-md border border-red-600/30 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-red-400;
+		@apply inline-flex items-center justify-center rounded-md border border-red-600/40 bg-red-600/10 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-red-400;
 	}
 
 	/* Card — separated by tone and elevation rather than a hard outline. The hairline ring

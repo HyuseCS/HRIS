@@ -83,7 +83,9 @@ const formEvent = (roles: Role[], fields: Record<string, string>) => {
 	return {
 		locals: locals(roles),
 		request: { formData: async () => f },
-		getClientAddress: () => '127.0.0.1'
+		getClientAddress: () => '127.0.0.1',
+		// The action parks a success flash here before redirecting (#phase-04 feedback contract).
+		cookies: { set: () => {}, get: () => undefined, delete: () => {} }
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} as any
 }

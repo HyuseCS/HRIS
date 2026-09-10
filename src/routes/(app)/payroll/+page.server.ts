@@ -81,6 +81,9 @@ export const actions: Actions = {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
 		}
+
+		// Irreversible and money-moving. Silence here read as a no-op.
+		return { action: 'void', saved: 'Payroll run voided.' }
 	},
 
 	compute: async ({ request, locals, getClientAddress }) => {

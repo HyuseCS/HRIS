@@ -5,6 +5,7 @@
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { addToast } from '$lib/stores/toast.svelte'
@@ -102,24 +103,23 @@
 			{#if form?.error}<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
 					{form.error}
 				</div>{/if}
-			<!-- #163: wide enough that Month, Year and all four period buttons sit on one row
-			     and the two date fields keep their two-column grid instead of stacking. -->
-			<div class="max-w-4xl">
-				<PeriodPicker />
-			</div>
-			<div class="flex items-center gap-2">
-				<button
-					type="submit"
-					disabled={create.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{create.busy ? 'Creating…' : 'Create'}</button
-				>
-				<button
-					type="button"
-					onclick={() => (showCreate = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-			</div>
+			<PeriodPicker>
+				{#snippet actions()}
+					<div class="flex gap-2">
+						<button
+							type="button"
+							onclick={() => (showCreate = false)}
+							class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
+						>
+						<button
+							type="submit"
+							disabled={create.busy}
+							class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+							>{create.busy ? 'Creating…' : 'Create'}</button
+						>
+					</div>
+				{/snippet}
+			</PeriodPicker>
 		</form>
 	{/if}
 
@@ -206,7 +206,7 @@
 											message="The run is marked VOIDED and any amortization it collected is credited back. This cannot be undone, and the same exact period cannot be created again."
 											confirmText="Void run"
 											triggerLabel="Void"
-											triggerClass="btn-row text-destructive"
+											triggerClass="btn-row-danger"
 										>
 											<input type="hidden" name="id" value={run.id} />
 										</ConfirmButton>
@@ -228,5 +228,7 @@
 				</tbody>
 			</table>
 		</div>
+	{:catch}
+		<LoadError what="the payroll runs" />
 	{/await}
 </div>

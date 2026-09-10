@@ -11,6 +11,8 @@ import {
 import { buildApprovalChain } from './routing'
 import { canAny } from '$lib/server/rbac'
 import { computeLeaveTotalDays, assertLeaveBalance, assertLeaveEligibility } from './leave'
+import { resolveInfoUpdateColumn } from './apply'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { evictTombstonedBytes } from './documents'
 import type { AuditContext } from '../types'
 
@@ -25,6 +27,19 @@ export async function createRequest(
 ) {
 	const parsed = requestSchema.parse(input)
 	const cols = deriveRequestColumns(parsed)
+
+	// #24: an INFO_UPDATE is free-text by design — `field` names the column and `requestedValue`
+	// carries whatever the employee typed — so the phone rule cannot live in the payload schema,
+	// which never knows which column is being changed. It goes here for the same reason the LEAVE
+	// balance gate does: this is the only choke point all three filing paths share. Without it an
+	// employee files "abc" and an approver's click writes it straight to contactPhone.
+	if (
+		parsed.type === 'INFO_UPDATE' &&
+		resolveInfoUpdateColumn(parsed.field) === 'contactPhone' &&
+		!isValidPhone(parsed.requestedValue)
+	) {
+		error(400, phoneError('New phone number'))
+	}
 
 	const employee = await db.employee.findFirst({
 		where: { id: employeeId, organizationId },

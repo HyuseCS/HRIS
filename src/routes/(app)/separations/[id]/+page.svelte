@@ -56,7 +56,7 @@
 	<title>Separation — {s.employee.lastName}, {s.employee.firstName}</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
+<div class="space-y-6">
 	{#if form?.error}
 		<Banner kind="error" message={form.error} />
 	{/if}
@@ -98,9 +98,11 @@
 			description="{s.employee.jobTitle} · {s.employee.department?.name ?? '—'} · #{s.employee
 				.employeeNumber}"
 		>
+			{#snippet badge()}
+				<Badge status={s.status} domain="separation" />
+			{/snippet}
 			{#snippet back()}
 				<BackButton fallback="/separations" label="Separations" />
-				<Badge status={s.status} domain="separation" />
 			{/snippet}
 		</PageHeader>
 		<p class="text-sm">
@@ -109,150 +111,160 @@
 		{#if s.reason}<p class="text-sm text-muted-foreground">{s.reason}</p>{/if}
 	</div>
 
-	<!-- Clearance checklist -->
-	<div class="rounded-lg border bg-card">
-		<div class="border-b px-4 py-3">
-			<div class="flex items-center justify-between">
-				<h2 class="font-semibold">Clearance checklist</h2>
-				<span class="text-xs text-muted-foreground"
-					>{s.clearanceItems.length - pendingCount}/{s.clearanceItems.length} cleared</span
-				>
-			</div>
-			{#if !isFinalized}
-				<p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
-					Marking any item cleared here means you will not be able to finalize this case. Another HR
-					administrator, or your CEO, will have to finalize it.
-				</p>
-			{/if}
-		</div>
-		<ul class="divide-y">
-			{#each s.clearanceItems as item (item.id)}
-				<li class="flex items-center justify-between gap-3 px-4 py-3">
-					<div>
-						<p class="text-sm font-medium">{item.label}</p>
-						<p class="text-xs text-muted-foreground">{CLEARANCE_AREA_LABELS[item.area]}</p>
+	<!-- Two columns from lg up: the checklist is the long working list, so it takes the left
+	     side on its own; the money and the irreversible actions sit together on the right. -->
+	<div class="grid gap-6 lg:grid-cols-3 lg:items-start">
+		<div class="space-y-6 lg:col-span-2">
+			<!-- Clearance checklist -->
+			<div class="rounded-lg border bg-card">
+				<div class="border-b px-4 py-3">
+					<div class="flex items-center justify-between">
+						<h2 class="font-semibold">Clearance checklist</h2>
+						<span class="text-xs text-muted-foreground"
+							>{s.clearanceItems.length - pendingCount}/{s.clearanceItems.length} cleared</span
+						>
 					</div>
-					{#if isFinalized}
-						<Badge status={item.status} domain="clearance" />
-					{:else}
-						{@const toggle = clearanceGuard(item.id)}
-						<form method="POST" action="?/toggleClearance" use:enhance={toggle.enhance}>
-							<input type="hidden" name="itemId" value={item.id} />
-							<input
-								type="hidden"
-								name="cleared"
-								value={item.status === 'CLEARED' ? 'false' : 'true'}
-							/>
+					{#if !isFinalized}
+						<p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
+							Marking any item cleared here means you will not be able to finalize this case.
+							Another HR administrator, or your CEO, will have to finalize it.
+						</p>
+					{/if}
+				</div>
+				<ul class="divide-y">
+					{#each s.clearanceItems as item (item.id)}
+						<li class="flex items-center justify-between gap-3 px-4 py-3">
+							<div>
+								<p class="text-sm font-medium">{item.label}</p>
+								<p class="text-xs text-muted-foreground">{CLEARANCE_AREA_LABELS[item.area]}</p>
+							</div>
+							{#if isFinalized}
+								<Badge status={item.status} domain="clearance" />
+							{:else}
+								{@const toggle = clearanceGuard(item.id)}
+								<form method="POST" action="?/toggleClearance" use:enhance={toggle.enhance}>
+									<input type="hidden" name="itemId" value={item.id} />
+									<input
+										type="hidden"
+										name="cleared"
+										value={item.status === 'CLEARED' ? 'false' : 'true'}
+									/>
+									<button
+										type="submit"
+										disabled={toggle.busy}
+										class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50 {item.status ===
+										'CLEARED'
+											? 'text-green-600 dark:text-green-400'
+											: 'text-muted-foreground'}"
+									>
+										{item.status === 'CLEARED' ? 'Cleared' : 'Mark cleared'}
+									</button>
+								</form>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</div>
+		</div>
+
+		<div class="space-y-6">
+			<!-- Final pay -->
+			<div class="rounded-lg border bg-card">
+				<div class="border-b px-4 py-3">
+					<h2 class="font-semibold">Final pay {isFinalized ? '(settled)' : '(preview)'}</h2>
+				</div>
+				<dl class="divide-y">
+					{#each data.finalPay.lines as line (line.label)}
+						<div class="flex items-center justify-between px-4 py-2 text-sm">
+							<dt class="text-muted-foreground">{line.label}</dt>
+							<dd class="font-mono {line.amount < 0 ? 'text-red-600' : ''}">{peso(line.amount)}</dd>
+						</div>
+					{/each}
+					<div class="flex items-center justify-between px-4 py-3 text-sm font-semibold">
+						<dt>Net final pay</dt>
+						<dd class="font-mono {data.finalPay.total < 0 ? 'text-red-600' : ''}">
+							{peso(data.finalPay.total)}
+						</dd>
+					</div>
+				</dl>
+				{#if data.finalPay.total < 0}
+					<p class="px-4 pb-3 text-xs text-muted-foreground">
+						Negative total means the employee owes the company after offsets.
+					</p>
+				{/if}
+			</div>
+
+			<!-- Finalize -->
+			{#if !isFinalized}
+				<div class="rounded-lg border border-destructive/30 bg-card p-4">
+					<h2 class="font-semibold text-destructive">Finalize separation</h2>
+					<p class="mt-1 text-sm text-muted-foreground">
+						Snapshots the final pay above, sets the employee to <strong>OFFBOARDED</strong> (end
+						date
+						{formatShortDate(s.effectiveDate)}), and disables their login. Only a Super Admin can
+						undo it (#304).
+					</p>
+					{#if pendingCount > 0}
+						<p class="mt-2 text-sm text-amber-700 dark:text-amber-400">
+							{pendingCount} clearance item{pendingCount === 1 ? '' : 's'} still pending — clear all before
+							finalizing.
+						</p>
+					{/if}
+					{#if finalizeBar}
+						<p id="finalize-bar" class="mt-2 text-sm text-amber-700 dark:text-amber-400">
+							{finalizeBar}
+						</p>
+					{/if}
+					<form method="POST" action="?/finalize" use:enhance={finalize.enhance} class="mt-3">
+						<button
+							type="submit"
+							aria-describedby={finalizeBar ? 'finalize-bar' : undefined}
+							disabled={pendingCount > 0 || !!finalizeBar || finalize.busy}
+							class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+							>{finalize.busy ? 'Finalizing…' : 'Finalize & offboard'}</button
+						>
+					</form>
+				</div>
+			{:else}
+				<div class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+					Finalized{s.finalizedAt ? ` on ${formatShortDate(s.finalizedAt)}` : ''}. Final pay settled
+					at
+					<span class="font-mono">{peso(Number(s.finalPayAmount ?? 0))}</span>.
+				</div>
+				{#if data.canUndo}
+					<div class="rounded-lg border border-destructive/30 bg-card p-4">
+						<h2 class="font-semibold text-destructive">Undo finalization</h2>
+						<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
+							Restores the loan and cash-advance balances this finalize wrote off, sets the employee
+							back to their previous employment status, and <strong>re-enables their login</strong>.
+							Every undo is recorded in the audit log.
+						</p>
+						<form method="POST" action="?/undo" use:enhance={undo.enhance} class="mt-3 space-y-3">
+							<div class="flex items-center gap-2">
+								<input
+									id="reopenClearance"
+									name="reopenClearance"
+									type="checkbox"
+									value="true"
+									bind:checked={reopenClearance}
+									class="h-4 w-4 rounded border-input"
+								/>
+								<label for="reopenClearance" class="text-sm">
+									Re-open clearance items — the case returns to <strong>OPEN</strong> and every item goes
+									back to pending. Whoever cleared an item stays barred from finalizing this case.
+								</label>
+							</div>
 							<button
 								type="submit"
-								disabled={toggle.busy}
-								class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50 {item.status ===
-								'CLEARED'
-									? 'text-green-600 dark:text-green-400'
-									: 'text-muted-foreground'}"
+								aria-describedby="undo-warning"
+								disabled={undo.busy}
+								class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+								>{undo.busy ? 'Undoing…' : 'Undo finalization'}</button
 							>
-								{item.status === 'CLEARED' ? 'Cleared' : 'Mark cleared'}
-							</button>
 						</form>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	</div>
-
-	<!-- Final pay -->
-	<div class="rounded-lg border bg-card">
-		<div class="border-b px-4 py-3">
-			<h2 class="font-semibold">Final pay {isFinalized ? '(settled)' : '(preview)'}</h2>
-		</div>
-		<dl class="divide-y">
-			{#each data.finalPay.lines as line (line.label)}
-				<div class="flex items-center justify-between px-4 py-2 text-sm">
-					<dt class="text-muted-foreground">{line.label}</dt>
-					<dd class="font-mono {line.amount < 0 ? 'text-red-600' : ''}">{peso(line.amount)}</dd>
-				</div>
-			{/each}
-			<div class="flex items-center justify-between px-4 py-3 text-sm font-semibold">
-				<dt>Net final pay</dt>
-				<dd class="font-mono {data.finalPay.total < 0 ? 'text-red-600' : ''}">
-					{peso(data.finalPay.total)}
-				</dd>
-			</div>
-		</dl>
-		{#if data.finalPay.total < 0}
-			<p class="px-4 pb-3 text-xs text-muted-foreground">
-				Negative total means the employee owes the company after offsets.
-			</p>
-		{/if}
-	</div>
-
-	<!-- Finalize -->
-	{#if !isFinalized}
-		<div class="rounded-lg border border-destructive/30 bg-card p-4">
-			<h2 class="font-semibold text-destructive">Finalize separation</h2>
-			<p class="mt-1 text-sm text-muted-foreground">
-				Snapshots the final pay above, sets the employee to <strong>OFFBOARDED</strong> (end date
-				{formatShortDate(s.effectiveDate)}), and disables their login. Only a Super Admin can undo
-				it (#304).
-			</p>
-			{#if pendingCount > 0}
-				<p class="mt-2 text-sm text-amber-700 dark:text-amber-400">
-					{pendingCount} clearance item{pendingCount === 1 ? '' : 's'} still pending — clear all before
-					finalizing.
-				</p>
-			{/if}
-			{#if finalizeBar}
-				<p id="finalize-bar" class="mt-2 text-sm text-amber-700 dark:text-amber-400">
-					{finalizeBar}
-				</p>
-			{/if}
-			<form method="POST" action="?/finalize" use:enhance={finalize.enhance} class="mt-3">
-				<button
-					type="submit"
-					aria-describedby={finalizeBar ? 'finalize-bar' : undefined}
-					disabled={pendingCount > 0 || !!finalizeBar || finalize.busy}
-					class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-					>{finalize.busy ? 'Finalizing…' : 'Finalize & offboard'}</button
-				>
-			</form>
-		</div>
-	{:else}
-		<div class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-			Finalized{s.finalizedAt ? ` on ${formatShortDate(s.finalizedAt)}` : ''}. Final pay settled at
-			<span class="font-mono">{peso(Number(s.finalPayAmount ?? 0))}</span>.
-		</div>
-		{#if data.canUndo}
-			<div class="rounded-lg border border-destructive/30 bg-card p-4">
-				<h2 class="font-semibold text-destructive">Undo finalization</h2>
-				<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
-					Restores the loan and cash-advance balances this finalize wrote off, sets the employee
-					back to their previous employment status, and <strong>re-enables their login</strong>.
-					Every undo is recorded in the audit log.
-				</p>
-				<form method="POST" action="?/undo" use:enhance={undo.enhance} class="mt-3 space-y-3">
-					<div class="flex items-center gap-2">
-						<input
-							id="reopenClearance"
-							name="reopenClearance"
-							type="checkbox"
-							value="true"
-							bind:checked={reopenClearance}
-							class="h-4 w-4 rounded border-input"
-						/>
-						<label for="reopenClearance" class="text-sm">
-							Re-open clearance items — the case returns to <strong>OPEN</strong> and every item goes
-							back to pending. Whoever cleared an item stays barred from finalizing this case.
-						</label>
 					</div>
-					<button
-						type="submit"
-						aria-describedby="undo-warning"
-						disabled={undo.busy}
-						class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-						>{undo.busy ? 'Undoing…' : 'Undo finalization'}</button
-					>
-				</form>
-			</div>
-		{/if}
-	{/if}
+				{/if}
+			{/if}
+		</div>
+	</div>
 </div>

@@ -1,4 +1,5 @@
 import { fail, isHttpError } from '@sveltejs/kit'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { z } from 'zod'
 import { requireAnyCapability, requireFoodServiceOrg } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
@@ -51,11 +52,23 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 const branchSchema = z.object({
 	name: z.string().min(1).max(120),
 	address: z.string().max(300).optional(),
-	contactPhone: z.string().max(40).optional(),
+	// #24: format-checked. Landlines with an area code are the common case for a store, so the
+	// shared rule's leniency matters here — "(02) 8123 4567" must keep working.
+	contactPhone: z.string().max(40).optional().refine(isValidPhone, phoneError('Contact phone')),
 	status: z.enum(BRANCH_STATUSES),
 	managerId: z.string().optional(),
 	notes: z.string().max(2000).optional()
 })
+
+/**
+ * #24: the phone is the one field here whose rule the user cannot guess, so its message is
+ * surfaced verbatim. Everything else keeps the generic text rather than leaking a raw zod
+ * string ("String must contain at most 120 character(s)") into the form.
+ */
+function branchError(err: z.ZodError): string {
+	const phoneIssue = err.errors.find((e) => e.path[0] === 'contactPhone')
+	return phoneIssue?.message ?? 'Check the branch fields and try again.'
+}
 
 function inputOf(d: z.infer<typeof branchSchema>): BranchInput {
 	return {
@@ -91,7 +104,7 @@ export const actions: Actions = {
 	create: async ({ request, locals, getClientAddress }) => {
 		guard(locals)
 		const parsed = branchSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(422, { error: 'Check the branch fields and try again.' })
+		if (!parsed.success) return fail(422, { error: branchError(parsed.error) })
 		return run(() =>
 			createBranch(
 				locals.user!.organizationId,
@@ -107,7 +120,7 @@ export const actions: Actions = {
 		const id = data.id as string
 		if (!id) return fail(400, { error: 'Missing id' })
 		const parsed = branchSchema.safeParse(data)
-		if (!parsed.success) return fail(422, { error: 'Check the branch fields and try again.' })
+		if (!parsed.success) return fail(422, { error: branchError(parsed.error) })
 		return run(() =>
 			updateBranch(
 				locals.user!.organizationId,

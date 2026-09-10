@@ -1,7 +1,6 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -41,16 +40,11 @@
 
 	{#if form?.error}
 		<div
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
 		</div>
-	{/if}
-
-	<!-- Page-level, like the error block above. Only ?/release and ?/void populate `saved` for
-	     now; open/import/generate/lock stay silent until the phase-04 feedback contract. -->
-	{#if form?.saved}
-		<Banner kind="success" message={form.saved} />
 	{/if}
 
 	{#if showOpen}
@@ -61,9 +55,9 @@
 			class="rounded-lg border p-4 space-y-3"
 		>
 			<h2 class="font-semibold">Open a Payroll Period</h2>
-			<div class="grid gap-4 sm:grid-cols-2">
-				<div class="space-y-1.5">
-					<label for="name" class="text-sm font-medium">Name</label>
+			<div class="space-y-4">
+				<div class="max-w-sm space-y-1.5">
+					<label for="name" class="block text-sm font-medium">Name</label>
 					<input
 						id="name"
 						name="name"
@@ -72,20 +66,23 @@
 						class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 				</div>
-				<PeriodPicker startName="start" endName="end" />
-			</div>
-			<div class="flex justify-end gap-2">
-				<button
-					type="button"
-					onclick={() => (showOpen = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-				<button
-					type="submit"
-					disabled={openPeriod.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{openPeriod.busy ? 'Opening…' : 'Open'}</button
-				>
+				<PeriodPicker startName="start" endName="end">
+					{#snippet actions()}
+						<div class="flex gap-2">
+							<button
+								type="button"
+								onclick={() => (showOpen = false)}
+								class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
+							>
+							<button
+								type="submit"
+								disabled={openPeriod.busy}
+								class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+								>{openPeriod.busy ? 'Opening…' : 'Open'}</button
+							>
+						</div>
+					{/snippet}
+				</PeriodPicker>
 			</div>
 		</form>
 	{/if}

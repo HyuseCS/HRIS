@@ -3,14 +3,19 @@ import { db } from '$lib/server/db'
 import { listUnread } from '$lib/server/services/notifications'
 import { countPendingApprovals } from '$lib/server/services/approvals'
 import { countWaitingInquiries } from '$lib/server/services/complaints'
+import { takeFlash } from '$lib/server/flash'
 import type { LayoutServerLoad } from './$types'
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 	if (!locals.user) {
 		redirect(302, '/login')
 	}
 
 	const user = locals.user
+	// Read AND clear before the awaits below: a redirect-after-success parked its message here
+	// because the redirect threw its `form` payload away.
+	const flash = takeFlash(cookies)
+
 	const [notifications, pendingApprovals, waitingInquiries, memberships, currentOrg] =
 		await Promise.all([
 			listUnread(user.id),
@@ -52,6 +57,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		memberOrgs,
 		notifications,
 		pendingApprovals,
-		waitingInquiries
+		waitingInquiries,
+		flash
 	}
 }

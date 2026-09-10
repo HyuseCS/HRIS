@@ -33,12 +33,10 @@ test.describe('Job-board tracking (#117)', () => {
 		}).toPass()
 	})
 
-	test('HR ticks a board with a URL, then closing surfaces the takedown', async ({ page }) => {
+	test('HR adds a board with a URL, then closing surfaces the takedown', async ({ page }) => {
 		await login(page, USERS.admin)
 		await page.goto('/recruitment/jp_seed_demo', { waitUntil: 'domcontentloaded' })
-		// Wait for hydration before touching the checkbox — otherwise hydration reconciles it
-		// back to its server (unchecked) state after Playwright checks it, and the save posts
-		// posted=false.
+		// Wait for hydration — the add dialog and the remove confirmation are client-only.
 		await page.waitForLoadState('networkidle')
 
 		// Keep the run rerun-safe: make sure the posting starts OPEN.
@@ -50,25 +48,38 @@ test.describe('Job-board tracking (#117)', () => {
 
 		await expect(page.getByRole('heading', { name: 'Posted on' })).toBeVisible()
 
-		// Tick JobStreet, paste a URL, save.
-		const jobStreet = page.locator('li', { hasText: 'JobStreet' })
-		await jobStreet.getByRole('checkbox').check()
+		// Add JobStreet through the "+" tile. Rerun-safe: a prior run leaves a TAKEN_DOWN tile
+		// behind, which is still a tile, so the picker would no longer offer the board.
+		const jobStreet = page.locator('[data-board="JobStreet"]')
+		if ((await jobStreet.count()) === 0) {
+			await page.getByRole('button', { name: 'Add board' }).click()
+			await page.getByLabel('Board', { exact: true }).selectOption({ label: 'JobStreet' })
+			await page.getByRole('button', { name: 'Add', exact: true }).click()
+			await expect(jobStreet).toBeVisible()
+		}
+
+		// Save the URL. On a taken-down tile this Save also re-posts the board.
 		await jobStreet.locator('input[name="url"]').fill('https://jobstreet.com/jobs/123')
+		const savedOk = page.waitForResponse((r) => r.url().includes('setChannel'))
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
-		await expect(page.getByText(/Posted on 1 of/)).toBeVisible()
+		await savedOk
+		await expect(jobStreet.getByText(/^Posted /)).toBeVisible()
 
 		// A bad URL is rejected with a field-level error.
 		await jobStreet.locator('input[name="url"]').fill('not-a-url')
+		const savedBad = page.waitForResponse((r) => r.url().includes('setChannel'))
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
+		await savedBad
 		await expect(jobStreet.getByText(/valid URL/)).toBeVisible()
 
 		// Close the posting → the still-live board is surfaced for takedown.
 		await page.getByRole('button', { name: 'Close Posting' }).click()
 		await expect(page.getByText(/still live on/)).toContainText('JobStreet')
 
-		// Untick (record a takedown) → the warning clears.
-		await jobStreet.getByRole('checkbox').uncheck()
-		await jobStreet.getByRole('button', { name: 'Save' }).click()
+		// Remove a LIVE board → takedown, not deletion: the warning clears but the tile stays.
+		await jobStreet.getByRole('button', { name: 'Remove JobStreet' }).click()
+		await page.getByRole('button', { name: 'Remove', exact: true }).click()
 		await expect(page.getByText(/still live on/)).toHaveCount(0)
+		await expect(jobStreet.getByText('Taken down')).toBeVisible()
 	})
 })

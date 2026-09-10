@@ -190,13 +190,13 @@ describe('reportsToId is proposal-routed (#263)', () => {
 		// The single most important case in the file. Left in `rest`, `reportsToId` would be written
 		// by updateEmployee the moment the proposal was filed — a change that reads as "awaiting
 		// confirmation" (202) but has already landed.
-		const res = await patch({ reportsToId: 'mgr2', contactPhone: '0917' }, ['MANAGER'])
+		const res = await patch({ reportsToId: 'mgr2', contactPhone: '09171234567' }, ['MANAGER'])
 
 		expect(res.status).toBe(202)
 		expect(createProposal).toHaveBeenCalledTimes(1)
 		// The other field DID apply — it is not routed through proposals — but the write that carried
 		// it must not carry the reporting line with it.
-		expect(writtenData().contactPhone).toBe('0917')
+		expect(writtenData().contactPhone).toBe('09171234567')
 		expectReportingLineNotWritten()
 	})
 
@@ -300,17 +300,17 @@ describe('employmentStatus is not editable here (#263)', () => {
 
 	it('refuses the whole request rather than applying the rest of it', async () => {
 		// The caller resubmits without the field. Pins that we did not build a partial apply.
-		const res = await patch({ employmentStatus: 'OFFBOARDED', contactPhone: '0917' })
+		const res = await patch({ employmentStatus: 'OFFBOARDED', contactPhone: '09171234567' })
 
 		expect(res.status).toBe(400)
 		expect(dbMock.employee.update).not.toHaveBeenCalled()
 	})
 
 	it('leaves a PATCH that carries no employmentStatus untouched', async () => {
-		const res = await patch({ contactPhone: '0917' })
+		const res = await patch({ contactPhone: '09171234567' })
 
 		expect(res.status).toBe(200)
-		expect(writtenData().contactPhone).toBe('0917')
+		expect(writtenData().contactPhone).toBe('09171234567')
 	})
 })
 
@@ -325,7 +325,7 @@ describe('unknown fields are refused, not stripped (#264)', () => {
 	})
 
 	it('refuses the whole body when an unknown key rides along with a known one', async () => {
-		const res = await patch({ contactPhone: '0917', nickname: 'Bibo' })
+		const res = await patch({ contactPhone: '09171234567', nickname: 'Bibo' })
 
 		expect(res.status).toBe(400)
 		// `.strict()` is not a partial apply: the known half does not land either.

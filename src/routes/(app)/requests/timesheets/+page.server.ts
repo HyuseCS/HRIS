@@ -1,6 +1,7 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { canAny } from '$lib/server/rbac'
+import { paginate } from '$lib/server/pagination'
 import { reviewTimesheet } from '$lib/server/services/timesheets'
 import { canActOnStage, liveChain, timesheetSoD } from '$lib/server/services/approvals'
 import type { Role } from '@prisma/client'
@@ -16,7 +17,7 @@ function canReviewTimesheets(roles: Role[]) {
 	)
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	const roles = user.roles
 	if (!canReviewTimesheets(roles)) redirect(303, '/requests')
@@ -61,12 +62,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 				timesheetSoD(user.id, ts.approvalSteps, live.attempt)
 			)
 		})
-		.map(({ approvalSteps, ...ts }) => ({
-			...ts,
-			currentStage: liveChain(approvalSteps)?.currentStep?.stage ?? null
-		}))
+		.map(({ approvalSteps, ...ts }) => {
+			const live = liveChain(approvalSteps)
+			return {
+				...ts,
+				currentStage: live?.currentStep?.stage ?? null,
+				currentStageKind: live?.currentStep?.stageKind ?? null,
+				currentStageRole: live?.currentStep?.role ?? null
+			}
+		})
 
-	return { pendingTimesheets }
+	const pagination = paginate(url, pendingTimesheets.length)
+
+	return {
+		pendingTimesheets: pendingTimesheets.slice(pagination.skip, pagination.skip + pagination.take),
+		pagination
+	}
 }
 
 function ctxOf(event: RequestEvent) {
@@ -104,12 +115,11 @@ export const actions: Actions = {
 			)
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 
 		// The page already renders `form?.saved`; the action just never populated it.
-		return { saved: approved ? 'Timesheet approved.' : 'Timesheet rejected.' }
+		return { action: 'review', saved: approved ? 'Timesheet approved.' : 'Timesheet rejected.' }
 	},
 
 	// Bulk approve each selected (submitted) timesheet; non-submitted ones are skipped.
@@ -135,6 +145,11 @@ export const actions: Actions = {
 				skipped++
 			}
 		}
+		if (done === 0)
+			return fail(400, {
+				error:
+					'No timesheets were approved. They may already have been reviewed, or they are not yours to act on.'
+			})
 		return {
 			saved: `Approved ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}
@@ -167,6 +182,11 @@ export const actions: Actions = {
 				skipped++
 			}
 		}
+		if (done === 0)
+			return fail(400, {
+				error:
+					'No timesheets were rejected. They may already have been reviewed, or they are not yours to act on.'
+			})
 		return {
 			saved: `Rejected ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
 		}

@@ -183,5 +183,12 @@ export const actions: Actions = {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
 		}
+
+		// Final payroll sign-off. `action` is already bound above to the decision verb, so this
+		// names the key explicitly rather than shorthand.
+		return {
+			action: 'decide',
+			saved: action === 'approve' ? 'Payroll run signed off.' : 'Run returned to the maker.'
+		}
 	}
 }

@@ -7,6 +7,7 @@ import { listEmployeeDocuments } from '$lib/server/services/documents'
 import { listEnrollmentsForEmployee } from '$lib/server/services/benefits'
 import { listPunches } from '$lib/server/services/timelog'
 import { manilaDateTime, manilaDayKey } from '$lib/utils/dates'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import type { Actions, PageServerLoad } from './$types'
 
 // How far back the read-only punch view looks. Discord punches accumulate quickly, so a
@@ -65,10 +66,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 const updateSchema = z.object({
 	firstName: z.string().min(1).optional(),
 	lastName: z.string().min(1).optional(),
+	// #24: format-checked. The refine sits after the transform, so a blank field arrives as
+	// undefined and is treated as "not submitted" rather than as a bad number.
 	contactPhone: z
 		.string()
 		.optional()
-		.transform((v) => v || undefined),
+		.transform((v) => v || undefined)
+		.refine(isValidPhone, phoneError('Phone')),
 	contactAddress: z
 		.string()
 		.optional()

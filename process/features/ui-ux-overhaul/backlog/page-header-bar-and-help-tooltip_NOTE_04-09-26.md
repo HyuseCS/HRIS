@@ -119,6 +119,52 @@ Three ways to resolve it, owner's call:
 which was the actual point of the phase 03 rule. It needs the qualifying rule written into the
 component comment so the next sweep does not have to guess.
 
+## Part 4 — the detail-page variant
+
+**Raised by the owner, 2026-09-04**, while laying out `separations/[id]`:
+
+> *"If we were to implement the header, the name of the employee and the back button would be
+> placed on the header along with the status."*
+
+Parts 1-3 above design the **list-page** shape only: title, short description, `?`. A detail page
+carries three more things, and today they are passed through `PageHeader`'s `back()` snippet and
+render inside the page body:
+
+| Element | Where it is now |
+|---|---|
+| Record name as the title | `PageHeader title=` — already correct |
+| Back link | `back()` snippet, e.g. `separations/[id]:103`, `recruitment/applicant/[applicantId]:87` |
+| Status badge / stage pill | same `back()` snippet, beside the Back link |
+
+So the bar needs two shapes, not one:
+
+```
+list:    +--------------------------------------------------+
+         |  User Roles  (?)                      [ + Add ]  |
+         +--------------------------------------------------+
+
+detail:  +--------------------------------------------------+
+         |  < Separations   Cruz, Bea   [Hired]             |
+         |  Software Engineer · Software Developers · #919  |
+         +--------------------------------------------------+
+```
+
+Notes for whoever builds it:
+
+- The `back()` snippet is the current carrier for both the Back link and the badge, so the two
+  move together. Do not split them.
+- Detail pages that already wrap this cluster in their own card must drop that card, or the page
+  ends up with a bar and a duplicate header block. Confirmed present on `separations/[id]` (the
+  `space-y-2 rounded-lg border bg-card p-4` wrapper) and absent on
+  `recruitment/applicant/[applicantId]`, which uses a bare `PageHeader`. Sweep for both.
+- The status badge is a `Badge`/stage pill, so it inherits whatever `[[surface-background-inconsistency]]`
+  settles — the same block named in Part 3. A gray pill on the new bar's background is the exact
+  pairing that failed before: `bg-muted` on a near-equal surface, fixed in `8c745be` by moving to
+  `bg-foreground/15`. Re-measure it against the bar, do not assume it carries over.
+- The description line on a detail page is generated, not authored (`jobTitle · department ·
+  number`), so the ~90-character rule from Part 1 does not apply to it. It needs its own check
+  for a long department name rather than a tooltip.
+
 ## Scope
 
 - `src/lib/components/ui/PageHeader.svelte` — the bar

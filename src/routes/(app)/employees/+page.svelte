@@ -7,6 +7,7 @@
 	import { tenureLabel } from '$lib/utils/dates'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import type { PageData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -162,6 +163,8 @@
 				</tbody>
 			</table>
 		</div>
+	{:catch}
+		<LoadError what="the employee list" />
 	{/await}
 
 	<Pagination meta={data.pagination} />

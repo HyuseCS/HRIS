@@ -148,11 +148,9 @@ export const actions: Actions = {
 					error: String(e.body.message),
 					values: raw as Record<string, string>
 				})
-			if (e instanceof Error)
-				return fail(400, { error: e.message, values: raw as Record<string, string> })
 			throw e
 		}
-		return { message: 'Request submitted.' }
+		return { saved: 'Request submitted.' }
 	},
 
 	cancel: async ({ request, locals, getClientAddress }) => {
@@ -172,10 +170,9 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
-		return { message: 'Request cancelled.' }
+		return { saved: 'Request cancelled.' }
 	},
 
 	resubmit: async ({ request, locals, getClientAddress }) => {
@@ -195,9 +192,8 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
-		return { message: 'Request re-submitted.' }
+		return { saved: 'Request re-submitted.' }
 	}
 }

@@ -126,7 +126,7 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+		class="fixed inset-0 flex items-center justify-center whitespace-normal bg-black/50 p-4 backdrop-blur-sm"
 		style="z-index: {zIndex}"
 		onclick={close}
 		role="presentation"

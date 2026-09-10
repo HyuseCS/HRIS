@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte'
 	import {
 		periodOf,
 		periodShareOf,
@@ -29,7 +30,8 @@
 		year = $bindable(),
 		month0 = $bindable(),
 		kind = $bindable('FIRST_HALF'),
-		compact = false
+		compact = false,
+		actions
 	}: {
 		startName?: string
 		endName?: string
@@ -37,6 +39,7 @@
 		month0?: number
 		kind?: PeriodKind | 'CUSTOM'
 		compact?: boolean
+		actions?: Snippet
 	} = $props()
 
 	// Default to the current PHT month when the parent didn't seed a value.
@@ -173,7 +176,7 @@
 			</select>
 		</div>
 
-		<div class="{compact ? 'min-w-[200px]' : 'min-w-0 basis-[545px]'} flex-1 space-y-1.5">
+		<div class="{compact ? 'min-w-[200px] flex-1' : 'basis-full'} space-y-1.5">
 			{#if compact}
 				<label for="pp-kind" class="block text-sm font-medium">Period</label>
 				<select id="pp-kind" bind:value={kind} class={selectClass}>
@@ -184,7 +187,7 @@
 			{:else}
 				<span class="block text-sm font-medium">Period</span>
 				<div
-					class="flex min-h-9 flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-1"
+					class="flex min-h-9 w-fit flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-1"
 					role="group"
 				>
 					{#each KIND_OPTIONS as opt (opt.value)}
@@ -244,5 +247,8 @@
 		</div>
 	{/if}
 
-	<p class="text-sm text-muted-foreground" aria-live="polite">{preview}</p>
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<p class="text-sm text-muted-foreground" aria-live="polite">{preview}</p>
+		{#if actions}{@render actions()}{/if}
+	</div>
 </div>

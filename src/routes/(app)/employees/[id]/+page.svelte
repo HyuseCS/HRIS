@@ -2,7 +2,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { tenureLabel, tenureRequirement, monthsOfService } from '$lib/utils/dates'
 	import {
@@ -106,50 +106,44 @@
 	// contacts, loans, cash advances, recurring earnings/deductions, uploaded documents, or a
 	// second offboard/reveal. One guard per form; the per-row forms share the guard for their
 	// action, which is fine because those rows submit one at a time.
-	const reveal = createSubmitGuard()
-	const update = createSubmitGuard()
-	const offboard = createSubmitGuard()
-	const setSupervisors = createSubmitGuard()
-	const deleteEmergencyContact = createSubmitGuard()
-	const addEmergencyContact = createSubmitGuard()
-	const addLoan = createSubmitGuard()
-	const addCashAdvance = createSubmitGuard()
-	const endEarning = createSubmitGuard()
-	const addEarning = createSubmitGuard()
-	const endDeduction = createSubmitGuard()
-	const addDeduction = createSubmitGuard()
-	const toggleStatutory = createSubmitGuard()
-	const toggleErExternal = createSubmitGuard()
-	const setAllocation = createSubmitGuard()
-	const changeCompensation = createSubmitGuard()
-	const promote = createSubmitGuard()
-	const assignTemplate = createSubmitGuard()
+	//
+	// `error: null`: each card renders its own failure, so an error toast would repeat it. Other
+	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
+	const reveal = submitFeedback({ error: null })
+	const update = submitFeedback({ error: null })
+	const offboard = submitFeedback({ error: null })
+	const setSupervisors = submitFeedback({ error: null })
+	const deleteEmergencyContact = submitFeedback({ error: null })
+	const addEmergencyContact = submitFeedback({ error: null })
+	const addLoan = submitFeedback({ error: null })
+	const addCashAdvance = submitFeedback({ error: null })
+	const endEarning = submitFeedback({ error: null })
+	const addEarning = submitFeedback({ error: null })
+	const endDeduction = submitFeedback({ error: null })
+	const addDeduction = submitFeedback({ error: null })
+	const toggleStatutory = submitFeedback({ error: null })
+	const toggleErExternal = submitFeedback({ error: null })
+	const setAllocation = submitFeedback({ error: null })
+	const changeCompensation = submitFeedback({ error: null })
+	const promote = submitFeedback({ error: null })
+	const assignTemplate = submitFeedback({ error: null })
+	// P0-7: this page has 24 actions and used to have ONE ungated error slot, itself inside a card
+	// that is hidden for an offboarded employee — so a failed document upload or loan add rendered
+	// nowhere at all. Every card now answers only for its own actions.
+	function errorFor(names: string[]): string | null {
+		const f = form as { action?: string; error?: unknown } | null
+		return f && names.includes(f.action ?? '') && typeof f.error === 'string' ? f.error : null
+	}
+
 	const STATUTORY_LABELS: Record<string, string> = {
 		SSS: 'SSS',
 		PHILHEALTH: 'PhilHealth',
 		PAGIBIG: 'Pag-IBIG'
 	}
-	const uploadDocument = createSubmitGuard()
+	const uploadDocument = submitFeedback({ error: null })
+	// Shared by every onboarding row: the rows submit one at a time, same as the per-row forms above.
+	const toggleOnboardingStep = submitFeedback({ error: null })
 
-	// Feedback for the actions that have no slot of their own.
-	//
-	// This page has 21 actions and only five render their own result (assignTemplate, update,
-	// changeCompensation, promote, offboard). Phase 01 gated those five on `form.action` so a
-	// failed addLoan could not paint itself into the Update Profile card, and accepted that the
-	// other sixteen would report nothing — on the stated grounds that phase 07 would give every
-	// form its own slot. It did not: phase 07 and phase 10 both still carry these same five.
-	//
-	// A page-level region cannot mis-attribute, because it belongs to no form. It restores the
-	// signal for the rest without touching the five that already work. `reveal` is excluded: it
-	// returns data, not an outcome.
-	const OWN_SLOT = [
-		'assignTemplate',
-		'update',
-		'changeCompensation',
-		'promote',
-		'offboard',
-		'reveal'
-	]
 	const DONE: Record<string, string> = {
 		setSupervisors: 'Supervisors saved.',
 		addLoan: 'Loan added.',
@@ -167,10 +161,19 @@
 		deleteDocument: 'Document deleted.',
 		toggleOnboardingStep: 'Onboarding step updated.'
 	}
-	const loose = $derived(
-		form?.action && !OWN_SLOT.includes(form.action) ? (form as Record<string, unknown>) : null
-	)
+	// Success feedback for the actions that render no success of their own. Errors are
+	// handled per card by `actionError`; this is only the success half, kept from the
+	// phase 03 remediation because most of these actions return `success: true` with no
+	// message for submitFeedback's toast to read.
+	const savedNotice = $derived(form?.success ? (DONE[form.action as string] ?? null) : null)
 </script>
+
+{#snippet actionError(names: string[])}
+	{@const message = errorFor(names)}
+	{#if message}
+		<Banner kind="error" {message} />
+	{/if}
+{/snippet}
 
 <svelte:head>
 	<title>{employee.lastName}, {employee.firstName} — Veent HRIS</title>
@@ -178,8 +181,10 @@
 
 <div class="space-y-6">
 	<PageHeader title="{employee.lastName}, {employee.firstName}">
-		{#snippet back()}
+		{#snippet badge()}
 			<Badge status={employee.employmentStatus} domain="employment" />
+		{/snippet}
+		{#snippet back()}
 			<BackButton
 				fallback={canManage ? '/employees' : '/team'}
 				label={canManage ? 'Employees' : 'Team'}
@@ -187,10 +192,8 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if loose?.error}
-		<Banner kind="error" message={String(loose.error)} />
-	{:else if loose?.success}
-		<Banner kind="success" message={DONE[form!.action as string] ?? 'Saved.'} />
+	{#if savedNotice}
+		<Banner kind="success" message={savedNotice} />
 	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-2">
@@ -201,6 +204,7 @@
 					? 'border-green-500/30 bg-green-500/5'
 					: 'border-amber-500/30 bg-amber-500/5'}"
 			>
+				{@render actionError(['toggleOnboardingStep'])}
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<h2 class="font-semibold">
 						Onboarding
@@ -225,14 +229,19 @@
 							<li class="mb-2.5 flex items-start gap-2 break-inside-avoid text-sm">
 								{#if step.manual}
 									<!-- Manual step: HR ticks it off (equipment issued, NDA signed, …). #116 -->
-									<form method="POST" action="?/toggleOnboardingStep" use:enhance>
+									<form
+										method="POST"
+										action="?/toggleOnboardingStep"
+										use:enhance={toggleOnboardingStep.enhance}
+									>
 										<input type="hidden" name="itemId" value={step.id} />
 										<input type="hidden" name="done" value={(!step.done).toString()} />
 										<button
 											type="submit"
+											disabled={toggleOnboardingStep.busy}
 											aria-pressed={step.done}
 											aria-label="{step.done ? 'Uncheck' : 'Check'} {step.label}"
-											class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-bold transition-colors {step.done
+											class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-bold transition-colors disabled:pointer-events-none disabled:opacity-50 {step.done
 												? 'bg-green-500 text-white hover:bg-green-600'
 												: 'border border-muted-foreground/40 text-transparent hover:border-primary hover:text-muted-foreground'}"
 										>
@@ -412,6 +421,7 @@
 		<!-- Supervisors (#176): primary manager + additional superiors -->
 		<div class="rounded-lg border bg-card p-6 space-y-4">
 			<h2 class="font-semibold">Supervisors</h2>
+			{@render actionError(['setSupervisors'])}
 			<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
 				<dt class="text-muted-foreground">Primary</dt>
 				<dd>
@@ -876,6 +886,7 @@
 				Emergency Contacts
 				<span class="text-xs font-normal text-muted-foreground">(name, relationship, phone)</span>
 			</h2>
+			{@render actionError(['addEmergencyContact', 'deleteEmergencyContact'])}
 
 			{#if employee.emergencyContacts.length}
 				<div class="rounded-md border">
@@ -974,6 +985,7 @@
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Loans &amp; Cash Advances</h2>
+				{@render actionError(['addLoan', 'addCashAdvance'])}
 				<p class="text-xs text-muted-foreground">
 					Active items amortize automatically each payroll period (fixed installment, capped at
 					balance).
@@ -1104,6 +1116,7 @@
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Recurring Allowances &amp; Incentives</h2>
+				{@render actionError(['addEarning', 'endEarning'])}
 				<p class="text-xs text-muted-foreground">
 					Monthly amounts, prorated to each payroll period and added to the payslip's Allowances /
 					Incentives lines. Ended items stop from the next payroll run.
@@ -1181,6 +1194,13 @@
 		{#if canManage}
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Recurring Deductions</h2>
+				{@render actionError([
+					'addDeduction',
+					'endDeduction',
+					'toggleStatutoryExemption',
+					'toggleEmployerShareExternal',
+					'setStatutoryAllocation'
+				])}
 
 				<div class="space-y-2">
 					<h3 class="text-sm font-medium">Statutory contributions</h3>
@@ -1386,6 +1406,7 @@
 						>(201 file — contracts, IDs, exit docs)</span
 					>
 				</h2>
+				{@render actionError(['uploadDocument', 'deleteDocument'])}
 
 				{#if data.documents.length}
 					<div class="overflow-x-auto rounded-md border">

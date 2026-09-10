@@ -8,7 +8,7 @@
 	import AnnouncementItem from '$lib/components/dashboard/AnnouncementItem.svelte'
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -47,8 +47,8 @@
 	let showPost = $state(false)
 
 	// Per-posting guards + a reject-note toggle for the approval card (#195).
-	const decideGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
-	const decideGuard = (id: string) => (decideGuards[id] ??= createSubmitGuard())
+	const decideGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
+	const decideGuard = (id: string) => (decideGuards[id] ??= submitFeedback({ error: null }))
 	let rejectingId = $state<string | null>(null)
 
 	// Today's birthday greeting, rendered at the top of the announcements feed (#167).
@@ -88,15 +88,19 @@
 		}
 	})
 	// #108: a double-click posts the announcement twice to the whole organisation.
-	const postAnnouncement = createSubmitGuard(() => async ({ update }) => {
-		await update()
-		showPost = false
+	const postAnnouncement = submitFeedback({
+		error: null,
+		onSuccess: () => {
+			showPost = false
+		}
 	})
 	// Give-award form (#180).
 	let showAward = $state(false)
-	const giveAward = createSubmitGuard(() => async ({ update }) => {
-		await update()
-		showAward = false
+	const giveAward = submitFeedback({
+		error: null,
+		onSuccess: () => {
+			showAward = false
+		}
 	})
 </script>
 
@@ -277,7 +281,7 @@
 				     and a hairline rule between two-line rows reads as clutter where a tile edge
 				     reads as grouping. Unread rows carry the accent ring, so "new" survives without
 				     a separate dot competing with the icon. -->
-				<ul class="space-y-2">
+				<ul class="max-h-96 space-y-2 overflow-y-auto">
 					{#each data.recentActivity as n (n.id)}
 						{@const unread = !n.readAt}
 						<li>
@@ -327,13 +331,6 @@
 				{/if}
 			</div>
 
-			{#if form?.posted}
-				<Banner kind="success" message="Announcement posted." />
-			{/if}
-			{#if form?.awarded}
-				<Banner kind="success" message="Award given." />
-			{/if}
-
 			{#if showAward && data.canPost}
 				<form
 					method="POST"
@@ -341,7 +338,9 @@
 					use:enhance={giveAward.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<div class="grid gap-2 sm:grid-cols-2">
 						<select name="employeeId" required class="input h-9">
 							<option value="">Select employee…</option>
@@ -373,7 +372,9 @@
 					use:enhance={postAnnouncement.enhance}
 					class="space-y-2 rounded-md border p-3"
 				>
-					{#if form?.error}<p class="text-xs text-red-400">{form.error}</p>{/if}
+					{#if form?.action === 'postAnnouncement' && form?.error}<p class="text-xs text-red-400">
+							{form.error}
+						</p>{/if}
 					<input name="title" placeholder="Title" required class="input h-9" />
 					<textarea
 						name="body"
@@ -627,6 +628,11 @@
 			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
 				Postings awaiting your approval
 			</p>
+			<!-- Scoped: with the award panel open, a posting failure used to render under
+			     "Give award", where nothing had gone wrong. -->
+			{#if form?.action === 'decidePosting' && form?.error}
+				<Banner kind="error" message={form.error} />
+			{/if}
 			<ul class="divide-y divide-border/60">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}

@@ -125,7 +125,9 @@ test('HR submits an employee draft, the chain signs off, and the employee sees A
 	// /timesheets never approves — that happens only in the review queue.
 	await expect(hrDialog.getByRole('button', { name: 'Approve' })).toHaveCount(0)
 	await hrDialog.getByRole('button', { name: 'Submit for review' }).click()
-	await expect(hrPage.getByText('Timesheet submitted for review.')).toBeVisible()
+	// Scoped to <main>: phase 04 also toasts this message, and a page-wide locator now matches
+	// both the page banner and the toast.
+	await expect(hrPage.getByRole('main').getByText('Timesheet submitted for review.')).toBeVisible()
 	await hrCtx.close()
 
 	// --- HR submitting on the employee's behalf completes the MAKE stage (#134);

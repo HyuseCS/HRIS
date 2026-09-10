@@ -5,7 +5,9 @@ import { HIRE_ROLES } from '$lib/rbac'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { createEmployee } from '$lib/server/services/employees'
 import { sendWelcomeEmail } from '$lib/server/notifications'
+import { setFlash } from '$lib/server/flash'
 import { govIdSchema } from '$lib/utils/gov-ids'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { isRateBasisAllowed, RATE_BASIS_MISMATCH } from '$lib/utils/rate-basis'
 import type { Actions, PageServerLoad } from './$types'
 
@@ -89,7 +91,11 @@ const createSchema = z
 		tinNumber: govIdSchema('tinNumber'),
 		emergencyContactName: z.string().optional(),
 		emergencyContactRelation: z.string().optional(),
-		emergencyContactPhone: z.string().optional(),
+		// #24: format-checked; blank is still "not provided", not a failure.
+		emergencyContactPhone: z
+			.string()
+			.optional()
+			.refine(isValidPhone, phoneError('Emergency contact phone')),
 		bankName: z.string().optional(),
 		bankAccountName: z.string().optional(),
 		bankAccountNumber: govIdSchema('bankAccountNumber'),
@@ -123,7 +129,7 @@ const createSchema = z
 	})
 
 export const actions: Actions = {
-	create: async ({ request, locals, getClientAddress }) => {
+	create: async ({ request, locals, getClientAddress, cookies }) => {
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 		const user = locals.user!
 
@@ -157,6 +163,12 @@ export const actions: Actions = {
 
 			sendWelcomeEmail(parsed.data.email, tempPassword)
 
+			// The welcome mail goes out silently, so the operator is told about it here — otherwise
+			// they have no way to know whether to hand the password over themselves.
+			setFlash(cookies, {
+				kind: 'success',
+				message: `${parsed.data.firstName} ${parsed.data.lastName} was created. A welcome email with sign-in details was sent to ${parsed.data.email}.`
+			})
 			redirect(303, `/employees/${newEmployee.id}`)
 		} catch (e: unknown) {
 			const errMsg = e instanceof Error ? e.message : String(e)

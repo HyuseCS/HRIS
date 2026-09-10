@@ -99,9 +99,11 @@
 		title="{r.employee.firstName} {r.employee.lastName}"
 		description="{r.cycle.name} · Reviewer: {r.reviewer.firstName} {r.reviewer.lastName}"
 	>
+		{#snippet badge()}
+			<Badge status={r.status} domain="review" />
+		{/snippet}
 		{#snippet back()}
 			<BackButton fallback="/performance" label="Performance" />
-			<Badge status={r.status} domain="review" />
 		{/snippet}
 	</PageHeader>
 

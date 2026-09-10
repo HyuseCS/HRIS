@@ -188,7 +188,7 @@ not a tradeoff.
 6. **The punch page** — honest geolocation copy, split `role="status"`/`role="alert"`, location-failure-never-loses-the-punch carried through UI, copy, and no-JS fallback.
 7. **Decision-ready detail pages** — request detail's attempt-grouped timeline, leave-balance ledger, removed-documents audit panel; approver cards with waiting-time, coverage shortfall, and unverified-doc chips.
 8. **Honest dead-end copy** — "Used by N reviews — deactivate instead of deleting"; the redacted-subject explanation; offboarding/posting-approver setting descriptions.
-9. **The token system** — full HSL set in both themes, pre-paint bootstrap, per-tenant theming, documented micro-decisions (44px coarse-pointer floor).
+9. **The token system** — full HSL set in both themes, pre-paint bootstrap, per-tenant theming, documented micro-decisions (24px coarse-pointer floor).
 10. **Team attendance matrix and the "Exceptions only" filter** — task-shaped density done right.
 
 ---
