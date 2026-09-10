@@ -48,7 +48,7 @@
 
 	// Per-posting guards + a reject-note toggle for the approval card (#195).
 	const decideGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
-	const decideGuard = (id: string) => (decideGuards[id] ??= submitFeedback())
+	const decideGuard = (id: string) => (decideGuards[id] ??= submitFeedback({ error: null }))
 	let rejectingId = $state<string | null>(null)
 
 	// Today's birthday greeting, rendered at the top of the announcements feed (#167).
