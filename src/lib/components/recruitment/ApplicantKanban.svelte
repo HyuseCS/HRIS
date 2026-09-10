@@ -89,7 +89,7 @@
 	<div class="flex gap-4 min-w-max">
 		{#each STAGES as stage}
 			{@const stageApplicants = applicantsInStage(stage)}
-			<div class="w-64 flex-shrink-0">
+			<div class="w-60 flex-shrink-0">
 				<!-- Column Header -->
 				<div
 					class="mb-2 flex items-center justify-between rounded-md px-3 py-2 {STAGE_HEADER_COLORS[
