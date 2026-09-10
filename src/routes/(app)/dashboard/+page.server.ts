@@ -171,7 +171,7 @@ export const actions: Actions = {
 			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		})
-		return { action: 'postAnnouncement', posted: true }
+		return { action: 'postAnnouncement', saved: 'Announcement posted.' }
 	},
 
 	// Approve or send back a job posting from the approver's dashboard card (#195).
@@ -240,6 +240,6 @@ export const actions: Actions = {
 				return fail(e.status, { action: 'giveAward', error: String(e.body.message) })
 			throw e
 		}
-		return { action: 'giveAward', awarded: true }
+		return { action: 'giveAward', saved: 'Award given.' }
 	}
 }

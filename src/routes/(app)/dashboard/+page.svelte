@@ -8,7 +8,6 @@
 	import AnnouncementItem from '$lib/components/dashboard/AnnouncementItem.svelte'
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -89,15 +88,19 @@
 		}
 	})
 	// #108: a double-click posts the announcement twice to the whole organisation.
-	const postAnnouncement = createSubmitGuard(() => async ({ update }) => {
-		await update()
-		showPost = false
+	const postAnnouncement = submitFeedback({
+		error: null,
+		onSuccess: () => {
+			showPost = false
+		}
 	})
 	// Give-award form (#180).
 	let showAward = $state(false)
-	const giveAward = createSubmitGuard(() => async ({ update }) => {
-		await update()
-		showAward = false
+	const giveAward = submitFeedback({
+		error: null,
+		onSuccess: () => {
+			showAward = false
+		}
 	})
 </script>
 
@@ -327,13 +330,6 @@
 					</div>
 				{/if}
 			</div>
-
-			{#if form?.posted}
-				<Banner kind="success" message="Announcement posted." />
-			{/if}
-			{#if form?.awarded}
-				<Banner kind="success" message="Award given." />
-			{/if}
 
 			{#if showAward && data.canPost}
 				<form
