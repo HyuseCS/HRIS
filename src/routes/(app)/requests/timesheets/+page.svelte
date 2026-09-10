@@ -4,8 +4,8 @@
 	import { enhance } from '$app/forms'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
-	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
@@ -24,8 +24,8 @@
 	function toggle(id: string) {
 		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
 	}
-	function toggleAll(ids: string[], on: boolean) {
-		selected = on ? ids : []
+	function toggleAll() {
+		selected = selected.length > 0 ? [] : allIds
 	}
 	const clearOnSuccess: SubmitFunction = () => {
 		busy = true
@@ -43,6 +43,14 @@
 
 	const allIds = $derived(data.pendingTimesheets.map((t) => t.id))
 	const allSelected = $derived(allIds.length > 0 && allIds.every((id) => selected.includes(id)))
+	const someSelected = $derived(selected.length > 0 && !allSelected)
+	let selectAllCheckbox = $state<HTMLInputElement>()
+	$effect(() => {
+		if (selectAllCheckbox) {
+			selectAllCheckbox.indeterminate = someSelected
+			selectAllCheckbox.checked = allSelected
+		}
+	})
 
 	// The bulk rejection reason is collected in a popup (#70 follow-up) — no
 	// inline textarea in the bar. Confirming fills the hidden input and submits.
@@ -63,39 +71,38 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Timesheet Approvals" description="Review and approve submitted timesheets." />
+	<PageHeader title="Timesheet Approvals" description="Review and approve submitted timesheets.">
+		{#snippet back()}
+			{#if data.pagination.total > 0}
+				<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+					{data.pagination.total} awaiting you
+				</span>
+			{/if}
+		{/snippet}
+	</PageHeader>
 
-	{#if data.pendingTimesheets.length === 0}
-		<div class="rounded-md border bg-muted/50">
-			<EmptyState title="No pending timesheets to review" />
-		</div>
-	{:else}
-		<!-- Bulk bar: appears when cards are selected -->
-		<label class="flex w-fit items-center gap-2 text-sm text-muted-foreground">
-			<input
-				type="checkbox"
-				checked={allSelected}
-				onchange={(e) => toggleAll(allIds, e.currentTarget.checked)}
-				class="align-middle"
-			/>
-			Select all
-		</label>
-
-		{#if selected.length}
-			<div
-				class="flex flex-wrap items-end justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3"
-				transition:slide={{ duration: 120 }}
-			>
-				<span class="text-sm font-medium">{selected.length} selected</span>
-				<div class="flex items-center gap-2">
-					<button
-						onclick={() => (selected = [])}
-						class="text-sm text-muted-foreground hover:underline">Clear</button
+	<div class="rounded-lg border bg-muted/50">
+		{#if data.pendingTimesheets.length > 0}
+			<div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2">
+				<label
+					class="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-foreground/70"
+				>
+					<input
+						bind:this={selectAllCheckbox}
+						type="checkbox"
+						onchange={toggleAll}
+						class="cursor-pointer align-middle"
+					/>
+					<span aria-live="polite"
+						>{selected.length ? `${selected.length} selected` : 'Select all'}</span
 					>
+				</label>
+
+				<div class="flex items-center gap-2">
 					<form method="POST" action="?/approveMany" use:enhance={bulkFb.enhance}>
 						<input type="hidden" name="ids" value={selected.join(',')} />
 						<button
-							disabled={busy}
+							disabled={busy || !selected.length}
 							class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
 							>Approve selected</button
 						>
@@ -110,7 +117,7 @@
 						<input type="hidden" name="rejectionReason" value={bulkReason} />
 						<button
 							type="button"
-							disabled={busy}
+							disabled={busy || !selected.length}
 							onclick={() => (rejectDialogOpen = true)}
 							class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
 							>Reject selected</button
@@ -120,47 +127,55 @@
 			</div>
 		{/if}
 
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-			{#each data.pendingTimesheets as ts (ts.id)}
-				<div
-					role="button"
-					tabindex="0"
-					onclick={() => (openTs = ts)}
-					onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (openTs = ts)}
-					class="cursor-pointer space-y-3 rounded-md border bg-card p-4 hover:border-primary/40 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring {selected.includes(
-						ts.id
-					)
-						? 'border-primary/50 ring-1 ring-primary/40'
-						: ''}"
-				>
-					<div class="flex items-start justify-between gap-3">
-						<div class="min-w-0">
-							<p class="truncate text-sm font-semibold">
-								{ts.employee.lastName}, {ts.employee.firstName}
-							</p>
-							<p class="mt-0.5 text-xs text-muted-foreground">
-								{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}
-							</p>
+		<div class="p-4">
+			{#if data.pendingTimesheets.length === 0}
+				<EmptyState title="No pending timesheets to review" />
+			{:else}
+				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					{#each data.pendingTimesheets as ts (ts.id)}
+						<div
+							role="button"
+							tabindex="0"
+							onclick={() => (openTs = ts)}
+							onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (openTs = ts)}
+							class="cursor-pointer space-y-3 rounded-md border bg-card p-4 hover:border-primary/40 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring {selected.includes(
+								ts.id
+							)
+								? 'border-primary/50 ring-1 ring-primary/40'
+								: ''}"
+						>
+							<div class="flex items-start justify-between gap-3">
+								<div class="min-w-0">
+									<p class="truncate text-sm font-semibold">
+										{ts.employee.lastName}, {ts.employee.firstName}
+									</p>
+									<p class="mt-0.5 text-xs text-muted-foreground">
+										{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}
+									</p>
+								</div>
+								<input
+									type="checkbox"
+									checked={selected.includes(ts.id)}
+									onchange={() => toggle(ts.id)}
+									onclick={(e) => e.stopPropagation()}
+									aria-label="Select timesheet"
+									class="align-middle"
+								/>
+							</div>
+							<div class="rounded-md bg-muted/50 px-3 py-2 text-sm">
+								{Number(ts.totalHours).toFixed(1)} hrs · {ts.entries.length} entries
+							</div>
+							<div class="flex justify-end">
+								<span class="btn-row pointer-events-none">Review</span>
+							</div>
 						</div>
-						<input
-							type="checkbox"
-							checked={selected.includes(ts.id)}
-							onchange={() => toggle(ts.id)}
-							onclick={(e) => e.stopPropagation()}
-							aria-label="Select timesheet"
-							class="align-middle"
-						/>
-					</div>
-					<div class="rounded-md bg-muted/50 px-3 py-2 text-sm">
-						{Number(ts.totalHours).toFixed(1)} hrs · {ts.entries.length} entries
-					</div>
-					<div class="flex justify-end">
-						<span class="btn-row pointer-events-none">Review</span>
-					</div>
+					{/each}
 				</div>
-			{/each}
+
+				<Pagination meta={data.pagination} />
+			{/if}
 		</div>
-	{/if}
+	</div>
 </div>
 
 <TimesheetModal bind:ts={openTs} mode="review" isManager={true} />
