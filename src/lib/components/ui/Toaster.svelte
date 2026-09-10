@@ -8,6 +8,7 @@
 	} from '$lib/stores/toast.svelte'
 
 	const toasts = $derived(getToasts())
+	let region = $state<HTMLElement>()
 
 	// Hover-to-pause is attached imperatively, not as `onmouseenter`: a toast card is a static
 	// element, and declaring mouse handlers on one earns an a11y warning that would be wrong to
@@ -21,6 +22,10 @@
 			destroy() {
 				node.removeEventListener('mouseenter', onEnter)
 				node.removeEventListener('mouseleave', onLeave)
+				// An unmounting node fires neither mouseleave nor focusout, and both flags are module
+				// state that only a resume clears — skip this and the toaster stays paused for good.
+				onLeave()
+				if (!region?.contains(document.activeElement)) resumeToasts('focus')
 			}
 		}
 	}
@@ -42,6 +47,7 @@
 	aria-atomic="true", which would read the WHOLE stack out again each time one toast arrives.
 -->
 <div
+	bind:this={region}
 	role="status"
 	aria-live="polite"
 	aria-atomic="false"

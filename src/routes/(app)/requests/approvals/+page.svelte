@@ -24,7 +24,7 @@
 		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
 	}
 	function toggleAll() {
-		selected = selected.length > 0 ? [] : allIds
+		selected = allSelected ? [] : allIds
 	}
 	// ponytail: indeterminate and checked set imperatively — bind: cannot target a $derived
 	let selectAllCheckbox = $state<HTMLInputElement>()
@@ -269,7 +269,10 @@
 										checked={picked}
 										onchange={() => toggle(req.id)}
 										onclick={(e) => e.stopPropagation()}
-										aria-label="Select request"
+										aria-label="Select {typeLabel(req.type)} request for {req.employee
+											.firstName} {req.employee.lastName}{req.dateFrom
+											? `, ${formatDateRange(req.dateFrom, req.dateTo)}`
+											: ''}"
 										class="mt-1 shrink-0 cursor-pointer align-middle"
 									/>
 								</div>
