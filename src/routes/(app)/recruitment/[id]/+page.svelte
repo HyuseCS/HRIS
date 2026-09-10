@@ -160,7 +160,7 @@
 
 	<!-- Posted on — manual job-board tracking (#117) -->
 	{#if isHrAdmin}
-		<div class="min-h-[16rem] space-y-3 rounded-lg border bg-card p-4">
+		<div class="min-h-[16rem] space-y-3 rounded-lg border p-4">
 			<h2 class="text-sm font-semibold">Posted on</h2>
 
 			<!-- Close-the-loop: a CLOSED role still live somewhere needs a takedown. -->
