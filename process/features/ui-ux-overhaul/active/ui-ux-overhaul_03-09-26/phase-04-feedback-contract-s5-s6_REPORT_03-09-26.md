@@ -371,3 +371,34 @@ unit tests; `pnpm check` 0 errors / 1 pre-existing warning; `pnpm lint` 0 errors
 warning; e2e 141/141.
 
 **Dependency changes.** None. No new package, no schema change, no migration.
+
+## Post-hoc correction (CodeRabbit PR #13 review, 10-09-26)
+
+Original text above is left as written; this section is the audit record of what a later review
+pass found and fixed. Full detail:
+`process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/coderabbit-pr13-review_REPORT_10-09-26.md`.
+
+**Item 43's "21/21 actions covered" claim stands.** The review challenged it, arguing `reveal` has
+a failure path that was left silent. It does not. `?/reveal` contains no `fail()` call —
+`requireAnyCapability` raises `error(403)`, which arrives as `result.type === 'error'`, and
+`submitFeedback` toasts `FRIENDLY_ERROR` on that branch regardless of the `error` option. The
+`error: null` on that guard suppresses nothing. AC-7 is unaffected.
+
+**Two silent sites in this phase's own blast radius, found by the same review:**
+
+- `attendance ?/saveTimesheet` (not one of item 54's five lock/unlock actions — a separate,
+  missed site) returned a `saved` message the page never rendered. Fixed in `6323995`.
+- `Toaster.svelte`'s `pausable` action (S5, item 30) released its hover listeners on `destroy()`
+  but never called `resumeToasts('hover')`, so dismissing a hovered toast via "Dismiss all" or a
+  focused ✕ paused the toaster for the rest of the page session. Fixed in `b880e41`.
+
+Two more non-blocking defects landed in files this session touched: the dashboard's
+`decideGuard` (item 47) showed both the default toast and its own scoped banner for the same
+posting-decision failure (fixed in `b821b24`), and `requests/timesheets`' shared `singleReject`
+guard (item 46 area) disabled Reject on every card while one was in flight, not just the one being
+rejected (fixed in `b821b24`).
+
+All four behavioural fixes were re-verified live against the running dev server with a negative
+control, not just read from source. **Status is unchanged: still `Keep in active/testing`** — this
+correction does not newly block or unblock archival; the outstanding Hybrid/Agent-Probe manual
+pass was already the reason it wasn't archivable.

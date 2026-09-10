@@ -109,7 +109,7 @@
 	//
 	// `error: null`: each card renders its own failure, so an error toast would repeat it. Other
 	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
-	const reveal = submitFeedback()
+	const reveal = submitFeedback({ error: null })
 	const update = submitFeedback({ error: null })
 	const offboard = submitFeedback({ error: null })
 	const setSupervisors = submitFeedback({ error: null })

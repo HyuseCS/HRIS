@@ -170,6 +170,13 @@ suite coexisted with a real defect:
    not that the walk branch ever runs — prove it with a fixture sized past the page boundary, plus
    a negative control that asserts the target is NOT on page 1.
 
+9. **A machine code-review's severity grade is a hypothesis, not a verdict.** The PR #13
+   CodeRabbit pass (10-09-26) graded two findings `major`; neither survived verification against
+   source (one was a deliberately committed a11y decision, one a deliberate teardown trade). It
+   graded a third finding low — a saved-timesheet message the page never rendered — and that one
+   was a real silent-failure regression CI had been failing on for a day. Verify the defect and
+   its stated cause separately against source before acting on a tool's grade in either direction.
+
 ## Known Gaps
 
 - **#287 — the e2e suite is flaky**: random specs time out on `page.goto('/login')`. Still a CI

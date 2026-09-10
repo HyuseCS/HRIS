@@ -118,6 +118,25 @@ NEAREST THE BUTTON.** It is not "delete the banner" — both directions have shi
 - `0a2f11d` — the inline error sat physically ON the row beside its own button. Inline kept, toast
   suppressed with `submitFeedback({ error: null })`.
 
+**Before suppressing a toast, prove the replacement surface exists — don't assume it.** Two
+feedback defects landed in one PR (`3aa9fb7`, PR #13, 10-09-26) from the same move: deciding a
+form's feedback on the reasoning that a page-local surface handles it, without checking that
+surface was actually wired for that action. `attendance ?/saveTimesheet` took `success: null` and
+had no banner at all, so a successful save said nothing. The dashboard's `decideGuard` was NOT
+suppressed and duplicated its own scoped banner. Grep the page for the `actionError`/scoped-banner
+call site for that specific action name before adding or trusting a `{ success: null }` /
+`{ error: null }` override — see `removing-a-banner-can-silence-errors` for the inverse mistake
+(deleting a shared surface without checking who still relies on it).
+
+**The `error` option only covers `fail()`. A thrown `error()` always toasts.** The same PR's review
+called `employees/[id]`'s audited `reveal` a silent failure because it carries `error: null` and
+sits in zero `actionError` lists. It is not. `submitFeedback`'s `error` option is read only on
+`result.type === 'failure'`, which is what a `fail()` return produces; `?/reveal` has no `fail()`
+call, and `requireAnyCapability`'s `error(403)` arrives as `result.type === 'error'`, a branch that
+toasts `FRIENDLY_ERROR` unconditionally. Before calling an `error: null` guard silent, check
+whether its action returns `fail()` at all — and remember that the `error()` path can only ever say
+"Something went wrong", so it tells a denial and a crash apart for nobody.
+
 Selector facts, and they decide whether any assertion means anything:
 
 - **`getByRole('alert')` matches the `Banner` component ONLY**, for `kind="error"` and
@@ -153,6 +172,13 @@ rejection in **green**. Owner ruling owed —
   state-transition walk** — click through every state in a real browser — not just a render check.
   Both bugs above were found only by clicking through empty→some→all→empty in a live browser; a
   static read of the source or a single render assertion would have missed both.
+- **A Playwright check that clicks before hydration settles proves nothing.** A select-all test
+  (`/requests/approvals`) called `.check()` and then asserted the post-click state — Svelte
+  repropped `checked={picked}` from a stale one-way binding and silently undid the click, and the
+  test passed anyway because it never looked at the PRE-click state to confirm the click had any
+  effect. The control that actually caught the real bug (F15, PR #13) asserted the state
+  immediately BEFORE the click too, so a no-op click shows up as "nothing changed" instead of
+  reading as a pass. Assert before and after, not just after.
 - **Deleting the `enhance` import breaks `use:enhance={someGuard.enhance}` silently.** The
   directive name `use:enhance` resolves to the *imported* SvelteKit action; `someGuard` (e.g. a
   `submitFeedback()` guard) is only the argument passed to it. If the import is removed but a bare
