@@ -1,6 +1,8 @@
 <script lang="ts">
+	import type { SubmitFunction } from '@sveltejs/kit'
 	import { enhance } from '$app/forms'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 
 	interface Applicant {
 		id: string
@@ -22,6 +24,12 @@
 	// #52: stage moves confirm through a small dialog with an optional note that
 	// lands in the applicant's stage history.
 	let pending = $state<{ applicant: Applicant; from: Stage; to: Stage } | null>(null)
+
+	const closeAfterAnswer: SubmitFunction = () => async ({ update }) => {
+		await update()
+		pending = null
+	}
+	const move = submitFeedback({ inner: closeAfterAnswer })
 
 	const STAGES = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED'] as const
 	type Stage = (typeof STAGES)[number]
@@ -184,11 +192,7 @@
 		<form
 			method="POST"
 			action="?/advanceStage"
-			use:enhance={() =>
-				async ({ update }) => {
-					await update()
-					pending = null
-				}}
+			use:enhance={move.enhance}
 			class="mt-4 space-y-4"
 		>
 			<input type="hidden" name="applicantId" value={target.applicant.id} />
@@ -215,11 +219,13 @@
 				>
 				<button
 					type="submit"
-					class="rounded-md px-4 py-2 text-sm font-medium {target.to === 'REJECTED'
+					disabled={move.busy}
+					class="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50 {target.to ===
+					'REJECTED'
 						? 'bg-red-600 text-white hover:bg-red-700'
 						: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
 				>
-					{target.to === 'REJECTED' ? 'Reject' : 'Confirm move'}
+					{move.busy ? 'Working…' : target.to === 'REJECTED' ? 'Reject' : 'Confirm move'}
 				</button>
 			</div>
 		</form>
