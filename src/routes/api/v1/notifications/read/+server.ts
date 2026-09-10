@@ -10,14 +10,20 @@ import type { RequestHandler } from './$types'
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) error(401, 'Unauthorized')
 
+	// A truncated or corrupt body must NOT fall through to mark-all — that consumes the whole
+	// unread queue, the outcome the `{ ids }` shape exists to prevent. Only an empty body means all.
 	let ids: string[] | null = null
-	try {
-		const body = await request.json()
+	const raw = (await request.text()).trim()
+	if (raw) {
+		let body: { ids?: unknown }
+		try {
+			body = JSON.parse(raw)
+		} catch {
+			error(400, 'Malformed JSON body')
+		}
 		if (body && Array.isArray(body.ids)) {
 			ids = body.ids.filter((id: unknown): id is string => typeof id === 'string')
 		}
-	} catch {
-		// No body, or not JSON — fall through to the mark-all behaviour.
 	}
 
 	// `markRead` already no-ops on an empty list, so an explicit `{ ids: [] }` marks nothing —

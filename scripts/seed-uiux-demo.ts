@@ -59,13 +59,17 @@ async function main() {
 			where: { id: JOB_POSTING_ID },
 			data: { status: JOB_POSTING_CLEAR_STATUS }
 		})
-		await db.timeLog.updateMany({
+		const clearedPunches = await db.timeLog.updateMany({
 			where: { id: PUNCH_ID },
 			data: { latitude: null, longitude: null, locationAccuracyM: null, locationCapturedAt: null }
 		})
 		console.log(`✔ Cleared ${removedApplicants.count} seeded applicant(s).`)
 		console.log(`✔ Reset ${JOB_POSTING_ID} status to ${JOB_POSTING_CLEAR_STATUS}.`)
-		console.log(`✔ Cleared location on punch ${PUNCH_ID}.`)
+		console.log(
+			clearedPunches.count
+				? `✔ Cleared location on punch ${PUNCH_ID}.`
+				: `– No punch ${PUNCH_ID} to clear.`
+		)
 		return
 	}
 

@@ -69,13 +69,15 @@ export async function findTimesheetCard(
 	await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
 	// The walk always advances 1 → 2 → 3…, so the next page number is known; waiting on a
 	// bare /page=\d+/ would match the page already in the URL and return before the nav lands.
-	for (let next = 2; next <= 20; next++) {
+	for (let next = 2; ; next++) {
 		const card = page
 			.locator('[role="button"]', { hasText: employeeName })
 			.filter({ hasText: hoursLabel })
 		if (await card.count()) return card
 		const link = page.getByRole('link', { name: 'Next →' })
-		if (!(await link.count())) break
+		// The bound is on NAVIGATING, not on looking: checking it after the click would leave the
+		// last page fetched and never examined, and report a miss for a card that is there.
+		if (next > 20 || !(await link.count())) break
 		await link.click()
 		await page.waitForURL(new RegExp(`[?&]page=${next}(&|$)`), { waitUntil: 'domcontentloaded' })
 	}
