@@ -124,6 +124,15 @@ the #302 UI audit.
   state-transition walk** — click through every state in a real browser — not just a render check.
   Both bugs above were found only by clicking through empty→some→all→empty in a live browser; a
   static read of the source or a single render assertion would have missed both.
+- **Deleting the `enhance` import breaks `use:enhance={someGuard.enhance}` silently.** The
+  directive name `use:enhance` resolves to the *imported* SvelteKit action; `someGuard` (e.g. a
+  `submitFeedback()` guard) is only the argument passed to it. If the import is removed but a bare
+  `use:enhance` directive is left behind pointing at a guard's `.enhance` property, the form still
+  submits but nothing about the result — success or failure — reaches the user; there is no error,
+  no type-check failure, and no visual break. It looks exactly like the toast/banner bug being
+  fixed. Grep every `use:enhance` call site in a component before removing or moving an `enhance`
+  import near it (`b026395`, 10-09-26 — a stage-move form left on a bare `use:enhance` after a
+  UI sweep missed a child component).
 
 ## Verification Expectation
 

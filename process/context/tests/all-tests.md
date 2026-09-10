@@ -63,6 +63,17 @@ It does not cover CI pipeline shape — that is `process/context/cicd/all-cicd.m
 produces phantom type errors that do not match the code on disk. This has been misdiagnosed at
 least three times.
 
+**`pnpm check` runs `svelte-kit sync` and will stop the owner's dev server.** When the dev server
+must stay up, `pnpm exec svelte-check --tsconfig ./tsconfig.json` (without `svelte-kit sync`) is a
+safe stand-in — it reads the existing generated types and never writes `.svelte-kit/`. It is not a
+full substitute (it won't catch a stale generated client the way a fresh sync would), but it
+covers a type-check pass without touching the running server.
+
+**`pnpm format:check` runs FIRST in the CI gate set and short-circuits everything after it.** A
+red baseline here — even from a file the current task never planned to touch — makes every later
+gate in the set unprovable until it's cleared. Clear it as its own commit before trusting any other
+gate result (`f29a329`, 10-09-26).
+
 ## Default Verification Order
 
 1. run the narrowest existing automated test

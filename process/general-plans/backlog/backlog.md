@@ -1,5 +1,44 @@
 # Backlog
 
+## recruitment-detail-banner-dedupe follow-ups
+
+### Run the two unrun e2e specs and `pnpm check` for the banner-dedupe + board-tile work
+
+- **Priority**: Medium
+- **Problem**: `tests/e2e/form-errors.spec.ts` (new `updateStatus` toast case) and
+  `tests/e2e/job-board-tracking.spec.ts` (reworked after the per-posting tile UI replaced the row
+  UI it drove) are both committed but never executed. `pnpm check` was also never run this session.
+  All three need the owner's dev server down first.
+- **Root cause**: the session ran entirely against a live dev server on 5173; `pnpm check` runs
+  `svelte-kit sync` and stops it, and the e2e tier needs its own build+preview.
+- **Fix options**: with the dev server down, run `pnpm check`, then `pnpm test:e2e -- form-errors
+  job-board-tracking`; fix whatever the reworked job-board spec's new tile locators surface.
+- **Source**: `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/recruitment-detail-banner-dedupe_PLAN_10-09-26.md`
+
+### R2 convert-banner regression check has no fixture
+
+- **Priority**: Low (accepted residual, not a regression)
+- **Problem**: The plan's R2 live-probe (does the `convert` banner still render after the
+  `updateStatus` banner was deleted) is `BLOCKED — no fixture`. Neither `prisma/seed-core.ts` nor
+  `scripts/seed-uiux-demo.ts` seeds a hired applicant, and the plan explicitly forbids fabricating
+  one. Static proof stands in its place: the `convert` block (page line ~227) is untouched by the
+  diff.
+- **Root cause**: no seed fixture reaches the `hiredApplicants.length > 0` branch.
+- **Fix options**: add a hired-applicant fixture to `scripts/seed-uiux-demo.ts` (or a dedicated e2e
+  seed) the next time recruitment's "Hired Applicants" card needs real test coverage.
+- **Source**: `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/recruitment-detail-banner-dedupe_PLAN_10-09-26.md`, Validate Contract "Open gaps"
+
+### F1 — the notifications surface should be a toast, not a banner
+
+- **Priority**: Low
+- **Problem**: Owner finding from this session: "the notifs is using a banner, should use a Toast."
+  The specific surface (which page/component) was never identified during this session.
+- **Root cause**: not investigated — parked as a finding, not a scoped task.
+- **Fix options**: next UI/UX pass should grep for the notifications banner, confirm which route
+  owns it, and scope a plan the same shape as this one (delete banner, confirm `submitFeedback` or
+  equivalent already toasts).
+- **Source**: owner feedback during `feat/uiux-phase-4` session, 10-09-26.
+
 ## #278 follow-ups
 
 ### Add `finance@veent.ph` and `payroll@veent.ph` to `tests/e2e/helpers.ts` `USERS`
