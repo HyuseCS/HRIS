@@ -2,7 +2,7 @@
 title: /settings/roles renders every login with no limit
 date: 10-09-26
 found: phase 04 feedback-contract manual test pass, section 8 check 1
-status: BACKLOG — no phase owns it
+status: RESOLVED — shipped in d26066d, 10-09-26
 ---
 
 # `/settings/roles` has no pagination
@@ -47,3 +47,20 @@ A real `skip`/`take` in `listOrgUsers` belongs with the already-filed
 Raised by the owner during the pass: "The table here has no limit for some reason. We will
 have to add that unless it gets tackled on a future phase." It is not tackled on a future
 phase. Either widen phase 07's SC-4 by one route, or take this note as its own change.
+
+## Resolution
+
+Shipped 10-09-26 in `d26066d`, `feat(settings): paginate and filter the roles table`, under
+`process/general-plans/completed/roles-pagination-and-bulk-allfail_10-09-26/`. Two things landed
+that this note didn't anticipate:
+
+- The owner added an **email/name filter box** alongside pagination (`?q=`), not just the bare
+  pagination this note sketched.
+- The param is the **default `page`**, not the `upage` this note's fix sketch proposed. A
+  repo-wide check found 9 of 11 paginated routes use the default `page` param — only two-table
+  pages pass an explicit `param` — and `/settings/roles` has one table, so the default was
+  correct. This note's `upage` suggestion predated that param-convention count.
+
+Pagination stayed at `paginate`'s default `pageSize: 10` (not this note's suggested 20) — this
+table carries two forms per row, so 10 rows is already 20 forms, a 90%+ cut from the 196
+originally measured. `listOrgUsers` was left unchanged, as this note required.

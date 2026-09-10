@@ -4,13 +4,14 @@ description: "PLAN — two independent fixes: /settings/roles pagination + email
 date: 10-09-26
 branch: feat/uiux-phase-4
 complexity: SIMPLE
-status: VALIDATED — gate CONDITIONAL (3 FAIL-grade defects converted to binding execute instructions E1-E3). Not executed.
+status: SHIPPED — both sections CODE DONE, full gate set green (attendance e2e pre-existing failure excepted). Commits d26066d (B1), bb7eb28 (O1), cacdb09 (plan). Owner VERIFIED confirmation still pending.
 ---
 
 # PLAN — `/settings/roles` pagination (B1) + bulk timesheet all-fail (O1)
 
 **Date**: 10-09-26 · **Branch**: `feat/uiux-phase-4` @ `c3bf6cf` (tree clean) · **Complexity**: SIMPLE
-**Status**: VALIDATED — gate **CONDITIONAL**. See `## Validate Contract`; E1-E7 are binding on EXECUTE.
+**Status**: SHIPPED — both sections CODE DONE. See `## Execution Outcome`. `✅ VERIFIED` is still
+open pending the owner's manual confirmation (see `## Phase Completion Rules`).
 
 **TL;DR.** Two small, unrelated fixes. Section 1 paginates and filters the roles table in the
 route `load` (212 users are in the DOM today). Section 2 makes an all-failed bulk timesheet
@@ -423,6 +424,29 @@ Test routing reference: `process/context/tests/all-tests.md`.
   pre-existing attendance failure) **and the user confirmed it working**. Code-only completion is
   `CODE DONE`, never `VERIFIED`.
 - The Section 2 e2e known gap does not block `VERIFIED`; it is recorded, not silently dropped.
+
+## Execution Outcome
+
+Both sections shipped `CODE DONE`. Full gate set run at `cacdb09`:
+
+| Gate | Result |
+|---|---|
+| `pnpm format:check` | GREEN |
+| `pnpm lint` | GREEN (0 errors, 1 pre-existing `CalculatorWindow` warning) |
+| `pnpm exec svelte-check --tsconfig ./tsconfig.json` | GREEN (1118 files, 0 errors) |
+| `pnpm test` | GREEN (2435 tests / 209 files) |
+| `CI=1 pnpm test:e2e` | 142 passed / 1 failed — failure is the pre-existing `attendance-save-timesheet-custom-range` spec, not ours |
+
+Commits:
+
+| Commit | Section |
+|---|---|
+| `d26066d` | Section 1 — `feat(settings): paginate and filter the roles table` (B1) |
+| `bb7eb28` | Section 2 — `fix(timesheets): report a failed bulk review as a failure` (O1) |
+| `cacdb09` | `docs(plan): record the roles pagination and bulk all-fail plan` |
+
+Status: `CODE DONE` for both sections. `✅ VERIFIED` per `## Phase Completion Rules` still
+requires the owner's manual confirmation — not yet given as of archival.
 
 ## Execution strategy
 
