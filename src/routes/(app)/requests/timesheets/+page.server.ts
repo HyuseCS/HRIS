@@ -1,6 +1,7 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { canAny } from '$lib/server/rbac'
+import { paginate } from '$lib/server/pagination'
 import { reviewTimesheet } from '$lib/server/services/timesheets'
 import { canActOnStage, liveChain, timesheetSoD } from '$lib/server/services/approvals'
 import type { Role } from '@prisma/client'
@@ -16,7 +17,7 @@ function canReviewTimesheets(roles: Role[]) {
 	)
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	const roles = user.roles
 	if (!canReviewTimesheets(roles)) redirect(303, '/requests')
@@ -61,12 +62,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 				timesheetSoD(user.id, ts.approvalSteps, live.attempt)
 			)
 		})
-		.map(({ approvalSteps, ...ts }) => ({
-			...ts,
-			currentStage: liveChain(approvalSteps)?.currentStep?.stage ?? null
-		}))
+		.map(({ approvalSteps, ...ts }) => {
+			const live = liveChain(approvalSteps)
+			return {
+				...ts,
+				currentStage: live?.currentStep?.stage ?? null,
+				currentStageKind: live?.currentStep?.stageKind ?? null,
+				currentStageRole: live?.currentStep?.role ?? null
+			}
+		})
 
-	return { pendingTimesheets }
+	const pagination = paginate(url, pendingTimesheets.length)
+
+	return {
+		pendingTimesheets: pendingTimesheets.slice(pagination.skip, pagination.skip + pagination.take),
+		pagination
+	}
 }
 
 function ctxOf(event: RequestEvent) {
