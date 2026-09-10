@@ -160,7 +160,7 @@
 
 	<!-- Posted on — manual job-board tracking (#117) -->
 	{#if isHrAdmin}
-		<div class="rounded-lg border p-4 space-y-3">
+		<div class="min-h-[16rem] space-y-3 rounded-lg border p-4">
 			<h2 class="text-sm font-semibold">Posted on</h2>
 
 			<!-- Close-the-loop: a CLOSED role still live somewhere needs a takedown. -->
@@ -182,7 +182,7 @@
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
 					{#if addable.length === 0}
 						<div
-							class="flex min-h-[6rem] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground"
+							class="flex min-h-[11rem] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground"
 						>
 							All boards added
 						</div>
@@ -190,7 +190,7 @@
 						<button
 							type="button"
 							onclick={() => (addOpen = true)}
-							class="flex min-h-[6rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+							class="flex min-h-[11rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 						>
 							<span aria-hidden="true" class="text-xl leading-none">+</span>
 							Add board
@@ -199,13 +199,16 @@
 
 					{#each channels as b (b.boardId)}
 						{@const guard = channelGuard(b.boardId)}
-						<div data-board={b.name} class="space-y-2 rounded-lg border p-3">
+						<div
+							data-board={b.name}
+							class="flex min-h-[11rem] flex-col gap-2 rounded-lg border p-3"
+						>
 							<div class="flex items-center gap-2">
-								<span class="text-sm font-medium">{b.name}</span>
+								<span class="truncate text-sm font-medium">{b.name}</span>
 								{#if b.status === 'TAKEN_DOWN'}
-									<span class="badge-yellow">Taken down</span>
+									<span class="badge-yellow shrink-0">Taken down</span>
 								{/if}
-								<div class="ml-auto flex items-center">
+								<div class="ml-auto flex shrink-0 items-center">
 									<ConfirmButton
 										action="?/removeChannel"
 										title={b.live ? 'Take this posting down?' : 'Remove this board?'}
@@ -222,29 +225,36 @@
 								</div>
 							</div>
 
-							{#if b.live && b.postedAt}
-								<p class="text-xs text-muted-foreground">Posted {formatShortDate(b.postedAt)}</p>
-							{/if}
+							<p class="text-xs text-muted-foreground">
+								{b.postedAt ? `Posted ${formatShortDate(b.postedAt)}` : 'Not posted yet'}
+							</p>
 
-							<form method="POST" action="?/setChannel" use:enhance={guard.enhance}>
+							<form
+								method="POST"
+								action="?/setChannel"
+								use:enhance={guard.enhance}
+								class="flex flex-1 flex-col gap-1"
+							>
 								<input type="hidden" name="boardId" value={b.boardId} />
 								<input type="hidden" name="posted" value="true" />
-								<div class="flex items-center gap-2">
-									<label class="sr-only" for="url-{b.boardId}">{b.name} listing web address</label>
-									<input
-										id="url-{b.boardId}"
-										name="url"
-										value={b.url ?? ''}
-										placeholder="https://…"
-										class="w-full min-w-0 {channelInputClass}"
-									/>
-									<button type="submit" disabled={guard.busy} class="btn-row shrink-0"
+								<label for="url-{b.boardId}" class="text-xs font-medium text-muted-foreground"
+									>Listing link</label
+								>
+								<input
+									id="url-{b.boardId}"
+									name="url"
+									value={b.url ?? ''}
+									placeholder="https://…"
+									class="w-full min-w-0 {channelInputClass}"
+								/>
+								{#if form && 'channelBoardId' in form && form.channelBoardId === b.boardId}
+									<p class="text-xs text-red-600 dark:text-red-400">{form.error}</p>
+								{/if}
+								<div class="mt-auto flex justify-end pt-2">
+									<button type="submit" disabled={guard.busy} class="btn-row-positive"
 										>{guard.busy ? '…' : 'Save'}</button
 									>
 								</div>
-								{#if form && 'channelBoardId' in form && form.channelBoardId === b.boardId}
-									<p class="mt-1 text-xs text-red-600 dark:text-red-400">{form.error}</p>
-								{/if}
 							</form>
 						</div>
 					{/each}
