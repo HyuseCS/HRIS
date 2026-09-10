@@ -87,3 +87,26 @@
   user decision; the compensating control is that Doors A and C already pin gate order.
 - **Source**: `process/general-plans/active/payslip-draft-visibility-278_PLAN_10-08-26.md`, Validate
   Contract "Open gaps"
+
+## e2e: two specs share `jp_seed_demo`, so the suite flakes under local parallel workers
+
+`tests/e2e/job-board-tracking.spec.ts` and `tests/e2e/form-errors.spec.ts` both drive the
+`jp_seed_demo` posting. `playwright.config.ts` sets `fullyParallel: true` with
+`workers: process.env.CI ? 1 : undefined`, so **CI runs serial and is green (141 passed)**, while a
+bare local `pnpm test:e2e` runs them concurrently and job-board-tracking fails.
+
+Reproduce: `pnpm test:e2e` flakes; `CI=1 pnpm test:e2e` passes; the spec passes alone.
+
+Fix by giving one of the two its own posting fixture rather than sharing the seeded one. Until
+then, run the suite locally with `CI=1`.
+
+Recorded 2026-09-10.
+
+## e2e: `attendance-save-timesheet-custom-range` fails, and predates this branch
+
+`tests/e2e/attendance-save-timesheet-custom-range.spec.ts:89` expects
+`Timesheet saved (7 days).` and the toast never appears. **Confirmed pre-existing**: it fails
+identically in a worktree checked out at `d4c8e41`, before any of this session's commits. No
+timesheet rows exist in the dev database, so it is not overlap residue.
+
+Recorded 2026-09-10.
