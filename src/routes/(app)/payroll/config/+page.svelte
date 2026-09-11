@@ -13,7 +13,7 @@
 	// Re-seed the was→now baseline once the save lands, so a second save with no further edits
 	// correctly reports "nothing changed" instead of replaying the first edit.
 	const saveRates = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
+		await update({ reset: false })
 		if (result.type === 'success') baselineRates = { ...rateValues }
 	})
 
