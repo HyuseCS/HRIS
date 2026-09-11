@@ -71,25 +71,25 @@ const PARITY: Record<
 		sssEe: '900',
 		philhealthEe: '750',
 		pagibigEe: '200',
-		tax: '1463.4',
-		total: '3313.4',
-		net: '26686.6'
+		tax: '1097.55',
+		total: '2947.55',
+		net: '27052.45'
 	},
 	'50000': {
 		sssEe: '900',
 		philhealthEe: '1250',
 		pagibigEe: '200',
-		tax: '6079.25',
-		total: '8429.25',
-		net: '41570.75'
+		tax: '4738.4',
+		total: '7088.4',
+		net: '42911.6'
 	},
 	'250000': {
 		sssEe: '900',
 		philhealthEe: '2500',
 		pagibigEe: '200',
-		tax: '66347.89',
-		total: '69947.89',
-		net: '180052.11'
+		tax: '57461.7',
+		total: '61061.7',
+		net: '188938.3'
 	},
 	'10000.20': {
 		sssEe: '450',
@@ -130,8 +130,8 @@ describe('overrides change the computed deduction', () => {
 				{ floor: 50000, ceiling: Infinity, baseTax: 0, rate: 0.2, excessOver: 50000 }
 			]
 		}
-		// 30000 gross → default tax 1463.40; with the exemption up to 50k it becomes 0.
-		expect(s(computeStatutoryDeductions(30000).withholdingTax)).toBe('1463.4')
+		// 30000 gross → default tax 1097.55; with the exemption up to 50k it becomes 0.
+		expect(s(computeStatutoryDeductions(30000).withholdingTax)).toBe('1097.55')
 		expect(s(computeStatutoryDeductions(30000, rates).withholdingTax)).toBe('0')
 	})
 
@@ -299,10 +299,10 @@ describe('validation rejects incoherent tables (trust boundary)', () => {
 })
 
 // #220: saving through the editor makes only ranges+rates authoritative and DERIVES the tax
-// baseTax/excessOver. For every standard salary the derived table reproduces today's computed tax
-// exactly; only the high brackets differ from the OLD published table by a rounding cent
-// (10833.33→10833.5, 40833.33→40833.5, 200833.33→200833.5), so the ₱250k case asserts the DERIVED
-// value — deriving is the intended behaviour now.
+// baseTax/excessOver. Under the 2023 BIR table deriving reproduces the shipped baseTax exactly, so
+// the derived path owes the SAME pesos as the seeded one at every salary — no row is excepted. The
+// old ₱250k exception existed only because the 2018 table's exact-thirds boundaries could not be
+// re-derived from its integer floors; that drift is gone.
 const seededDerivedRow: StatutoryRateConfigRow = {
 	...seededRow,
 	taxBrackets: deriveTaxBrackets(
@@ -310,13 +310,13 @@ const seededDerivedRow: StatutoryRateConfigRow = {
 	) as unknown as Prisma.JsonValue
 }
 const SEEDED_DERIVED = statutoryRatesFromConfig(seededDerivedRow)
-const DERIVED_PARITY = {
-	...PARITY,
-	'250000': { ...PARITY['250000'], tax: '66348.06', total: '69948.06', net: '180051.94' }
-}
 
 describe('seeded config with DERIVED baseTax reproduces the computed tax (#220)', () => {
-	for (const [salary, exp] of Object.entries(DERIVED_PARITY)) {
+	it('the derived table owes the same pesos as the seeded one at every salary', () => {
+		expect(seededDerivedRow.taxBrackets).toEqual(seededRow.taxBrackets)
+	})
+
+	for (const [salary, exp] of Object.entries(PARITY)) {
 		it(`salary ${salary}`, () => {
 			const r = computeStatutoryDeductions(salary, SEEDED_DERIVED)
 			expect(s(r.sssEe)).toBe(exp.sssEe)

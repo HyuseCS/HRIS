@@ -4,8 +4,10 @@ import {
 	computePhilhealth,
 	computePagibig,
 	computeWithholdingTax,
-	computeStatutoryDeductions
+	computeStatutoryDeductions,
+	BIR_MONTHLY_TAX_TABLE
 } from '$lib/server/services/payroll/ph-statutory'
+import { deriveTaxBrackets } from '$lib/server/services/payroll/statutory-rates'
 import { D, type Money } from '$lib/server/services/payroll/money'
 
 // #119: the statutory engine now returns exact `Decimal` values (unquantized — the caller prorates
@@ -73,7 +75,29 @@ describe('BIR Withholding Tax', () => {
 
 	it('computes tax for 2nd bracket', () => {
 		const tax = computeWithholdingTax(25000)
-		expect(n(tax)).toBeCloseTo((20 * (25000 - 20833)) / 100, 0)
+		expect(n(tax)).toBeCloseTo((15 * (25000 - 20833)) / 100, 0)
+	})
+})
+
+describe('BIR table — derived baseTax equals the shipped baseTax', () => {
+	it("derives the shipped table's own baseTax from its floors and rates alone", () => {
+		const derived = deriveTaxBrackets(
+			BIR_MONTHLY_TAX_TABLE.map(({ floor, rate }) => ({ floor, rate }))
+		)
+		expect(derived.map((b) => b.baseTax)).toEqual(BIR_MONTHLY_TAX_TABLE.map((b) => b.baseTax))
+		expect(derived.map((b) => b.baseTax)).toEqual([0, 0, 1875, 8541.8, 33541.8, 183541.8])
+		expect(derived.map((b) => b.excessOver)).toEqual(BIR_MONTHLY_TAX_TABLE.map((b) => b.excessOver))
+	})
+
+	it('derives the 2018 drift from the 2018 rate vector over the same floors', () => {
+		const derived = deriveTaxBrackets(
+			BIR_MONTHLY_TAX_TABLE.map(({ floor }, i) => ({
+				floor,
+				rate: [0, 0.2, 0.25, 0.3, 0.32, 0.35][i]
+			}))
+		)
+		expect(derived.map((b) => b.baseTax)).toEqual([0, 0, 2500, 10833.5, 40833.5, 200833.5])
+		expect(derived.map((b) => b.baseTax)).not.toEqual(BIR_MONTHLY_TAX_TABLE.map((b) => b.baseTax))
 	})
 })
 

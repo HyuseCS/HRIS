@@ -288,11 +288,11 @@ export interface TaxBracket {
 
 export const BIR_MONTHLY_TAX_TABLE: TaxBracket[] = [
 	{ floor: 0, ceiling: 20833, baseTax: 0, rate: 0, excessOver: 0 },
-	{ floor: 20833, ceiling: 33332, baseTax: 0, rate: 0.2, excessOver: 20833 },
-	{ floor: 33333, ceiling: 66666, baseTax: 2500, rate: 0.25, excessOver: 33333 },
-	{ floor: 66667, ceiling: 166666, baseTax: 10833.33, rate: 0.3, excessOver: 66667 },
-	{ floor: 166667, ceiling: 666666, baseTax: 40833.33, rate: 0.32, excessOver: 166667 },
-	{ floor: 666667, ceiling: Infinity, baseTax: 200833.33, rate: 0.35, excessOver: 666667 }
+	{ floor: 20833, ceiling: 33332, baseTax: 0, rate: 0.15, excessOver: 20833 },
+	{ floor: 33333, ceiling: 66666, baseTax: 1875, rate: 0.2, excessOver: 33333 },
+	{ floor: 66667, ceiling: 166666, baseTax: 8541.8, rate: 0.25, excessOver: 66667 },
+	{ floor: 166667, ceiling: 666666, baseTax: 33541.8, rate: 0.3, excessOver: 166667 },
+	{ floor: 666667, ceiling: Infinity, baseTax: 183541.8, rate: 0.35, excessOver: 666667 }
 ]
 
 export function computeWithholdingTax(
