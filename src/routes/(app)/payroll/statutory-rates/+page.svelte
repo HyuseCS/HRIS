@@ -9,6 +9,8 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	const NO_EFFECTIVE_CHANGE = 'No effective change vs the live rates.'
+
 	// Re-seed the touched-services baseline once the save lands, so the confirm and the leave guard
 	// both stop reporting edits the user has already committed.
 	const saveGuard = submitFeedback({
@@ -255,18 +257,32 @@
 			<h2 class="text-lg font-semibold">Pending proposals</h2>
 			<div class="space-y-3">
 				{#each data.pending as p (p.id)}
-					<div class="rounded-md border bg-muted/30 p-4">
+					{@const empty = p.changes.length === 1 && p.changes[0] === NO_EFFECTIVE_CHANGE}
+					<div class="rounded-md border bg-muted/30 px-4 py-3">
 						<div class="flex items-start justify-between gap-4">
-							<div class="text-sm">
-								<p class="font-medium">Proposed by {p.proposer}</p>
-								<p class="text-xs text-muted-foreground">
-									{new Date(p.createdAt).toLocaleString()}
+							<div class="min-w-0 text-sm">
+								<p>
+									<span class="font-medium">{p.proposer}</span>
+									<span class="text-xs text-muted-foreground"
+										>· {new Date(p.createdAt).toLocaleString()}</span
+									>
 								</p>
-								<ul class="mt-2 list-disc space-y-0.5 pl-5 text-muted-foreground">
-									{#each p.changes as c (c)}
-										<li>{c}</li>
-									{/each}
-								</ul>
+								{#if empty}
+									<p class="text-muted-foreground">
+										No effective change vs the live rates — nothing to apply, reject it.
+									</p>
+								{:else if p.changes.length === 1}
+									<p class="text-muted-foreground">{p.changes[0]}</p>
+								{:else}
+									<details class="text-muted-foreground">
+										<summary class="cursor-pointer">{p.changes.length} changes</summary>
+										<ul class="mt-1 list-disc space-y-0.5 pl-5">
+											{#each p.changes as c (c)}
+												<li>{c}</li>
+											{/each}
+										</ul>
+									</details>
+								{/if}
 							</div>
 							<!-- #108: ConfirmButton's busy state is this form's single-submit guard. -->
 							<div class="flex shrink-0 gap-2">
