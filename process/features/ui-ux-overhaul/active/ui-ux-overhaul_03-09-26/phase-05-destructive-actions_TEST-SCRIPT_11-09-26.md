@@ -769,9 +769,10 @@ The **Reset** trigger renders only when `d.manuallyEdited` is true, so you must 
 
 1. Log in as `hr@veent.ph`, go to `/attendance` (employee view; add `?view=team` for the team view,
    and `?from=YYYY-MM-DD&to=YYYY-MM-DD` to reach the right dates).
-2. Pick an unlocked day row. Change **Reg** (the `regularHours` cell) to a distinctive value, e.g.
-   `7.25`, and click that row's **Save**. The row now shows a **Reset** button beside Save
-   (tooltip: `Discard manual edit and re-derive from punches`).
+2. Pick an unlocked day row. Set its **In** and **Out** to distinctive times, e.g. `09:00` and
+   `17:00`, and click that row's **Save**. Reg and OT are read-only and derived (F10 / D4) — typing
+   into them is not possible and would not have been stored. The row now shows a **Reset** button
+   beside Save (tooltip: `Discard manual edit and re-derive from punches`).
 3. Click **Reset**.
 4. Expect title `Discard this manual edit?`, message exactly:
    `The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost.`

@@ -96,30 +96,6 @@
 	}
 	const n = (x: unknown) => Number(x)
 
-	// When In/Out are entered manually, auto-fill Reg (and OT overflow) to mirror the derive
-	// engine: worked = (Out − In) − 1h break past 5h; Reg = min(worked, 8), OT = the rest.
-	// HR can still override the numbers afterward.
-	function recalcHours(e: Event) {
-		const el = e.currentTarget as HTMLInputElement
-		const fid = el.getAttribute('form')
-		if (!fid) return
-		const q = (name: string) =>
-			document.querySelector<HTMLInputElement>(`input[name="${name}"][form="${fid}"]`)
-		const tin = q('timeIn')?.value
-		const tout = q('timeOut')?.value
-		const reg = q('regularHours')
-		const ot = q('overtimeHours')
-		if (!tin || !tout || !reg || !ot) return
-		const [ih, im] = tin.split(':').map(Number)
-		const [oh, om] = tout.split(':').map(Number)
-		let mins = oh * 60 + om - (ih * 60 + im)
-		if (mins < 0) mins += 1440 // overnight out
-		const gross = mins / 60
-		const worked = Math.max(0, gross - (gross > 5 ? 1 : 0))
-		reg.value = Math.min(worked, 8).toFixed(2)
-		ot.value = Math.max(0, worked - 8).toFixed(2)
-	}
-
 	// 24h HH:MM for a <input type="time">, in Manila time; '' when no punch.
 	function toTimeInput(d: string | Date | null) {
 		if (!d) return ''
@@ -138,9 +114,6 @@
 	// Content-sized (not w-full) so the table columns spread evenly instead of one ballooning.
 	const CELL =
 		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
-	const CELL_NUM =
-		CELL +
-		' w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 	const CELL_SEL = CELL + ' appearance-none'
 	const CELL_TIME = CELL + ' w-24'
 
@@ -545,6 +518,13 @@
 		</p>
 	{/if}
 
+	{#if data.canManage}
+		<p class="text-xs text-muted-foreground">
+			Reg and OT are worked out from the punches and the approved overtime, and cannot be typed in.
+			Correct a day by editing its In and Out.
+		</p>
+	{/if}
+
 	{#if data.view === 'team'}
 		<!-- Team-for-a-day table -->
 		<div class="overflow-x-auto rounded-lg border">
@@ -607,7 +587,6 @@
 										form="c-{d.id}"
 										type="time"
 										value={toTimeInput(d.timeIn)}
-										oninput={recalcHours}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeIn ?? null)}{/if}</td
 							>
@@ -617,31 +596,20 @@
 										form="c-{d.id}"
 										type="time"
 										value={toTimeInput(d.timeOut)}
-										oninput={recalcHours}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeOut ?? null)}{/if}</td
 							>
 							<td class="px-3 py-2 text-right font-mono"
-								>{#if editable && d}<input
-										name="regularHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.regularHours)}
-										class={CELL_NUM}
-									/>{:else}{d ? n(d.regularHours).toFixed(2) : '—'}{/if}</td
+								>{d ? n(d.regularHours).toFixed(2) : '—'}</td
 							>
 							<td class="px-3 py-2 text-right font-mono"
-								>{#if editable && d}<input
-										name="overtimeHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.overtimeHours)}
-										class={CELL_NUM}
-									/>{:else}{d ? n(d.overtimeHours).toFixed(2) : '—'}{/if}</td
+								>{#if d}{n(d.overtimeHours).toFixed(
+										2
+									)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+											class="ml-1 text-xs text-amber-600 dark:text-amber-400"
+											title="unapproved OT"
+											>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
+										>{/if}{:else}—{/if}</td
 							>
 							{#if data.showAmPm}
 								<!-- M-15: after Reg/OT, mirroring the header order. -->
@@ -757,7 +725,6 @@
 										form="c-{d.id}"
 										type="time"
 										value={toTimeInput(d.timeIn)}
-										oninput={recalcHours}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeIn)}{/if}</td
 							>
@@ -767,42 +734,19 @@
 										form="c-{d.id}"
 										type="time"
 										value={toTimeInput(d.timeOut)}
-										oninput={recalcHours}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeOut)}{/if}</td
 							>
-							<td class="px-3 py-2 text-right font-mono">
-								{#if editable}
-									<input
-										name="regularHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.regularHours)}
-										class={CELL_NUM}
-									/>
-								{:else}{n(d.regularHours).toFixed(2)}{/if}
-							</td>
-							<td class="px-3 py-2 text-right font-mono">
-								{#if editable}
-									<input
-										name="overtimeHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.overtimeHours)}
-										class={CELL_NUM}
-									/>
-								{:else}{n(d.overtimeHours).toFixed(
-										2
-									)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
-											class="ml-1 text-xs text-amber-600 dark:text-amber-400"
-											title="unapproved OT"
-											>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
-										>{/if}{/if}
-							</td>
+							<td class="px-3 py-2 text-right font-mono">{n(d.regularHours).toFixed(2)}</td>
+							<td class="px-3 py-2 text-right font-mono"
+								>{n(d.overtimeHours).toFixed(
+									2
+								)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+										class="ml-1 text-xs text-amber-600 dark:text-amber-400"
+										title="unapproved OT"
+										>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
+									>{/if}</td
+							>
 							<td class="px-3 py-2 text-right font-mono">{n(d.nightDiffHours).toFixed(2)}</td>
 							<td class="px-3 py-2 text-right font-mono text-muted-foreground"
 								>{d.lateMinutes}/{d.undertimeMinutes}</td

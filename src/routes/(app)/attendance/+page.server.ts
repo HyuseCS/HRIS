@@ -171,8 +171,6 @@ const correctSchema = z.object({
 	date: z.string().optional(),
 	timeIn: z.string().optional(),
 	timeOut: z.string().optional(),
-	regularHours: z.coerce.number().min(0).optional(),
-	overtimeHours: z.coerce.number().min(0).optional(),
 	status: z
 		.enum(['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY'])
 		.optional(),
