@@ -70,6 +70,7 @@ adding a page, a query set, a dependency, or a capability.
 | Phase 2 (`nav-ia`) | The sectioned sidebar and the Approvals/Requests collapsible group. S1's badge attaches to the group header phase 2 leaves behind. | S1 blocked — do not hand-roll a group header. |
 | Phase 3 (`design-system`) | `Badge`/`StatusPill` from `$lib/components/ui/`, the label maps in `$lib/labels`. | S4's badge-helper item degrades to "extract a local 4-way map"; record the deviation. |
 | Phase 4 (`feedback-contract`) | `submitFeedback` on `createSubmitGuard`, the cookie flash util, the `{ action, error?, saved? }` action shape. | **Not required for S2.** S2's `/leave/new` becomes a *load* redirect (308) with no action and no user input — a load redirect carries no flash, so the flash util is not on S2's path. S1/S3/S4 consume `submitFeedback` only where they touch an existing form; if it is absent, keep the page's current feedback and record the deviation. Nothing in this phase is blocked on phase 4. |
+| Phase 05 S11 (bell handoff, D3) | The `db.actionProposal` vs `statutoryRateProposal` count gap (below) settled: `countPendingApprovals` must count pending `statutoryRateProposal` rows before the bell's badge count can be trusted. | S1 blocked on the bell sub-item until this data gap is closed — do not ship a bell whose count silently excludes statutory-rate proposals. |
 
 **Research-refresh (loop step 1, mandatory before any edit):** every line number in this plan is
 from HEAD `5e5cdfe` and phases 1–5 will have moved them. Re-grep each anchor before editing and
@@ -167,6 +168,33 @@ settings.
 > therefore a *forward* reference to a file phase 02 is expected to create. At research-refresh,
 > check which of the two anchors is real before editing; do not create `src/lib/nav.ts` in this
 > phase.
+
+**Bell requirement, added per phase 05 S11 (owner decision D3 handoff, not built there).** In scope
+for S1, not a new section:
+
+- Add a notification bell to the app shell carrying a dot with the count of outstanding items, as
+  the persistent-trace surface the Approvals nav badge cannot be (a badge lives only on the
+  Approvals group; a bell can surface every domain, including ones with no nav presence yet). The
+  justification already lives in the codebase at `approvals.ts:466-468`: *"Notifications are
+  one-shot toasts marked read on the next page load, so without this badge a proposal filed while
+  the confirmer was away leaves no standing trace anywhere in the UI."* The bell is the general
+  answer to the problem that comment works around one badge at a time.
+- **Entry condition, not a mid-phase discovery — the data gap.** `countPendingApprovals` →
+  `listActionableProposals` (`approvals.ts:469`) reads `db.actionProposal`
+  (`action-proposals.ts:324`), a **different Prisma model** from `statutoryRateProposal`, the model
+  the statutory-rates page writes to. A pending statutory-rate proposal is therefore **invisible**
+  to `countPendingApprovals` today, and to any bell or badge built on top of it. Whatever the bell
+  counts must include `statutoryRateProposal` rows — settle this data question before any visual
+  work, per the Entry Conditions table above.
+- **Scope warning.** A bell that opens its own dedicated proposals page is a *fifth* approver inbox,
+  exactly what binding decision D3 (four inboxes stay, no merge) exists to prevent. The bell must
+  route into this phase's "Awaiting you" aggregator, not around it.
+- **F7's card-density half is already done.** Phase 05 S7c turned each pending statutory-rate
+  proposal into its own card on `/payroll/statutory-rates`. Phase 06 does not redo that — only the
+  bell/count half of F7 is this phase's to build.
+- The visual design (icon, dot placement, animation) is expected to be refined later by the
+  `impeccable` / `ui-ux-pro-max` skill; this plan captures the requirement and the data gap, not a
+  final design.
 
 ### S2 — One leave-filing form
 
@@ -401,13 +429,16 @@ Payroll tab visibility inherits `payroll/+layout.server.ts:14-16`, which is itse
 
 ## Blast Radius
 
-- **Files:** 16 source files changed, 1 deleted, 1 new `$lib` helper, 4 test files updated.
+- **Files:** 16 source files changed, 1 deleted, 1 new `$lib` helper, 4 test files updated. The bell
+  (D3/S11 handoff) adds to this: the `countPendingApprovals` query gains a `statutoryRateProposal`
+  count, and the app shell gains a bell affordance wired to the same aggregator S1 already builds.
 - **Packages:** single SvelteKit app; no workspace fan-out.
 - **Risk class:** **medium.** No schema, no service logic, no capability change, and the highest-risk
   T5 item (the `employees/[id]` audited career-event forms) is explicitly deferred to phase 7. The
-  two live risks are (a) the payroll tab bar showing a sign-off-only user a page their route will
-  403, and (b) the `/leave/new` retirement silently losing the leave-filing role-context assertion.
-  Both have named gates below.
+  three live risks are (a) the payroll tab bar showing a sign-off-only user a page their route will
+  403, (b) the `/leave/new` retirement silently losing the leave-filing role-context assertion, and
+  (c) the bell shipping with a count that still excludes `statutoryRateProposal` rows if the data gap
+  above is not closed first. All three have named gates.
 - **Authorization-adjacent:** yes, read-only. Nav/tab visibility narrows or stays equal; nothing
   widens.
 
@@ -418,6 +449,7 @@ Payroll tab visibility inherits `payroll/+layout.server.ts:14-16`, which is itse
 | `pnpm format:check && pnpm lint && pnpm check && pnpm test` green, in that order, run at the end of **each** section not batched | Fully-Automated | Phase exit criterion: the CI gate set passes |
 | `tests/unit/approval-queues.test.ts` + `approval-self-guard.test.ts` + `dashboard-org-scoping.test.ts` pass unmodified | Fully-Automated | S1 added no query and no scope: the aggregator's counts are the service's counts |
 | New unit assertion: `countPendingApprovals().total` equals the sum of its four domain fields, and is `0` for a role without `APPROVE_REQUESTS` | Fully-Automated | D3: "the combined count matches the sum of the four inboxes" |
+| New unit assertion: a pending `statutoryRateProposal` row is reflected in `countPendingApprovals().total` and in the bell's count | Fully-Automated | S11 data gap: `db.actionProposal` vs `statutoryRateProposal` no longer leaves a proposal invisible to the bell |
 | `tests/unit/request-filing-role-context.test.ts` — the leave role-context assertions now run against `/requests ?/create` and still pass | Fully-Automated | S2 retired a door without retiring its guard |
 | New e2e assertion: `GET /leave/new` responds 308 to `/requests?new=leave`, and the landing page has the leave form open | Fully-Automated | S2: the retired door redirects to the canonical one |
 | `attendance-save-timesheet-cross-month.test.ts` + `attendance-save-timesheet-custom-range.spec.ts` pass **unmodified** | Fully-Automated | S3 changed copy only; the same-month guard and the save path are untouched |
