@@ -131,3 +131,44 @@ test('a saved row shows the stored values without a reload, and its siblings kee
 	const cleared = await expectRowMatchesStored(edited, EDITED)
 	expect(cleared.status).toBe('ABSENT')
 })
+
+/**
+ * F11b — Save belongs to a row that has unsaved edits and to no other row. The zero assertions are
+ * the risk here: a selector that can never match anything would satisfy them for ever, so the test
+ * plants a matching node first and watches the count follow it.
+ */
+test('Save renders only on a row with unsaved edits', async ({ page }) => {
+	test.slow()
+	await seed()
+	await login(page, USERS.admin)
+	await page.goto(url(), { waitUntil: 'domcontentloaded' })
+
+	const saves = page.getByRole('button', { name: 'Save', exact: true })
+	const edited = rowFor(page, EDITED)
+
+	await expect(saves).toHaveCount(0)
+	const planted = await page.evaluateHandle(() => {
+		const b = document.createElement('button')
+		b.textContent = 'Save'
+		document.body.append(b)
+		return b
+	})
+	await expect(saves).toHaveCount(1)
+	await planted.evaluate((b: Element) => b.remove())
+	await expect(saves).toHaveCount(0)
+
+	await edited.locator('input[name="timeIn"]').fill('10:00')
+	await expect(saves).toHaveCount(1)
+	await expect(edited.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
+
+	// Typing the stored value back is not an edit.
+	await edited.locator('input[name="timeIn"]').fill('09:00')
+	await expect(saves).toHaveCount(0)
+
+	await edited.locator('select[name="status"]').selectOption('ON_LEAVE')
+	await expect(saves).toHaveCount(1)
+
+	await edited.getByRole('button', { name: 'Save', exact: true }).click()
+	await expect(page.getByText('Attendance day saved.')).toBeVisible()
+	await expect(saves).toHaveCount(0)
+})

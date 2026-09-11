@@ -61,6 +61,15 @@
 	function setEdit(id: string, field: EditField, value: string) {
 		rowState[id] = { ...rowState[id], [field]: value }
 	}
+	function isDirty(d: DayRow) {
+		const e = rowState[d.id]
+		if (!e) return false
+		return (
+			(e.timeIn !== undefined && e.timeIn !== toTimeInput(d.timeIn)) ||
+			(e.timeOut !== undefined && e.timeOut !== toTimeInput(d.timeOut)) ||
+			(e.status !== undefined && e.status !== d.status)
+		)
+	}
 	const correctRow =
 		(id: string): SubmitFunction =>
 		() =>
@@ -661,23 +670,31 @@
 								{#if editable && d}
 									{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 									<div class="flex items-center gap-1">
-										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
+										<form
+											id="c-{d.id}"
+											method="POST"
+											action="?/correct"
+											use:enhance={save.enhance}
+											class="w-[4.5rem]"
+										>
 											<input type="hidden" name="id" value={d.id} />
 											<input type="hidden" name="date" value={toDateKey(d.date)} />
-											<button
-												disabled={save.busy}
-												class="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-												>{save.busy ? 'Saving…' : 'Save'}</button
-											>
+											{#if isDirty(d)}
+												<button
+													disabled={save.busy}
+													class="w-full rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+													>{save.busy ? 'Saving…' : 'Save'}</button
+												>
+											{/if}
 										</form>
 										<ConfirmButton
 											action="?/resetDay"
 											title="Discard the manual edit?"
 											message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
 											confirmText="Reset"
-											triggerLabel="Reset"
+											triggerLabel="Recalculate"
 											disabled={!d.manuallyEdited}
-											triggerTitle="Discard manual edit and re-derive from punches"
+											triggerTitle="Recalculate this day from the raw punches"
 											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
 											submit={keepValues}
 										>
@@ -824,23 +841,26 @@
 												method="POST"
 												action="?/correct"
 												use:enhance={save.enhance}
+												class="w-[4.5rem]"
 											>
 												<input type="hidden" name="id" value={d.id} />
 												<input type="hidden" name="date" value={toDateKey(d.date)} />
-												<button
-													disabled={save.busy}
-													class="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-													>{save.busy ? 'Saving…' : 'Save'}</button
-												>
+												{#if isDirty(d)}
+													<button
+														disabled={save.busy}
+														class="w-full rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+														>{save.busy ? 'Saving…' : 'Save'}</button
+													>
+												{/if}
 											</form>
 											<ConfirmButton
 												action="?/resetDay"
 												title="Discard the manual edit?"
 												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
 												confirmText="Reset"
-												triggerLabel="Reset"
+												triggerLabel="Recalculate"
 												disabled={!d.manuallyEdited}
-												triggerTitle="Discard manual edit and re-derive from punches"
+												triggerTitle="Recalculate this day from the raw punches"
 												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
 												submit={keepValues}
 											>
