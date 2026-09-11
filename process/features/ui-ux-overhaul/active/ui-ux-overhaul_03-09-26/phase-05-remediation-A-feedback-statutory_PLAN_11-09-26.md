@@ -269,47 +269,119 @@ moves to meet it. Do not edit the comment.
   the dev DB and read the row back; do not rely on a type-check.
 
 **The golden-test churn — the largest single risk in this plan.** Changing the engine default
-changes every absolute tax figure in the unit suite. Verified touch points (35 `withholdingTax`
-mentions across 17 test files):
+changes every absolute tax figure in the unit suite. Verified touch points, re-counted during
+VALIDATE: **35 `withholdingTax` mentions across 16 test files** (10 unit + 4 e2e specs + 2 payslip
+unit) — not 17.
 
 | File | What must be recomputed |
 |---|---|
-| `tests/unit/ph-statutory.test.ts:71,75` | `computeWithholdingTax(20000)` stays `0`; `(25000)` moves `833.40 → 625.05` |
-| `tests/unit/payroll-statutory-config.test.ts:117,134,325,348,360` | table-driven `exp.tax` rows + the `30000 → '1463.4'` baseline + the two hand-built-table cases at `:348`/`:360` (those pass their **own** table and should be unaffected — confirm, do not assume) |
+| `tests/unit/ph-statutory.test.ts:71,76` | `computeWithholdingTax(20000)` stays `0`. `:74` is **a formula, not a literal**: `toBeCloseTo((20 * (25000 - 20833)) / 100, 0)` at `:76`. The 2018 rate `20` is embedded in the expression — change it to `15`, which makes the expression itself the hand-computation. Result moves `833.40 → 625.05`. |
+| `tests/unit/payroll-statutory-config.test.ts:43-104` (`PARITY`) | **The primary table-driven surface.** Every `tax:`/`total:`/`net:` literal in the `PARITY` record, read back by the loops at `:105` and `:319`. The `'30000'` row's `tax: '1463.4'` is the baseline the rest of the suite echoes. |
+| `tests/unit/payroll-statutory-config.test.ts:134,135` | the `30000 → '1463.4'` exemption baseline and its `'0'` counterpart |
+| `tests/unit/payroll-statutory-config.test.ts:301-316` | **The `#220` derived-parity block — see the collapse requirement below. This is not a number to repoint.** |
+| `tests/unit/payroll-statutory-config.test.ts:332-364` | the two hand-built-table cases. They pass their **own** table (`deriveTaxBrackets` on literal rows) and are unaffected by the engine default — confirm, do not assume. **The plan's earlier `:348`/`:360` anchors were wrong; neither line holds a `withholdingTax`.** |
 | `tests/unit/payroll-calculator.test.ts:40` | `731.7` |
 | `tests/unit/payroll-standard-period-golden.test.ts:116,166,216,266,316,366,423,473` | eight inline-snapshot `withholdingTax` values (`731.7` ×6, `1463.4` ×2) **and** every `netPay`/`totalDeductions` figure in the same snapshots |
 | `tests/unit/payroll-custom-period-statutory-proration.test.ts:32,52,116` | the `MONTHLY.withholdingTax = 1463.4` constant; the two proration assertions derive from it |
 | `tests/unit/payroll-custom-period-ee-share.test.ts:59,88` | `1463.4 * CUSTOM_SHARE` ×2 |
 | `tests/unit/payroll-statutory-exemption.test.ts:61,80,120` | relative to `base` — should hold; confirm |
 | `tests/unit/payroll-statutory-allocation.test.ts:125` | relative equality — should hold; confirm |
-| `tests/unit/payroll-deductions.test.ts:57`, `payslip-*.test.ts`, `report-scoping.test.ts` | hand-fed literals, not engine output — should hold; confirm |
+| `tests/unit/payroll-deductions.test.ts:57`, `payslip-document.test.ts:16`, `payslip-draft-visibility.test.ts:62`, `report-scoping.test.ts:60,75` | hand-fed literals, not engine output — **confirmed unaffected during VALIDATE** |
 
-**Method, mandatory:** run `pnpm test`, take the actual failure list, and **recompute each new
-expected value by hand from the 2023 table** before writing it in. Do **not** paste vitest's
-"received" value into the expectation — that is a test that can no longer fail. Record the
-hand-computation for at least the golden file in the phase report.
+#### C-1 — the `#220` derived-parity block must COLLAPSE, not be repointed (binding)
 
-E2E: `payroll-lock-idempotency`, `payroll-void-run-amortization`, `payslip-draft-visibility`,
-`payslip-tenancy` reference tax; check whether any assert an absolute peso figure.
+`tests/unit/payroll-statutory-config.test.ts:301-316` builds:
+
+```
+const seededDerivedRow = { ...seededRow, taxBrackets: deriveTaxBrackets(DEFAULT_STATUTORY_RATE_CONFIG.taxBrackets…) }
+const SEEDED_DERIVED  = statutoryRatesFromConfig(seededDerivedRow)
+const DERIVED_PARITY  = { ...PARITY, '250000': { ...PARITY['250000'], tax: '66348.06', total: '69948.06', net: '180051.94' } }
+```
+
+That `'250000'` override exists for **exactly one reason**: today `deriveTaxBrackets` disagrees with
+the seeded table. Its own comment at `:301-305` names the drift this plan removes — *"only the high
+brackets differ from the OLD published table by a rounding cent (10833.33→10833.5, 40833.33→40833.5,
+200833.33→200833.5)"*.
+
+After D1, `deriveTaxBrackets(BIR_MONTHLY_TAX_TABLE)` reproduces the shipped table exactly, so
+`SEEDED_DERIVED` becomes identical to `SEEDED` and `DERIVED_PARITY` becomes identical to `PARITY`.
+**Required:**
+
+1. **Delete** the `'250000'` override. `DERIVED_PARITY` must reduce to `PARITY` — either drop the
+   alias entirely and loop over `PARITY`, or keep the name with no overrides and assert
+   `expect(DERIVED_PARITY).toEqual(PARITY)`.
+2. **Rewrite the `:301-305` comment.** It currently describes drift that will no longer exist.
+   Leaving it is the repo's *"a comment about a FIXED bug reads identically to one about a live
+   bug"* trap, which has cost a reverted commit here before.
+3. **Record the collapse in the phase report as the second D1 proof**, beside the AC-S2.2
+   arithmetic.
+
+**Repointing `'66348.06'` to a new drifted figure is a FAILURE of this section even if `pnpm test`
+goes green.** A green suite that still carries the override means D1 did not do what D1 is for. If
+the override cannot be deleted because the numbers still disagree, **stop** — the table is wrong,
+not the test.
+
+#### Method, mandatory
+
+Run `pnpm test`, take the actual failure list, and **recompute each new expected value by hand from
+the 2023 table** before writing it in. Do **not** paste vitest's "received" value into the
+expectation — that is a test that can no longer fail.
+
+**How a reviewer tells the difference:** every changed literal must have its derivation written into
+the phase report. No derivation, no accepted expectation. A diff that changes a number with no
+matching line in the report is rejected on sight, green or not.
+
+Worked derivation to start from (verified during VALIDATE — confirm the quantization, do not assume
+it):
+
+```
+statutory at ₱30,000 gross: sssEe 900 + philhealthEe 750 + pagibigEe 200 = 1,850
+taxable monthly = 30,000 − 1,850 = 28,150
+2018: (28,150 − 20,833) × 0.20 = 1,463.40   ← today's `tax: '1463.4'`, and 731.70 at periodShare 0.5
+2023: (28,150 − 20,833) × 0.15 = 1,097.55   ← the new monthly figure; the half-period figure is
+                                              1,097.55 × 0.5 = 548.775 BEFORE money quantization —
+                                              read the quantized value from the engine's own rule,
+                                              do not round it by eye
+```
+
+**E2E — resolved during VALIDATE, no action needed.** All six e2e `withholdingTax` occurrences
+(`payroll-lock-idempotency.spec.ts:75`, `payslip-tenancy.spec.ts:81,116,161`,
+`payroll-void-run-amortization.spec.ts:93`, `payslip-draft-visibility.spec.ts:41`) are fixture
+**inputs** written as `withholdingTax: 0`. **None asserts an engine-computed peso figure.** The
+plan's earlier open question on this is closed.
 
 **Acceptance criteria (each can FAIL).**
 
 - `AC-S2.1` — `BIR_MONTHLY_TAX_TABLE` carries rates `0/0.15/0.20/0.25/0.30/0.35` and baseTax
   `0/0/1875/8541.8/33541.8/183541.8`.
-- `AC-S2.2` (**the D1 proof**) — a new unit test asserts
+- `AC-S2.2` (**the D1 proof**) — a new permanent unit test **in `tests/unit/ph-statutory.test.ts`**
+  (where the table lives and `computeWithholdingTax` is already covered) asserts
   `deriveTaxBrackets(BIR_MONTHLY_TAX_TABLE.map(({floor,rate}) => ({floor,rate})))` returns
-  `baseTax` values **identical** to `BIR_MONTHLY_TAX_TABLE`'s own. This test must be written to
-  fail against the 2018 table — verify that by stashing the new table and watching it go red
-  (negative control).
+  `baseTax` values **identical** to `BIR_MONTHLY_TAX_TABLE`'s own. A second case in the same file
+  is the **permanent 2018 negative control**: feeding the rate vector
+  `[0, 0.2, 0.25, 0.3, 0.32, 0.35]` over the same floors must derive
+  `[0, 0, 2500, 10833.5, 40833.5, 200833.5]` — the drift, asserted as a fact so the first case
+  cannot quietly become vacuous. Both figures were re-derived against the live helper during
+  VALIDATE. Also confirm the first case goes red against the 2018 table by stashing the new table
+  once, and paste that run into the report.
 - `AC-S2.3` — `pnpm tsx scripts/migrate-bir-tax-table-2023.ts` reports `3 config row(s)` on the
   first run and `0 config row(s)` on the second.
 - `AC-S2.4` — after the migration, all three orgs' `taxBrackets` read
   `[0,0,1875,8541.8,33541.8,183541.8]` with rates `[0,0.15,0.2,0.25,0.3,0.35]`.
 - `AC-S2.5` — `pnpm test` is green, and every changed expectation has a hand-derived figure
-  recorded in the phase report.
+  recorded in the phase report. An expectation with no recorded derivation fails this criterion
+  regardless of suite colour.
+- `AC-S2.6` (**the second D1 proof**) — `payroll-statutory-config.test.ts`'s `'250000'`
+  `DERIVED_PARITY` override is **deleted** and the `:301-305` comment is rewritten. A run in which
+  the override survives with a new number FAILS this criterion even if the suite is green.
+- `AC-S2.7` — `tests/unit/ph-statutory.test.ts:76`'s rate is changed inside the expression
+  (`20 → 15`), not replaced by a bare literal.
 
 **Gate.** `pnpm format:check && pnpm lint && pnpm check && pnpm test`, plus the two script runs and
-the read-back query.
+the read-back query. Baseline before any edit, verified during VALIDATE: format:check clean; lint
+0 errors / 1 warning (`src/lib/components/payroll/CalculatorWindow.svelte:82`,
+`a11y_no_static_element_interactions`); `pnpm test` 2468 passed across 211 files — any change to the pre-existing-warning count or
+an unexplained change in file count is itself a finding.
 
 ---
 
@@ -530,6 +602,38 @@ unconditionally**, regardless of what the user edited. That is the whole of symp
    `floor, ceiling, baseTax, rate, excessOver`), plus array length. Do not sort keys via a
    stringify-with-replacer trick and call it done — compare the fields you mean, so a future added
    field fails loudly rather than silently.
+
+   **2b. The open-ceiling rule — defensive, NOT a live bug. Read the correction before acting.**
+
+   The raw tables do carry an infinite top bracket (`BIR_MONTHLY_TAX_TABLE`
+   `ceiling: Infinity` at `ph-statutory.ts:295`; `SSS_TABLE_2024` `salaryCeiling: Infinity` at
+   `:226`), and `Infinity` cannot cross JSON or the DB. **The repo already solved this.**
+   `sssBracketsToWire` / `taxBracketsToWire` (`ph-statutory.ts:339-346`) convert `Infinity → null`
+   on the way out, and `DEFAULT_STATUTORY_RATE_CONFIG` (`:354-362`) is built **through** those
+   converters — its comment says so: *"Infinity ceilings already wired to null"*.
+
+   Traced through both sides of `summarizeChanges`:
+
+   | Side | Value of the top `ceiling` | Why |
+   |---|---|---|
+   | `live`, org **has** a row | `null` | stored jsonb was written wire-shaped |
+   | `live`, org has **no** row | `null` | `toWireConfig` (`:22-35`) falls back to `DEFAULT_STATUTORY_RATE_CONFIG`, already wired |
+   | `payload` | `null` | `parseRates`'s `nn()` (`:133`) returns `null` for an empty ceiling input |
+
+   **So `Infinity` never reaches the comparison on any path, and this is NOT a live defect.** An
+   earlier VALIDATE pass called it one; that was verifying the defect (Infinity exists in the
+   tables) without verifying the premise (that it reaches the comparison). It does not.
+
+   What remains is a cheap **fixture hazard**, and that is what the rule guards: a test that builds
+   its expected table from the RAW `BIR_MONTHLY_TAX_TABLE` gets `Infinity`, while everything in
+   production is wire-shaped `null` — so the test mismatches production and the comparison looks
+   broken when it is not.
+
+   The rule, kept because it costs one line and removes a whole class of confusion:
+   **`null`, `undefined` and `Infinity` all mean "open ceiling" and compare equal.** Apply it to
+   `salaryCeiling` and `ceiling` on both sides. Do **not** "fix" this by removing `Infinity` from
+   the shipped tables — `computeWithholdingTax` relies on it for its `income.lte(b.ceiling)`
+   bracket lookup (`ph-statutory.ts:305`).
 3. Keep the scalar comparisons at `:44-51` exactly as they are. They are correct.
 4. The `'No effective change vs the live rates.'` fallback at `:62` becomes **reachable for the
    first time**. That is intended and S7c renders it.
@@ -549,6 +653,14 @@ every save, so the BIR line would still be "true" and the fix would be unprovabl
 - A bracket-count change (34 vs 33 rows) → the line **is** produced.
 - Pag-IBIG cap only → exactly one line, `Pag-IBIG cap: ₱200 → ₱99,999`.
 - Nothing changed → exactly `['No effective change vs the live rates.']`.
+- **(8th, the open-ceiling case — mandatory.)** A `live` side built from the **raw**
+  `BIR_MONTHLY_TAX_TABLE` / `SSS_TABLE_2024` (top `ceiling` / `salaryCeiling` = `Infinity`) against
+  a wire-shaped payload whose top bracket carries `null`, identical in every other field →
+  exactly `['No effective change vs the live rates.']`. Assert it for **both** `taxBrackets` and
+  `sssBrackets`. This is the negative control for the normalisation rule and the guard against the
+  raw-table fixture mistake. **Also assert the realistic production shape explicitly:** an org with
+  no config row (`live` = `DEFAULT_STATUTORY_RATE_CONFIG`, already `null`) vs an identical wire
+  payload → same single fallback line. That second half is the one that mirrors what actually runs.
 
 **Do not touch** `touchedServices` or the confirm-dialog sentence. P1-9a proved the dialog is
 already correct ("You are changing: SSS, Pag-IBIG…"); it is the highest-value message in the phase.
@@ -562,6 +674,10 @@ Fixing the dialog would be fixing the wrong end.
   the pending proposal lists **exactly one** line, the Pag-IBIG one.
 - `AC-S7a.3` — `summarizeChanges` is exported from a module outside `+page.server.ts` and is
   covered by tests.
+- `AC-S7a.4` — the open-ceiling normalisation is implemented and both halves of the 8th case pass.
+  Prove the raw-table half can fail: drop the normalisation, watch it go red, restore it. Paste both
+  runs. **The no-config-row half is expected to pass with or without the normalisation** — that is
+  the verified fact, not a weakness in the test; record it as such rather than "fixing" it.
 
 **Commit:** `fix(payroll): compare statutory payloads by value, not by JSON key order`
 
@@ -667,11 +783,28 @@ via a crafted row instead.
 **File:** `src/routes/(app)/settings/roles/+page.svelte:214-223` (the `{:else}` activate branch)
 
 **The change.** Route the activate branch through `ConfirmButton`, exactly like the deactivate
-branch at `:202-212`. Keep the per-row `setActiveGuard(u.id)` (`:30-31`, `:186`) — it is the #108
-double-submit guard and `ConfirmButton` has its own internal `submitFeedback`; make sure the row
-does not end up with two competing guards. If `ConfirmButton`'s internal guard is sufficient for
-this row (it is for the deactivate branch), drop the row's own guard **for this branch only** and
-say so; the `{#if u.isActive}` branch is unaffected.
+branch at `:202-212`.
+
+**The per-row guard dies with this change — remove it (binding).** Verified during VALIDATE: the
+`{#if u.isActive}` deactivate branch already uses `ConfirmButton`, which owns its own
+`submitFeedback` (`ConfirmButton.svelte:50-53`). Once the `{:else}` activate branch also uses
+`ConfirmButton`, **nothing reads the row's own guard any more.** Its only three readers are inside
+the branch being replaced:
+
+| Binding | Line | Reader after this change |
+|---|---|---|
+| `setActiveGuards` record | `:30` | none |
+| `setActiveGuard(id)` factory | `:31` | none |
+| `{@const setActive = setActiveGuard(u.id)}` | `:186` | none — `:214` `use:enhance`, `:219` `disabled`, `:222` label all disappear with the branch |
+
+All three are orphans **created by this change**, so the surgical-changes rule says remove them in
+this commit. `pnpm lint` will flag the unused binding if they are left. Do **not** keep a second
+guard alongside `ConfirmButton`'s — that is the R7 wedge.
+
+The comment block sits at `:199-201`, inside the `{#if u.isActive}` deactivate branch that opens at
+`:198`. Its third line — *"#108: ConfirmButton's busy state is this form's single-submit guard"*
+(`:201`) — stays true and becomes true for **both** branches; keep it and say so. Only the first two
+lines (`:199-200`) assert the reversed decision.
 
 Keep `<input type="hidden" name="isActive" value="true" />`.
 
@@ -692,11 +825,12 @@ now carrying two. Add the new entry as `site: '12b re-activate login'` with a no
 needle — `can sign in again immediately and regains access to everything their roles allow` (the
 `{u.email}` prefix is interpolated and cannot be part of the needle).
 
-**Documentation amendments — all five, in this commit.** Otherwise the next reader hits a plan that
-argues against the shipped code:
+**Amendments — all six, in this commit.** Otherwise the next reader hits a plan, and a source
+comment, that argue against the shipped code:
 
 | File | Line | What to change |
 |---|---|---|
+| **`src/routes/(app)/settings/roles/+page.svelte`** | **`:199-201`** | **The source comment is the first thing this change makes false.** It reads: *"Deactivating locks a person out, so it confirms first; re-activating is neither destructive nor irreversible and deliberately stays one click."* Rewrite it to say both directions confirm and name the different consequence each one carries. **Do not delete it** — this repo has a standing lesson that a comment describing a reversed decision reads identically to one describing live behaviour, and that trap has cost a reverted commit here. This is the one comment edit S8 is allowed; it is an amendment to a pre-existing comment, not a new explanatory comment, so the no-comments rule does not bar it. |
 | `phase-05-destructive-actions_PLAN_03-09-26.md` | `:472` | Remove the "Login re-activation" row from the *Deliberately Not Confirmed (and why)* table; add a note that owner decision 11-09-26 reversed it. |
 | same | `:385-387` | Rewrite the "Asymmetric by design" paragraph — the asymmetry is gone; both directions confirm, with different consequences named. |
 | same | `:389-392` | Update the site 12 wiring instruction to cover both branches. |
@@ -713,8 +847,16 @@ record shows a decision was reversed, not that it never existed.
 - `AC-S8.3` — cancelling it leaves `isActive` false (read back via `psql`).
 - `AC-S8.4` — the row's double-submit protection still holds (fast double-click → one audit row).
 - `AC-S8.5` — `COPY.length === 18`, the header comment says 18, and all 18 needles pass.
-- `AC-S8.6` — all five documentation anchors are amended; `grep -n "Deliberately Not Confirmed" -A20`
+- `AC-S8.6` — all **six** anchors are amended; `grep -n "Deliberately Not Confirmed" -A20`
   no longer shows a re-activation row.
+- `AC-S8.7` — `grep -n "deliberately stays one click" src/` returns **nothing**. The source comment
+  at `settings/roles/+page.svelte:199-201` describes the shipped behaviour, not the reversed
+  decision.
+- `AC-S8.8` — `setActiveGuards`, `setActiveGuard` and the `{@const setActive = …}` at `:186` are
+  gone, and `pnpm lint` still reports exactly **0 errors / 1 warning**, that one warning being the
+  pre-existing `src/lib/components/payroll/CalculatorWindow.svelte:82` a11y
+  `a11y_no_static_element_interactions` — verified as the baseline during VALIDATE. A count alone is
+  not the criterion; it must be *that* warning and no other.
 
 **Gate.** Full gate set + live browser pass.
 
@@ -787,15 +929,41 @@ Per `(page, action)` pair, assert exactly one of these is wired:
 
 - a toast — the action returns `saved: '<string>'` **and** the client form's handler is
   `submitFeedback`/`ConfirmButton` without `success: null`; or
-- an inline/page surface — a `<FormFeedback>` or `Banner` gated on `form.action === '<action>'`,
-  **and** the toast is suppressed (`success: null`) or the action returns no `saved` string.
+- an inline/page surface — a `<FormFeedback>` or `Banner` whose **gating needle** (see below) is
+  present, **and** the toast is suppressed (`success: null`) or the action returns no `saved`
+  string.
 
 Two ⇒ fail (the F1 shape). Zero ⇒ fail (the F2 shape).
 
-**The table must cover, at minimum:** `employees/[id]` offboard (banner, toast suppressed),
-`payroll/config` update + updateRates (inline FormFeedback each), `payroll/[id]` override (toast),
-`payroll/statutory-rates` ×4 (toast), `payroll/periods` void + release (existing), `settings/roles`
-setActive (existing toast), `separations/[id]` finalize + undo (existing).
+**The gating rule is a per-site needle, not one hard-coded pattern (binding).** A single
+`form.action === '<action>'` match is wrong — verified during VALIDATE, it misses two of the sites
+this very table requires:
+
+| Site | Actual gating expression | Server return |
+|---|---|---|
+| `separations/[id]` finalize | `{#if form?.finalized}` (`+page.svelte:82`) | `{ finalized: true }` (`+page.server.ts:97`) |
+| `separations/[id]` undo | `{#if form?.undone}` (`+page.svelte:58`) | `{ undone: true, …}` (`+page.server.ts:117`) |
+| `employees/[id]` — 15 non-offboard actions | `{#if savedNotice}` (`:206`), where `savedNotice = form?.success ? (DONE[form.action] ?? null) : null` (`:169`), `DONE` map at `:148-164` | `{ action, success: true }` |
+| `employees/[id]` offboard | `{#if form?.action === 'offboard' && form?.saved}` (`:1813`) | `{ action: 'offboard', saved: '…' }` (`+page.server.ts:676`) |
+| `payroll/config` update / updateRates | `<FormFeedback>` per card (after S4) | `{ action, saved }` (after S4) |
+| `payroll/periods` release + void | no banner — `ConfirmButton` toast only | `{ action, saved }` (`:110`, `:121`) |
+
+So each row of the site table carries its **own** gating needle string, the same way
+`destructive-confirms.test.ts` carries a per-site copy needle. The gate asserts that the row's
+declared needle is present **and** that the toast half matches the row's declared expectation.
+
+**Do NOT re-wire `separations/[id]` or the `employees/[id]` `DONE` map to fit the gate.** Those
+pages already report exactly once; they simply use a different gating shape. S9 is height and
+placement only. Assert their current shape and move on. Changing working code to satisfy a new test
+is how a gate becomes the tail wagging the dog.
+
+**The table must cover, at minimum:** `employees/[id]` offboard (banner, toast suppressed) **and at
+least three `DONE`-map actions** (so the indirection is covered, not skipped), `payroll/config`
+update + updateRates (inline FormFeedback each), `payroll/[id]` override (toast),
+`payroll/statutory-rates` ×4 (toast), `payroll/periods` void + release (existing),
+`settings/roles` setActive (existing toast — **note S8 moves the activate branch to
+`ConfirmButton`; the site stays one-toast either way**), `separations/[id]` finalize + undo
+(existing, `form?.finalized` / `form?.undone` needles).
 `attendance` is **read-only** in this scan — assert its current state, do not change the file.
 
 **Honesty requirements, non-negotiable.**
@@ -817,6 +985,9 @@ setActive (existing toast), `separations/[id]` finalize + undo (existing).
   in the report.
 - `AC-S10.3` — the gate fails on a *second* surface too, not just on zero. Prove it: add a
   duplicate banner to one page, watch it go red, remove it.
+- `AC-S10.5` — no file under `src/routes/(app)/separations/**` or the `employees/[id]` `DONE` map
+  was edited to make the gate pass. `git diff` for S10's commit touches only
+  `tests/unit/success-surfaces.test.ts`.
 - `AC-S10.4` — the file states its own limits and carries a non-vacuity assertion.
 
 **Gate.** Full gate set.
@@ -950,7 +1121,12 @@ plus the golden/tax expectation files listed in S2.
 | `tests/unit/statutory-change-summary.test.ts` — 7 cases, first two proven red pre-fix | Fully-Automated | AC-S7a.1, AC-S7a.3 |
 | `tests/unit/success-surfaces.test.ts` + its removal/duplication negative controls | Fully-Automated | AC-S10.1–AC-S10.4 |
 | `tests/unit/destructive-confirms.test.ts` at `COPY.length === 18` | Fully-Automated | AC-S8.5 |
-| derive-equals-published assertion on the 2023 table | Fully-Automated | AC-S2.2 (the D1 proof) |
+| derive-equals-published assertion on the 2023 table, **in `tests/unit/ph-statutory.test.ts`**, with the 2018 vector as a permanent negative-control case | Fully-Automated | AC-S2.2 (the D1 proof) |
+| `DERIVED_PARITY` collapses to `PARITY` — the `'250000'` override deleted, the `:301-305` comment rewritten | Fully-Automated | AC-S2.6 (the second D1 proof) |
+| `tests/unit/statutory-change-summary.test.ts` 8th case — default config (`ceiling: Infinity`) vs jsonb payload (`ceiling: null`) compares equal | Fully-Automated | AC-S7a.4 |
+| `grep -n "deliberately stays one click" src/` returns nothing | Fully-Automated | AC-S8.7 |
+| `pnpm lint` new-warning count is 0 against the 1 pre-existing baseline warning | Fully-Automated | AC-S8.8 |
+| `git diff` for S10's commit touches only `tests/unit/success-surfaces.test.ts` | Fully-Automated | AC-S10.5 |
 | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/separations.spec.ts tests/e2e/timesheet-punch.spec.ts` | Hybrid — needs the dev DB up | AC-S5.4, AC-S9.5 |
 | `pnpm tsx scripts/migrate-bir-tax-table-2023.ts` run twice + `psql` read-back | Hybrid — needs `veent-db-5434` | AC-S2.3, AC-S2.4 |
 | `psql` restore verification queries (4) | Hybrid — needs `veent-db-5434` | AC-S1.1–AC-S1.4 |
@@ -1001,6 +1177,10 @@ fixture, both of which are currently hand-rolled per session.)
 | R9 | Plan A and plan B both edit `destructive-confirms.test.ts` and conflict | Ownership is assigned: plan A owns the file; plan B has been told. S8 is the only section that touches it. |
 | R10 | S7's fixtures cannot be made because the form refuses a no-change submit | Documented fallback in S7c: reach the empty state via a crafted row and say so in the report. |
 | R11 | `pnpm check` stops the owner's dev server mid-live-pass | Use `pnpm exec svelte-check --tsconfig ./tsconfig.json` while the server must stay up; run the full `pnpm check` at section end when it can be stopped. |
+| R12 | S2 repoints `DERIVED_PARITY`'s `'250000'` override to a new drifted number, the suite goes green, and the drift D1 exists to kill survives in a test that now certifies it | `AC-S2.6` makes deletion the criterion and a surviving override an explicit section failure regardless of suite colour. The stale comment at `:301-305` must be rewritten in the same edit. |
+| R13 | S7a's field-by-field compare hits `Infinity` (default config) against `null` (jsonb round trip) and emits a false "table changed" line — F5's own bug, reintroduced by F5's fix | S7a step 2b makes open-ceiling normalisation binding; the 8th test case is its negative control (`AC-S7a.4`). |
+| R14 | S10's gate is written against one `form.action ===` pattern, silently reports zero surfaces for `separations/[id]` and the `employees/[id]` `DONE` map, and someone "fixes" those working pages to satisfy it | S10's per-site needle table records each site's real gating expression; `AC-S10.5` asserts S10's commit touches only the test file. |
+| R15 | S8 leaves `setActiveGuards` / `setActiveGuard` / the `{@const}` at `:186` behind as dead code, or leaves the `:199-201` comment asserting re-activation "deliberately stays one click" | `AC-S8.7` and `AC-S8.8`. Both are orphans/false statements created by this change, so the surgical-changes rule requires them removed or corrected here. |
 
 ---
 
@@ -1032,8 +1212,14 @@ No production environment exists for this repo; do not reason about production i
   `src/lib/server/services/attendance/**` appears in any commit from this plan.
 - `AC-P7` — No explanatory comments were added to shipped code (`git diff` grepped for added
   comment lines before each commit).
-- `AC-P8` — The phase 05 plan/report/test-script no longer argue against the shipped re-activation
-  confirm, and the phase 06 plan owns the bell plus its data gap.
+- `AC-P8` — The phase 05 plan/report/test-script **and the `settings/roles/+page.svelte:199-201`
+  source comment** no longer argue against the shipped re-activation confirm, and the phase 06 plan
+  owns the bell plus its data gap.
+- `AC-P9` — D1 is proven twice and both proofs are in the phase report: the derive-equals-published
+  assertion with its permanent 2018 negative control (AC-S2.2), and the collapse of
+  `DERIVED_PARITY` into `PARITY` (AC-S2.6). Neither is satisfied by a green suite alone.
+- `AC-P10` — No working page was edited to satisfy a new gate. S10's commit touches only its own
+  test file (AC-S10.5).
 
 ---
 
@@ -1045,6 +1231,9 @@ No production environment exists for this repo; do not reason about production i
 | same file, header comment `:185-187` "17 messages across 16 sites" | 17/16 | **18 messages across 16 sites**, site 12 now has two | S8 |
 | `COPY` array — new entry `12b re-activate login` | — | added | S8 |
 | every absolute `withholdingTax` / `netPay` / `totalDeductions` expectation listed in S2 | 2018 figures | hand-recomputed 2023 figures | S2 |
+| `tests/unit/payroll-statutory-config.test.ts:313-316` `DERIVED_PARITY`'s `'250000'` override | present | **deleted** (not repointed) | S2 |
+| `tests/unit/ph-statutory.test.ts:76` rate inside `toBeCloseTo((20 * (25000 - 20833)) / 100, 0)` | `20` | **`15`** | S2 |
+| `tests/unit/statutory-change-summary.test.ts` case count | — | **8** (the 7 listed plus the C-4 open-ceiling case) | S7a |
 
 Nothing else in the suite has a hard count. `G2`'s `sourceFiles().length > 100` is a floor and is
 unaffected. S10's new gate introduces its own non-vacuity floor — record its initial value.
@@ -1091,9 +1280,12 @@ Status: CONDITIONAL
 Date: 11-09-26
 date: 2026-09-11
 generated-by: outer-pvl
+supersedes: 2026-09-11 (outer-pvl, first pass, committed at 89b059c) — this contract is the second PVL cycle, written after one plan-validate-fix loop applied C-1..C-9 into the plan body
+
+PVL cycles: 1 completed fix loop (pass 1 CONDITIONAL → plan supplement → pass 2 re-validation)
 
 Parallel strategy: sequential
-Rationale: 7-signal score 5/7 (S2 schema/auth surface, S4 phase program, S5 depth requested, S6 high-risk class, S7 5+ files) → HIGH tier, which normally recommends agent-team or workflow. Overridden to sequential because this harness exposes no Agent/Task/TeamCreate tool — the two-layer fan-out was executed in-thread as batched read-only probes (psql, grep, sed, one throwaway vitest run). Fan-out coverage was not reduced; only the execution method changed. Agent count: 1.
+Rationale: 7-signal score 5/7 (S2, S4, S5, S6, S7) → HIGH tier, which normally recommends agent-team or workflow. Overridden to sequential because this harness exposes no Agent/Task/TeamCreate tool — both fan-out passes were executed in-thread as batched read-only probes (psql, grep, sed, one throwaway vitest run, one `pnpm lint` baseline run). Fan-out coverage was not reduced; only the execution method changed. Agent count: 1.
 
 ### Test gates
 
@@ -1166,88 +1358,82 @@ Legacy line form (for existing validate-contract consumers):
 
 ### Dimension findings
 
-- Infra fit: PASS — every command in the plan is real and matches the loaded test context (`pnpm format:check`/`lint`/`check`/`test`, `pnpm tsx`, `docker exec -i veent-db-5434 psql -p 5434`, `CI=1 pnpm exec dotenv -e .env.dev -- playwright test`). Live DB state re-verified this session and matches the plan's table byte for byte. No server start, no `.env` edit, no schema change.
-- Test coverage: CONCERN — the churn map misses the `#220` derived-parity block and miscounts the file set; see C-1, C-2, C-3.
-- Breaking changes: CONCERN — the Public Contracts table covers all six return-shape changes and no external consumer exists, but two change-created orphans are not declared; see C-5.
-- Security surface: CONCERN — three high-risk classes are present (money engine, data migration, login re-activation) and the plan has no `harness/` evidence pack; see C-6. The S8 change itself strictly tightens access (adds a confirm), no capability or auth logic moves, and the migration is org-scoped with a verified-correct guard.
-- Section S1 (data restore): PASS — mechanical feasibility confirmed against the live DB; `org_seed` holds `pagibigCap 88888.00`, `eeShare 188`/`total 578`, `baseTax [0,0,2500,10833.5,40833.5,200833.5]`; the two other orgs are clean. Zero PENDING proposals confirmed. Highest-risk edit: an `UPDATE` without the `WHERE` — the plan names it.
-- Section S2 (D1 tax table): CONCERN — the arithmetic is independently proven (below) and the migration guard is proven correct, but the golden-churn map has a hole; see C-1/C-2/C-3. Highest-risk edit: pasting vitest "received" values; mitigated by the hand-computation rule plus AC-S2.2's negative control.
-- Section S3 (F3 reset): PASS — `createSubmitGuard` at `:15`, `await update()` at `:16`, baseline re-seed at `:17` all confirmed; six-site audit list is correctly framed as per-form, not blanket.
-- Section S4 (FormFeedback): PASS — shared Banner at `:84-86` with a client-side hard-coded string confirmed; both server returns are bare `{ success: true }` at `:104`/`:154` confirmed; `?/update` uses `saveConfig = createSubmitGuard()` (no toast), so no double surface is created.
-- Section S5 (F1 offboard): PASS — fully verified. The Banner at `:1813-1814` is gated on `form?.action === 'offboard' && form?.saved`, the server returns `{ action: 'offboard', saved: 'Employee offboarded.' }` at `:676`, and `offboard` is deliberately absent from the `DONE` map, so `savedNotice` never double-fires. `submitFeedback({ success: null })` suppresses the toast while still calling `update()`, so the Banner still renders — the mechanism is correct.
-- Section S6 (F2 override): PASS — `?/override` confirmed to fall off the end at `:143` after `overridePayrollEntry`; `{ action: 'void', saved: 'Period voided.' }` at `payroll/periods/+page.server.ts:121` is a real precedent; `submitFeedback` re-exposes `busy`, so the per-row memoised guard survives the swap.
-- Section S7a (F5 key order): CONCERN — root cause fully confirmed, one edge case unhandled; see C-4.
-- Section S7b (F6 toasts): PASS — all four `{ success: '…' }` returns confirmed at `:203/:218/:229/:240`; `Banner` is imported at `:4` and used at exactly one place (`:241`), so the orphaned-import risk R4 is real and correctly flagged. `ConfirmButton` does read the server's `saved` string (`ConfirmButton.svelte:50-53`), so Confirm/Reject genuinely need no client change.
-- Section S7c (F7 density): PASS — both pinned confirm needles and the `p.changes.join()` interpolation confirmed in place; anchors drift ~2 lines (see C-7).
-- Section S8 (F8 re-activate): CONCERN — the test-fear analysis is correct (nothing pins the activate branch as unconfirmed; `COPY.length === 17` confirmed), but two things are missing; see C-5 and C-8.
-- Section S9 (F9 height + settled line): PASS — all anchors present with ~2 lines of drift; `separations.spec.ts` confirmed to hold zero assertions on `settled`/`Finalized on`/`Final pay`.
-- Section S10 (surface gate): CONCERN — the gate's matching rule does not fit two of the sites its own table requires; see C-9.
-- Section S11 (phase-06 handoff): PASS — phase 06 plan is `PLANNED` and unexecuted; S1 at `:128` is the right home.
+- Infra fit: PASS — every command is real and matches the loaded test context. Live DB state and the lint baseline re-verified this pass. No server start, no `.env` edit, no schema change.
+- Test coverage: PASS (upgraded from CONCERN) — the churn map now carries the corrected count (35 mentions / 16 files), the `PARITY` data table at `:43-104` as the primary surface, corrected anchors, the `#220` derived-parity collapse as a binding criterion, and a worked derivation the reviewer can check against.
+- Breaking changes: PASS (upgraded from CONCERN) — both change-created orphans are now declared: the three dead `setActive` bindings (AC-S8.8) and the false source comment (AC-S8.7).
+- Security surface: CONCERN — unchanged. Three high-risk classes are present (money engine, data migration, login re-activation) and the `harness/` evidence pack is still an execute-agent instruction (E10), not a plan-body requirement. The S8 change itself strictly tightens access; the migration is org-scoped with a verified-correct guard.
+- Section S1 (data restore): PASS — re-verified against the live DB.
+- Section S2 (D1 tax table): PASS (upgraded from CONCERN) — C-1/C-2/C-3 landed as AC-S2.6, AC-S2.7, R12 and the corrected churn table. Arithmetic independently re-proven; migration guard proven correct.
+- Section S3 (F3 reset): PASS.
+- Section S4 (FormFeedback): PASS.
+- Section S5 (F1 offboard): PASS — mechanism fully verified.
+- Section S6 (F2 override): PASS.
+- Section S7a (F5 key order): PASS (upgraded from CONCERN, but see N-1 — the concern that upgraded it was itself wrong). Root cause confirmed; the open-ceiling rule is now correctly labelled defensive rather than a live bug.
+- Section S7b (F6 toasts): PASS.
+- Section S7c (F7 density): PASS.
+- Section S8 (F8 re-activate): PASS (upgraded from CONCERN) — C-5 and C-8 landed as AC-S8.7, AC-S8.8, R15 and the sixth amendment row.
+- Section S9 (F9 height + settled line): PASS.
+- Section S10 (surface gate): PASS (upgraded from CONCERN) — C-9 landed as the per-site needle table, AC-S10.5 and R14, with an explicit ban on re-wiring the working pages.
+- Section S11 (phase-06 handoff): PASS.
 
-**Totals: 0 FAILs / 9 CONCERNs / 12 PASSes → Net Gate: CONDITIONAL**
+**Totals: 0 FAILs / 2 CONCERNs / 17 PASSes → Net Gate: CONDITIONAL**
 
-### Independently re-proven in this VALIDATE pass
+The gate stays CONDITIONAL, not PASS. Seven of the nine pass-1 concerns are closed in the plan body, but two remain and four known-gaps still bar a terminal PASS:
 
-Ran the repo's real `deriveTaxBrackets` against both vectors:
-
-```
-2023 rates [0,.15,.20,.25,.30,.35] → baseTax [0, 0, 1875, 8541.8, 33541.8, 183541.8]   = published BIR
-2018 rates [0,.20,.25,.30,.32,.35] → baseTax [0, 0, 2500, 10833.5, 40833.5, 200833.5]  = the live drift
-```
-
-Live DB (read-only, 11-09-26) — all three orgs share the 2018 rate vector `[0,0.2,0.25,0.3,0.32,0.35]` and the floor vector `[0,20833,33333,66667,166667,666667]`, while only `org_seed` has drifted `baseTax`. **The plan's rule is therefore correct and load-bearing: guard on rate+floor, never on `baseTax` — a `baseTax` guard would skip `org_seed`, the one row that most needs the fix.** S1-before-S2 is also confirmed necessary: the backup JSON carries the 2018 `taxBrackets`.
-
-Test-file sweep: `withholdingTax` appears **35 times across 16 files** (10 unit + 4 e2e specs + 2 payslip unit). All six e2e occurrences are fixture **inputs** (`withholdingTax: 0`), not assertions on engine output — the plan's open question "check whether any assert an absolute peso figure" is hereby **closed: none do.**
-
-### Concerns (each with what clears it)
-
-| # | Concern | Severity | What clears it |
+| # | Remaining concern | Severity | What would clear it |
 |---|---|---|---|
-| C-1 | **The `#220` derived-parity block is missing from S2's churn map.** `tests/unit/payroll-statutory-config.test.ts:301-316` builds `SEEDED_DERIVED = deriveTaxBrackets(DEFAULT_STATUTORY_RATE_CONFIG.taxBrackets)` and `DERIVED_PARITY = { ...PARITY, '250000': { tax: '66348.06', total: '69948.06', net: '180051.94' } }` — an override that exists **only** because derive ≠ seed today. Its comment names the exact drift D1 removes (`10833.33→10833.5, 40833.33→40833.5, 200833.33→200833.5`). After D1 the override must be **deleted** (not renumbered) and the comment rewritten, and `DERIVED_PARITY` collapses to `PARITY`. That collapse is the best unit-level proof D1 worked; patching the number instead would hide it and leave a comment describing a fixed bug. | CONCERN | Add to S2: delete the `'250000'` override, assert `DERIVED_PARITY` is identical to `PARITY` (or drop the alias entirely), rewrite the `:301-305` comment, and record the collapse in the phase report as the second D1 proof. |
-| C-2 | **The file count is wrong and two anchors do not exist.** S2 says "35 `withholdingTax` mentions across 17 test files" — it is **16** files. And `payroll-statutory-config.test.ts:348` / `:360` (cited as the hand-built-table cases) hold no `withholdingTax`; the real mentions there are `:117, :134, :135, :325`, plus the `tax:` literals in the `PARITY` data table at `:43-104`, which S2 never cites by line. The hand-built-table cases are real but live at `:332-364` and are correctly assessed as unaffected (they pass their own table). | CONCERN | Correct the count to 16, repoint the two anchors to `:332-364`, and add `PARITY` (`:43-104`) to the churn map as the primary table-driven surface. |
-| C-3 | **`ph-statutory.test.ts:75` is a formula, not a literal.** The assertion is `toBeCloseTo((20 * (25000 - 20833)) / 100, 0)` — the 2018 rate `20` is embedded in the *expression*. S2 describes only the value move `833.40 → 625.05`. An execute-agent looking for a literal will not find one. | CONCERN | State in S2 that the rate inside the expression changes `20 → 15`, which is itself the hand-computation. |
-| C-4 | **S7a's comparison spec has no rule for `ceiling: Infinity` / `null`.** The shipped top bracket is `ceiling: Infinity`; JSON/jsonb cannot hold `Infinity` (it serialises to `null`), and `parseRates` uses `nn()` which yields `null` for an empty input. A field-by-field numeric comparison of `ceiling` will compare `Infinity` against `null` whenever `DEFAULT_STATUTORY_RATE_CONFIG` is the `live` side (the no-row branch of `toWireConfig`), producing a false "changed" line — the same class of bug S7a is fixing. The seven listed test cases do not cover it. | CONCERN | Add an explicit normalisation rule (treat `null` and `Infinity` as the same open ceiling) and an eighth test case: an unsaved org whose live config is the default, payload identical → `['No effective change vs the live rates.']`. |
-| C-5 | **S8 creates an undeclared orphan.** After both branches route through `ConfirmButton`, the whole per-row guard becomes dead: `setActiveGuards` (`:30`), `setActiveGuard` (`:31`), and the `{@const setActive = setActiveGuard(u.id)}` at `:186` have no remaining reader (`:214/:219/:222` are the branch being replaced). The plan says only "drop the row's own guard for this branch"; it does not say the map and the `{@const}` die with it. `pnpm lint` will flag the unused binding. | CONCERN | Name the three dead bindings in S8 and require their removal in the same commit (surgical rule: this orphan is created by this change). |
-| C-6 | **No evidence pack for three high-risk classes.** The Blast Radius table itself marks money/payroll computation, data migration, and permission as present, but nothing in the plan requires the `harness/` artefact set before finalize. | CONCERN | Add a `harness/` folder under the task folder with `risk-gate.json`, `context-snippets.json`, `verification.json`, `review-decision.json` for S2 and S8, written before either section is called done. |
-| C-7 | **Line anchors run ~2 lines ahead of the working tree throughout.** Verified drift: statutory pending card opens `:251` (plan says `:253`), per-proposal block `:255` (says `:257`), separations `#finalize-bar` `:209` (says `:211-215`), muted settled block `:227-231` (says `:226-231`), `summarizeChanges` body `:40-64` with `JSON.stringify` at `:53-56`/`:58-61` and the fallback at `:63` (says `:52-56`/`:57-61`/`:62`). Everything named is present; only the numbers slip. | CONCERN | Already mitigated by the plan's own "re-grep every line anchor before editing" instruction — accepted as a known residual, not re-anchored. |
-| C-8 | **S8 amends five markdown files but not the source comment that argues against the change.** `src/routes/(app)/settings/roles/+page.svelte:199-201` reads: *"Deactivating locks a person out, so it confirms first; re-activating is neither destructive nor irreversible and deliberately stays one click."* S8 makes that comment false in shipped code. This repo has a standing lesson that a comment describing a reversed decision reads identically to one describing live behaviour. | CONCERN | Add the in-source comment as a sixth S8 amendment: rewrite it (do not delete it) to state that both directions now confirm and that the 11-09-26 owner pass reversed the one-click call. |
-| C-9 | **S10's matching rule does not fit two sites its own required table names.** The rule is "a `<FormFeedback>` or `Banner` gated on `form.action === '<action>'`". Verified exceptions: `separations/[id]` finalize/undo are gated on `form?.finalized` (`:82`) and `form?.undone` (`:58`) — the server returns `{ finalized: true }` / `{ undone: true }` with no `action` and no `saved`; and `employees/[id]`'s other 15 actions render through the `DONE[form.action]` map (`:148-169`, banner at `:206-207`), an indirection the literal rule cannot see. `payroll/periods` release/void return `{ action, saved }` with `ConfirmButton` and no banner — those do match. | CONCERN | Widen S10's rule to accept a per-site surface *needle* (the exact gating expression, like `destructive-confirms.test.ts` does for copy) instead of one hard-coded `form.action ===` pattern, and record `separations` and the `DONE`-map sites as explicitly-shaped entries. Do **not** expand scope to re-wire those sites — S9 is height-and-placement only. |
+| C-6 | No `harness/` evidence pack for the three high-risk classes | CONCERN | Write `risk-gate.json`, `context-snippets.json`, `verification.json`, `review-decision.json` under the task folder for S2 and S8. Carried as instruction E10. |
+| C-7 | Line anchors run 1–2 lines ahead of the working tree in places | CONCERN | Accepted residual. Mitigated by the plan's own re-grep rule (E1). This pass corrected the anchors it touched; it did not re-anchor the whole plan. |
+
+### What the SECOND pass found that the first pass missed
+
+Three defects, two of them introduced by the first pass itself. This is the standing lesson working as intended — amending a plan introduces defects.
+
+| # | Finding | Status |
+|---|---|---|
+| N-1 | **Pass 1's C-4 was a false positive, and the supplement nearly shipped it into the plan as a live bug.** The claim was that `summarizeChanges` would compare `Infinity` (default config) against `null` (jsonb round trip). Verified this pass: `ph-statutory.ts:339-346` already defines `sssBracketsToWire` / `taxBracketsToWire`, which convert `Infinity → null`, and `DEFAULT_STATUTORY_RATE_CONFIG` (`:354-362`) is built **through** them — its own comment says *"Infinity ceilings already wired to null"*. All three paths into the comparison carry `null`. **`Infinity` never reaches `summarizeChanges`.** Pass 1 verified that the defect shape existed (Infinity is in the raw tables) without verifying the causal premise (that it reaches the comparison). | Corrected in the plan body. The normalisation rule survives — it costs one line and guards a real **fixture** hazard (a test built from the raw table gets `Infinity` while production is wire-shaped) — but it is now labelled defensive, with the verified trace written out and the false-positive history recorded so nobody re-raises it. The 8th test case was rewritten to test the fixture hazard plus the real production shape. |
+| N-2 | **The supplement's own anchor "correction" was wrong.** C-2 repointed `ph-statutory.test.ts` to `:70,74` — those are the `it(` lines. The assertions are at `:71` and `:76`. The original plan's `:71,75` was right on the first and one line off on the second. | Corrected to `:71,76` in the churn table, the count-bump table and AC-S2.7. |
+| N-3 | The `employees/[id]` `DONE` map closes at `:164`, not `:165` as the supplement wrote. | Corrected in S10's needle table. |
+
+Also confirmed this pass, not asserted: the lint baseline is exactly 0 errors / 1 warning, and that warning is `src/lib/components/payroll/CalculatorWindow.svelte:82` (`a11y_no_static_element_interactions`). AC-S8.8 now names it, so the criterion is checkable rather than a bare count. Every S10 needle anchor (`separations` `:58`/`:82` and server `:97`/`:117`; `employees` `:169`/`:206`/`:1813` and server `:676`; `periods` `:110`/`:121`; `ConfirmButton` `:50-53`) was re-read and is correct.
 
 ### Open gaps
 
 - Card height (S9a) has no automated gate — known-gap: documented, backlog stub `separation-card-height-gate_NOTE_11-09-26.md`.
 - Toast readability before dismissal has no automated gate — known-gap: documented, backlog stub `toast-readability-gate_NOTE_11-09-26.md`.
 - Statutory proposal lifecycle has no e2e and no fixture (0 PENDING rows confirmed live) — known-gap: documented, backlog stub `statutory-proposal-e2e-fixture_NOTE_11-09-26.md`.
-- No component-interaction harness (dialog opens / traps focus / confirm submits) — known-gap: documented, already tracked at `process/features/ui-ux-overhaul/backlog/a11y-component-test-harness_NOTE_03-09-26.md` and `component-test-dom-environment_NOTE_03-09-26.md` (both verified to exist — reference them, do not duplicate).
+- No component-interaction harness — known-gap: documented, already tracked at `process/features/ui-ux-overhaul/backlog/a11y-component-test-harness_NOTE_03-09-26.md` and `component-test-dom-environment_NOTE_03-09-26.md` (both verified to exist — reference them, do not duplicate).
 
 ### What this coverage does NOT prove
 
-- `pnpm test` green after S2 does **not** prove the new tax expectations are right. It proves the suite agrees with itself. Only the hand-derivation recorded in the phase report, plus AC-S2.2's 2018 negative control, separate a correct table from a self-consistent wrong one. This is the single place in the plan where green means nothing on its own.
-- `tests/unit/success-surfaces.test.ts` is a **source scan**. It proves strings co-occur in a file. It does not prove a surface mounts, is inside the viewport, is reachable by a keyboard user, or is read before it dismisses. Both negative controls prove the scan can go red; they do not upgrade it to a render test.
+- `pnpm test` green after S2 does **not** prove the new tax expectations are right. It proves the suite agrees with itself. Only the hand-derivation recorded in the phase report, AC-S2.2's permanent 2018 negative control, and AC-S2.6's collapse of `DERIVED_PARITY` separate a correct table from a self-consistent wrong one. This is the single place in the plan where green means nothing on its own.
+- AC-S2.6's collapse proves derive equals the shipped table. It does **not** prove the shipped table matches what the BIR actually published — that rests on the figures in S2's table being transcribed correctly from the source document, which no gate checks.
+- `tests/unit/success-surfaces.test.ts` is a **source scan**. It proves strings co-occur in a file. It does not prove a surface mounts, is inside the viewport, is reachable by keyboard, or is read before it dismisses. Both negative controls prove the scan can go red; they do not upgrade it to a render test. Its per-site needles also mean it proves each site still matches *its declared shape* — a site that changes shape correctly will go red and needs its needle updated, which is a maintenance cost, not a defect.
 - `tests/unit/destructive-confirms.test.ts` at `COPY.length === 18` proves 18 needles exist in source. It does not prove any dialog opens, that Cancel aborts the POST, or that the message is visible.
-- `tests/unit/statutory-change-summary.test.ts` proves the comparison function is key-order-insensitive on synthetic fixtures. It does **not** prove Postgres' actual jsonb round-trip matches those fixtures — no test in the plan reads a real `statutory_rate_configs` row. The live AC-S7a.2 probe is the only thing that closes that loop, and it is agent-judged.
+- `tests/unit/statutory-change-summary.test.ts` proves the comparison is key-order-insensitive on synthetic fixtures. It does **not** prove Postgres' actual jsonb round trip matches those fixtures — no test in the plan reads a real `statutory_rate_configs` row. The live AC-S7a.2 probe is the only thing that closes that loop, and it is agent-judged.
+- The open-ceiling case proves the comparison tolerates `Infinity` in a fixture. It proves nothing about production, because production never produces `Infinity` at that point — that is the verified finding N-1, not a gap in the test.
 - The migration script's two runs prove idempotency on **three dev org rows**. They prove nothing about an org with a customised table, because none exists to test the skip path against — the skip branch ships unexercised.
-- Every Agent-Probe row is one human-driven browser pass on one machine. It proves the behaviour once, at one viewport, in one theme. It is not a regression guard.
+- Every Agent-Probe row is one human-driven browser pass on one machine, at one viewport, in one theme. It proves the behaviour once. It is not a regression guard.
 - `pnpm check` does not cover `scripts/**` or `prisma/**`, so the migration script is type-checked by nothing but its own run.
-- No gate anywhere proves AC-P6 continuously — the attendance-file exclusion is checked once, by hand, at the end.
+- No gate proves AC-P6 continuously — the attendance-file exclusion is checked once, by hand, at the end.
 
-Gate: CONDITIONAL (0 FAILs; 9 CONCERNs, all with named remedies; developed behaviour exists whose only coverage is a Known-Gap, so a terminal PASS is banned)
-Accepted by: session — pending owner confirmation. Concerns carried as accepted-with-remedy: C-1 derived-parity block, C-2 file count and anchors, C-3 embedded rate expression, C-4 Infinity/null ceiling, C-5 orphaned setActive guard, C-6 missing evidence pack, C-7 line-anchor drift, C-8 lying source comment, C-9 S10 matching rule.
+Gate: CONDITIONAL (0 FAILs; 2 CONCERNs — C-6 evidence pack, C-7 anchor drift; four known-gaps bar a terminal PASS; 1 completed plan-validate-fix cycle)
+Accepted by: session — C-6 carried as execute-agent instruction E10, C-7 accepted as residual under the re-grep rule E1. The four known-gaps are accepted as named residuals with backlog stubs, not as proof of anything.
 
 ### Execute-agent instructions
 
 | # | Instruction | Trigger |
 |---|---|---|
-| E1 | Re-grep every line anchor immediately before editing. Anchors in this plan run ~2 lines ahead of the working tree, and earlier sections move later sections' anchors. | Every section |
-| E2 | S2: after `pnpm test` fails, recompute each expectation by hand from the 2023 table and write the arithmetic into the phase report **before** editing the file. Never paste a vitest "received" value. A reviewer tells the difference by the presence of that written derivation — no derivation, no accepted expectation. | S2 entry |
-| E3 | S2: handle `payroll-statutory-config.test.ts:301-316` by **deleting** the `'250000'` override and rewriting its comment, not by patching the number. Record the collapse as the second D1 proof. | S2 entry |
+| E1 | Re-grep every line anchor immediately before editing. Anchors run 1–2 lines ahead of the working tree in places, and earlier sections move later sections' anchors. | Every section |
+| E2 | S2: recompute each expectation by hand from the 2023 table and write the arithmetic into the phase report **before** editing the file. Never paste a vitest "received" value. No derivation in the report, no accepted expectation. | S2 entry |
+| E3 | S2: **delete** the `DERIVED_PARITY` `'250000'` override and rewrite the `:301-305` comment. Repointing the number is a section failure even if the suite is green (AC-S2.6). | S2 entry |
 | E4 | S2: run the migration against the dev DB for real and read the row back. `pnpm check` covers neither `scripts/**` nor `prisma/**`. | S2 entry |
-| E5 | S7a: normalise `ceiling` — `null` and `Infinity` mean the same open ceiling. Add the default-config test case. | S7a entry |
-| E6 | S7b: before removing the `Banner` import, grep every use. It is imported at `:4` and used only at `:241`, so removal is correct here — but confirm it, because a stray import removal has silently broken `use:enhance` in this repo. | S7b step 6 |
-| E7 | S8: amend `settings/roles/+page.svelte:199-201` in the same commit. Rewrite the comment, do not delete it. | S8 entry |
-| E8 | S8: remove `setActiveGuards`, `setActiveGuard` and the `{@const setActive = …}` at `:186` once both branches use `ConfirmButton` — they become dead in this commit. | S8 entry |
-| E9 | S10: use per-site gating needles, not one hard-coded `form.action ===` pattern. `separations/[id]` uses `form?.finalized`/`form?.undone`; `employees/[id]`'s 15 non-offboard actions use the `DONE[form.action]` map. Assert their current shape; do not re-wire them. | S10 entry |
-| E10 | Write the `harness/` evidence pack for S2 and S8 before either is reported done. | S2 and S8 exit |
+| E5 | S7a: implement the open-ceiling normalisation as a **defensive fixture guard**. Do not re-raise it as a live bug — the plan records the verified trace showing `Infinity` never reaches the comparison. | S7a entry |
+| E6 | S7b: before removing the `Banner` import, grep every use. Imported at `:4`, used only at `:241`, so removal is correct — but confirm it. | S7b step 6 |
+| E7 | S8: amend the source comment at `settings/roles/+page.svelte:199-200` in the same commit. Rewrite, do not delete. Keep the `#108` sentence at `:201`. | S8 entry |
+| E8 | S8: remove `setActiveGuards` (`:30`), `setActiveGuard` (`:31`) and the `{@const setActive = …}` (`:186`). | S8 entry |
+| E9 | S10: use per-site gating needles per the section's table. Do **not** re-wire `separations/[id]` or the `employees/[id]` `DONE` map to fit the gate (AC-S10.5). | S10 entry |
+| E10 | Write the `harness/` evidence pack for S2 and S8 before either is reported done. This is the one pass-1 concern still unresolved in the plan body. | S2 and S8 exit |
 | E11 | Run the gate set in CI order every time: `pnpm format:check` → `pnpm lint` → `pnpm check` → `pnpm test`. CI runs `format:check` first and short-circuits. | Every commit |
 | E12 | Before each commit: `git diff --cached -U0 \| grep -E '^\+\s*(//\|/\*\|<!--)'` and confirm only `// ponytail:` lines appear. Stage explicit paths, never `git add -A`. | Every commit |
 | E13 | Live passes: ONE step at a time — announce, run, report, wait. Never chain browser writes. Never start the dev server or the container; ask the owner. | S3–S9 |
