@@ -1025,7 +1025,108 @@ maintained forever.
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 11-09-26
+date: 2026-09-11
+generated-by: outer-pvl
+
+Parallel strategy: parallel-subagents
+Rationale: 5/7 signals (S2 API-contract change, S4 phase program, S5 explicit depth request, S6 high-risk class, S7 9-file blast radius). Layer 1 × 4 dimensions + Layer 2 × 5 sections, read-only, no cross-agent talk needed. 9 agents, cost guard not triggered.
+
+### Source verification performed (every load-bearing claim in the plan was checked against the file)
+
+| Plan claim | Verdict |
+|---|---|
+| `correctSchema` carries `regularHours`/`overtimeHours` at `+page.server.ts:174-175` | CONFIRMED — exact lines |
+| `?/correct` 403 comes from `requireAnyCapability` BEFORE `correctSchema.safeParse` | CONFIRMED — `:201` vs `:202`; `employee-view-only.spec.ts` posts `{id,date,status}` only, no hours. Schema narrowing cannot reach it |
+| `correctDay` has exactly ONE route caller | CONFIRMED — `+page.server.ts:212` only. `resetDayToDerived` likewise `:225` only |
+| `correctDay` returns the updated row | CONFIRMED — `return await db.$transaction(...)` returning `updated` (`index.ts:683,707`) |
+| `src/hooks.ts` transport covers a form-action return, not just `load` | CONFIRMED at runtime source — `@sveltejs/kit@2.69.2` `runtime/server/page/actions.js:71-85` calls `stringify_action_response(data, route_id, options.hooks.transport)`. Prisma `Decimal` will NOT reach the client raw |
+| `approvedOtHours` cap from APPROVED `OVERTIME` requests, `rawOvertimeHours` stored ungated | CONFIRMED — `index.ts:606-623` |
+| Timesheet bulk: partial = SUCCESS, `fail()` only when `done === 0` | CONFIRMED — `requests/timesheets/+page.server.ts:148-155`. The plan's fact-8 correction of the findings doc is right |
+| `COPY.length === 17` at `destructive-confirms.test.ts:219`; site 15 needle at `:211-214` pins the `message` prop, not `triggerLabel` | CONFIRMED — needle `thrown away and re-derived from the raw punches` matches `message=` at `+page.svelte:670` / `:844`; `triggerLabel="Reset"` is a separate prop. The D8 rename is safe |
+| Plan A takes `COPY.length` 17 → 18 in its S8 | CONFIRMED — plan A `:28-29`, `:688-689`, `:715`, `:1044`. S5's hard stop (grep `:219` for a value above 17) is real and mechanically checkable |
+| `high-stakes-action-feedback.test.ts:149-155` pins `{action, saved}`; `correctDay` already mocked at `:68` | CONFIRMED — extending it with `saveAll`/`resetAll` is mechanically feasible in-place |
+| Day table amber marker lives in the NON-editable branch (`:795-805`) | CONFIRMED — making the cells unconditional does bring it to editable rows |
+| Pagination + `exceptionsOnly` scope `dayRows` | CONFIRMED — `+page.server.ts:97-107`, `+page.svelte:161-163`, `Pagination` at `:879` |
+| All five gate commands exist verbatim | CONFIRMED — `format:check`/`lint`/`check`/`test`/`test:e2e` in `package.json` |
+
+Test gates:
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| A1.1, A1.2 | the route cannot forward a hand-typed hours figure to `correctDay`'s uncapped branch — the money control is closed at the SERVER, not only the UI | Fully-Automated | `tests/unit/attendance-correct-hours-ignored.test.ts` (new) — POST `?/correct` with `regularHours=7.25`, assert `correctDay`'s data argument has no `regularHours` key. MUST include a no-`date` case (see E1) | B |
+| A1.3, A1.4, A1.6 | no hours input and no `recalcHours` survive; the read-only copy is present | Fully-Automated | grep gates G1.3, G1.4 over `attendance/+page.svelte` | B |
+| A1.7 | the times-derive path is untouched | Fully-Automated | `pnpm test` — `tests/unit/attendance-correct-derive.test.ts:75,89,98,111` pass unchanged | A |
+| A2.1 | `?/correct` success payload carries the saved row | Fully-Automated | unit gate G2.1 on the action return | B |
+| A2.2, A2.3, A2.4 | what is displayed equals what is stored, with no reload | Hybrid — precondition: owner's dev server + `veent-db-5434` up | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/attendance-display-matches-stored.spec.ts` (new); assert against the Prisma row, not the typed value | B |
+| A2.6 | the F3 reset trap is not reintroduced — a sibling row keeps its values | Fully-Automated | G2.4 sibling-row negative control inside the same spec | B |
+| A3.1–A3.4 | Save renders only on a dirty row and clears after a save | Fully-Automated | G3.1 e2e count assertions, with the injected-node zero-proof from the plan's Mutation Checks | B |
+| A3.5, A3.6 | the trigger reads `Recalculate`; both `disabled={!d.manuallyEdited}` survive | Fully-Automated | grep gate G3.2 | B |
+| A3.7 | the rename did not touch dialog copy | Fully-Automated | `destructive-confirms.test.ts` passes UNMODIFIED | A |
+| A3.8 | the action column does not reflow as rows become dirty | Agent-Probe | L4 — measure the action-column rect before and after one edit | C |
+| A4.1–A4.4, A5.1, A5.2 | bulk partial = success with counts; all-fail = `fail(400)`; the hours key is stripped on the bulk door too; the row cap holds | Fully-Automated | `tests/unit/attendance-bulk-actions.test.ts` (new) | B |
+| A4.8, A5.7 | the new actions keep the `{action, saved}` feedback shape | Fully-Automated | extended `tests/unit/high-stakes-action-feedback.test.ts:149` | B |
+| A4.7 | the result panel names WHICH rows failed and why — not a bare count | Agent-Probe | L6 — make 2 rows dirty, Save all, read the panel and confirm both dates are listed with reasons | C |
+| A5.3 | the bulk dialog names count + date range + employee + data loss | Agent-Probe | L7 — read the message aloud against the four facts | C |
+| A5.6 | the site-16 confirm copy is pinned | Fully-Automated | `destructive-confirms.test.ts` with the new entry — depends on plan A landing first | C |
+| — (regression) | no regression across the 36 specs | Hybrid — flaky per #287; diagnose from the actual error, never relabel as flaky | `CI=1 pnpm test:e2e` | A |
+
+Legacy line form:
+- attendance route (server): Fully-automated: `pnpm format:check && pnpm lint && pnpm check && pnpm test`
+- attendance route (display == stored): hybrid: `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/attendance-display-matches-stored.spec.ts` + precondition owner's dev server and `veent-db-5434` running
+- attendance route (layout, panel copy, dialog copy): agent-probe: owner-driven L1–L7, one step at a time
+- `?/resetDay` row freshness after a single-row Recalculate: known-gap: documented — see Open gaps
+
+Dimension findings:
+- Infra fit: PASS — one route, two source files, no schema, no migration, no container or port surface. All five gate commands exist verbatim in `package.json`. The `pnpm test:e2e -- <spec>` filter trap and the `CI=1 pnpm exec dotenv -e .env.dev -- playwright test <spec>` workaround are both correctly carried. `global-setup.ts:78-95` wiping `employee@veent.ph` is correctly flagged and the plan seeds its own fixture.
+- Test coverage: CONCERN — the three new files do close both named gaps and the five mutation checks are genuine (each names a gate that would go red). Three holes remain: G1.2's negative control is under-specified (E1); no gate covers row freshness after `?/resetDay` or after `?/saveAll` (E4); and the plan states "no helper exists for DOM-matches-database" while `tests/e2e/attendance-save-timesheet-custom-range.spec.ts` is an existing same-page Prisma-seeding precedent to copy.
+- Breaking changes: PASS — verified at source. Narrowing `correctSchema` cannot break `employee-view-only.spec.ts:197` (403 at `:201` precedes `safeParse` at `:202`). `z.object` strips by default, so a stale tab degrades to a silent ignore, not a 400 — the plan's stated reasoning is correct. `correctDay` and `resetDayToDerived` each have exactly one route caller. The `{action, saved}` contract is preserved and extended, not replaced.
+- Security surface: PASS — the money control is closed at the SERVER. After the key removal the route can only forward `status` and `note` on `correctDay`'s uncapped branch; neither is a money field, and `nightDiffHours`/`lateMinutes`/`undertimeMinutes` were never in `correctSchema`. So the `approvedOtHours` cap becomes structurally unbypassable from this route, exactly as claimed — this is not a UI-only fix. No new authorization logic; both new actions reuse `requireAnyCapability(…, 'MANAGE_HR')` and the services' existing org scoping. Returning the saved row exposes nothing the client did not already hold, and `transport` keeps `Decimal` off the wire as a raw object. The `?/saveAll` row cap correctly closes the unbounded-transaction vector (R3).
+- Section 1 — Reg/OT read-only: PASS — every edit target exists at the cited line and is uniquely matchable. Highest-risk edit: deleting the `{#if editable}` wrapper around the four hours cells; sequence it cell by cell and run `pnpm check` between the two tables.
+- Section 2 — displayed matches stored: CONCERN — the approach choice is right and the F3 trap is genuinely avoided (nothing lets the form reset; `bind:value` makes DOM and model the same object). Two real gaps, both covered by E2 and E3. Highest-risk edit: the re-seed rule — it must refresh a row after a save and after an `invalidateAll`, without clobbering an edit the user is mid-way through typing.
+- Section 3 — dirty Save + rename: CONCERN — inherits S2's `manuallyEdited` gap (A3.4 and A3.6 are only correct if the model carries it). The rename itself is verified safe against the phase-05 gate. Highest-risk edit: none in the rename; the dirty derivation is the risk and it belongs to S2's model.
+- Section 4 — Save all: CONCERN — the failure policy, the row cap, the shared-schema rule and the result-panel precedent are all correct and verified against source. The multi-row wire format is undecided (E5) and it is the section's only real blocker. Highest-risk edit: the new action's per-row catch loop — a `throw` that escapes it turns a partial into a total failure and re-creates F10 at bulk scale.
+- Section 5 — Recalculate all: PASS — blocked by design, and the block is real: `destructive-confirms.test.ts:219` reads `17` today and plan A's S8 takes it to `18`, so the grep is a valid landing signal. The needle reasoning is correct and confirmed: `thrown away and re-derived from the raw punches` already pins site 15 at `:211-214`, so reusing it would pass even with the bulk dialog deleted; `Anything typed by hand on those days is lost` appears nowhere in the file today and is unique to the bulk dialog.
+
+### Execute-agent instructions (carry these; they are the CONDITIONAL terms)
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | `attendance-correct-hours-ignored.test.ts` must assert on the `data` argument passed to the mocked `correctDay`, and must include at least one case that posts NO `date`. With a `date` present the derive branch overwrites the hours anyway, so a DB-level or outcome-level assertion would stay green even with the schema keys re-added — the mutation check would not go red and the gate would be vacuous. | Section 1, item 7 |
+| E2 | The Section 2 row model MUST also carry `rawOvertimeHours` and `manuallyEdited`. `rawOvertimeHours` drives the amber unapproved-OT marker (A1.5) and `manuallyEdited` drives `disabled={!d.manuallyEdited}` on the Recalculate trigger (A3.6) — the server sets `manuallyEdited: true` on every correction, so omitting it leaves the button stale-disabled on a row the user just saved. That is the same defect class Section 2 exists to remove. Add both to the plan's field list at 2.2 and to A2.4. | Section 2, item 11 |
+| E3 | Do NOT copy `rowGuard`'s literal shape for the row model. `rowGuards` at `+page.svelte:34-42` is a plain `new Map()` and is NOT reactive — a model built that way will never re-render and Section 2 will appear to do nothing. Copy the lazy-cache *idea*, but hold the per-row record in `$state` (a `$state` record object keyed by id, or `SvelteMap`). Prove it with the sibling-row control before moving on. | Section 2, item 11 |
+| E4 | Write down which invalidations re-seed a row, before writing the code. At minimum: after a successful `?/correct` (patched from `result.data.day`), after `?/resetDay` (which does NOT return a row — it must re-seed from the refreshed `data`), after `?/saveAll` and `?/resetAll`, and on page/employee/range change. A row that is mid-edit and has no incoming change must not be clobbered (R2). `?/resetDay` row freshness has no automated gate — cover it at L5 and record the result. | Section 2, item 15 |
+| E5 | Decide and state the `?/saveAll` wire format before writing the action. `Object.fromEntries(formData)` collapses duplicate keys, and the row inputs are bound to their own per-row form via `form="c-{id}"` so they cannot be reused by a bulk form. Serialize the dirty rows from the client `$state` model into one field (JSON) or into indexed hidden fields, and validate each row with `correctSchema` as planned. Record the chosen shape in the Section 4 commit body. | Section 4, item 25 |
+| E6 | In `?/correct`, `correctDay`'s return must be hoisted (`let day` declared before the `try`) because the success `return` sits after the try/catch. Do not move the `return` inside the `try` — that would change the failure path the plan promises to leave alone. | Section 2, item 10 |
+| E7 | `tests/e2e/attendance-save-timesheet-custom-range.spec.ts` already seeds attendance rows through Prisma on this same page. Copy its fixture setup for `attendance-display-matches-stored.spec.ts` rather than hand-writing one. The plan's "no helper exists" note is about the assertion shape, not the fixture. | Section 2, item 16 |
+| E8 | Section 1 changes the team table's Reg/OT to read-only text but does not add the amber unapproved-OT marker there (the team table has never had one). Either add it for parity or state in the commit body that the team view intentionally does not show the ungated gap. Do not leave it undecided. | Section 1, item 3 |
+| E9 | Standing repo rules, unchanged: run the gate set in CI order `pnpm format:check && pnpm lint && pnpm check && pnpm test` — format runs FIRST in CI and short-circuits. No explanatory comments in shipped code; grep the diff for added comment lines. One commit per section, staging explicit paths, never `git add -A`. The owner starts dev servers. Live steps L1–L7 run ONE at a time: announce, run, report, WAIT. | every section |
+
+Open gaps:
+- `?/resetDay` row freshness: known-gap: documented — the single-row Recalculate does not return the re-derived row, so its row model can only be refreshed by the re-seed rule (E4). No automated gate covers it; L5 is the only evidence. Not worth a new action shape in this batch.
+- `?/saveAll` / `?/resetAll` post-bulk row freshness: known-gap: documented — `results` carries `{id, date, ok, reason?}` and no row data, so refreshed values rest entirely on the E4 re-seed rule. If E4 is built correctly this is covered; if it is not, the bulk path re-creates F10b.
+- Section 4's multi-row wire format is unspecified in the plan (E5). Not a FAIL: the action boundary, failure policy, schema reuse and row cap are all specified — only the encoding is open.
+- A3.8 (action-column reflow), A4.7 (per-row panel reads correctly) and A5.3 (the dialog names the blast radius) cannot be proven by any suite. Agent-Probe only, owner-driven.
+- The `exceptionsOnly`-scoping question at the end of the plan stays open by design. Surface it at L7, not before.
+- F11a (the time picker) is out of scope and was NOT validated. The six inherited contracts recorded in the plan were spot-checked and hold: `name="timeIn"`/`timeOut` at `:606,616,756,766` and the `form="c-{id}"` association at `:607,617,757,767` both exist as stated.
+
+What this coverage does NOT prove:
+- `pnpm test` (the unit tier) never renders the page. It cannot prove any cell shows what was stored, that Save hides on a clean row, that the panel lists the right dates, or that the column does not reflow. Every one of those rests on the e2e tier or on the owner's L-pass.
+- `attendance-correct-hours-ignored.test.ts` mocks `correctDay`. It proves the ROUTE strips the key; it does not prove the service caps OT — that is `attendance-correct-derive.test.ts:75-98`'s job, and neither test proves the two still agree after a real write. No test in this plan exercises a real `correctDay` against a real database.
+- `attendance-display-matches-stored.spec.ts` proves the day-table row on the employee view. It does not cover the team-day table, a locked row, a non-ACTIVE employee, or a row on a page other than page 1.
+- The grep gates (G1.3, G1.4, G3.2) prove strings are present or absent in the source file. They cannot prove the markup renders, that the copy is placed where an HR user will see it, or that the marker is visible rather than clipped.
+- `destructive-confirms.test.ts` scans source text for a needle. It does not prove the dialog opens, traps focus, or that its confirm actually submits — the repo has no component-interaction harness (`destructive-confirms.test.ts:11-18`; backlog notes `a11y-component-test-harness_NOTE_03-09-26.md`, `component-test-dom-environment_NOTE_03-09-26.md`).
+- `CI=1 pnpm test:e2e` proves no regression on the 36 existing specs against seeded demo data. It proves nothing about a real tenant's data volume, about concurrency between two HR users correcting the same day, or about the `?/saveAll` row cap under a crafted POST.
+- No gate proves the Section 1 residual (`correctDay`'s uncapped non-time branch) stays unreachable. If a future route calls `correctDay` without times, the bypass returns silently and nothing in this plan would catch it.
+- Nothing here proves the plan-A dependency ordering at runtime — only that `COPY.length` reads 17 today. If plan A lands a different count, S5's grep passes for the wrong reason.
+
+Gate: CONDITIONAL (0 FAILs, 4 CONCERNs — all four converted to execute-agent instructions E1–E5 with named gates; the money control, the 403 ordering, the Decimal transport, the needle uniqueness and the plan-A hard stop were each verified at source and are PASS)
+Accepted by: user / session — accepted concerns: (1) Section 2's row model omits `rawOvertimeHours` and `manuallyEdited` [E2]; (2) the `rowGuard` pattern named for reuse is non-reactive [E3]; (3) the re-seed rule is under-specified and is the crux of Sections 2, 4 and 5 [E4]; (4) Section 4's multi-row wire format is undecided [E5]. Plus (5) G1.2's negative control needs the no-`date` case to avoid being vacuous [E1].
+
+### Autonomous goal block
+
+BRANCH B — the umbrella plan `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/ui-ux-overhaul-umbrella_PLAN_03-09-26.md` carries `## Stable Program Goal` at line 79 and governs this phase. No `## Autonomous Goal Block` is written to this phase plan. Reference for latest state: that umbrella path.
 
 ---
 
