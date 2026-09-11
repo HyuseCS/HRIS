@@ -172,7 +172,7 @@ export const actions: Actions = {
 				tx
 			)
 		)
-		return { success: 'Statutory rates saved.' }
+		return { action: 'save', saved: 'Statutory rates saved.' }
 	},
 
 	// HR_ADMIN proposes — live rates unchanged until a CEO/Super Admin confirms.
@@ -187,7 +187,7 @@ export const actions: Actions = {
 			})
 
 		await proposeStatutoryRates(user.organizationId, parsed.data, ctxOf(user, getClientAddress))
-		return { success: 'Change submitted for CEO approval.' }
+		return { action: 'propose', saved: 'Change submitted for CEO approval.' }
 	},
 
 	confirmProposal: async ({ request, locals, getClientAddress }) => {
@@ -198,7 +198,7 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'Missing proposal id.' })
 
 		await confirmProposal(user.organizationId, id, ctxOf(user, getClientAddress))
-		return { success: 'Proposal applied to the live rates.' }
+		return { action: 'confirm', saved: 'Proposal applied to the live rates.' }
 	},
 
 	rejectProposal: async ({ request, locals, getClientAddress }) => {
@@ -209,6 +209,6 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'Missing proposal id.' })
 
 		await rejectProposal(user.organizationId, id, ctxOf(user, getClientAddress))
-		return { success: 'Proposal rejected.' }
+		return { action: 'reject', saved: 'Proposal rejected.' }
 	}
 }

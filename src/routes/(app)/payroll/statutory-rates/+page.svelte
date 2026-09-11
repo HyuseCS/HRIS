@@ -1,8 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { beforeNavigate, goto } from '$app/navigation'
@@ -12,9 +11,14 @@
 
 	// Re-seed the touched-services baseline once the save lands, so the confirm and the leave guard
 	// both stop reporting edits the user has already committed.
-	const saveGuard = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
-		if (result.type === 'success') baselineStatutory = serviceState()
+	const saveGuard = submitFeedback({
+		error: null,
+		inner:
+			() =>
+			async ({ update, result }) => {
+				await update()
+				if (result.type === 'success') baselineStatutory = serviceState()
+			}
 	})
 	let formEl = $state<HTMLFormElement>()
 	let confirmOpen = $state(false)
@@ -237,9 +241,6 @@
 		{/if}
 	</p>
 
-	{#if form?.success}
-		<Banner kind="success" message={form.success} />
-	{/if}
 	{#if form?.error}
 		<div
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
