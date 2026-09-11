@@ -74,7 +74,7 @@
 	const overrideGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function overrideGuard(entryId: string) {
 		let g = overrideGuards.get(entryId)
-		if (!g) overrideGuards.set(entryId, (g = submitFeedback()))
+		if (!g) overrideGuards.set(entryId, (g = submitFeedback({ error: null })))
 		return g
 	}
 
