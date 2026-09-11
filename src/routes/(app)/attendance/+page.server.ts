@@ -21,7 +21,7 @@ import {
 } from '$lib/server/services/attendance/import'
 import { paginate } from '$lib/server/pagination'
 import { isFoodServiceOrg } from '$lib/orgs'
-import { manilaDayKey } from '$lib/utils/dates'
+import { manilaDayKey, manilaShortDay } from '$lib/utils/dates'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
 const DAY_MS = 86_400_000
@@ -153,6 +153,20 @@ function toFail(e: unknown, extra?: { importError: true }) {
 	throw e
 }
 
+/**
+ * One day names itself; several report a count. A refused row is `failed`, never `skipped` —
+ * skipped reads as "nothing to do" and would hide a refusal behind a success.
+ */
+function bulkSaved(verb: string, results: { date: string; ok: boolean }[]) {
+	const done = results.filter((r) => r.ok)
+	const failed = results.length - done.length
+	const subject =
+		done.length === 1
+			? manilaShortDay(done[0].date)
+			: `${done.length} day${done.length === 1 ? '' : 's'}`
+	return failed > 0 ? `${verb} ${subject}, ${failed} failed.` : `${verb} ${subject}.`
+}
+
 const rangeSchema = z.object({
 	employeeId: z.string().min(1),
 	from: z.coerce.date(),
@@ -215,7 +229,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
-		return { action: 'correct', saved: 'Attendance day saved.', day }
+		return { action: 'correct', saved: `${manilaShortDay(day.date)} saved.`, day }
 	},
 
 	saveAll: async (event) => {
@@ -260,7 +274,7 @@ export const actions: Actions = {
 			})
 		return {
 			action: 'saveAll',
-			saved: `Saved ${done} day${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`,
+			saved: bulkSaved('Saved', results),
 			results
 		}
 	},
@@ -270,13 +284,14 @@ export const actions: Actions = {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const id = (await event.request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing day id' })
+		let reset: Awaited<ReturnType<typeof resetDayToDerived>>
 		try {
-			await resetDayToDerived(id, event.locals.user!.organizationId, ctxOf(event))
+			reset = await resetDayToDerived(id, event.locals.user!.organizationId, ctxOf(event))
 		} catch (e) {
 			return toFail(e)
 		}
 		// Several of these auto-submit on change, so the toast is the only possible cue.
-		return { action: 'resetDay', saved: 'Day reset to the derived values.' }
+		return { action: 'resetDay', saved: `${manilaShortDay(reset.date)} recalculated from punches.` }
 	},
 
 	resetAll: async (event) => {
@@ -324,7 +339,7 @@ export const actions: Actions = {
 			})
 		return {
 			action: 'resetAll',
-			saved: `Recalculated ${done} day${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`,
+			saved: bulkSaved('Recalculated', results),
 			results
 		}
 	},

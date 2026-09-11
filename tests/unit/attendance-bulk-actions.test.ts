@@ -100,7 +100,7 @@ describe('?/saveAll reports every row it touched (#F11c, D9)', () => {
 
 		expect(res.status).toBeUndefined()
 		expect(res.action).toBe('saveAll')
-		expect(res.saved).toBe('Saved 2 days, 1 skipped.')
+		expect(res.saved).toBe('Saved 2 days, 1 failed.')
 
 		const results = res.results as Result[]
 		expect(results).toHaveLength(3)
@@ -205,7 +205,7 @@ describe('?/resetAll recalculates every edited day and reports each row (#F11c, 
 
 		expect(res.status).toBeUndefined()
 		expect(res.action).toBe('resetAll')
-		expect(res.saved).toBe('Recalculated 2 days, 1 skipped.')
+		expect(res.saved).toBe('Recalculated 2 days, 1 failed.')
 
 		const results = res.results as Result[]
 		expect(results).toHaveLength(3)
@@ -299,6 +299,6 @@ describe('the Recalculate-all trigger states its scope', () => {
 
 	it('names the employee and the date range in the dialog, not just the count', () => {
 		expect(page).toContain('message="{editedCount} for {selectedEmployeeName} {editedSpan}')
-		expect(page).toContain('between ${fmtDate(new Date(Math.min(...times)))}')
+		expect(page).toContain('between ${manilaShortDay(new Date(Math.min(...times)))}')
 	})
 })

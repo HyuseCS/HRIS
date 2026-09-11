@@ -52,7 +52,9 @@ const dataArg = () => correctDay.mock.calls[0][2] as Record<string, unknown>
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	correctDay.mockResolvedValue(undefined)
+	// correctDay really returns the saved row, and the route reads its date for the toast.
+	// Resolving undefined here would be a mock that cannot fail the way production would.
+	correctDay.mockResolvedValue({ id: 'day1', date: new Date('2026-09-10T00:00:00+08:00') })
 })
 
 describe('?/correct cannot forward hand-typed hours (#F10)', () => {
@@ -100,13 +102,18 @@ describe('?/correct cannot forward hand-typed hours (#F10)', () => {
  */
 describe('?/correct returns the row it saved (#F10b)', () => {
 	it('carries the service return as `day`', async () => {
-		correctDay.mockResolvedValue({ id: 'day1', regularHours: 7, manuallyEdited: true })
+		correctDay.mockResolvedValue({
+			id: 'day1',
+			date: new Date('2026-09-03T00:00:00+08:00'),
+			regularHours: 7,
+			manuallyEdited: true
+		})
 
 		const res = await run({ id: 'day1', date: '2026-09-03', timeIn: '09:00', timeOut: '17:00' })
 
 		expect(res).toMatchObject({
 			action: 'correct',
-			saved: 'Attendance day saved.',
+			saved: 'Thu, Sep 3 saved.',
 			day: { id: 'day1', regularHours: 7, manuallyEdited: true }
 		})
 	})

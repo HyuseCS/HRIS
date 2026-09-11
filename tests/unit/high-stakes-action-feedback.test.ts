@@ -106,6 +106,12 @@ const run = (action: any, fields: Record<string, string>) =>
 beforeEach(() => {
 	vi.clearAllMocks()
 	for (const fn of Object.values(svc)) fn.mockResolvedValue(undefined)
+	// resetDayToDerived returns the day it reset and the route names that date in its toast;
+	// undefined is not a shape production can produce.
+	svc.resetDayToDerived.mockResolvedValue({
+		reset: true,
+		date: new Date('2026-09-10T00:00:00+08:00')
+	})
 })
 
 /** The `saved: true | string` contract as an assertion. */

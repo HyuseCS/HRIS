@@ -9,6 +9,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
+	import { manilaShortDay } from '$lib/utils/dates'
 	import type { PageData, ActionData } from './$types'
 
 	// Don't reset the form on success: enhance's default form.reset() clears the cross-cell
@@ -125,14 +126,6 @@
 
 	const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY']
 
-	function fmtDate(d: string | Date) {
-		return new Date(d).toLocaleDateString('en-PH', {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric',
-			timeZone: 'Asia/Manila'
-		})
-	}
 	function fmtTime(d: string | Date | null) {
 		if (!d) return '—'
 		return new Date(d).toLocaleTimeString('en-PH', {
@@ -200,7 +193,7 @@
 	const editedSpan = $derived.by(() => {
 		const times = editedDays.map((d) => new Date(d.date).getTime())
 		if (times.length === 0) return ''
-		return `between ${fmtDate(new Date(Math.min(...times)))} and ${fmtDate(new Date(Math.max(...times)))} `
+		return `between ${manilaShortDay(new Date(Math.min(...times)))} and ${manilaShortDay(new Date(Math.max(...times)))} `
 	})
 	const selectedEmployeeName = $derived.by(() => {
 		const e = data.employees.find((x) => x.id === data.selectedEmployeeId)
@@ -812,7 +805,7 @@
 							<summary class="cursor-pointer text-xs font-medium">Why days were not {verb}</summary>
 							<ul class="mt-1 space-y-0.5 text-xs">
 								{#each failed as r (r.id)}
-									<li>{fmtDate(r.date)} — {r.reason}</li>
+									<li>{manilaShortDay(r.date)} — {r.reason}</li>
 								{/each}
 							</ul>
 						</details>
@@ -855,7 +848,7 @@
 								: ''}"
 						>
 							<td class="px-3 py-2 whitespace-nowrap"
-								>{fmtDate(d.date)}
+								>{manilaShortDay(d.date)}
 								{#if d.isLocked}<span
 										title="locked"
 										class="inline-flex align-middle text-muted-foreground"
