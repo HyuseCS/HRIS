@@ -612,8 +612,13 @@ condition as Save would make a committed manual override unreachable unless you 
 
 Worth doing, and it needs decisions rather than just a button:
 - **Save all** posts every dirty row. Decide the failure mode when one row fails — all-or-nothing, or
-  per-row results. The repo has a precedent to copy: the bulk timesheet review reports partial
-  failures as a failure (`fix(timesheets): report a failed bulk review as a failure`, on staging).
+  per-row results. The repo has a precedent to copy: the bulk timesheet review.
+
+  **CORRECTION (11-09-26, plan B section 4).** The line above said that precedent "reports partial
+  failures as a failure". It does not. Verified at `src/routes/(app)/requests/timesheets/+page.server.ts:148-155`:
+  a partial returns **success** (`Approved 3 timesheets, 2 skipped.`) and `fail()` fires **only**
+  when `done === 0`. So the repo precedent is *partial = success with counts*, and D9 extends it to
+  *partial = success with counts AND per-row reasons*. `?/saveAll` follows the verified behaviour.
 - **Reset all** is destructive across many days at once, so under this phase's own rule it needs a
   `ConfirmButton` naming the count: "N days are re-derived from punches…".
 - Both need a disabled state when nothing qualifies, and a count in the label so the user knows the

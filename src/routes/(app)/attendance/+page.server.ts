@@ -176,6 +176,8 @@ const correctSchema = z.object({
 		.optional(),
 	note: z.string().optional()
 })
+const bulkRowSchema = correctSchema.extend({ date: z.string().min(1) })
+const MAX_BULK_ROWS = paginate(new URL('http://localhost/'), 0).take
 
 export const actions: Actions = {
 	derive: async (event) => {
@@ -213,6 +215,53 @@ export const actions: Actions = {
 			return toFail(e)
 		}
 		return { action: 'correct', saved: 'Attendance day saved.', day }
+	},
+
+	saveAll: async (event) => {
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
+		const raw = (await event.request.formData()).get('rows')
+		if (typeof raw !== 'string') return fail(400, { error: 'Nothing to save.' })
+		let decoded: unknown
+		try {
+			decoded = JSON.parse(raw)
+		} catch {
+			return fail(400, { error: 'Could not read the days to save.' })
+		}
+		const parsed = z.array(bulkRowSchema).min(1).safeParse(decoded)
+		if (!parsed.success) return fail(400, { error: 'Could not read the days to save.' })
+		if (parsed.data.length > MAX_BULK_ROWS)
+			return fail(400, { error: `Too many days in one save — ${MAX_BULK_ROWS} at a time.` })
+
+		const organizationId = event.locals.user!.organizationId
+		const ctx = ctxOf(event)
+		const results: { id: string; date: string; ok: boolean; reason?: string }[] = []
+		for (const row of parsed.data) {
+			const { id, date, timeIn, timeOut, ...rest } = row
+			const data: Parameters<typeof correctDay>[2] = { ...rest }
+			data.timeIn = timeIn ? new Date(`${date}T${timeIn}:00+08:00`) : null
+			data.timeOut = timeOut ? new Date(`${date}T${timeOut}:00+08:00`) : null
+			try {
+				await correctDay(id, organizationId, data, ctx)
+				results.push({ id, date, ok: true })
+			} catch (e) {
+				const err = e as { status?: number; body?: { message?: string } }
+				if (!err?.status || ![400, 404, 409].includes(err.status)) throw e
+				results.push({ id, date, ok: false, reason: err.body?.message ?? 'Could not be saved' })
+			}
+		}
+		const done = results.filter((r) => r.ok).length
+		const skipped = results.length - done
+		if (done === 0)
+			return fail(400, {
+				action: 'saveAll',
+				error: `No days were saved — ${skipped} could not be saved.`,
+				results
+			})
+		return {
+			action: 'saveAll',
+			saved: `Saved ${done} day${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`,
+			results
+		}
 	},
 
 	// Discard a manual override on a day and re-derive it from punches.

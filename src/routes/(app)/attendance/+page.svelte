@@ -70,6 +70,18 @@
 			(e.status !== undefined && e.status !== d.status)
 		)
 	}
+	type SaveAllResult = { id: string; date: string; ok: boolean; reason?: string }
+	const saveAll = submitFeedback({
+		inner:
+			() =>
+			async ({ result, update }) => {
+				if (result.type === 'success')
+					for (const r of (result.data as { results?: SaveAllResult[] } | undefined)?.results ?? [])
+						if (r.ok) delete rowState[r.id]
+				await update({ reset: false })
+			}
+	})
+
 	const correctRow =
 		(id: string): SubmitFunction =>
 		() =>
@@ -169,6 +181,18 @@
 	)
 	const dayRows = $derived(
 		exceptionsOnly ? data.days.filter((d) => isException(d.status)) : data.days
+	)
+	const dirtyDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && isDirty(d)))
+	const dirtyRowsField = $derived(
+		JSON.stringify(
+			dirtyDays.map((d) => ({
+				id: d.id,
+				date: toDateKey(d.date),
+				timeIn: editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+				timeOut: editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+				status: editOf(d.id, 'status', d.status)
+			}))
+		)
 	)
 
 	// Heroicons (outline, 24×24) — match the inline-SVG convention used in the app nav.
@@ -725,6 +749,51 @@
 			</table>
 		</div>
 	{:else}
+		{#if data.canManage}
+			<form method="POST" action="?/saveAll" use:enhance={saveAll.enhance}>
+				<input type="hidden" name="rows" value={dirtyRowsField} />
+				<button
+					disabled={saveAll.busy || dirtyDays.length === 0}
+					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					>{saveAll.busy
+						? 'Saving…'
+						: `Save ${dirtyDays.length} changed ${dirtyDays.length === 1 ? 'day' : 'days'} on this page`}</button
+				>
+			</form>
+			{#if form && 'results' in form && form.action === 'saveAll' && form.results}
+				{@const res = form.results}
+				{@const okCount = res.filter((r) => r.ok).length}
+				{@const failed = res.filter((r) => !r.ok)}
+				{@const nothing = okCount === 0}
+				{@const partial = okCount > 0 && failed.length > 0}
+				<div
+					role="status"
+					class="rounded-md border px-3 py-2 text-sm {nothing
+						? 'border-destructive/20 bg-destructive/10 text-red-400'
+						: partial
+							? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+							: 'border-green-500/20 bg-green-500/10 text-green-600'}"
+				>
+					<p class="font-medium">
+						{#if nothing}No days were saved — {failed.length}
+							{failed.length === 1 ? 'day' : 'days'} could not be saved.{:else if partial}Partly
+							saved — {okCount} of {res.length} days saved, {failed.length} skipped.{:else}Saved {okCount}
+							{okCount === 1 ? 'day' : 'days'} on this page.{/if}
+					</p>
+					{#if failed.length > 0}
+						<details class="mt-1" open={nothing}>
+							<summary class="cursor-pointer text-xs font-medium">Why days were not saved</summary>
+							<ul class="mt-1 space-y-0.5 text-xs">
+								{#each failed as r (r.id)}
+									<li>{fmtDate(r.date)} — {r.reason}</li>
+								{/each}
+							</ul>
+						</details>
+					{/if}
+				</div>
+			{/if}
+		{/if}
+
 		<!-- Single-employee range table -->
 		<div class="overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
