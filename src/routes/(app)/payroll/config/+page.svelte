@@ -1,7 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
-	import Banner from '$lib/components/ui/Banner.svelte'
+	import FormFeedback from '$lib/components/ui/FormFeedback.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -81,18 +81,6 @@
 		<a href="/payroll/statutory-rates" class="underline hover:text-foreground">Statutory Rates</a>.
 	</p>
 
-	{#if form?.success}
-		<Banner kind="success" message="Payroll configuration saved successfully." />
-	{/if}
-
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-		>
-			{form.error}
-		</div>
-	{/if}
-
 	<form
 		method="POST"
 		action="?/update"
@@ -148,7 +136,8 @@
 			</div>
 		{/if}
 
-		<div class="flex justify-end pt-2">
+		<div class="flex flex-wrap items-center justify-end gap-3 pt-2">
+			<FormFeedback {form} action="update" />
 			<button
 				type="submit"
 				disabled={saveConfig.busy}
@@ -196,7 +185,8 @@
 			{/each}
 		</div>
 
-		<div class="flex justify-end">
+		<div class="flex flex-wrap items-center justify-end gap-3">
+			<FormFeedback {form} action="updateRates" />
 			<button
 				type="button"
 				onclick={submitRates}
