@@ -187,11 +187,25 @@
 						Negative total means the employee owes the company after offsets.
 					</p>
 				{/if}
+				{#if isFinalized}
+					<div class="border-t px-4 py-3">
+						<p class="text-base font-semibold">
+							Settled at <span class="font-mono">{peso(Number(s.finalPayAmount ?? 0))}</span>
+						</p>
+						{#if s.finalizedAt}
+							<p class="mt-1 text-xs text-muted-foreground">
+								Finalized on {formatShortDate(s.finalizedAt)}
+							</p>
+						{/if}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Finalize -->
 			{#if !isFinalized}
-				<div class="rounded-lg border border-destructive/30 bg-card p-4">
+				<div
+					class="min-h-[20rem] max-h-[24rem] rounded-lg border border-destructive/30 bg-card p-4"
+				>
 					<h2 class="font-semibold text-destructive">Finalize separation</h2>
 					<p class="mt-1 text-sm text-muted-foreground">
 						Snapshots the final pay above, sets the employee to <strong>OFFBOARDED</strong> (end
@@ -223,52 +237,47 @@
 						/>
 					</div>
 				</div>
-			{:else}
-				<div class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-					Finalized{s.finalizedAt ? ` on ${formatShortDate(s.finalizedAt)}` : ''}. Final pay settled
-					at
-					<span class="font-mono">{peso(Number(s.finalPayAmount ?? 0))}</span>.
-				</div>
-				{#if data.canUndo}
-					<div class="rounded-lg border border-destructive/30 bg-card p-4">
-						<h2 class="font-semibold text-destructive">Undo finalization</h2>
-						<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
-							Restores the loan and cash-advance balances this finalize wrote off, sets the employee
-							back to their previous employment status, and <strong>re-enables their login</strong>.
-							Every undo is recorded in the audit log.
-						</p>
-						<form
-							bind:this={undoFormEl}
-							method="POST"
-							action="?/undo"
-							use:enhance={undo.enhance}
-							class="mt-3 space-y-3"
+			{:else if data.canUndo}
+				<div
+					class="min-h-[20rem] max-h-[24rem] rounded-lg border border-destructive/30 bg-card p-4"
+				>
+					<h2 class="font-semibold text-destructive">Undo finalization</h2>
+					<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
+						Restores the loan and cash-advance balances this finalize wrote off, sets the employee
+						back to their previous employment status, and <strong>re-enables their login</strong>.
+						Every undo is recorded in the audit log.
+					</p>
+					<form
+						bind:this={undoFormEl}
+						method="POST"
+						action="?/undo"
+						use:enhance={undo.enhance}
+						class="mt-3 space-y-3"
+					>
+						<div class="flex items-center gap-2">
+							<input
+								id="reopenClearance"
+								name="reopenClearance"
+								type="checkbox"
+								value="true"
+								bind:checked={reopenClearance}
+								class="h-4 w-4 rounded border-input"
+							/>
+							<label for="reopenClearance" class="text-sm">
+								Re-open clearance items — the case returns to <strong>OPEN</strong> and every item goes
+								back to pending. Whoever cleared an item stays barred from finalizing this case.
+							</label>
+						</div>
+						<button
+							type="button"
+							aria-describedby="undo-warning"
+							disabled={undo.busy}
+							onclick={() => (undoConfirm = true)}
+							class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+							>{undo.busy ? 'Undoing…' : 'Undo finalization'}</button
 						>
-							<div class="flex items-center gap-2">
-								<input
-									id="reopenClearance"
-									name="reopenClearance"
-									type="checkbox"
-									value="true"
-									bind:checked={reopenClearance}
-									class="h-4 w-4 rounded border-input"
-								/>
-								<label for="reopenClearance" class="text-sm">
-									Re-open clearance items — the case returns to <strong>OPEN</strong> and every item goes
-									back to pending. Whoever cleared an item stays barred from finalizing this case.
-								</label>
-							</div>
-							<button
-								type="button"
-								aria-describedby="undo-warning"
-								disabled={undo.busy}
-								onclick={() => (undoConfirm = true)}
-								class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-								>{undo.busy ? 'Undoing…' : 'Undo finalization'}</button
-							>
-						</form>
-					</div>
-				{/if}
+					</form>
+				</div>
 			{/if}
 		</div>
 	</div>
