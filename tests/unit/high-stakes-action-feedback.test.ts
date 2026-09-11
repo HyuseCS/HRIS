@@ -20,6 +20,7 @@ const svc = vi.hoisted(() => ({
 	decidePayrollRun: vi.fn(),
 	release: vi.fn(),
 	voidPeriod: vi.fn(),
+	overridePayrollEntry: vi.fn(),
 	setUserActive: vi.fn(),
 	lockRange: vi.fn(),
 	unlockRange: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock('$lib/server/services/payroll/index', () => ({
 	createPayrollRun: vi.fn(),
 	computePayroll: vi.fn(),
 	getPayrollRun: vi.fn(),
-	overridePayrollEntry: vi.fn()
+	overridePayrollEntry: svc.overridePayrollEntry
 }))
 vi.mock('$lib/server/services/payroll/runs', () => ({
 	voidRun: svc.voidRun,
@@ -124,6 +125,14 @@ describe('money-adjacent actions report their outcome', () => {
 	it('payroll/periods ?/release and ?/void each report', async () => {
 		expectFeedback(await run(periods.actions.release, { id: 'p1' }), 'release')
 		expectFeedback(await run(periods.actions.void, { id: 'p1' }), 'void')
+	})
+
+	it('payroll/[id] ?/override says the net pay was overridden', async () => {
+		expectFeedback(
+			await run(payrollRun.actions.override, { entryId: 'e1', netPay: '1000', note: 'why' }),
+			'override'
+		)
+		expect(svc.overridePayrollEntry).toHaveBeenCalledOnce()
 	})
 
 	it('payroll/[id] ?/decide distinguishes a sign-off from a return', async () => {

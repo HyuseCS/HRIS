@@ -71,10 +71,10 @@
 
 	// #108: the override form is rendered inside an {#each}, so it gets a per-entry guard rather
 	// than a shared one. Memoised by entry id so the identity is stable across re-renders.
-	const overrideGuards = new Map<string, ReturnType<typeof createSubmitGuard>>()
+	const overrideGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function overrideGuard(entryId: string) {
 		let g = overrideGuards.get(entryId)
-		if (!g) overrideGuards.set(entryId, (g = createSubmitGuard()))
+		if (!g) overrideGuards.set(entryId, (g = submitFeedback()))
 		return g
 	}
 
