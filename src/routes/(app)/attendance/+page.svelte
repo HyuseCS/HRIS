@@ -792,28 +792,22 @@
 			</div>
 			{#if form && 'results' in form && (form.action === 'saveAll' || form.action === 'resetAll') && form.results}
 				{@const res = form.results}
-				{@const verb = form.action === 'resetAll' ? 'recalculated' : 'saved'}
-				{@const verbTitle = form.action === 'resetAll' ? 'Recalculated' : 'Saved'}
-				{@const okCount = res.filter((r) => r.ok).length}
 				{@const failed = res.filter((r) => !r.ok)}
-				{@const nothing = okCount === 0}
-				{@const partial = okCount > 0 && failed.length > 0}
-				<div
-					role="status"
-					class="rounded-md border px-3 py-2 text-sm {nothing
-						? 'border-destructive/20 bg-destructive/10 text-red-400'
-						: partial
-							? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-							: 'border-green-500/20 bg-green-500/10 text-green-600'}"
-				>
-					<p class="font-medium">
-						{#if nothing}No days were {verb} — {failed.length}
-							{failed.length === 1 ? 'day' : 'days'} could not be {verb}.{:else if partial}Partly {verb}
-							— {okCount} of {res.length} days {verb}, {failed.length} skipped.{:else}{verbTitle}
-							{okCount}
-							{okCount === 1 ? 'day' : 'days'} on this page.{/if}
-					</p>
-					{#if failed.length > 0}
+				{#if failed.length > 0}
+					{@const verb = form.action === 'resetAll' ? 'recalculated' : 'saved'}
+					{@const okCount = res.length - failed.length}
+					{@const nothing = okCount === 0}
+					<div
+						role="status"
+						class="rounded-md border px-3 py-2 text-sm {nothing
+							? 'border-destructive/20 bg-destructive/10 text-red-400'
+							: 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'}"
+					>
+						<p class="font-medium">
+							{#if nothing}No days were {verb} — {failed.length}
+								{failed.length === 1 ? 'day' : 'days'} could not be {verb}.{:else}Partly {verb}
+								— {okCount} of {res.length} days {verb}, {failed.length} failed.{/if}
+						</p>
 						<details class="mt-1" open={nothing}>
 							<summary class="cursor-pointer text-xs font-medium">Why days were not {verb}</summary>
 							<ul class="mt-1 space-y-0.5 text-xs">
@@ -822,8 +816,8 @@
 								{/each}
 							</ul>
 						</details>
-					{/if}
-				</div>
+					</div>
+				{/if}
 			{/if}
 		{/if}
 
