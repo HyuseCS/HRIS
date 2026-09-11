@@ -204,7 +204,7 @@
 			<!-- Finalize -->
 			{#if !isFinalized}
 				<div
-					class="min-h-[20rem] max-h-[24rem] rounded-lg border border-destructive/30 bg-card p-4"
+					class="flex min-h-[15.5rem] flex-col rounded-lg border border-destructive/30 bg-card p-4"
 				>
 					<h2 class="font-semibold text-destructive">Finalize separation</h2>
 					<p class="mt-1 text-sm text-muted-foreground">
@@ -224,7 +224,7 @@
 							{finalizeBar}
 						</p>
 					{/if}
-					<div class="mt-3">
+					<div class="mt-auto pt-4">
 						<ConfirmButton
 							action="?/finalize"
 							title="Finalize this separation?"
@@ -239,7 +239,7 @@
 				</div>
 			{:else if data.canUndo}
 				<div
-					class="min-h-[20rem] max-h-[24rem] rounded-lg border border-destructive/30 bg-card p-4"
+					class="flex min-h-[15.5rem] flex-col rounded-lg border border-destructive/30 bg-card p-4"
 				>
 					<h2 class="font-semibold text-destructive">Undo finalization</h2>
 					<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
@@ -252,7 +252,7 @@
 						method="POST"
 						action="?/undo"
 						use:enhance={undo.enhance}
-						class="mt-3 space-y-3"
+						class="mt-auto flex flex-col gap-3 pt-4"
 					>
 						<div class="flex items-center gap-2">
 							<input
