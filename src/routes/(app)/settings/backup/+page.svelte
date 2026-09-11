@@ -22,7 +22,7 @@
 	// page with `effect_update_depth_exceeded`. Written that way the save succeeded (HTTP 200,
 	// row committed) while the toast never rendered and the console filled with errors.
 	const save = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
+		await update({ reset: false })
 		if (result.type === 'success') addToast('Backup schedule saved.', { kind: 'success' })
 		else if (result.type === 'failure') {
 			const d = result.data as { error?: string } | undefined
