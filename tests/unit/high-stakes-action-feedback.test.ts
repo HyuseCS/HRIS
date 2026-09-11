@@ -20,6 +20,7 @@ const svc = vi.hoisted(() => ({
 	decidePayrollRun: vi.fn(),
 	release: vi.fn(),
 	voidPeriod: vi.fn(),
+	overridePayrollEntry: vi.fn(),
 	setUserActive: vi.fn(),
 	lockRange: vi.fn(),
 	unlockRange: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock('$lib/server/services/payroll/index', () => ({
 	createPayrollRun: vi.fn(),
 	computePayroll: vi.fn(),
 	getPayrollRun: vi.fn(),
-	overridePayrollEntry: vi.fn()
+	overridePayrollEntry: svc.overridePayrollEntry
 }))
 vi.mock('$lib/server/services/payroll/runs', () => ({
 	voidRun: svc.voidRun,
@@ -105,6 +106,12 @@ const run = (action: any, fields: Record<string, string>) =>
 beforeEach(() => {
 	vi.clearAllMocks()
 	for (const fn of Object.values(svc)) fn.mockResolvedValue(undefined)
+	// resetDayToDerived returns the day it reset and the route names that date in its toast;
+	// undefined is not a shape production can produce.
+	svc.resetDayToDerived.mockResolvedValue({
+		reset: true,
+		date: new Date('2026-09-10T00:00:00+08:00')
+	})
 })
 
 /** The `saved: true | string` contract as an assertion. */
@@ -124,6 +131,14 @@ describe('money-adjacent actions report their outcome', () => {
 	it('payroll/periods ?/release and ?/void each report', async () => {
 		expectFeedback(await run(periods.actions.release, { id: 'p1' }), 'release')
 		expectFeedback(await run(periods.actions.void, { id: 'p1' }), 'void')
+	})
+
+	it('payroll/[id] ?/override says the net pay was overridden', async () => {
+		expectFeedback(
+			await run(payrollRun.actions.override, { entryId: 'e1', netPay: '1000', note: 'why' }),
+			'override'
+		)
+		expect(svc.overridePayrollEntry).toHaveBeenCalledOnce()
 	})
 
 	it('payroll/[id] ?/decide distinguishes a sign-off from a return', async () => {
@@ -153,5 +168,14 @@ describe('permission-adjacent and destructive actions report their outcome', () 
 		expectFeedback(await run(attendance.actions.lockTeam, { date: '2026-09-01' }), 'lockTeam')
 		expectFeedback(await run(attendance.actions.unlockTeam, { date: '2026-09-01' }), 'unlockTeam')
 		expectFeedback(await run(attendance.actions.resetDay, { id: 'day1' }), 'resetDay')
+	})
+
+	it('attendance ?/saveAll and ?/resetAll keep the same shape at bulk scale', async () => {
+		const rows = JSON.stringify([
+			{ id: 'day1', date: '2026-09-01', timeIn: '09:00', timeOut: '17:00', status: 'PRESENT' }
+		])
+		expectFeedback(await run(attendance.actions.saveAll, { rows }), 'saveAll')
+		expectFeedback(await run(attendance.actions.resetAll, { rows }), 'resetAll')
+		expect(svc.resetDayToDerived).toHaveBeenCalledOnce()
 	})
 })

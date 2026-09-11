@@ -11,10 +11,10 @@ import {
 	listPendingProposals,
 	statutoryRateInputSchema,
 	deriveTaxBrackets,
-	deriveSssTotals,
-	type StatutoryRateInput
+	deriveSssTotals
 } from '$lib/server/services/payroll/statutory-rates'
 import type { StatutoryRateConfigRow } from '$lib/server/services/payroll/statutory-rates'
+import { summarizeChanges } from '$lib/server/services/payroll/statutory-change-summary'
 import type { Actions, PageServerLoad } from './$types'
 
 // Live config (authoritative + seeded) mapped to the editor's wire shape. Each field falls back to
@@ -32,34 +32,6 @@ function toWireConfig(row: StatutoryRateConfigRow | null) {
 		sssBrackets: (row.sssBrackets as unknown) ?? d.sssBrackets,
 		taxBrackets: (row.taxBrackets as unknown) ?? d.taxBrackets
 	}
-}
-
-type WireConfig = ReturnType<typeof toWireConfig>
-
-// Human-readable diff of a proposed payload against the live config, for the review panel.
-function summarizeChanges(payload: StatutoryRateInput, live: WireConfig): string[] {
-	const out: string[] = []
-	const pct = (v: number) => `${(v * 100).toFixed(2).replace(/\.?0+$/, '')}%`
-	const peso = (v: number) => `₱${v.toLocaleString('en-PH')}`
-	const scalar = (label: string, pv: number | null, lv: number, fmt: (v: number) => string) => {
-		if (pv != null && pv !== lv) out.push(`${label}: ${fmt(lv)} → ${fmt(pv)}`)
-	}
-	scalar('PhilHealth rate', payload.philhealthRate, live.philhealthRate, pct)
-	scalar('PhilHealth floor', payload.philhealthFloor, live.philhealthFloor, peso)
-	scalar('PhilHealth ceiling', payload.philhealthCeiling, live.philhealthCeiling, peso)
-	scalar('Pag-IBIG rate', payload.pagibigRate, live.pagibigRate, pct)
-	scalar('Pag-IBIG cap', payload.pagibigCap, live.pagibigCap, peso)
-	if (
-		payload.sssBrackets &&
-		JSON.stringify(payload.sssBrackets) !== JSON.stringify(live.sssBrackets)
-	)
-		out.push('SSS contribution table changed')
-	if (
-		payload.taxBrackets &&
-		JSON.stringify(payload.taxBrackets) !== JSON.stringify(live.taxBrackets)
-	)
-		out.push('BIR withholding-tax table changed')
-	return out.length ? out : ['No effective change vs the live rates.']
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -200,7 +172,7 @@ export const actions: Actions = {
 				tx
 			)
 		)
-		return { success: 'Statutory rates saved.' }
+		return { action: 'save', saved: 'Statutory rates saved.' }
 	},
 
 	// HR_ADMIN proposes — live rates unchanged until a CEO/Super Admin confirms.
@@ -215,7 +187,7 @@ export const actions: Actions = {
 			})
 
 		await proposeStatutoryRates(user.organizationId, parsed.data, ctxOf(user, getClientAddress))
-		return { success: 'Change submitted for CEO approval.' }
+		return { action: 'propose', saved: 'Change submitted for CEO approval.' }
 	},
 
 	confirmProposal: async ({ request, locals, getClientAddress }) => {
@@ -226,7 +198,7 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'Missing proposal id.' })
 
 		await confirmProposal(user.organizationId, id, ctxOf(user, getClientAddress))
-		return { success: 'Proposal applied to the live rates.' }
+		return { action: 'confirm', saved: 'Proposal applied to the live rates.' }
 	},
 
 	rejectProposal: async ({ request, locals, getClientAddress }) => {
@@ -237,6 +209,6 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'Missing proposal id.' })
 
 		await rejectProposal(user.organizationId, id, ctxOf(user, getClientAddress))
-		return { success: 'Proposal rejected.' }
+		return { action: 'reject', saved: 'Proposal rejected.' }
 	}
 }

@@ -143,6 +143,8 @@ export const actions: Actions = {
 			note,
 			ctxOf(locals, getClientAddress())
 		)
+
+		return { action: 'override', saved: 'Net pay overridden.' }
 	},
 
 	// Recompute this run in place (e.g. after assigning recurring earnings or

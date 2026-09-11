@@ -761,7 +761,7 @@ export async function resetDayToDerived(id: string, organizationId: string, ctx:
 		ctx
 	)
 
-	return { reset: true }
+	return { reset: true, date: day.date }
 }
 
 /** Lock AttendanceDays in a range so payroll can import them (read-only thereafter). */

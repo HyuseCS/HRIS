@@ -382,18 +382,28 @@ not paraphrase at execution time.
 
 - **File:** `src/routes/(app)/settings/roles/+page.svelte:219-230`
 - **Stakes:** locks a person out of the system.
-- **Asymmetric by design:** the same button both activates and deactivates. **Confirm only the
-  deactivate direction.** Re-activating a login is neither destructive nor irreversible; putting a
-  dialog on it is friction with no consequence to name.
+- **Both directions confirm.** *Amended 11-09-26 by owner decision, reversing this plan's original
+  call.* The original text read: "Asymmetric by design … confirm only the deactivate direction.
+  Re-activating a login is neither destructive nor irreversible; putting a dialog on it is friction
+  with no consequence to name." That reasoning weighed only the *irreversible* and *money-affecting*
+  limbs of the phase rule and missed the *person-affecting* one: re-activation restores someone's
+  ability to sign in and reach payroll data, and it is the one direction where a misclick **grants**
+  access rather than removing it. A deactivated account is usually deactivated for a reason.
 - **Shape:** **A**.
-- **Wiring:** branch on `u.isActive`. When `true`, render `<ConfirmButton action="?/setActive">`
-  with both hidden inputs as children. When `false`, keep the existing plain form and its
-  `setActiveGuard` untouched. Keep the per-row guard for the activate branch — the #108 comment at
-  `:21-25` still applies to it and must not be deleted.
+- **Wiring:** branch on `u.isActive`. **Both branches render `<ConfirmButton action="?/setActive">`**
+  with both hidden inputs as children — only the copy and the `isActive` value differ. *Amended
+  11-09-26: the original text kept the activate branch as a plain form with its own
+  `setActiveGuard`.* With both branches on `ConfirmButton`, nothing reads the per-row
+  `setActiveGuards` / `setActiveGuard` bindings any more, so they are removed; `ConfirmButton` owns
+  its own `submitFeedback`, so the #108 single-submit protection is not lost.
 - **Message:**
   - **title:** `Deactivate this login?`
   - **message:** `{u.email} is signed out and cannot sign in again until someone re-activates them. Their employee record, payroll history and documents are untouched.`
   - **confirmText:** `Deactivate`
+- **Message (re-activate branch, added 11-09-26):**
+  - **title:** `Re-activate this login?`
+  - **message:** `{u.email} can sign in again immediately and regains access to everything their roles allow.`
+  - **confirmText:** `Activate`
 - **Copy note:** the second sentence exists because "deactivate" reads as "delete" to a first-time
   user, and the honest-dead-end-copy standard (do-not-break item 8) says to state what *survives*.
 
@@ -469,7 +479,13 @@ Recording these so a later reviewer does not read the omission as an oversight.
 | Attendance `lock` / `unlock` / `lockTeam` / `unlockTeam` | Reversible pairs. Their §E silent-success defect is phase 04's. |
 | Separation clearance item toggles | Reversible; per-row; a dialog per checkbox would make the checklist unusable. |
 | Inventory delete, branch close, holiday delete | **Already correct** — kit `ConfirmButton`. Verify unchanged after phase 04's rebuild; do not edit. |
-| Login re-activation (site 12, `isActive === false`) | Not destructive. Confirming it is friction with no consequence to name. |
+
+> **Amended 11-09-26 (owner decision).** This table originally carried a "Login re-activation
+> (site 12, `isActive === false`)" row reading *"Not destructive. Confirming it is friction with no
+> consequence to name."* The owner reversed that call: re-activation is **person-affecting** — it
+> hands back sign-in and payroll access, and a misclick there grants access instead of removing it.
+> The row is removed and site 12 now confirms in both directions. See phase 05 remediation plan A,
+> section S8.
 
 ---
 

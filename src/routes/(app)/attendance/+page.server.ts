@@ -21,7 +21,7 @@ import {
 } from '$lib/server/services/attendance/import'
 import { paginate } from '$lib/server/pagination'
 import { isFoodServiceOrg } from '$lib/orgs'
-import { manilaDayKey } from '$lib/utils/dates'
+import { manilaDayKey, manilaShortDay } from '$lib/utils/dates'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
 const DAY_MS = 86_400_000
@@ -153,6 +153,20 @@ function toFail(e: unknown, extra?: { importError: true }) {
 	throw e
 }
 
+/**
+ * One day names itself; several report a count. A refused row is `failed`, never `skipped` —
+ * skipped reads as "nothing to do" and would hide a refusal behind a success.
+ */
+function bulkSaved(verb: string, results: { date: string; ok: boolean }[]) {
+	const done = results.filter((r) => r.ok)
+	const failed = results.length - done.length
+	const subject =
+		done.length === 1
+			? manilaShortDay(done[0].date)
+			: `${done.length} day${done.length === 1 ? '' : 's'}`
+	return failed > 0 ? `${verb} ${subject}, ${failed} failed.` : `${verb} ${subject}.`
+}
+
 const rangeSchema = z.object({
 	employeeId: z.string().min(1),
 	from: z.coerce.date(),
@@ -171,13 +185,14 @@ const correctSchema = z.object({
 	date: z.string().optional(),
 	timeIn: z.string().optional(),
 	timeOut: z.string().optional(),
-	regularHours: z.coerce.number().min(0).optional(),
-	overtimeHours: z.coerce.number().min(0).optional(),
 	status: z
 		.enum(['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY'])
 		.optional(),
 	note: z.string().optional()
 })
+const bulkRowSchema = correctSchema.extend({ date: z.string().min(1) })
+const bulkResetRowSchema = z.object({ id: z.string().min(1), date: z.string().min(1) })
+const MAX_BULK_ROWS = paginate(new URL('http://localhost/'), 0).take
 
 export const actions: Actions = {
 	derive: async (event) => {
@@ -208,12 +223,60 @@ export const actions: Actions = {
 			data.timeIn = timeIn ? new Date(`${date}T${timeIn}:00+08:00`) : null
 			data.timeOut = timeOut ? new Date(`${date}T${timeOut}:00+08:00`) : null
 		}
+		let day: Awaited<ReturnType<typeof correctDay>>
 		try {
-			await correctDay(id, event.locals.user!.organizationId, data, ctxOf(event))
+			day = await correctDay(id, event.locals.user!.organizationId, data, ctxOf(event))
 		} catch (e) {
 			return toFail(e)
 		}
-		return { action: 'correct', saved: 'Attendance day saved.' }
+		return { action: 'correct', saved: `${manilaShortDay(day.date)} saved.`, day }
+	},
+
+	saveAll: async (event) => {
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
+		const raw = (await event.request.formData()).get('rows')
+		if (typeof raw !== 'string') return fail(400, { error: 'Nothing to save.' })
+		let decoded: unknown
+		try {
+			decoded = JSON.parse(raw)
+		} catch {
+			return fail(400, { error: 'Could not read the days to save.' })
+		}
+		const parsed = z.array(bulkRowSchema).min(1).safeParse(decoded)
+		if (!parsed.success) return fail(400, { error: 'Could not read the days to save.' })
+		if (parsed.data.length > MAX_BULK_ROWS)
+			return fail(400, { error: `Too many days in one save — ${MAX_BULK_ROWS} at a time.` })
+
+		const organizationId = event.locals.user!.organizationId
+		const ctx = ctxOf(event)
+		const results: { id: string; date: string; ok: boolean; reason?: string }[] = []
+		for (const row of parsed.data) {
+			const { id, date, timeIn, timeOut, ...rest } = row
+			const data: Parameters<typeof correctDay>[2] = { ...rest }
+			data.timeIn = timeIn ? new Date(`${date}T${timeIn}:00+08:00`) : null
+			data.timeOut = timeOut ? new Date(`${date}T${timeOut}:00+08:00`) : null
+			try {
+				await correctDay(id, organizationId, data, ctx)
+				results.push({ id, date, ok: true })
+			} catch (e) {
+				const err = e as { status?: number; body?: { message?: string } }
+				if (!err?.status || ![400, 404, 409].includes(err.status)) throw e
+				results.push({ id, date, ok: false, reason: err.body?.message ?? 'Could not be saved' })
+			}
+		}
+		const done = results.filter((r) => r.ok).length
+		const skipped = results.length - done
+		if (done === 0)
+			return fail(400, {
+				action: 'saveAll',
+				error: `No days were saved — ${skipped} could not be saved.`,
+				results
+			})
+		return {
+			action: 'saveAll',
+			saved: bulkSaved('Saved', results),
+			results
+		}
 	},
 
 	// Discard a manual override on a day and re-derive it from punches.
@@ -221,13 +284,64 @@ export const actions: Actions = {
 		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
 		const id = (await event.request.formData()).get('id') as string
 		if (!id) return fail(400, { error: 'Missing day id' })
+		let reset: Awaited<ReturnType<typeof resetDayToDerived>>
 		try {
-			await resetDayToDerived(id, event.locals.user!.organizationId, ctxOf(event))
+			reset = await resetDayToDerived(id, event.locals.user!.organizationId, ctxOf(event))
 		} catch (e) {
 			return toFail(e)
 		}
 		// Several of these auto-submit on change, so the toast is the only possible cue.
-		return { action: 'resetDay', saved: 'Day reset to the derived values.' }
+		return { action: 'resetDay', saved: `${manilaShortDay(reset.date)} recalculated from punches.` }
+	},
+
+	resetAll: async (event) => {
+		requireAnyCapability(event.locals.user!.roles, 'MANAGE_HR')
+		const raw = (await event.request.formData()).get('rows')
+		if (typeof raw !== 'string') return fail(400, { error: 'Nothing to recalculate.' })
+		let decoded: unknown
+		try {
+			decoded = JSON.parse(raw)
+		} catch {
+			return fail(400, { error: 'Could not read the days to recalculate.' })
+		}
+		const parsed = z.array(bulkResetRowSchema).min(1).safeParse(decoded)
+		if (!parsed.success) return fail(400, { error: 'Could not read the days to recalculate.' })
+		if (parsed.data.length > MAX_BULK_ROWS)
+			return fail(400, {
+				error: `Too many days in one recalculate — ${MAX_BULK_ROWS} at a time.`
+			})
+
+		const organizationId = event.locals.user!.organizationId
+		const ctx = ctxOf(event)
+		const results: { id: string; date: string; ok: boolean; reason?: string }[] = []
+		for (const { id, date } of parsed.data) {
+			try {
+				await resetDayToDerived(id, organizationId, ctx)
+				results.push({ id, date, ok: true })
+			} catch (e) {
+				const err = e as { status?: number; body?: { message?: string } }
+				if (!err?.status || ![400, 404, 409].includes(err.status)) throw e
+				results.push({
+					id,
+					date,
+					ok: false,
+					reason: err.body?.message ?? 'Could not be recalculated'
+				})
+			}
+		}
+		const done = results.filter((r) => r.ok).length
+		const skipped = results.length - done
+		if (done === 0)
+			return fail(400, {
+				action: 'resetAll',
+				error: `No days were recalculated — ${skipped} could not be recalculated.`,
+				results
+			})
+		return {
+			action: 'resetAll',
+			saved: bulkSaved('Recalculated', results),
+			results
+		}
 	},
 
 	lock: async (event) => {

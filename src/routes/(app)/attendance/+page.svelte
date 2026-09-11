@@ -9,6 +9,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
+	import { manilaShortDay } from '$lib/utils/dates'
 	import type { PageData, ActionData } from './$types'
 
 	// Don't reset the form on success: enhance's default form.reset() clears the cross-cell
@@ -45,6 +46,53 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	type DayRow = NonNullable<PageData['team'][number]['day']>
+	type RowState = { timeIn?: string; timeOut?: string; status?: string; saved?: DayRow }
+	type EditField = 'timeIn' | 'timeOut' | 'status'
+
+	const rowState: Record<string, RowState> = $state({})
+
+	function rowOf(d: DayRow): DayRow {
+		const s = rowState[d.id]?.saved
+		return s && new Date(s.updatedAt) > new Date(d.updatedAt) ? s : d
+	}
+	function editOf(id: string, field: EditField, base: string) {
+		return rowState[id]?.[field] ?? base
+	}
+	function setEdit(id: string, field: EditField, value: string) {
+		rowState[id] = { ...rowState[id], [field]: value }
+	}
+	function isDirty(d: DayRow) {
+		const e = rowState[d.id]
+		if (!e) return false
+		return (
+			(e.timeIn !== undefined && e.timeIn !== toTimeInput(d.timeIn)) ||
+			(e.timeOut !== undefined && e.timeOut !== toTimeInput(d.timeOut)) ||
+			(e.status !== undefined && e.status !== d.status)
+		)
+	}
+	type BulkResult = { id: string; date: string; ok: boolean; reason?: string }
+	const clearOkRows: SubmitFunction =
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success')
+				for (const r of (result.data as { results?: BulkResult[] } | undefined)?.results ?? [])
+					if (r.ok) delete rowState[r.id]
+			await update({ reset: false })
+		}
+	const saveAll = submitFeedback({ inner: clearOkRows })
+
+	const correctRow =
+		(id: string): SubmitFunction =>
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success') {
+				const day = (result.data as { day?: DayRow } | undefined)?.day
+				if (day) rowState[id] = { saved: day }
+			}
+			await update({ reset: false })
+		}
+
 	// #163: the range stays free-form and "Save as timesheet" now accepts any same-month span —
 	// createTimesheet validates it server-side and refuses an overlap with a 409. Quick-picks still
 	// snap to a standard pay period. from/to are YYYY-MM-DD (UTC-midnight days).
@@ -78,14 +126,6 @@
 
 	const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY']
 
-	function fmtDate(d: string | Date) {
-		return new Date(d).toLocaleDateString('en-PH', {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric',
-			timeZone: 'Asia/Manila'
-		})
-	}
 	function fmtTime(d: string | Date | null) {
 		if (!d) return '—'
 		return new Date(d).toLocaleTimeString('en-PH', {
@@ -95,30 +135,6 @@
 		})
 	}
 	const n = (x: unknown) => Number(x)
-
-	// When In/Out are entered manually, auto-fill Reg (and OT overflow) to mirror the derive
-	// engine: worked = (Out − In) − 1h break past 5h; Reg = min(worked, 8), OT = the rest.
-	// HR can still override the numbers afterward.
-	function recalcHours(e: Event) {
-		const el = e.currentTarget as HTMLInputElement
-		const fid = el.getAttribute('form')
-		if (!fid) return
-		const q = (name: string) =>
-			document.querySelector<HTMLInputElement>(`input[name="${name}"][form="${fid}"]`)
-		const tin = q('timeIn')?.value
-		const tout = q('timeOut')?.value
-		const reg = q('regularHours')
-		const ot = q('overtimeHours')
-		if (!tin || !tout || !reg || !ot) return
-		const [ih, im] = tin.split(':').map(Number)
-		const [oh, om] = tout.split(':').map(Number)
-		let mins = oh * 60 + om - (ih * 60 + im)
-		if (mins < 0) mins += 1440 // overnight out
-		const gross = mins / 60
-		const worked = Math.max(0, gross - (gross > 5 ? 1 : 0))
-		reg.value = Math.min(worked, 8).toFixed(2)
-		ot.value = Math.max(0, worked - 8).toFixed(2)
-	}
 
 	// 24h HH:MM for a <input type="time">, in Manila time; '' when no punch.
 	function toTimeInput(d: string | Date | null) {
@@ -138,9 +154,6 @@
 	// Content-sized (not w-full) so the table columns spread evenly instead of one ballooning.
 	const CELL =
 		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
-	const CELL_NUM =
-		CELL +
-		' w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 	const CELL_SEL = CELL + ' appearance-none'
 	const CELL_TIME = CELL + ' w-24'
 
@@ -161,6 +174,32 @@
 	const dayRows = $derived(
 		exceptionsOnly ? data.days.filter((d) => isException(d.status)) : data.days
 	)
+	const dirtyDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && isDirty(d)))
+	const dirtyRowsField = $derived(
+		JSON.stringify(
+			dirtyDays.map((d) => ({
+				id: d.id,
+				date: toDateKey(d.date),
+				timeIn: editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+				timeOut: editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+				status: editOf(d.id, 'status', d.status)
+			}))
+		)
+	)
+	const editedDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && d.manuallyEdited))
+	const editedRowsField = $derived(
+		JSON.stringify(editedDays.map((d) => ({ id: d.id, date: toDateKey(d.date) })))
+	)
+	const editedSpan = $derived.by(() => {
+		const times = editedDays.map((d) => new Date(d.date).getTime())
+		if (times.length === 0) return ''
+		return `between ${manilaShortDay(new Date(Math.min(...times)))} and ${manilaShortDay(new Date(Math.max(...times)))} `
+	})
+	const selectedEmployeeName = $derived.by(() => {
+		const e = data.employees.find((x) => x.id === data.selectedEmployeeId)
+		return e ? `${e.firstName} ${e.lastName}` : 'this employee'
+	})
+	const editedCount = $derived(`${editedDays.length} ${editedDays.length === 1 ? 'day' : 'days'}`)
 
 	// Heroicons (outline, 24×24) — match the inline-SVG convention used in the app nav.
 	const IC = {
@@ -545,6 +584,13 @@
 		</p>
 	{/if}
 
+	{#if data.canManage}
+		<p class="text-xs text-muted-foreground">
+			Reg and OT are worked out from the punches and the approved overtime, and cannot be typed in.
+			Correct a day by editing its In and Out.
+		</p>
+	{/if}
+
 	{#if data.view === 'team'}
 		<!-- Team-for-a-day table -->
 		<div class="overflow-x-auto rounded-lg border">
@@ -572,7 +618,7 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each teamRows as t (t.id)}
-						{@const d = t.day}
+						{@const d = t.day ? rowOf(t.day) : null}
 						{@const editable = data.canManage && d && !d.isLocked}
 						<tr
 							class="hover:bg-muted/30 {d && (d.status === 'ABSENT' || d.status === 'INCOMPLETE')
@@ -586,9 +632,15 @@
 							<td class="px-3 py-2 text-muted-foreground">{t.departmentName ?? '—'}</td>
 							<td class="px-3 py-2">
 								{#if editable && d}
-									<select name="status" form="c-{d.id}" class={CELL_SEL}>
-										{#each STATUSES as s (s)}<option value={s} selected={s === d.status}>{s}</option
-											>{/each}
+									<select
+										name="status"
+										form="c-{d.id}"
+										class={CELL_SEL}
+										bind:value={
+											() => editOf(d.id, 'status', d.status), (v) => setEdit(d.id, 'status', v)
+										}
+									>
+										{#each STATUSES as s (s)}<option value={s}>{s}</option>{/each}
 									</select>
 								{:else if d}
 									<Badge status={d.status} domain="attendance" />
@@ -606,8 +658,10 @@
 										name="timeIn"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeIn)}
-										oninput={recalcHours}
+										bind:value={
+											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+											(v) => setEdit(d.id, 'timeIn', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeIn ?? null)}{/if}</td
 							>
@@ -616,32 +670,24 @@
 										name="timeOut"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeOut)}
-										oninput={recalcHours}
+										bind:value={
+											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+											(v) => setEdit(d.id, 'timeOut', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeOut ?? null)}{/if}</td
 							>
 							<td class="px-3 py-2 text-right font-mono"
-								>{#if editable && d}<input
-										name="regularHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.regularHours)}
-										class={CELL_NUM}
-									/>{:else}{d ? n(d.regularHours).toFixed(2) : '—'}{/if}</td
+								>{d ? n(d.regularHours).toFixed(2) : '—'}</td
 							>
 							<td class="px-3 py-2 text-right font-mono"
-								>{#if editable && d}<input
-										name="overtimeHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.overtimeHours)}
-										class={CELL_NUM}
-									/>{:else}{d ? n(d.overtimeHours).toFixed(2) : '—'}{/if}</td
+								>{#if d}{n(d.overtimeHours).toFixed(
+										2
+									)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+											class="ml-1 text-xs text-amber-600 dark:text-amber-400"
+											title="unapproved OT"
+											>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
+										>{/if}{:else}—{/if}</td
 							>
 							{#if data.showAmPm}
 								<!-- M-15: after Reg/OT, mirroring the header order. -->
@@ -652,25 +698,33 @@
 							{/if}
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
-									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
+									{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 									<div class="flex items-center gap-1">
-										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
+										<form
+											id="c-{d.id}"
+											method="POST"
+											action="?/correct"
+											use:enhance={save.enhance}
+											class="w-[4.5rem]"
+										>
 											<input type="hidden" name="id" value={d.id} />
 											<input type="hidden" name="date" value={toDateKey(d.date)} />
-											<button
-												disabled={save.busy}
-												class="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-												>{save.busy ? 'Saving…' : 'Save'}</button
-											>
+											{#if isDirty(d)}
+												<button
+													disabled={save.busy}
+													class="w-full rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+													>{save.busy ? 'Saving…' : 'Save'}</button
+												>
+											{/if}
 										</form>
 										<ConfirmButton
 											action="?/resetDay"
 											title="Discard the manual edit?"
-											message="This day goes back to the values derived from its punch records. The manual correction is lost."
+											message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
 											confirmText="Reset"
-											triggerLabel="Reset"
+											triggerLabel="Recalculate"
 											disabled={!d.manuallyEdited}
-											triggerTitle="Discard manual edit and re-derive from punches"
+											triggerTitle="Recalculate this day from the raw punches"
 											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
 											submit={keepValues}
 										>
@@ -701,6 +755,65 @@
 			</table>
 		</div>
 	{:else}
+		{#if data.canManage}
+			<div class="flex flex-wrap items-center gap-2">
+				<form method="POST" action="?/saveAll" use:enhance={saveAll.enhance}>
+					<input type="hidden" name="rows" value={dirtyRowsField} />
+					<button
+						disabled={saveAll.busy || dirtyDays.length === 0}
+						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{saveAll.busy
+							? 'Saving…'
+							: `Save ${dirtyDays.length} changed ${dirtyDays.length === 1 ? 'day' : 'days'} on this page`}</button
+					>
+				</form>
+				<ConfirmButton
+					action="?/resetAll"
+					title="Discard {editedDays.length} manual {editedDays.length === 1 ? 'edit' : 'edits'}?"
+					message="{editedCount} for {selectedEmployeeName} {editedSpan}{editedDays.length === 1
+						? 'is'
+						: 'are'} thrown away and re-derived from the raw punches. Anything typed by hand on those days is lost. Only the days shown on this page are affected."
+					confirmText="Recalculate"
+					triggerLabel="Recalculate {editedCount} on this page"
+					disabled={editedDays.length === 0}
+					triggerTitle="Recalculate every manually edited day shown on this page"
+					triggerClass="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					submit={clearOkRows}
+				>
+					<input type="hidden" name="rows" value={editedRowsField} />
+				</ConfirmButton>
+			</div>
+			{#if form && 'results' in form && (form.action === 'saveAll' || form.action === 'resetAll') && form.results}
+				{@const res = form.results}
+				{@const failed = res.filter((r) => !r.ok)}
+				{#if failed.length > 0}
+					{@const verb = form.action === 'resetAll' ? 'recalculated' : 'saved'}
+					{@const okCount = res.length - failed.length}
+					{@const nothing = okCount === 0}
+					<div
+						role="status"
+						class="rounded-md border px-3 py-2 text-sm {nothing
+							? 'border-destructive/20 bg-destructive/10 text-red-400'
+							: 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'}"
+					>
+						<p class="font-medium">
+							{#if nothing}No days were {verb} — {failed.length}
+								{failed.length === 1 ? 'day' : 'days'} could not be {verb}.{:else}Partly {verb}
+								— {okCount} of {res.length} days {verb}, {failed.length} failed.{/if}
+						</p>
+						<details class="mt-1" open={nothing}>
+							<summary class="cursor-pointer text-xs font-medium">Why days were not {verb}</summary>
+							<ul class="mt-1 space-y-0.5 text-xs">
+								{#each failed as r (r.id)}
+									<li>{manilaShortDay(r.date)} — {r.reason}</li>
+								{/each}
+							</ul>
+						</details>
+					</div>
+				{/if}
+			{/if}
+		{/if}
+
 		<!-- Single-employee range table -->
 		<div class="overflow-x-auto rounded-lg border">
 			<table class="w-full text-sm">
@@ -726,7 +839,8 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y">
-					{#each dayRows as d (d.id)}
+					{#each dayRows as src (src.id)}
+						{@const d = rowOf(src)}
 						{@const editable = data.canManage && !d.isLocked}
 						<tr
 							class="hover:bg-muted/30 {d.status === 'ABSENT' || d.status === 'INCOMPLETE'
@@ -734,7 +848,7 @@
 								: ''}"
 						>
 							<td class="px-3 py-2 whitespace-nowrap"
-								>{fmtDate(d.date)}
+								>{manilaShortDay(d.date)}
 								{#if d.isLocked}<span
 										title="locked"
 										class="inline-flex align-middle text-muted-foreground"
@@ -743,9 +857,15 @@
 							>
 							<td class="px-3 py-2">
 								{#if editable}
-									<select name="status" form="c-{d.id}" class={CELL_SEL}>
-										{#each STATUSES as s (s)}<option value={s} selected={s === d.status}>{s}</option
-											>{/each}
+									<select
+										name="status"
+										form="c-{d.id}"
+										class={CELL_SEL}
+										bind:value={
+											() => editOf(d.id, 'status', d.status), (v) => setEdit(d.id, 'status', v)
+										}
+									>
+										{#each STATUSES as s (s)}<option value={s}>{s}</option>{/each}
 									</select>
 								{:else}
 									<Badge status={d.status} domain="attendance" />
@@ -756,8 +876,10 @@
 										name="timeIn"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeIn)}
-										oninput={recalcHours}
+										bind:value={
+											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+											(v) => setEdit(d.id, 'timeIn', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeIn)}{/if}</td
 							>
@@ -766,43 +888,23 @@
 										name="timeOut"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeOut)}
-										oninput={recalcHours}
+										bind:value={
+											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+											(v) => setEdit(d.id, 'timeOut', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeOut)}{/if}</td
 							>
-							<td class="px-3 py-2 text-right font-mono">
-								{#if editable}
-									<input
-										name="regularHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.regularHours)}
-										class={CELL_NUM}
-									/>
-								{:else}{n(d.regularHours).toFixed(2)}{/if}
-							</td>
-							<td class="px-3 py-2 text-right font-mono">
-								{#if editable}
-									<input
-										name="overtimeHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.overtimeHours)}
-										class={CELL_NUM}
-									/>
-								{:else}{n(d.overtimeHours).toFixed(
-										2
-									)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
-											class="ml-1 text-xs text-amber-600 dark:text-amber-400"
-											title="unapproved OT"
-											>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
-										>{/if}{/if}
-							</td>
+							<td class="px-3 py-2 text-right font-mono">{n(d.regularHours).toFixed(2)}</td>
+							<td class="px-3 py-2 text-right font-mono"
+								>{n(d.overtimeHours).toFixed(
+									2
+								)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+										class="ml-1 text-xs text-amber-600 dark:text-amber-400"
+										title="unapproved OT"
+										>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
+									>{/if}</td
+							>
 							<td class="px-3 py-2 text-right font-mono">{n(d.nightDiffHours).toFixed(2)}</td>
 							<td class="px-3 py-2 text-right font-mono text-muted-foreground"
 								>{d.lateMinutes}/{d.undertimeMinutes}</td
@@ -821,30 +923,33 @@
 											>locked</span
 										>
 									{:else}
-										{@const save = rowGuard(`correct:${d.id}`, keepValues)}
+										{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 										<div class="flex items-center gap-1">
 											<form
 												id="c-{d.id}"
 												method="POST"
 												action="?/correct"
 												use:enhance={save.enhance}
+												class="w-[4.5rem]"
 											>
 												<input type="hidden" name="id" value={d.id} />
 												<input type="hidden" name="date" value={toDateKey(d.date)} />
-												<button
-													disabled={save.busy}
-													class="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-													>{save.busy ? 'Saving…' : 'Save'}</button
-												>
+												{#if isDirty(d)}
+													<button
+														disabled={save.busy}
+														class="w-full rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+														>{save.busy ? 'Saving…' : 'Save'}</button
+													>
+												{/if}
 											</form>
 											<ConfirmButton
 												action="?/resetDay"
 												title="Discard the manual edit?"
-												message="This day goes back to the values derived from its punch records. The manual correction is lost."
+												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
 												confirmText="Reset"
-												triggerLabel="Reset"
+												triggerLabel="Recalculate"
 												disabled={!d.manuallyEdited}
-												triggerTitle="Discard manual edit and re-derive from punches"
+												triggerTitle="Recalculate this day from the raw punches"
 												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
 												submit={keepValues}
 											>
