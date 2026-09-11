@@ -70,17 +70,16 @@
 			(e.status !== undefined && e.status !== d.status)
 		)
 	}
-	type SaveAllResult = { id: string; date: string; ok: boolean; reason?: string }
-	const saveAll = submitFeedback({
-		inner:
-			() =>
-			async ({ result, update }) => {
-				if (result.type === 'success')
-					for (const r of (result.data as { results?: SaveAllResult[] } | undefined)?.results ?? [])
-						if (r.ok) delete rowState[r.id]
-				await update({ reset: false })
-			}
-	})
+	type BulkResult = { id: string; date: string; ok: boolean; reason?: string }
+	const clearOkRows: SubmitFunction =
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success')
+				for (const r of (result.data as { results?: BulkResult[] } | undefined)?.results ?? [])
+					if (r.ok) delete rowState[r.id]
+			await update({ reset: false })
+		}
+	const saveAll = submitFeedback({ inner: clearOkRows })
 
 	const correctRow =
 		(id: string): SubmitFunction =>
@@ -194,6 +193,20 @@
 			}))
 		)
 	)
+	const editedDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && d.manuallyEdited))
+	const editedRowsField = $derived(
+		JSON.stringify(editedDays.map((d) => ({ id: d.id, date: toDateKey(d.date) })))
+	)
+	const editedSpan = $derived.by(() => {
+		const times = editedDays.map((d) => new Date(d.date).getTime())
+		if (times.length === 0) return ''
+		return `between ${fmtDate(new Date(Math.min(...times)))} and ${fmtDate(new Date(Math.max(...times)))} `
+	})
+	const selectedEmployeeName = $derived.by(() => {
+		const e = data.employees.find((x) => x.id === data.selectedEmployeeId)
+		return e ? `${e.firstName} ${e.lastName}` : 'this employee'
+	})
+	const editedCount = $derived(`${editedDays.length} ${editedDays.length === 1 ? 'day' : 'days'}`)
 
 	// Heroicons (outline, 24×24) — match the inline-SVG convention used in the app nav.
 	const IC = {
@@ -750,18 +763,37 @@
 		</div>
 	{:else}
 		{#if data.canManage}
-			<form method="POST" action="?/saveAll" use:enhance={saveAll.enhance}>
-				<input type="hidden" name="rows" value={dirtyRowsField} />
-				<button
-					disabled={saveAll.busy || dirtyDays.length === 0}
-					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					>{saveAll.busy
-						? 'Saving…'
-						: `Save ${dirtyDays.length} changed ${dirtyDays.length === 1 ? 'day' : 'days'} on this page`}</button
+			<div class="flex flex-wrap items-center gap-2">
+				<form method="POST" action="?/saveAll" use:enhance={saveAll.enhance}>
+					<input type="hidden" name="rows" value={dirtyRowsField} />
+					<button
+						disabled={saveAll.busy || dirtyDays.length === 0}
+						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{saveAll.busy
+							? 'Saving…'
+							: `Save ${dirtyDays.length} changed ${dirtyDays.length === 1 ? 'day' : 'days'} on this page`}</button
+					>
+				</form>
+				<ConfirmButton
+					action="?/resetAll"
+					title="Discard {editedDays.length} manual {editedDays.length === 1 ? 'edit' : 'edits'}?"
+					message="{editedCount} for {selectedEmployeeName} {editedSpan}{editedDays.length === 1
+						? 'is'
+						: 'are'} thrown away and re-derived from the raw punches. Anything typed by hand on those days is lost. Only the days shown on this page are affected."
+					confirmText="Recalculate"
+					triggerLabel="Recalculate {editedCount} on this page"
+					disabled={editedDays.length === 0}
+					triggerTitle="Recalculate every manually edited day shown on this page"
+					triggerClass="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					submit={clearOkRows}
 				>
-			</form>
-			{#if form && 'results' in form && form.action === 'saveAll' && form.results}
+					<input type="hidden" name="rows" value={editedRowsField} />
+				</ConfirmButton>
+			</div>
+			{#if form && 'results' in form && (form.action === 'saveAll' || form.action === 'resetAll') && form.results}
 				{@const res = form.results}
+				{@const verb = form.action === 'resetAll' ? 'recalculated' : 'saved'}
+				{@const verbTitle = form.action === 'resetAll' ? 'Recalculated' : 'Saved'}
 				{@const okCount = res.filter((r) => r.ok).length}
 				{@const failed = res.filter((r) => !r.ok)}
 				{@const nothing = okCount === 0}
@@ -775,14 +807,15 @@
 							: 'border-green-500/20 bg-green-500/10 text-green-600'}"
 				>
 					<p class="font-medium">
-						{#if nothing}No days were saved — {failed.length}
-							{failed.length === 1 ? 'day' : 'days'} could not be saved.{:else if partial}Partly
-							saved — {okCount} of {res.length} days saved, {failed.length} skipped.{:else}Saved {okCount}
+						{#if nothing}No days were {verb} — {failed.length}
+							{failed.length === 1 ? 'day' : 'days'} could not be {verb}.{:else if partial}Partly {verb}
+							— {okCount} of {res.length} days {verb}, {failed.length} skipped.{:else}{verbTitle}
+							{okCount}
 							{okCount === 1 ? 'day' : 'days'} on this page.{/if}
 					</p>
 					{#if failed.length > 0}
 						<details class="mt-1" open={nothing}>
-							<summary class="cursor-pointer text-xs font-medium">Why days were not saved</summary>
+							<summary class="cursor-pointer text-xs font-medium">Why days were not {verb}</summary>
 							<ul class="mt-1 space-y-0.5 text-xs">
 								{#each failed as r (r.id)}
 									<li>{fmtDate(r.date)} — {r.reason}</li>

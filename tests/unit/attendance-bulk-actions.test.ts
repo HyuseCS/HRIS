@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { error } from '@sveltejs/kit'
 import type { Role } from '@prisma/client'
 
@@ -16,6 +18,7 @@ import type { Role } from '@prisma/client'
  */
 
 const correctDay = vi.hoisted(() => vi.fn())
+const resetDayToDerived = vi.hoisted(() => vi.fn())
 
 vi.mock('$lib/server/db', () => ({ db: {} }))
 vi.mock('$lib/server/services/attendance', () => ({
@@ -27,7 +30,7 @@ vi.mock('$lib/server/services/attendance', () => ({
 	correctDay,
 	lockRange: vi.fn(),
 	unlockRange: vi.fn(),
-	resetDayToDerived: vi.fn(),
+	resetDayToDerived,
 	createTimesheetFromAttendance: vi.fn()
 }))
 vi.mock('$lib/server/services/attendance/import', () => ({
@@ -54,6 +57,17 @@ const saveAll = (rows: Row[] | string) => {
 	} as any) as Promise<any>
 }
 
+const resetAll = (rows: { id?: string; date?: string }[] | string) => {
+	const body = new FormData()
+	body.set('rows', typeof rows === 'string' ? rows : JSON.stringify(rows))
+	return attendance.actions.resetAll({
+		request: { formData: async () => body },
+		locals: { user: { id: 'actor', organizationId: 'org1', roles: SUPER } },
+		getClientAddress: () => '127.0.0.1'
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	} as any) as Promise<any>
+}
+
 const row = (id: string, date: string, extra: Row = {}) => ({
 	id,
 	date,
@@ -68,6 +82,7 @@ const locked = () => error(409, 'This attendance day is locked and cannot be edi
 beforeEach(() => {
 	vi.clearAllMocks()
 	correctDay.mockResolvedValue(undefined)
+	resetDayToDerived.mockResolvedValue(undefined)
 })
 
 describe('?/saveAll reports every row it touched (#F11c, D9)', () => {
@@ -164,5 +179,126 @@ describe('?/saveAll reports every row it touched (#F11c, D9)', () => {
 		})
 
 		await expect(saveAll([row('day1', '2026-09-01')])).rejects.toThrow('connection reset')
+	})
+})
+
+/**
+ * F11c second half — `?/resetAll` is `?/resetDay` over every manually edited day on the page. It
+ * acts on COMMITTED state, so a row it touches loses hand-entered corrections; the per-row report
+ * is the only way the user learns which days survived.
+ *
+ * The service already refuses a locked day and a non-ACTIVE employee with a 409. Those refusals are
+ * NOT pre-filtered in the action — they become the per-row `reason`, in the service's own words.
+ */
+describe('?/resetAll recalculates every edited day and reports each row (#F11c, D9)', () => {
+	it("a partial is a SUCCESS and the refused row carries the service's own words", async () => {
+		resetDayToDerived.mockImplementation((id: string) => {
+			if (id === 'day2') throw locked()
+			return Promise.resolve(undefined)
+		})
+
+		const res = await resetAll([
+			{ id: 'day1', date: '2026-09-01' },
+			{ id: 'day2', date: '2026-09-02' },
+			{ id: 'day3', date: '2026-09-03' }
+		])
+
+		expect(res.status).toBeUndefined()
+		expect(res.action).toBe('resetAll')
+		expect(res.saved).toBe('Recalculated 2 days, 1 skipped.')
+
+		const results = res.results as Result[]
+		expect(results).toHaveLength(3)
+		expect(results.filter((r) => !r.ok)).toEqual([
+			{
+				id: 'day2',
+				date: '2026-09-02',
+				ok: false,
+				reason: 'This attendance day is locked and cannot be edited'
+			}
+		])
+		expect(results.filter((r) => r.ok).map((r) => r.date)).toEqual(['2026-09-01', '2026-09-03'])
+	})
+
+	it('a total failure is a fail(400) that still names every row and why', async () => {
+		resetDayToDerived.mockImplementation(() => {
+			throw locked()
+		})
+
+		const res = await resetAll([
+			{ id: 'day1', date: '2026-09-01' },
+			{ id: 'day2', date: '2026-09-02' }
+		])
+
+		expect(res.status).toBe(400)
+		expect(res.data.error).toContain('No days were recalculated')
+		const results = res.data.results as Result[]
+		expect(results.map((r) => r.date)).toEqual(['2026-09-01', '2026-09-02'])
+		expect(
+			results.every((r) => r.reason === 'This attendance day is locked and cannot be edited')
+		).toBe(true)
+	})
+
+	it('refuses more rows than one page can hold, without running a single reset', async () => {
+		const rows = Array.from({ length: 11 }, (_, i) => ({ id: `day${i}`, date: '2026-09-01' }))
+
+		const res = await resetAll(rows)
+
+		expect(res.status).toBe(400)
+		expect(res.data.error).toContain('Too many days')
+		expect(resetDayToDerived).not.toHaveBeenCalled()
+	})
+
+	it('accepts a full page of rows', async () => {
+		const rows = Array.from({ length: 10 }, (_, i) => ({ id: `day${i}`, date: '2026-09-01' }))
+
+		expect((await resetAll(rows)).action).toBe('resetAll')
+		expect(resetDayToDerived).toHaveBeenCalledTimes(10)
+	})
+
+	it('refuses a malformed body instead of trusting it', async () => {
+		expect((await resetAll('not json')).status).toBe(400)
+		expect((await resetAll([])).status).toBe(400)
+		expect((await resetAll([{ date: '2026-09-01' }])).status).toBe(400)
+		expect((await resetAll([{ id: 'day1', date: '' }])).status).toBe(400)
+		expect(resetDayToDerived).not.toHaveBeenCalled()
+	})
+
+	it('lets an unexpected error escape rather than reporting it as a skipped row', async () => {
+		resetDayToDerived.mockImplementation(() => {
+			throw new Error('connection reset')
+		})
+
+		await expect(resetAll([{ id: 'day1', date: '2026-09-01' }])).rejects.toThrow('connection reset')
+	})
+})
+
+// ── The bulk trigger's blast radius is visible BEFORE the click (A5.4, A5.5) ──
+// Source scans. They prove the count and the page-scope wording are in the file; they cannot prove
+// the button renders or that the number shown is right — that is the owner's L7 step.
+describe('the Recalculate-all trigger states its scope', () => {
+	const page = readFileSync(
+		join(import.meta.dirname, '../../src/routes/(app)/attendance/+page.svelte'),
+		'utf8'
+	).replace(/\s+/g, ' ')
+
+	it('selects only the unlocked, manually edited rows that are actually shown', () => {
+		expect(page).toContain(
+			'const editedDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && d.manuallyEdited))'
+		)
+	})
+
+	it('puts the count in the trigger label and says the scope is this page', () => {
+		expect(page).toContain('triggerLabel="Recalculate {editedCount} on this page"')
+		expect(page).toContain("`${editedDays.length} ${editedDays.length === 1 ? 'day' : 'days'}`")
+	})
+
+	it('is disabled when nothing qualifies', () => {
+		expect(page).toContain('disabled={editedDays.length === 0}')
+	})
+
+	it('names the employee and the date range in the dialog, not just the count', () => {
+		expect(page).toContain('message="{editedCount} for {selectedEmployeeName} {editedSpan}')
+		expect(page).toContain('between ${fmtDate(new Date(Math.min(...times)))}')
 	})
 })

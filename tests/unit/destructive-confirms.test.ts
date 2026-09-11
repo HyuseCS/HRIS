@@ -5,7 +5,7 @@ import { join } from 'node:path'
 /**
  * UI/UX overhaul phase 05 (§T3) — the structural destructive-action gates.
  *
- * One rule, sixteen call sites: anything irreversible, money-affecting or person-affecting goes
+ * One rule, seventeen call sites: anything irreversible, money-affecting or person-affecting goes
  * through the kit `ConfirmButton`/`ConfirmDialog` with a message that names the consequence.
  *
  * WHAT THESE GATES DO NOT PROVE. They are source scans. They prove text is present in a file.
@@ -123,7 +123,7 @@ describe('G2 — no native confirm() calls in src/', () => {
 })
 
 // ── G3 — the consequence-naming copy survives a later softening edit ──────────
-// One exact NON-interpolated substring per drafted message. 18 messages across 16 sites: site 9
+// One exact NON-interpolated substring per drafted message. 19 messages across 17 sites: site 9
 // has two (manage / approval paths), site 12 has two (deactivate / re-activate, owner decision
 // 11-09-26) and site 14 has a base plus its conditional clause.
 const COPY: { site: string; file: string; needle: string }[] = [
@@ -217,12 +217,19 @@ const COPY: { site: string; file: string; needle: string }[] = [
 		site: '15 attendance reset',
 		file: 'routes/(app)/attendance/+page.svelte',
 		needle: 'thrown away and re-derived from the raw punches'
+	},
+	{
+		// Deliberately NOT site 15's needle: that one pins the single-row dialog's `message`, so
+		// reusing it would stay green with the bulk dialog deleted outright.
+		site: '16 attendance recalculate all',
+		file: 'routes/(app)/attendance/+page.svelte',
+		needle: 'Anything typed by hand on those days is lost'
 	}
 ]
 
 describe('G3 — every confirm message still names its consequence', () => {
-	it('covers all 18 drafted messages', () => {
-		expect(COPY.length).toBe(18)
+	it('covers all 19 drafted messages', () => {
+		expect(COPY.length).toBe(19)
 	})
 
 	for (const { site, file, needle } of COPY) {

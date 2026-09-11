@@ -163,4 +163,13 @@ describe('permission-adjacent and destructive actions report their outcome', () 
 		expectFeedback(await run(attendance.actions.unlockTeam, { date: '2026-09-01' }), 'unlockTeam')
 		expectFeedback(await run(attendance.actions.resetDay, { id: 'day1' }), 'resetDay')
 	})
+
+	it('attendance ?/saveAll and ?/resetAll keep the same shape at bulk scale', async () => {
+		const rows = JSON.stringify([
+			{ id: 'day1', date: '2026-09-01', timeIn: '09:00', timeOut: '17:00', status: 'PRESENT' }
+		])
+		expectFeedback(await run(attendance.actions.saveAll, { rows }), 'saveAll')
+		expectFeedback(await run(attendance.actions.resetAll, { rows }), 'resetAll')
+		expect(svc.resetDayToDerived).toHaveBeenCalledOnce()
+	})
 })
