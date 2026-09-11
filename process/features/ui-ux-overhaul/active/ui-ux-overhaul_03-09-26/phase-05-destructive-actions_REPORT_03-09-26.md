@@ -353,3 +353,158 @@ order. CI runs format first and skips the rest, so a green `pnpm check` alone pr
 
 None created in this session (writing to `process/features/ui-ux-overhaul/backlog/` is
 UPDATE-PROCESS work). One is **owed**: `component-interaction-test-harness_NOTE_{date}.md`.
+
+---
+
+## Rebase onto staging (11-09-26)
+
+The branch was ~175 commits behind `origin/staging` after PR #13 merged. It was brought up to date by
+**rebase**, per `phase-05-rebase-onto-staging_PLAN_11-09-26.md` (validated CONDITIONAL, two accepted
+concerns, zero FAILs). Owner chose rebase over merge.
+
+**Command:** `git rebase --onto origin/staging b3334f0 feat/uiux-phase-5`
+
+`--onto` was chosen over a plain `git rebase origin/staging` because the three pre-phase-05 commits
+that carry the same work as staging under a *different pre-image* (`75d88c1`, `c487adc`, `eab4c57`)
+are all ancestors of `b3334f0`. `--onto` excludes them by construction; a plain rebase offers all
+three, each conflicts, and one wrong `--continue` replays a subset over staging's superset.
+
+The conflict map was derived before execution by simulating the whole rebase read-only with
+`git merge-tree --write-tree`, chaining each tree into the next. No ref and no working-tree file was
+touched by that simulation.
+
+**Result:** `339630b` (staging) → **`9165b9d`** (new branch tip). Old tip `1bf99af` remains in the
+reflog. Not pushed; `origin/feat/uiux-phase-5` still points at `1bf99af` and PR #14 is unchanged.
+
+### Replayed commits (11)
+
+| # | New hash | Old hash | Result |
+|---|---|---|---|
+| 1 | `51f7132` | `9062f11` | clean |
+| 2 | `529c321` | `715f965` | clean |
+| 3 | `30550cf` | `ab01634` | clean |
+| 4 | `a39fa7b` | `3c7c08e` | clean |
+| 5 | `cdffc95` | `5c3cfc3` | clean |
+| 6 | `1171c27` | `8fd0e61` | **conflict** — `employees/[id]` |
+| 7 | `493a973` | `0114184` | **conflict** ×2 — `attendance`, `separations/[id]` |
+| 8 | `3a8e247` | `9296163` | clean |
+| 9 | `7514478` | `e3ad21a` | clean |
+| 10 | `1884c28` | `1bf99af` | clean |
+| 11 | `9165b9d` | `59fc409` | clean (the rebase plan commit itself — see the plan's Self-Inclusion Note) |
+
+The expected post-rebase count is **11**, not 10: the plan commit was authored on the branch and
+therefore replays with it.
+
+### Conflicts, and which side won
+
+**`src/routes/(app)/employees/[id]/+page.svelte` (commit 6).** Staging won the shared block and
+phase 05's content was appended to it. Kept staging's `{ error: null }` on the audited reveal (the
+`c319c05` revert), its `toggleOnboardingStep`, and its `DONE` / `savedNotice` handling; phase 05's
+offboard confirm state was added after it. Phase 05's bare `uploadDocument = submitFeedback()` was
+dropped — staging's per-card error slots (`eab4c57`) supersede it.
+
+**`src/routes/(app)/attendance/+page.svelte` (commit 7).** Staging's structure taken wholesale, then
+phase 05's consequence copy substituted into both Reset `message` props. Staging had independently
+built the same `ConfirmButton` with *different* copy and an extra `disabled={!d.manuallyEdited}`.
+Taking either side whole was wrong: `--ours` keeps the guard but loses the copy that
+`destructive-confirms.test.ts` site 15 pins verbatim (`thrown away and re-derived from the raw
+punches`), and that failure would not have surfaced until two commits later. The file now differs
+from staging by exactly those two `message` lines.
+
+**`src/routes/(app)/separations/[id]/+page.svelte` (commit 7).** Rebuilt from staging's side, then
+phase 05's five edits re-applied by hand.
+
+### What the simulation did not predict
+
+The `attendance` auto-merge produced a **duplicate `import ConfirmButton`** — both sides had added
+it. Caught and removed during resolution. This is the trap the phase 04 update recorded: the hunk
+that merges cleanly beside the one that conflicts is the dangerous one.
+
+The two files that auto-merged inside a conflicted commit (`settings/roles`,
+`performance/reviews/[id]`) were diffed against staging afterwards rather than trusted. Both
+resolved correctly: zero native confirms, consequence copy intact.
+
+### Deviation from the plan
+
+Plan step C3.3 asked that `aria-describedby` be preserved on the separations finalize control. It
+could not be, and nothing was lost: phase 05's own commit `0114184` had already replaced that
+attribute with `triggerTitle={finalizeBar ?? undefined}`, and `ConfirmButton` exposes no
+`aria-describedby` prop. Staging never touched the line. The
+`disabled={pendingCount > 0 || !!finalizeBar}` guard was preserved as the plan required.
+
+### Shape checks
+
+| Check | Expected | Actual |
+|---|---|---|
+| `git log --oneline origin/staging..HEAD` | 11 | **11** |
+| Trap commits `75d88c1` / `c487adc` / `eab4c57` present | no | **absent** |
+| `git diff origin/staging...HEAD --stat` | the 15-path allow-list | **15 paths, exact** |
+| Native `confirm(` call sites in `src/` | 0 | **0** |
+| Leftover conflict markers in `src/`, `tests/` | none | **none** |
+
+### Gate set (CI order)
+
+| Gate | Result |
+|---|---|
+| `pnpm format:check` | PASS |
+| `pnpm lint` | PASS — 0 errors, 1 pre-existing a11y warning in `CalculatorWindow.svelte` |
+| `pnpm check` | PASS — 1126 files, 0 errors |
+| `pnpm test` | PASS — 211 files, 2468 tests; `destructive-confirms.test.ts` 30/30 including site 15 |
+| `CI=1 pnpm test:e2e` | 143 passed, **1 failed** — `timesheet-punch.spec.ts` `signed punch → aggregate → approve`. Not a rebase defect; see below. |
+
+### The one e2e failure, and why it is not this rebase
+
+It is **not** the pre-existing failure recorded in the backlog on 2026-09-10 — that one
+(`attendance-save-timesheet-custom-range.spec.ts`) now passes. This is a second, separate failure,
+so it was investigated rather than waved through.
+
+**Where it fails.** `tests/e2e/timesheet-punch.spec.ts:104`. The punches ingest, the aggregate
+succeeds and its `Aggregated 7.00 hrs across 1 day` banner is asserted visible at line 96. The spec
+then reloads `/timesheets` and looks the new row up by name:
+
+```
+locator('tr').filter({ hasText: 'Employee, Elena' }).filter({ hasText: /draft/i }).filter({ hasText: '7.00 hrs' })
+Expected: 1   Received: 0
+```
+
+**Why.** `/timesheets` paginates at `pageSize = 10` (`src/lib/server/pagination.ts:39`) and the team
+queue is ordered `periodStart: 'desc'` (`src/lib/server/services/timesheets.ts:88`). The spec
+aggregates **last week**, so its draft is the oldest row in the queue. Measured against the live dev
+database, logged in as `admin@veent.ph`:
+
+| pos | status | periodStart | employee |
+|---|---|---|---|
+| 10 | SUBMITTED | 2026-09-02 | Tina |
+| 11 | SUBMITTED | 2026-08-31 | Testcase |
+| **12** | **DRAFT** | **2026-08-30** | **Elena** |
+| 13 | SUBMITTED | 2026-08-24 | Testcase |
+| 14 | SUBMITTED | 2026-08-10 | Maria |
+
+Position 12 of 14 is **page 2**. The spec reloads with no `teamPage` param, so it reads page 1 and
+matches zero rows. This is the failure shape already recorded in this repo: paginating a list
+silently breaks every e2e that finds its row by name.
+
+**Why it is not the rebase.** `git diff origin/staging...HEAD` touches no timesheet file — not the
+route, not the service, not the pagination helper, not the spec. Every code path in this failure is
+byte-identical to `origin/staging`. The two files phase 05 does change on this side of the app
+(`attendance/+page.svelte`) differ from staging by exactly two `message` string literals on
+`?/resetDay` confirm buttons, which this spec never reaches.
+
+**Why it surfaced now.** Phase 05 had never run the full suite against staging's current seed
+volume. Fifteen seeded `SUBMITTED` timesheets now sort ahead of a last-week draft, which is what
+pushes it onto page 2. Staging's `3aa9fb7` taught several specs to follow the paginated queue; this
+one was missed.
+
+**Not fixed here.** The fix belongs to the spec, not to phase 05, and editing a test until it passes
+is the wrong move inside a rebase whose whole purpose was to change nothing. Filed in
+`process/general-plans/backlog/backlog.md`.
+
+### Status
+
+`CODE DONE`. The rebase itself is **VERIFIED** — shape checks exact, four of five gates green, and
+the fifth failure traced to a surface this branch does not touch. Phase 05 as a feature remains
+`CODE DONE` and not `✅ VERIFIED`: the owner P1-P6 / R1-R3 / A1 pass is still owed. The click-through
+script for it is `phase-05-destructive-actions_TEST-SCRIPT_11-09-26.md`.
+
+The branch is **not pushed**. `origin/feat/uiux-phase-5` still points at `1bf99af` and PR #14 is
+unchanged. Pushing `9165b9d` requires `--force-with-lease` and is a separate owner-authorised step.

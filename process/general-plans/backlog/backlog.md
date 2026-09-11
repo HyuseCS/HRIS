@@ -111,3 +111,26 @@ identically in a worktree checked out at `d4c8e41`, before any of this session's
 timesheet rows exist in the dev database, so it is not overlap residue.
 
 Recorded 2026-09-10.
+
+## e2e: `timesheet-punch` looks its draft row up on page 1 of a paginated queue
+
+`tests/e2e/timesheet-punch.spec.ts:104` aggregates **last week's** punches into a DRAFT timesheet,
+reloads `/timesheets`, and finds the row by employee name. `/timesheets` paginates at
+`pageSize = 10` (`src/lib/server/pagination.ts:39`) ordered `periodStart: 'desc'`
+(`src/lib/server/services/timesheets.ts:88`), and the seed now holds 15 `SUBMITTED` timesheets with
+newer periods. A last-week draft therefore sorts to position 12 of 14 in the admin team queue —
+**page 2** — and the reload, which passes no `teamPage` param, reads page 1 and matches 0 rows.
+
+The aggregate itself works; line 96 asserts its `Aggregated 7.00 hrs across 1 day` banner and
+passes. Only the row lookup fails.
+
+**Not branch-specific.** Found on `feat/uiux-phase-5` after its rebase onto staging, but every code
+path involved is byte-identical to `origin/staging` — that branch's diff touches no timesheet file.
+`3aa9fb7` taught several specs to follow the paginated queue; this one was missed.
+
+**Fix shape**: follow `3aa9fb7` — filter the queue down to the row (`?q=`) rather than paging to it,
+and never assert a row's presence off an unfiltered page 1. Re-running the spec is also not
+idempotent: a leftover draft for the same week leaves `Aggregate week` disabled, so it then fails
+earlier at line 89. Clear the spec's own draft before a re-run.
+
+Recorded 2026-09-11.
