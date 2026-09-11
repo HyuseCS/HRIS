@@ -1087,7 +1087,220 @@ Destructive steps needing a disposable fixture: S5 (offboard), S8 (deactivate/re
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 11-09-26
+date: 2026-09-11
+generated-by: outer-pvl
+
+Parallel strategy: sequential
+Rationale: 7-signal score 5/7 (S2 schema/auth surface, S4 phase program, S5 depth requested, S6 high-risk class, S7 5+ files) → HIGH tier, which normally recommends agent-team or workflow. Overridden to sequential because this harness exposes no Agent/Task/TeamCreate tool — the two-layer fan-out was executed in-thread as batched read-only probes (psql, grep, sed, one throwaway vitest run). Fan-out coverage was not reduced; only the execution method changed. Agent count: 1.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-S1.1–AC-S1.4 | `org_seed` statutory row restored; the two clean orgs untouched | Hybrid | `docker exec -i veent-db-5434 psql -p 5434 -U veent -d veent_hris -tAc "select \"pagibigCap\", \"sssBrackets\"->0->>'eeShare', jsonb_path_query_array(\"taxBrackets\",'$[*].baseTax') from statutory_rate_configs where \"organizationId\"='org_seed';"` + `row_to_json` before/after diff for `org_jojo`/`org_sweetleaf` — precondition: `veent-db-5434` up | A |
+| AC-S2.1 | `BIR_MONTHLY_TAX_TABLE` carries the 2023 rates and baseTax | Fully-Automated | `pnpm vitest run tests/unit/ph-statutory.test.ts` exits 0 | B |
+| AC-S2.2 | `deriveTaxBrackets` on the shipped table reproduces its own `baseTax` — the D1 proof | Fully-Automated | new case in `tests/unit/ph-statutory.test.ts`: `expect(deriveTaxBrackets(BIR_MONTHLY_TAX_TABLE.map(({floor,rate})=>({floor,rate}))).map(b=>b.baseTax)).toEqual(BIR_MONTHLY_TAX_TABLE.map(b=>b.baseTax))`, plus the 2018 vector as an explicit negative-control case in the same file | B |
+| AC-S2.3, AC-S2.4 | Migration is idempotent and lands the 2023 table on all three dev orgs | Hybrid | `pnpm tsx scripts/migrate-bir-tax-table-2023.ts` twice (`3 config row(s)` then `0 config row(s)`) + psql rate/floor/baseTax vector read-back — precondition: `veent-db-5434` up | B |
+| AC-S2.5 | The whole unit suite is green against hand-computed 2023 figures | Fully-Automated | `pnpm test` exits 0 AND the phase report carries the hand-derivation for every changed literal | B |
+| AC-S3.1–AC-S3.4 | Config save no longer blanks the six bound multiplier inputs | Agent-Probe | Live browser, one step at a time: save multipliers → read the six input values → edit two → save → read the dialog's was→now strings | A |
+| AC-S4.1–AC-S4.4 | Each payroll-config card answers for its own action within one viewport | Agent-Probe | Live browser: press each Save, assert the message renders inside that card only, measure button↔message distance with `getBoundingClientRect` at 903px | A |
+| AC-S5.1–AC-S5.3 | Offboard reports exactly once, on the surviving page Banner | Agent-Probe | Live browser on a disposable employee: sample `[role=status][aria-live=polite]` for ≥4s from the click (must stay empty), assert the `role="status"` Banner without `aria-live` is present after the card unmounts | A |
+| AC-S5.4 | The existing e2e workaround for this double-surface still passes | Hybrid | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/timesheet-punch.spec.ts` — precondition: dev DB + build/preview | A |
+| AC-S6.1–AC-S6.4 | Net-pay override reports once, keeps its per-row double-submit guard | Agent-Probe | Live browser + `psql` read-back of `payroll_entries."netPay"` and an audit-row count after a fast double-click | A |
+| AC-S7a.1, AC-S7a.3 | The change summary names only what really changed; the fallback line is reachable | Fully-Automated | new `tests/unit/statutory-change-summary.test.ts`, 7+ cases; the first two proven RED against pre-fix code (negative control pasted into the report) | B |
+| AC-S7a.2 | A Pag-IBIG-cap-only proposal lists exactly one line to the approver | Agent-Probe | Live browser: propose as `hr@veent.ph`, read the pending card as `ceo@veent.ph` | A |
+| AC-S7b.1–AC-S7b.4 | Four statutory outcomes toast; no green Banner; leave guard and error path survive | Agent-Probe | Live browser: four actions, sample the polite live region each time; then edit→save→navigate (no leave dialog); then a validation failure | A |
+| AC-S7c.1–AC-S7c.6 | Three proposal content states render per D7; both confirm needles survive | Agent-Probe + Fully-Automated | Live browser for the three states and the height measurement; `pnpm vitest run tests/unit/destructive-confirms.test.ts` for sites 7 and 8 | A |
+| AC-S8.1–AC-S8.4 | Re-activation confirms, and the row keeps exactly one submit guard | Agent-Probe | Live browser on a disposable login: dialog copy, cancel → `psql` shows `isActive` still false, fast double-click → one audit row | A |
+| AC-S8.5 | `COPY.length === 18` with all 18 needles green | Fully-Automated | `pnpm vitest run tests/unit/destructive-confirms.test.ts` exits 0 | B |
+| AC-S9.1–AC-S9.4 | The finalize card holds one height; the settled fact is emphasised inside its own card | Agent-Probe | Live browser: measure the card with and without `#finalize-bar`, assert the standalone muted block is gone from the DOM, read the amount's computed colour | A |
+| AC-S9.5 | Separations e2e unaffected | Hybrid | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/separations.spec.ts` — precondition: dev DB + build/preview | A |
+| AC-S10.1–AC-S10.4 | Exactly one success surface per action per page, proven by a gate that can go red both ways | Fully-Automated | new `tests/unit/success-surfaces.test.ts` + BOTH negative controls (remove one surface → red; add a duplicate → red), outputs pasted in the report | B |
+| AC-S11.1–AC-S11.4 | Phase 06 owns the bell and its `actionProposal` vs `statutoryRateProposal` data gap | Agent-Probe | Read-back of the amended phase-06 plan sections + `git show --stat` proving no `src/` file in the commit | A |
+| AC-P5 | CI gate set green in CI order | Fully-Automated | `pnpm format:check && pnpm lint && pnpm check && pnpm test` — run in this order; CI runs `format:check` FIRST and short-circuits, so a green `pnpm check` alone proves nothing | A |
+| AC-P6 | No attendance file touched | Fully-Automated | `git log --format=%H feat/uiux-phase-5 -- 'src/routes/(app)/attendance/**' 'src/lib/server/services/attendance/**'` shows no commit from this plan | A |
+| AC-P7 | No explanatory comments added | Fully-Automated | `git diff --cached -U0 \| grep -E '^\+\s*(//\|/\*\|<!--)'` returns only `// ponytail:` lines, run before each commit | A |
+
+gap-resolution legend: A — proven now; B — gate added by this plan's checklist; C — deferred to a named later phase; D — backlog test-building stub (named residual).
+
+Failing stub (AC-S2.2, the D1 proof):
+```
+test("should derive baseTax identical to the shipped BIR_MONTHLY_TAX_TABLE", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: derive-equals-published on the 2023 table")
+})
+test("should NOT derive the published baseTax from the 2018 rate vector (negative control)", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: 2018 vector derives [0,0,2500,10833.5,40833.5,200833.5]")
+})
+```
+
+Failing stub (AC-S7a.1):
+```
+test("should not report an SSS change when only the key order differs", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: jsonb key order vs derive declaration order")
+})
+test("should return the no-effective-change fallback when nothing changed", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: reachable fallback at summarizeChanges")
+})
+```
+
+Failing stub (AC-S10.1/AC-S10.3):
+```
+test("should fail when a page action has zero success surfaces", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: zero-surface negative control")
+})
+test("should fail when a page action has two success surfaces", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: duplicate-surface negative control")
+})
+```
+
+Legacy line form (for existing validate-contract consumers):
+- S2 tax engine: Fully-automated: `pnpm test` | Hybrid: `pnpm tsx scripts/migrate-bir-tax-table-2023.ts` + psql read-back
+- S1 data restore: Hybrid: four psql verification queries
+- S7a change summary: Fully-automated: `pnpm vitest run tests/unit/statutory-change-summary.test.ts`
+- S8 confirm copy: Fully-automated: `pnpm vitest run tests/unit/destructive-confirms.test.ts`
+- S10 surface gate: Fully-automated: `pnpm vitest run tests/unit/success-surfaces.test.ts` + two negative controls
+- S3/S4/S5/S6/S7b/S7c/S9 placement and density: Agent-probe: live browser, one step at a time
+- Card height, toast readability, statutory proposal lifecycle, component interaction: known-gap: documented, backlog stubs named in Verification Evidence
+
+### Dimension findings
+
+- Infra fit: PASS — every command in the plan is real and matches the loaded test context (`pnpm format:check`/`lint`/`check`/`test`, `pnpm tsx`, `docker exec -i veent-db-5434 psql -p 5434`, `CI=1 pnpm exec dotenv -e .env.dev -- playwright test`). Live DB state re-verified this session and matches the plan's table byte for byte. No server start, no `.env` edit, no schema change.
+- Test coverage: CONCERN — the churn map misses the `#220` derived-parity block and miscounts the file set; see C-1, C-2, C-3.
+- Breaking changes: CONCERN — the Public Contracts table covers all six return-shape changes and no external consumer exists, but two change-created orphans are not declared; see C-5.
+- Security surface: CONCERN — three high-risk classes are present (money engine, data migration, login re-activation) and the plan has no `harness/` evidence pack; see C-6. The S8 change itself strictly tightens access (adds a confirm), no capability or auth logic moves, and the migration is org-scoped with a verified-correct guard.
+- Section S1 (data restore): PASS — mechanical feasibility confirmed against the live DB; `org_seed` holds `pagibigCap 88888.00`, `eeShare 188`/`total 578`, `baseTax [0,0,2500,10833.5,40833.5,200833.5]`; the two other orgs are clean. Zero PENDING proposals confirmed. Highest-risk edit: an `UPDATE` without the `WHERE` — the plan names it.
+- Section S2 (D1 tax table): CONCERN — the arithmetic is independently proven (below) and the migration guard is proven correct, but the golden-churn map has a hole; see C-1/C-2/C-3. Highest-risk edit: pasting vitest "received" values; mitigated by the hand-computation rule plus AC-S2.2's negative control.
+- Section S3 (F3 reset): PASS — `createSubmitGuard` at `:15`, `await update()` at `:16`, baseline re-seed at `:17` all confirmed; six-site audit list is correctly framed as per-form, not blanket.
+- Section S4 (FormFeedback): PASS — shared Banner at `:84-86` with a client-side hard-coded string confirmed; both server returns are bare `{ success: true }` at `:104`/`:154` confirmed; `?/update` uses `saveConfig = createSubmitGuard()` (no toast), so no double surface is created.
+- Section S5 (F1 offboard): PASS — fully verified. The Banner at `:1813-1814` is gated on `form?.action === 'offboard' && form?.saved`, the server returns `{ action: 'offboard', saved: 'Employee offboarded.' }` at `:676`, and `offboard` is deliberately absent from the `DONE` map, so `savedNotice` never double-fires. `submitFeedback({ success: null })` suppresses the toast while still calling `update()`, so the Banner still renders — the mechanism is correct.
+- Section S6 (F2 override): PASS — `?/override` confirmed to fall off the end at `:143` after `overridePayrollEntry`; `{ action: 'void', saved: 'Period voided.' }` at `payroll/periods/+page.server.ts:121` is a real precedent; `submitFeedback` re-exposes `busy`, so the per-row memoised guard survives the swap.
+- Section S7a (F5 key order): CONCERN — root cause fully confirmed, one edge case unhandled; see C-4.
+- Section S7b (F6 toasts): PASS — all four `{ success: '…' }` returns confirmed at `:203/:218/:229/:240`; `Banner` is imported at `:4` and used at exactly one place (`:241`), so the orphaned-import risk R4 is real and correctly flagged. `ConfirmButton` does read the server's `saved` string (`ConfirmButton.svelte:50-53`), so Confirm/Reject genuinely need no client change.
+- Section S7c (F7 density): PASS — both pinned confirm needles and the `p.changes.join()` interpolation confirmed in place; anchors drift ~2 lines (see C-7).
+- Section S8 (F8 re-activate): CONCERN — the test-fear analysis is correct (nothing pins the activate branch as unconfirmed; `COPY.length === 17` confirmed), but two things are missing; see C-5 and C-8.
+- Section S9 (F9 height + settled line): PASS — all anchors present with ~2 lines of drift; `separations.spec.ts` confirmed to hold zero assertions on `settled`/`Finalized on`/`Final pay`.
+- Section S10 (surface gate): CONCERN — the gate's matching rule does not fit two of the sites its own table requires; see C-9.
+- Section S11 (phase-06 handoff): PASS — phase 06 plan is `PLANNED` and unexecuted; S1 at `:128` is the right home.
+
+**Totals: 0 FAILs / 9 CONCERNs / 12 PASSes → Net Gate: CONDITIONAL**
+
+### Independently re-proven in this VALIDATE pass
+
+Ran the repo's real `deriveTaxBrackets` against both vectors:
+
+```
+2023 rates [0,.15,.20,.25,.30,.35] → baseTax [0, 0, 1875, 8541.8, 33541.8, 183541.8]   = published BIR
+2018 rates [0,.20,.25,.30,.32,.35] → baseTax [0, 0, 2500, 10833.5, 40833.5, 200833.5]  = the live drift
+```
+
+Live DB (read-only, 11-09-26) — all three orgs share the 2018 rate vector `[0,0.2,0.25,0.3,0.32,0.35]` and the floor vector `[0,20833,33333,66667,166667,666667]`, while only `org_seed` has drifted `baseTax`. **The plan's rule is therefore correct and load-bearing: guard on rate+floor, never on `baseTax` — a `baseTax` guard would skip `org_seed`, the one row that most needs the fix.** S1-before-S2 is also confirmed necessary: the backup JSON carries the 2018 `taxBrackets`.
+
+Test-file sweep: `withholdingTax` appears **35 times across 16 files** (10 unit + 4 e2e specs + 2 payslip unit). All six e2e occurrences are fixture **inputs** (`withholdingTax: 0`), not assertions on engine output — the plan's open question "check whether any assert an absolute peso figure" is hereby **closed: none do.**
+
+### Concerns (each with what clears it)
+
+| # | Concern | Severity | What clears it |
+|---|---|---|---|
+| C-1 | **The `#220` derived-parity block is missing from S2's churn map.** `tests/unit/payroll-statutory-config.test.ts:301-316` builds `SEEDED_DERIVED = deriveTaxBrackets(DEFAULT_STATUTORY_RATE_CONFIG.taxBrackets)` and `DERIVED_PARITY = { ...PARITY, '250000': { tax: '66348.06', total: '69948.06', net: '180051.94' } }` — an override that exists **only** because derive ≠ seed today. Its comment names the exact drift D1 removes (`10833.33→10833.5, 40833.33→40833.5, 200833.33→200833.5`). After D1 the override must be **deleted** (not renumbered) and the comment rewritten, and `DERIVED_PARITY` collapses to `PARITY`. That collapse is the best unit-level proof D1 worked; patching the number instead would hide it and leave a comment describing a fixed bug. | CONCERN | Add to S2: delete the `'250000'` override, assert `DERIVED_PARITY` is identical to `PARITY` (or drop the alias entirely), rewrite the `:301-305` comment, and record the collapse in the phase report as the second D1 proof. |
+| C-2 | **The file count is wrong and two anchors do not exist.** S2 says "35 `withholdingTax` mentions across 17 test files" — it is **16** files. And `payroll-statutory-config.test.ts:348` / `:360` (cited as the hand-built-table cases) hold no `withholdingTax`; the real mentions there are `:117, :134, :135, :325`, plus the `tax:` literals in the `PARITY` data table at `:43-104`, which S2 never cites by line. The hand-built-table cases are real but live at `:332-364` and are correctly assessed as unaffected (they pass their own table). | CONCERN | Correct the count to 16, repoint the two anchors to `:332-364`, and add `PARITY` (`:43-104`) to the churn map as the primary table-driven surface. |
+| C-3 | **`ph-statutory.test.ts:75` is a formula, not a literal.** The assertion is `toBeCloseTo((20 * (25000 - 20833)) / 100, 0)` — the 2018 rate `20` is embedded in the *expression*. S2 describes only the value move `833.40 → 625.05`. An execute-agent looking for a literal will not find one. | CONCERN | State in S2 that the rate inside the expression changes `20 → 15`, which is itself the hand-computation. |
+| C-4 | **S7a's comparison spec has no rule for `ceiling: Infinity` / `null`.** The shipped top bracket is `ceiling: Infinity`; JSON/jsonb cannot hold `Infinity` (it serialises to `null`), and `parseRates` uses `nn()` which yields `null` for an empty input. A field-by-field numeric comparison of `ceiling` will compare `Infinity` against `null` whenever `DEFAULT_STATUTORY_RATE_CONFIG` is the `live` side (the no-row branch of `toWireConfig`), producing a false "changed" line — the same class of bug S7a is fixing. The seven listed test cases do not cover it. | CONCERN | Add an explicit normalisation rule (treat `null` and `Infinity` as the same open ceiling) and an eighth test case: an unsaved org whose live config is the default, payload identical → `['No effective change vs the live rates.']`. |
+| C-5 | **S8 creates an undeclared orphan.** After both branches route through `ConfirmButton`, the whole per-row guard becomes dead: `setActiveGuards` (`:30`), `setActiveGuard` (`:31`), and the `{@const setActive = setActiveGuard(u.id)}` at `:186` have no remaining reader (`:214/:219/:222` are the branch being replaced). The plan says only "drop the row's own guard for this branch"; it does not say the map and the `{@const}` die with it. `pnpm lint` will flag the unused binding. | CONCERN | Name the three dead bindings in S8 and require their removal in the same commit (surgical rule: this orphan is created by this change). |
+| C-6 | **No evidence pack for three high-risk classes.** The Blast Radius table itself marks money/payroll computation, data migration, and permission as present, but nothing in the plan requires the `harness/` artefact set before finalize. | CONCERN | Add a `harness/` folder under the task folder with `risk-gate.json`, `context-snippets.json`, `verification.json`, `review-decision.json` for S2 and S8, written before either section is called done. |
+| C-7 | **Line anchors run ~2 lines ahead of the working tree throughout.** Verified drift: statutory pending card opens `:251` (plan says `:253`), per-proposal block `:255` (says `:257`), separations `#finalize-bar` `:209` (says `:211-215`), muted settled block `:227-231` (says `:226-231`), `summarizeChanges` body `:40-64` with `JSON.stringify` at `:53-56`/`:58-61` and the fallback at `:63` (says `:52-56`/`:57-61`/`:62`). Everything named is present; only the numbers slip. | CONCERN | Already mitigated by the plan's own "re-grep every line anchor before editing" instruction — accepted as a known residual, not re-anchored. |
+| C-8 | **S8 amends five markdown files but not the source comment that argues against the change.** `src/routes/(app)/settings/roles/+page.svelte:199-201` reads: *"Deactivating locks a person out, so it confirms first; re-activating is neither destructive nor irreversible and deliberately stays one click."* S8 makes that comment false in shipped code. This repo has a standing lesson that a comment describing a reversed decision reads identically to one describing live behaviour. | CONCERN | Add the in-source comment as a sixth S8 amendment: rewrite it (do not delete it) to state that both directions now confirm and that the 11-09-26 owner pass reversed the one-click call. |
+| C-9 | **S10's matching rule does not fit two sites its own required table names.** The rule is "a `<FormFeedback>` or `Banner` gated on `form.action === '<action>'`". Verified exceptions: `separations/[id]` finalize/undo are gated on `form?.finalized` (`:82`) and `form?.undone` (`:58`) — the server returns `{ finalized: true }` / `{ undone: true }` with no `action` and no `saved`; and `employees/[id]`'s other 15 actions render through the `DONE[form.action]` map (`:148-169`, banner at `:206-207`), an indirection the literal rule cannot see. `payroll/periods` release/void return `{ action, saved }` with `ConfirmButton` and no banner — those do match. | CONCERN | Widen S10's rule to accept a per-site surface *needle* (the exact gating expression, like `destructive-confirms.test.ts` does for copy) instead of one hard-coded `form.action ===` pattern, and record `separations` and the `DONE`-map sites as explicitly-shaped entries. Do **not** expand scope to re-wire those sites — S9 is height-and-placement only. |
+
+### Open gaps
+
+- Card height (S9a) has no automated gate — known-gap: documented, backlog stub `separation-card-height-gate_NOTE_11-09-26.md`.
+- Toast readability before dismissal has no automated gate — known-gap: documented, backlog stub `toast-readability-gate_NOTE_11-09-26.md`.
+- Statutory proposal lifecycle has no e2e and no fixture (0 PENDING rows confirmed live) — known-gap: documented, backlog stub `statutory-proposal-e2e-fixture_NOTE_11-09-26.md`.
+- No component-interaction harness (dialog opens / traps focus / confirm submits) — known-gap: documented, already tracked at `process/features/ui-ux-overhaul/backlog/a11y-component-test-harness_NOTE_03-09-26.md` and `component-test-dom-environment_NOTE_03-09-26.md` (both verified to exist — reference them, do not duplicate).
+
+### What this coverage does NOT prove
+
+- `pnpm test` green after S2 does **not** prove the new tax expectations are right. It proves the suite agrees with itself. Only the hand-derivation recorded in the phase report, plus AC-S2.2's 2018 negative control, separate a correct table from a self-consistent wrong one. This is the single place in the plan where green means nothing on its own.
+- `tests/unit/success-surfaces.test.ts` is a **source scan**. It proves strings co-occur in a file. It does not prove a surface mounts, is inside the viewport, is reachable by a keyboard user, or is read before it dismisses. Both negative controls prove the scan can go red; they do not upgrade it to a render test.
+- `tests/unit/destructive-confirms.test.ts` at `COPY.length === 18` proves 18 needles exist in source. It does not prove any dialog opens, that Cancel aborts the POST, or that the message is visible.
+- `tests/unit/statutory-change-summary.test.ts` proves the comparison function is key-order-insensitive on synthetic fixtures. It does **not** prove Postgres' actual jsonb round-trip matches those fixtures — no test in the plan reads a real `statutory_rate_configs` row. The live AC-S7a.2 probe is the only thing that closes that loop, and it is agent-judged.
+- The migration script's two runs prove idempotency on **three dev org rows**. They prove nothing about an org with a customised table, because none exists to test the skip path against — the skip branch ships unexercised.
+- Every Agent-Probe row is one human-driven browser pass on one machine. It proves the behaviour once, at one viewport, in one theme. It is not a regression guard.
+- `pnpm check` does not cover `scripts/**` or `prisma/**`, so the migration script is type-checked by nothing but its own run.
+- No gate anywhere proves AC-P6 continuously — the attendance-file exclusion is checked once, by hand, at the end.
+
+Gate: CONDITIONAL (0 FAILs; 9 CONCERNs, all with named remedies; developed behaviour exists whose only coverage is a Known-Gap, so a terminal PASS is banned)
+Accepted by: session — pending owner confirmation. Concerns carried as accepted-with-remedy: C-1 derived-parity block, C-2 file count and anchors, C-3 embedded rate expression, C-4 Infinity/null ceiling, C-5 orphaned setActive guard, C-6 missing evidence pack, C-7 line-anchor drift, C-8 lying source comment, C-9 S10 matching rule.
+
+### Execute-agent instructions
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | Re-grep every line anchor immediately before editing. Anchors in this plan run ~2 lines ahead of the working tree, and earlier sections move later sections' anchors. | Every section |
+| E2 | S2: after `pnpm test` fails, recompute each expectation by hand from the 2023 table and write the arithmetic into the phase report **before** editing the file. Never paste a vitest "received" value. A reviewer tells the difference by the presence of that written derivation — no derivation, no accepted expectation. | S2 entry |
+| E3 | S2: handle `payroll-statutory-config.test.ts:301-316` by **deleting** the `'250000'` override and rewriting its comment, not by patching the number. Record the collapse as the second D1 proof. | S2 entry |
+| E4 | S2: run the migration against the dev DB for real and read the row back. `pnpm check` covers neither `scripts/**` nor `prisma/**`. | S2 entry |
+| E5 | S7a: normalise `ceiling` — `null` and `Infinity` mean the same open ceiling. Add the default-config test case. | S7a entry |
+| E6 | S7b: before removing the `Banner` import, grep every use. It is imported at `:4` and used only at `:241`, so removal is correct here — but confirm it, because a stray import removal has silently broken `use:enhance` in this repo. | S7b step 6 |
+| E7 | S8: amend `settings/roles/+page.svelte:199-201` in the same commit. Rewrite the comment, do not delete it. | S8 entry |
+| E8 | S8: remove `setActiveGuards`, `setActiveGuard` and the `{@const setActive = …}` at `:186` once both branches use `ConfirmButton` — they become dead in this commit. | S8 entry |
+| E9 | S10: use per-site gating needles, not one hard-coded `form.action ===` pattern. `separations/[id]` uses `form?.finalized`/`form?.undone`; `employees/[id]`'s 15 non-offboard actions use the `DONE[form.action]` map. Assert their current shape; do not re-wire them. | S10 entry |
+| E10 | Write the `harness/` evidence pack for S2 and S8 before either is reported done. | S2 and S8 exit |
+| E11 | Run the gate set in CI order every time: `pnpm format:check` → `pnpm lint` → `pnpm check` → `pnpm test`. CI runs `format:check` first and short-circuits. | Every commit |
+| E12 | Before each commit: `git diff --cached -U0 \| grep -E '^\+\s*(//\|/\*\|<!--)'` and confirm only `// ponytail:` lines appear. Stage explicit paths, never `git add -A`. | Every commit |
+| E13 | Live passes: ONE step at a time — announce, run, report, wait. Never chain browser writes. Never start the dev server or the container; ask the owner. | S3–S9 |
+
+### Backlog artifacts to create
+
+| Artifact | Location | Tracks |
+|---|---|---|
+| `toast-readability-gate_NOTE_11-09-26.md` | `process/features/ui-ux-overhaul/backlog/` | No automated proof a toast is readable before it dismisses |
+| `statutory-proposal-e2e-fixture_NOTE_11-09-26.md` | same | No e2e or seed fixture for the statutory proposal lifecycle |
+| `separation-card-height-gate_NOTE_11-09-26.md` | same | S9a card height has browser-only verification |
+
+---
+
+## Autonomous Goal Block
+
+```
+SESSION GOAL
+Execute plan A of the phase 05 owner-pass remediation:
+process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-05-remediation-A-feedback-statutory_PLAN_11-09-26.md
+Eleven sections, eleven commits, in the plan's dependency order: S1 data restore (no commit),
+S2 the 2023 BIR tax table, S3 the config reset trap, S4 the shared FormFeedback, S5 offboard,
+S6 override, S7a/b/c the statutory page, S8 the re-activation confirm, S9 separations,
+S10 the one-success-surface gate, S11 the phase-06 handoff.
+Branch feat/uiux-phase-5. Repo /home/hyuse/Desktop/VeentApps/hris.
+
+CONTRACT SUMMARY
+Gate: CONDITIONAL. 0 FAILs, 9 CONCERNs (C-1..C-9), each with a named remedy in the
+validate-contract's Concerns table and a matching execute-agent instruction E1..E13.
+Apply E1..E13 as written — they are the conditions the gate was granted on.
+
+AUTONOMY RULES
+- Commit per section as its gates go green. Stage explicit paths. Never `git add -A`.
+- Full gate set in CI order every commit: pnpm format:check, pnpm lint, pnpm check, pnpm test.
+- No explanatory comments in shipped code. The why goes in the commit message.
+- Reversible and cheap: just do it. Report after.
+- Blocked on one section: finish the others, name the blocker in one sentence.
+
+HARD STOPS
+- Never start ./start.sh, vite, or the veent-db-5434 container. The owner starts servers.
+- Never edit .env or .env.dev.
+- Never push. Commit freely; push only when the owner says push.
+- Never touch src/routes/(app)/attendance/** or src/lib/server/services/attendance/** — plan B owns them.
+- Live browser passes: ONE step at a time. Announce, run, report, WAIT. Never chain writes.
+- Every destructive live step names a disposable target before it runs.
+- Do not start S7 until S2 is green. Do not start S10 until S5-S9 have landed.
+
+NEXT PHASE
+EXECUTE, starting at S1 (data restore, no commit). Take the /tmp snapshot first.
+
+EXECUTE START COMMAND
+Read the plan file above, then begin S1.
+```
 
 ---
 
@@ -1095,15 +1308,15 @@ Destructive steps needing a disposable fixture: S5 (offboard), S8 (deactivate/re
 
 1. **Selected plan file path:**
    `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-05-remediation-A-feedback-statutory_PLAN_11-09-26.md`
-2. **Last completed phase or step:** PLAN written. No section started. Branch `feat/uiux-phase-5`,
+2. **Last completed phase or step:** VALIDATE complete — validate-contract written (CONDITIONAL). No section started. Branch `feat/uiux-phase-5`,
    which is rebased onto staging and pushed at `47252f9`; the findings doc is committed at `afe28b3`.
-3. **Validate-contract status:** pending — VALIDATE has not run.
+3. **Validate-contract status:** CONDITIONAL, written 11-09-26. 0 FAILs, 9 CONCERNs (C-1..C-9) each with a named remedy, carried into execute-agent instructions E1..E13.
 4. **Supporting context files loaded:** `process/context/tests/all-tests.md` (runner commands, the
    CI gate order, the e2e spec-filter trap, the "green is not evidence" discipline);
    `phase-05-owner-pass_FINDINGS_11-09-26.md`; `phase-05-destructive-actions_PLAN_/REPORT_03-09-26.md`;
    `phase-06-surface-consolidation_PLAN_03-09-26.md`; live `psql` state of
    `statutory_rate_configs` and `statutory_rate_proposals`.
-5. **Next step for a fresh agent:** run VALIDATE on this plan. On entering EXECUTE, start at **S1**
+5. **Next step for a fresh agent:** enter EXECUTE. Apply E1..E13 from the validate-contract as written — they are the conditions the CONDITIONAL gate was granted on. Start at **S1**
    (data restore — no commit), and do not start S7 until S2 is green. Re-grep every line anchor
    before editing: they are from the working tree at `47252f9` plus the uncommitted findings docs,
    and earlier sections in this plan will move later sections' anchors. Confirm plan B has not
