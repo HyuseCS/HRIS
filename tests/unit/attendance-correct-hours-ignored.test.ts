@@ -92,3 +92,22 @@ describe('?/correct cannot forward hand-typed hours (#F10)', () => {
 		expect(dataArg()).toEqual({ status: 'PRESENT', note: 'fixed by hand' })
 	})
 })
+
+/**
+ * F10b — the row can only show what was stored if the action hands the stored row back. Without
+ * `day` in the payload the client has nothing to patch from and the cells stay stale until a
+ * reload, which is the second half of the F10 defect.
+ */
+describe('?/correct returns the row it saved (#F10b)', () => {
+	it('carries the service return as `day`', async () => {
+		correctDay.mockResolvedValue({ id: 'day1', regularHours: 7, manuallyEdited: true })
+
+		const res = await run({ id: 'day1', date: '2026-09-03', timeIn: '09:00', timeOut: '17:00' })
+
+		expect(res).toMatchObject({
+			action: 'correct',
+			saved: 'Attendance day saved.',
+			day: { id: 'day1', regularHours: 7, manuallyEdited: true }
+		})
+	})
+})

@@ -45,6 +45,33 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	type DayRow = NonNullable<PageData['team'][number]['day']>
+	type RowState = { timeIn?: string; timeOut?: string; status?: string; saved?: DayRow }
+	type EditField = 'timeIn' | 'timeOut' | 'status'
+
+	const rowState: Record<string, RowState> = $state({})
+
+	function rowOf(d: DayRow): DayRow {
+		const s = rowState[d.id]?.saved
+		return s && new Date(s.updatedAt) > new Date(d.updatedAt) ? s : d
+	}
+	function editOf(id: string, field: EditField, base: string) {
+		return rowState[id]?.[field] ?? base
+	}
+	function setEdit(id: string, field: EditField, value: string) {
+		rowState[id] = { ...rowState[id], [field]: value }
+	}
+	const correctRow =
+		(id: string): SubmitFunction =>
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success') {
+				const day = (result.data as { day?: DayRow } | undefined)?.day
+				if (day) rowState[id] = { saved: day }
+			}
+			await update({ reset: false })
+		}
+
 	// #163: the range stays free-form and "Save as timesheet" now accepts any same-month span —
 	// createTimesheet validates it server-side and refuses an overlap with a 409. Quick-picks still
 	// snap to a standard pay period. from/to are YYYY-MM-DD (UTC-midnight days).
@@ -552,7 +579,7 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each teamRows as t (t.id)}
-						{@const d = t.day}
+						{@const d = t.day ? rowOf(t.day) : null}
 						{@const editable = data.canManage && d && !d.isLocked}
 						<tr
 							class="hover:bg-muted/30 {d && (d.status === 'ABSENT' || d.status === 'INCOMPLETE')
@@ -566,9 +593,15 @@
 							<td class="px-3 py-2 text-muted-foreground">{t.departmentName ?? '—'}</td>
 							<td class="px-3 py-2">
 								{#if editable && d}
-									<select name="status" form="c-{d.id}" class={CELL_SEL}>
-										{#each STATUSES as s (s)}<option value={s} selected={s === d.status}>{s}</option
-											>{/each}
+									<select
+										name="status"
+										form="c-{d.id}"
+										class={CELL_SEL}
+										bind:value={
+											() => editOf(d.id, 'status', d.status), (v) => setEdit(d.id, 'status', v)
+										}
+									>
+										{#each STATUSES as s (s)}<option value={s}>{s}</option>{/each}
 									</select>
 								{:else if d}
 									<Badge status={d.status} domain="attendance" />
@@ -586,7 +619,10 @@
 										name="timeIn"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeIn)}
+										bind:value={
+											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+											(v) => setEdit(d.id, 'timeIn', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeIn ?? null)}{/if}</td
 							>
@@ -595,7 +631,10 @@
 										name="timeOut"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeOut)}
+										bind:value={
+											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+											(v) => setEdit(d.id, 'timeOut', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeOut ?? null)}{/if}</td
 							>
@@ -620,7 +659,7 @@
 							{/if}
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
-									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
+									{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 									<div class="flex items-center gap-1">
 										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
 											<input type="hidden" name="id" value={d.id} />
@@ -694,7 +733,8 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y">
-					{#each dayRows as d (d.id)}
+					{#each dayRows as src (src.id)}
+						{@const d = rowOf(src)}
 						{@const editable = data.canManage && !d.isLocked}
 						<tr
 							class="hover:bg-muted/30 {d.status === 'ABSENT' || d.status === 'INCOMPLETE'
@@ -711,9 +751,15 @@
 							>
 							<td class="px-3 py-2">
 								{#if editable}
-									<select name="status" form="c-{d.id}" class={CELL_SEL}>
-										{#each STATUSES as s (s)}<option value={s} selected={s === d.status}>{s}</option
-											>{/each}
+									<select
+										name="status"
+										form="c-{d.id}"
+										class={CELL_SEL}
+										bind:value={
+											() => editOf(d.id, 'status', d.status), (v) => setEdit(d.id, 'status', v)
+										}
+									>
+										{#each STATUSES as s (s)}<option value={s}>{s}</option>{/each}
 									</select>
 								{:else}
 									<Badge status={d.status} domain="attendance" />
@@ -724,7 +770,10 @@
 										name="timeIn"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeIn)}
+										bind:value={
+											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+											(v) => setEdit(d.id, 'timeIn', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeIn)}{/if}</td
 							>
@@ -733,7 +782,10 @@
 										name="timeOut"
 										form="c-{d.id}"
 										type="time"
-										value={toTimeInput(d.timeOut)}
+										bind:value={
+											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+											(v) => setEdit(d.id, 'timeOut', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeOut)}{/if}</td
 							>
@@ -765,7 +817,7 @@
 											>locked</span
 										>
 									{:else}
-										{@const save = rowGuard(`correct:${d.id}`, keepValues)}
+										{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 										<div class="flex items-center gap-1">
 											<form
 												id="c-{d.id}"

@@ -206,12 +206,13 @@ export const actions: Actions = {
 			data.timeIn = timeIn ? new Date(`${date}T${timeIn}:00+08:00`) : null
 			data.timeOut = timeOut ? new Date(`${date}T${timeOut}:00+08:00`) : null
 		}
+		let day: Awaited<ReturnType<typeof correctDay>>
 		try {
-			await correctDay(id, event.locals.user!.organizationId, data, ctxOf(event))
+			day = await correctDay(id, event.locals.user!.organizationId, data, ctxOf(event))
 		} catch (e) {
 			return toFail(e)
 		}
-		return { action: 'correct', saved: 'Attendance day saved.' }
+		return { action: 'correct', saved: 'Attendance day saved.', day }
 	},
 
 	// Discard a manual override on a day and re-derive it from punches.
