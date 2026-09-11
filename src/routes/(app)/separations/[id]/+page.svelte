@@ -203,9 +203,7 @@
 
 			<!-- Finalize -->
 			{#if !isFinalized}
-				<div
-					class="flex min-h-[15.5rem] flex-col rounded-lg border border-destructive/30 bg-card p-4"
-				>
+				<div class="rounded-lg border border-destructive/30 bg-card p-4">
 					<h2 class="font-semibold text-destructive">Finalize separation</h2>
 					<p class="mt-1 text-sm text-muted-foreground">
 						Snapshots the final pay above, sets the employee to <strong>OFFBOARDED</strong> (end
@@ -224,7 +222,7 @@
 							{finalizeBar}
 						</p>
 					{/if}
-					<div class="mt-auto pt-4">
+					<div class="mt-3">
 						<ConfirmButton
 							action="?/finalize"
 							title="Finalize this separation?"
@@ -238,9 +236,7 @@
 					</div>
 				</div>
 			{:else if data.canUndo}
-				<div
-					class="flex min-h-[15.5rem] flex-col rounded-lg border border-destructive/30 bg-card p-4"
-				>
+				<div class="rounded-lg border border-destructive/30 bg-card p-4">
 					<h2 class="font-semibold text-destructive">Undo finalization</h2>
 					<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
 						Restores the loan and cash-advance balances this finalize wrote off, sets the employee
@@ -252,7 +248,7 @@
 						method="POST"
 						action="?/undo"
 						use:enhance={undo.enhance}
-						class="mt-auto flex flex-col gap-3 pt-4"
+						class="mt-3 space-y-3"
 					>
 						<div class="flex items-center gap-2">
 							<input
