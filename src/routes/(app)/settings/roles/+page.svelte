@@ -12,7 +12,6 @@
 	import Info from 'lucide-svelte/icons/info'
 	import Pencil from 'lucide-svelte/icons/pencil'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
-	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { Role } from '@prisma/client'
 	import type { PageData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -24,11 +23,9 @@
 	const canManageRoles = $derived(data.canManageRoles)
 	const canManageActive = $derived(data.canManageActive)
 
-	// #108: every user row has its own `?/setActive` form, so each gets its own guard — a shared
-	// one would disable the whole table while one row is in flight. Plain objects, not `$state`:
-	// each guard holds its own reactive `busy`, the maps only memoise identity.
-	const setActiveGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
-	const setActiveGuard = (id: string) => (setActiveGuards[id] ??= submitFeedback())
+	// #108: every role dialog is per row, so each gets its own guard — a shared one would
+	// disable the whole table while one row is in flight. Plain objects, not `$state`: each
+	// guard holds its own reactive `busy`, the map only memoises identity.
 	const setRoleGuards: Record<string, ReturnType<typeof createSubmitGuard>> = {}
 	// The refusal message, focused after a rejected save — see the guard below.
 	let errorEl = $state<HTMLElement>()
@@ -183,7 +180,6 @@
 			</thead>
 			<tbody class="divide-y">
 				{#each data.users as u (u.id)}
-					{@const setActive = setActiveGuard(u.id)}
 					{@const editable = canManageRoles && u.id !== data.user.id}
 					<tr class="hover:bg-muted/30">
 						<td class="px-4 py-3 font-medium">{u.email}</td>
@@ -196,8 +192,8 @@
 								/>
 								{#if canManageActive}
 									{#if u.isActive}
-										<!-- Deactivating locks a person out, so it confirms first; re-activating is
-										     neither destructive nor irreversible and deliberately stays one click.
+										<!-- Both directions confirm (owner decision 11-09-26): deactivating locks a person out,
+										     re-activating hands their access back. Each branch names its own consequence.
 										     #108: ConfirmButton's busy state is this form's single-submit guard. -->
 										<ConfirmButton
 											action="?/setActive"
@@ -211,17 +207,17 @@
 											<input type="hidden" name="isActive" value="false" />
 										</ConfirmButton>
 									{:else}
-										<form method="POST" action="?/setActive" use:enhance={setActive.enhance}>
+										<ConfirmButton
+											action="?/setActive"
+											title="Re-activate this login?"
+											message="{u.email} can sign in again immediately and regains access to everything their roles allow."
+											confirmText="Activate"
+											triggerLabel="Activate"
+											triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+										>
 											<input type="hidden" name="userId" value={u.id} />
 											<input type="hidden" name="isActive" value="true" />
-											<button
-												type="submit"
-												disabled={setActive.busy}
-												class="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-											>
-												{setActive.busy ? 'Saving…' : 'Activate'}
-											</button>
-										</form>
+										</ConfirmButton>
 									{/if}
 								{/if}
 							</div>

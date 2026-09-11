@@ -123,8 +123,9 @@ describe('G2 — no native confirm() calls in src/', () => {
 })
 
 // ── G3 — the consequence-naming copy survives a later softening edit ──────────
-// One exact NON-interpolated substring per drafted message. 17 messages across 16 sites: site 9
-// has two (manage / approval paths) and site 14 has a base plus its conditional clause.
+// One exact NON-interpolated substring per drafted message. 18 messages across 16 sites: site 9
+// has two (manage / approval paths), site 12 has two (deactivate / re-activate, owner decision
+// 11-09-26) and site 14 has a base plus its conditional clause.
 const COPY: { site: string; file: string; needle: string }[] = [
 	{
 		site: '1 offboard',
@@ -193,6 +194,11 @@ const COPY: { site: string; file: string; needle: string }[] = [
 		needle: 'Their employee record, payroll history and documents are untouched'
 	},
 	{
+		site: '12b re-activate login',
+		file: 'routes/(app)/settings/roles/+page.svelte',
+		needle: 'can sign in again immediately and regains access to everything their roles allow'
+	},
+	{
 		site: '13 separation finalize',
 		file: 'routes/(app)/separations/[id]/+page.svelte',
 		needle: 'This snapshots final pay, offboards the employee, and disables their login'
@@ -215,8 +221,8 @@ const COPY: { site: string; file: string; needle: string }[] = [
 ]
 
 describe('G3 — every confirm message still names its consequence', () => {
-	it('covers all 17 drafted messages', () => {
-		expect(COPY.length).toBe(17)
+	it('covers all 18 drafted messages', () => {
+		expect(COPY.length).toBe(18)
 	})
 
 	for (const { site, file, needle } of COPY) {

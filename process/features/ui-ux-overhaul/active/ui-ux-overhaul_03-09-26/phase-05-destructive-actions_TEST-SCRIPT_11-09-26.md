@@ -145,7 +145,7 @@ old value, or the psql row still holds the old value. "The dialog closed" is not
 | P1-10 Statutory dirty guard | | | | | |
 | P1-11 Release review | | | | | |
 | P1-12 Deactivate login | | | | | |
-| P1-12b Activate login | | n/a | | | no dialog expected |
+| P1-12b Re-activate login | | | | | dialog expected (amended 11-09-26) |
 | P1-13 Separation finalize | | | | | |
 | P1-14 Separation undo | | | | | |
 | P1-15 Attendance reset | | | | | |
@@ -393,7 +393,7 @@ The six fields and their labels (from `rateFields`): `Overtime`,
 
 1. Log in as `admin@veent.ph`, go to `/payroll/config`. **Write down all six current values.**
 2. Click **Save Multipliers** with nothing changed. Expect **no dialog** — the form submits
-   straight through and the page shows `Payroll configuration saved successfully.`
+   straight through and the multipliers card shows `Multipliers saved.`
 3. Change **Overtime** and **Rest day** only. Click **Save Multipliers**.
 4. Expect title `Save premium pay multipliers?`, and a message whose first paragraph is exactly:
    `These multipliers set overtime, night differential, rest-day and holiday pay for every payroll run from now on. Runs already computed are not recalculated.`
@@ -409,7 +409,7 @@ The six fields and their labels (from `rateFields`): `Overtime`,
      "SELECT overtime, \"restDay\", \"nightDiff\", \"regularHoliday\", \"specialHoliday\" FROM pay_rate_rules"
    ```
    No row at all means the org still runs on the DOLE defaults, which is also "unchanged".
-6. **Confirm** → `Payroll configuration saved successfully.` banner; re-load the page and the two
+6. **Confirm** → `Multipliers saved.` on the multipliers card; re-load the page and the two
    values persist. Restore the original six values afterwards (see Cleanup).
 
 **Playwright MCP**
@@ -417,7 +417,7 @@ The six fields and their labels (from `rateFields`): `Overtime`,
 1. login-as `admin@veent.ph`, `browser_navigate` `/payroll/config`
 2. `browser_snapshot` — record all six values
 3. `browser_click` "Save Multipliers button" → `browser_wait_for` text
-   `Payroll configuration saved successfully.` and assert no alertdialog appeared
+   `Multipliers saved.` and assert no alertdialog appeared
 4. `browser_fill_form` `Overtime` and `Rest day` with new values
 5. `browser_click` "Save Multipliers button" → `browser_wait_for` `Save premium pay multipliers?`
 6. `browser_snapshot` — record the `Changing:` list; assert exactly two rows
@@ -616,8 +616,8 @@ Site 11. File `src/routes/(app)/performance/reviews/[id]/+page.svelte`. Gate on 
 ### P1-12 — Deactivate a login
 
 Site 12. File `src/routes/(app)/settings/roles/+page.svelte`. Gate: `ADMINISTER_SYSTEM` →
-**SUPER_ADMIN or CEO**. Account: **`admin@veent.ph`**. Asymmetric by design: only the
-**deactivate** direction confirms.
+**SUPER_ADMIN or CEO**. Account: **`admin@veent.ph`**. *Amended 11-09-26 (remediation A, S8):* the
+site is no longer asymmetric — **both** directions confirm, each naming its own consequence.
 
 **Manual**
 
@@ -646,27 +646,32 @@ Site 12. File `src/routes/(app)/settings/roles/+page.svelte`. Gate: `ADMINISTER_
 
 ---
 
-### P1-12b — Activate a login (assert NO dialog)
+### P1-12b — Re-activate a login (a dialog IS expected)
 
-Same site, the `{:else}` branch: a plain form with a `type="submit"` button and its own
-`setActiveGuard`. **There must be no dialog.** Account: **`admin@veent.ph`**.
+Same site, the `{:else}` branch. *Amended 11-09-26 (remediation A, S8): this stage used to assert
+**no** dialog. The owner reversed that — the branch now renders `ConfirmButton`, so assert the
+dialog's copy instead of its absence.* Account: **`admin@veent.ph`**.
 
 **Manual**
 
 1. Still on `/settings/roles`, with `employee@veent.ph` now INACTIVE, click **Activate**.
-2. Expect **no dialog at all**. The badge flips straight to **ACTIVE**.
-3. Assert positively: `SELECT "isActive" FROM users WHERE email='employee@veent.ph'` reads `t`,
-   and no `role="alertdialog"` element appeared at any point.
+2. Expect title `Re-activate this login?`, message exactly:
+   `employee@veent.ph can sign in again immediately and regains access to everything their roles allow.`
+   confirm button **`Activate`**.
+3. **Cancel** → the badge still reads **INACTIVE**, and
+   `SELECT "isActive" FROM users WHERE email='employee@veent.ph'` still reads `f`.
+4. **Confirm** → the badge flips to **ACTIVE**, the trigger becomes **Deactivate**, and the SQL
+   reads `t`.
 
 **Playwright MCP**
 
-1. `browser_click` "Activate button"
-2. `browser_evaluate` → `() => document.querySelectorAll('[role="alertdialog"]').length`
-   — must return `0`
-3. `browser_wait_for` text `Deactivate` in that row (the trigger flipped back)
-4. Bash psql — `isActive` = `t`
+1. `browser_click` "Activate button" → `browser_wait_for` `Re-activate this login?`
+2. `browser_click` "Cancel button"; Bash psql — `isActive` = `f`
+3. `browser_click` "Activate button" → `browser_click` the alertdialog's `Activate` button
+4. `browser_wait_for` text `Deactivate` in that row (the trigger flipped back)
+5. Bash psql — `isActive` = `t`
 
-There is no cancel column for this stage. Record it as `n/a`.
+This stage now has a cancel column — record it like every other confirmed action.
 
 ---
 
@@ -1147,6 +1152,8 @@ Before and after cleanup, take the same SELECT. A cleanup you did not verify is 
   containment. A file that imports `ConfirmButton` and leaves one form bare still passes.
 - **The `beforeunload` prompt on the statutory page is native on purpose.** A browser gives no
   alternative. It is explicitly excluded from the zero-native-`confirm()` gate.
-- **Two behaviours that look like bugs and are not:** activating a login shows no dialog (site 12
-  is deliberately asymmetric), and saving the net-pay override or the DOLE multipliers with nothing
-  changed shows no dialog (nothing to warn about).
+- **One behaviour that looks like a bug and is not:** saving the net-pay override or the DOLE
+  multipliers with nothing changed shows no dialog (nothing to warn about).
+- **Site 12 is no longer asymmetric.** *Amended 11-09-26 (remediation A, S8).* This list used to
+  say "activating a login shows no dialog (site 12 is deliberately asymmetric)". The owner reversed
+  that call: re-activating now confirms too. A missing dialog on **Activate** is a defect.
