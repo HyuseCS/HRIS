@@ -112,7 +112,7 @@
 	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
 	const reveal = submitFeedback({ error: null })
 	const update = submitFeedback({ error: null })
-	const offboard = submitFeedback({ error: null })
+	const offboard = submitFeedback({ error: null, success: null })
 	const setSupervisors = submitFeedback({ error: null })
 	const deleteEmergencyContact = submitFeedback({ error: null })
 	const addEmergencyContact = submitFeedback({ error: null })
