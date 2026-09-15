@@ -150,7 +150,7 @@ old value, or the psql row still holds the old value. "The dialog closed" is not
 | P1-14 Separation undo | | | | | |
 | P1-15 Attendance reset | | | | | |
 | P1-16 Bulk reject | | n/a | | | verify-only |
-| P2 Cancel writes nothing | | | | | |
+| P2 Cancel writes nothing | admin (deactivate, void), hr (offboard) | deactivate `t`→`t`; offboard ACTIVE→ACTIVE; void OPEN→OPEN; `updatedAt` unchanged on all 3 | deactivate `t`→`f`; offboard ACTIVE→OFFBOARDED; void OPEN→VOIDED | PASS | 15-09-26. EMP-904 stood in for `p5-offboard`; `p5-void` opened at OPEN (Oct 1-15 2026), no Generate/Lock. Login re-activated and EMP-904 restored after. |
 | P3 Keyboard walk | | | | | |
 | P4 Dirty guard clears on save | | | | | |
 | P5 Override thresholds | | | | | |
