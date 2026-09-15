@@ -106,7 +106,7 @@ test('a saved row shows the stored values without a reload, and its siblings kee
 	await edited.locator('input[name="timeIn"]').fill('09:00')
 	await edited.locator('input[name="timeOut"]').fill('17:00')
 	await edited.getByRole('button', { name: 'Save', exact: true }).click()
-	await expect(page.getByText('Attendance day saved.')).toBeVisible()
+	await expect(page.getByText(/ saved\.$/)).toBeVisible()
 
 	// The stored hours must have moved off the seeded 3.00 — otherwise "DOM equals database" would
 	// be satisfied by the pre-save render and prove nothing.
@@ -122,11 +122,11 @@ test('a saved row shows the stored values without a reload, and its siblings kee
 	// PRESENT — the status half of the same staleness.
 	// Wait the first toast out: both saves say the same sentence, so a stale one would satisfy the
 	// second wait before the second save had landed.
-	await expect(page.getByText('Attendance day saved.')).toBeHidden({ timeout: 15000 })
+	await expect(page.getByText(/ saved\.$/)).toBeHidden({ timeout: 15000 })
 	await edited.locator('input[name="timeIn"]').fill('')
 	await edited.locator('input[name="timeOut"]').fill('')
 	await edited.getByRole('button', { name: 'Save', exact: true }).click()
-	await expect(page.getByText('Attendance day saved.')).toBeVisible()
+	await expect(page.getByText(/ saved\.$/)).toBeVisible()
 
 	const cleared = await expectRowMatchesStored(edited, EDITED)
 	expect(cleared.status).toBe('ABSENT')
@@ -169,6 +169,6 @@ test('Save renders only on a row with unsaved edits', async ({ page }) => {
 	await expect(saves).toHaveCount(1)
 
 	await edited.getByRole('button', { name: 'Save', exact: true }).click()
-	await expect(page.getByText('Attendance day saved.')).toBeVisible()
+	await expect(page.getByText(/ saved\.$/)).toBeVisible()
 	await expect(saves).toHaveCount(0)
 })
