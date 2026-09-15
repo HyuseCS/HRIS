@@ -78,7 +78,7 @@
 	{#key data.organizationId}
 		<form method="POST" action="?/create" use:enhance={create.enhance} class="space-y-8">
 			<!-- Personal Information -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Personal Information</legend>
 				<div class="grid gap-4 sm:grid-cols-3">
 					<div>
@@ -126,7 +126,7 @@
 			</fieldset>
 
 			<!-- Contact Information -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Contact Information</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
@@ -152,7 +152,7 @@
 			</fieldset>
 
 			<!-- Account -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Account</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
@@ -221,7 +221,7 @@
 			</fieldset>
 
 			<!-- Employment -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Employment Details</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
@@ -390,7 +390,7 @@
 			</fieldset>
 
 			<!-- Government IDs -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Government IDs</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
@@ -453,7 +453,7 @@
 			</fieldset>
 
 			<!-- Emergency Contact -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Emergency Contact</legend>
 				<div class="grid gap-4 sm:grid-cols-3">
 					<div>
@@ -488,7 +488,7 @@
 			</fieldset>
 
 			<!-- Bank / GCash Details -->
-			<fieldset class="rounded-md border p-4 space-y-4">
+			<fieldset class="rounded-md border bg-card p-4 space-y-4">
 				<legend class="px-1 text-sm font-semibold">Bank / GCash Details</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>

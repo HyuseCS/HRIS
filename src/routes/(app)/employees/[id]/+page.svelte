@@ -546,7 +546,7 @@
 				method="POST"
 				action="?/update"
 				use:enhance={update.enhance}
-				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
+				class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">Update Profile</h2>
 				<!--
@@ -1525,7 +1525,7 @@
 				method="POST"
 				action="?/changeCompensation"
 				use:enhance={changeCompensation.enhance}
-				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
+				class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">
 					Change Salary / Pay Type
@@ -1619,7 +1619,7 @@
 				method="POST"
 				action="?/promote"
 				use:enhance={promote.enhance}
-				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
+				class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">
 					Promote
