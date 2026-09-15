@@ -122,7 +122,7 @@
 		/>
 
 		{#if query.trim()}
-			<div class="rounded-lg border">
+			<div class="rounded-lg border bg-card">
 				<ul class="divide-y">
 					{#each matches as m (m.id)}
 						<li class="px-4 py-2">
@@ -138,7 +138,7 @@
 				</ul>
 			</div>
 		{:else if roots.length}
-			<div class="rounded-lg border p-4">
+			<div class="rounded-lg border bg-card p-4">
 				<ul class="space-y-1">
 					{#each roots as root (root.id)}
 						{@render nodeRow(root, [])}

@@ -66,7 +66,7 @@
 			method="POST"
 			action="?/create"
 			use:enhance={createHoliday.enhance}
-			class="rounded-lg border p-4 space-y-4"
+			class="rounded-lg border bg-card p-4 space-y-4"
 		>
 			<h2 class="font-semibold">Add New Holiday</h2>
 			<div class="grid gap-4 sm:grid-cols-3">
@@ -147,7 +147,7 @@
 			</div>
 		</div>
 		<!-- Holiday List -->
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

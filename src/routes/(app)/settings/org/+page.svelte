@@ -57,7 +57,7 @@
 			method="POST"
 			action="?/createPosition"
 			use:enhance={createPosition.enhance}
-			class="rounded-lg border p-4 space-y-4"
+			class="rounded-lg border bg-card p-4 space-y-4"
 		>
 			<h2 class="font-semibold">New Position</h2>
 			<div class="grid gap-3 sm:grid-cols-3">
@@ -114,7 +114,7 @@
 				</button>
 			</div>
 		</div>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -256,7 +256,7 @@
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold">Employee Assignments</h2>
 		<p class="text-sm text-muted-foreground">Assign each employee to a position in the catalog.</p>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
