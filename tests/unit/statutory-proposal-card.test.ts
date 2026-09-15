@@ -39,7 +39,7 @@ const renderPending = (changes: string[]) =>
 const THREE = [
 	'Pag-IBIG cap: ₱200 → ₱300',
 	'PhilHealth rate: 5% → 6%',
-	'SSS contribution table changed'
+	'SSS row 3 EE share: ₱225 → ₱230'
 ]
 
 describe('pending statutory proposal card', () => {

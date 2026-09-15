@@ -14,7 +14,7 @@ import {
 	deriveSssTotals
 } from '$lib/server/services/payroll/statutory-rates'
 import type { StatutoryRateConfigRow } from '$lib/server/services/payroll/statutory-rates'
-import { summarizeChanges } from '$lib/server/services/payroll/statutory-change-summary'
+import { summarizeChanges } from '$lib/payroll/statutory-change-summary'
 import type { Actions, PageServerLoad } from './$types'
 
 // Live config (authoritative + seeded) mapped to the editor's wire shape. Each field falls back to

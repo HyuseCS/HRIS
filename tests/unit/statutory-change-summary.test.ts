@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-	summarizeChanges,
-	type WireConfig
-} from '$lib/server/services/payroll/statutory-change-summary'
+import { summarizeChanges, type WireConfig } from '$lib/payroll/statutory-change-summary'
 import {
 	BIR_MONTHLY_TAX_TABLE,
 	SSS_TABLE_2024,
@@ -62,34 +59,51 @@ const payload = (over: Partial<StatutoryRateInput> = {}) =>
 
 describe('summarizeChanges', () => {
 	it('does not report an SSS change when only the key order differs', () => {
-		expect(summarizeChanges(payload(), liveConfig())).not.toContain(
-			'SSS contribution table changed'
-		)
+		expect(summarizeChanges(payload(), liveConfig()).filter((l) => l.startsWith('SSS'))).toEqual([])
 	})
 
 	it('does not report a tax change when only the key order differs', () => {
-		expect(summarizeChanges(payload(), liveConfig())).not.toContain(
-			'BIR withholding-tax table changed'
-		)
+		expect(summarizeChanges(payload(), liveConfig()).filter((l) => l.startsWith('BIR'))).toEqual([])
 	})
 
-	it('reports a genuinely changed SSS eeShare', () => {
+	it('reports a changed SSS eeShare as a row-level line', () => {
 		const edited = sssPayload.map((b, i) => (i === 0 ? { ...b, eeShare: b.eeShare + 5 } : b))
-		expect(summarizeChanges(payload({ sssBrackets: edited }), liveConfig())).toContain(
-			'SSS contribution table changed'
-		)
+		expect(summarizeChanges(payload({ sssBrackets: edited }), liveConfig())).toEqual([
+			'SSS row 1 EE share: ₱180 → ₱185'
+		])
 	})
 
-	it('reports a genuinely changed tax rate', () => {
+	it('reports a changed tax rate as a percentage', () => {
 		const edited = taxPayload.map((b, i) => (i === 2 ? { ...b, rate: 0.21 } : b))
-		expect(summarizeChanges(payload({ taxBrackets: edited }), liveConfig())).toContain(
-			'BIR withholding-tax table changed'
-		)
+		expect(summarizeChanges(payload({ taxBrackets: edited }), liveConfig())).toEqual([
+			'BIR row 3 rate: 20% → 21%'
+		])
+	})
+
+	it('reports an open-ended ceiling that was given a value', () => {
+		const last = sssPayload.length - 1
+		const edited = sssPayload.map((b, i) => (i === last ? { ...b, salaryCeiling: 50000 } : b))
+		expect(summarizeChanges(payload({ sssBrackets: edited }), liveConfig())).toEqual([
+			`SSS row ${last + 1} salary ceiling: ∞ → ₱50,000`
+		])
+	})
+
+	it('reports an added row', () => {
+		const added = [...taxPayload, { ...taxPayload[taxPayload.length - 1], floor: 900000 }]
+		expect(summarizeChanges(payload({ taxBrackets: added }), liveConfig())).toEqual([
+			`BIR row ${taxPayload.length + 1} added`
+		])
+	})
+
+	it('reports a removed row', () => {
+		expect(
+			summarizeChanges(payload({ taxBrackets: taxPayload.slice(0, -1) }), liveConfig())
+		).toEqual([`BIR row ${taxPayload.length} removed`])
 	})
 
 	it('reports a bracket-count change', () => {
 		expect(summarizeChanges(payload({ sssBrackets: sssPayload.slice(1) }), liveConfig())).toContain(
-			'SSS contribution table changed'
+			`SSS row ${sssPayload.length} removed`
 		)
 	})
 

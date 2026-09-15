@@ -6,10 +6,9 @@
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { beforeNavigate, goto } from '$app/navigation'
 	import type { PageData, ActionData } from './$types'
+	import { summarizeChanges, NO_EFFECTIVE_CHANGE } from '$lib/payroll/statutory-change-summary'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
-
-	const NO_EFFECTIVE_CHANGE = 'No effective change vs the live rates.'
 
 	// Re-seed the touched-services baseline once the save lands, so the confirm and the leave guard
 	// both stop reporting edits the user has already committed.
@@ -111,16 +110,33 @@
 			.map(([name]) => name)
 	)
 	const isDirty = $derived(touchedServices.length > 0)
+	const changes = $derived(
+		summarizeChanges(
+			{
+				philhealthRate: philhealthRate == null ? null : philhealthRate / 100,
+				philhealthFloor,
+				philhealthCeiling,
+				pagibigRate: pagibigRate == null ? null : pagibigRate / 100,
+				pagibigCap,
+				sssBrackets: JSON.parse(sssPayload),
+				taxBrackets: (JSON.parse(taxPayload) as { rate: number }[]).map((r) => ({
+					...r,
+					rate: r.rate / 100
+				}))
+			},
+			data.live
+		)
+	)
 
 	// Site 9: one dialog, two label sets — the manage path applies rates live, the other files a
-	// proposal. Derived so the copy tracks `touchedServices` as the user edits.
+	// proposal. Derived so the copy tracks `changes` as the user edits.
 	const confirmTitle = $derived(
 		data.canManage ? 'Apply statutory rates?' : 'Submit these rates for CEO approval?'
 	)
 	const confirmMessage = $derived(
 		data.canManage
-			? `These become the live tax and contribution tables for the whole organization and feed every payroll run computed from now on. Runs already computed are not recalculated.\n\nYou are changing: ${touchedServices.join(', ')}. Edits on tabs you are not looking at are included.`
-			: `A proposal goes to the CEO for approval. Nothing changes for payroll until it is approved.\n\nYou are submitting: ${touchedServices.join(', ')}. Edits on tabs you are not looking at are included.`
+			? `These become the live tax and contribution tables for the whole organization and feed every payroll run computed from now on. Runs already computed are not recalculated.\n\nChanges:\n${changes.join('\n')}`
+			: `A proposal goes to the CEO for approval. Nothing changes for payroll until it is approved.\n\nChanges:\n${changes.join('\n')}`
 	)
 	const confirmLabel = $derived(data.canManage ? 'Apply rates' : 'Submit for approval')
 
@@ -622,7 +638,7 @@
 			{#if data.canManage}
 				<button
 					type="button"
-					disabled={saveGuard.busy}
+					disabled={saveGuard.busy || !isDirty}
 					onclick={() => (confirmOpen = true)}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 				>
@@ -631,7 +647,7 @@
 			{:else}
 				<button
 					type="button"
-					disabled={saveGuard.busy}
+					disabled={saveGuard.busy || !isDirty}
 					onclick={() => (confirmOpen = true)}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 				>
