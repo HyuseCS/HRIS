@@ -1,5 +1,8 @@
 # Phase 05 owner pass — live results (11-09-26, branch 47252f9, dev 5173)
 
+**Status: P1 COMPLETE** — closed by the owner 15-09-26. All 16 stages recorded below; the one open
+half (P1-15 team view) was waived in that decision.
+
 | # | Site | Account | Cancel | Confirm | Verdict |
 |---|---|---|---|---|---|
 | 1 | Offboard | hr@veent.ph | dialog closed, focus back on trigger, card still present, row still ACTIVE / endDate null / login active | banner `Employee offboarded.`, card gone, row OFFBOARDED / endDate 2026-09-30 / login disabled | **PASS** |
@@ -115,7 +118,8 @@ DISABLED until the day is manually edited, and returns to disabled after the res
 that resolution are confirmed working together.
 P1-15 SCRIPT CORRECTIONS: title is `Discard the manual edit?` (not "this"), and the confirm button is
 `Reset` (not "Discard and re-derive"). Source `attendance/+page.svelte` confirms both.
-P1-15 NOT DONE: the team view (`?view=team`) second render site was not walked.
+P1-15 NOT DONE: the team view (`?view=team`) second render site was not walked. Owner closed P1 on
+15-09-26 without it, so this half stays unwalked by decision, not by oversight.
 | 16 | Bulk reject (verify-only) | admin@veent.ph (see deviation) | typed note enabled the confirm; **Cancel submitted nothing** — still 6 PENDING | toast `Rejected 2 requests.`, selection cleared, 2 rows PENDING→REJECTED | **PASS** |
 
 P1-16 assertions all held: `role="dialog"` NOT alertdialog, **zero** `[role=alertdialog]` nodes in
