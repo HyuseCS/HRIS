@@ -94,7 +94,7 @@
 		method="POST"
 		action="/payroll/calculator?/preview"
 		use:enhance={preview.enhance}
-		class="rounded-lg border p-5 space-y-4"
+		class="rounded-lg border bg-card p-5 space-y-4"
 	>
 		<div>
 			<label class="text-sm font-medium" for="calc-employee">Employee</label>

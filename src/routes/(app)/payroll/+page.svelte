@@ -97,7 +97,7 @@
 			method="POST"
 			action="?/create"
 			use:enhance={create.enhance}
-			class="rounded-lg border p-4 space-y-3"
+			class="rounded-lg border bg-card p-4 space-y-3"
 		>
 			<h2 class="font-semibold">Create Payroll Run</h2>
 			{#if form?.error}<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -129,7 +129,7 @@
 		<!-- A finance approver (CEO / Super Admin) sees runs from every tenant (#174); the
 		     Tenant column and per-row org label only appear once runs span more than one org. -->
 		{@const crossTenant = runs.some((r) => r.organizationId !== data.viewerOrg)}
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

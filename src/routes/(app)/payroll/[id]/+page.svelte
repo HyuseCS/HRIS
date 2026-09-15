@@ -195,7 +195,7 @@
 		</div>
 	</div>
 
-	<div class="rounded-lg border overflow-x-auto">
+	<div class="rounded-lg border bg-card overflow-x-auto">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -398,7 +398,7 @@
 					<li
 						class="flex items-start gap-3 rounded-lg border p-3 {active
 							? 'border-primary/50 bg-primary/5'
-							: ''}"
+							: 'bg-card'}"
 					>
 						<div
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium
