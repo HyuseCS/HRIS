@@ -32,3 +32,5 @@ Owner, during P3 (keyboard walk), 15-09-26, on `http://localhost:5173/payroll/st
 
 Open question for the fix: the save action and the CEO proposal flow take all four services in one
 payload; a per-tab save must send the other three unchanged.
+
+**DONE 15-09-26** in `d3ef7b5`: owner picked "show real edits". The confirm lists every edit (`SSS row 3 EE share: ₱225 → ₱230`), rows by position; Save is off with no edits. Checked live, no rates saved.

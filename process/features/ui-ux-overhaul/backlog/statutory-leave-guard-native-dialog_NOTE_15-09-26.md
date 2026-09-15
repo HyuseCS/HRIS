@@ -32,3 +32,5 @@ The page has two leave guards (`+page.svelte`, `onBeforeUnload` and `beforeNavig
    would then be lost silently on reload or tab close.
 
 Same pattern exists on `performance/templates/[id]` (the guard was ported from there).
+
+**CLOSED 15-09-26, no fix**: owner accepted it is the browser's own prompt ("ok that's why it doesn't fit the system"). In-app exits already use the themed dialog.
