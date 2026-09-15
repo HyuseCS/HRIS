@@ -45,7 +45,7 @@
 </script>
 
 {#if rows.length === 0}
-	<div class="rounded-lg bg-card ring-1 ring-black/[0.12] dark:ring-white/10">
+	<div class="rounded-lg border bg-card">
 		<EmptyState
 			variant={emptyVariant}
 			title={emptyTitle}
@@ -56,9 +56,7 @@
 {:else}
 	<!-- Desktop: a real table. Hidden rather than reflowed below sm so the two layouts can each
 	     be laid out properly instead of compromising on one. -->
-	<div
-		class="hidden overflow-x-auto rounded-lg bg-card ring-1 ring-black/[0.12] sm:block dark:ring-white/10"
-	>
+	<div class="hidden overflow-x-auto rounded-lg border bg-card sm:block">
 		<table class="w-full text-sm">
 			{#if caption}
 				<caption class="sr-only">{caption}</caption>
@@ -108,7 +106,7 @@
 			<!-- Deliberately not clickable, unlike the desktop row: a card-shaped button whose
 			     label is its whole contents is poor for screen readers, and every table that uses
 			     row-click also carries an action cell, which the card renders like any other. -->
-			<li class="rounded-lg bg-card p-3 ring-1 ring-black/[0.12] dark:ring-white/10">
+			<li class="rounded-lg border bg-card p-3">
 				<dl class="space-y-1.5">
 					{#each mobileColumns as column (column.key)}
 						<div class="flex items-start justify-between gap-3">
