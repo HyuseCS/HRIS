@@ -179,7 +179,7 @@
 					{@render yearForm()}
 				{/if}
 			</div>
-			<div class="rounded-lg border overflow-x-auto">
+			<div class="rounded-lg border bg-card overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
