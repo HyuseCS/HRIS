@@ -232,6 +232,33 @@ const SITES: Row[] = [
 		absent: NO_SUCCESS_BANNER
 	},
 	{
+		site: 'payroll/periods open (modal)',
+		page: 'lib/components/payroll/OpenPeriodDialog.svelte',
+		server: 'routes/(app)/payroll/periods/+page.server.ts',
+		action: 'open',
+		surface: 'toast',
+		expectServerSaved: true,
+		present: [
+			'action="?/open"',
+			'use:enhance={openPeriod.enhance}',
+			'const openPeriod = submitFeedback('
+		],
+		absent: NO_SUCCESS_BANNER
+	},
+	{
+		site: 'payroll/periods open (page)',
+		page: 'routes/(app)/payroll/periods/+page.svelte',
+		server: 'routes/(app)/payroll/periods/+page.server.ts',
+		action: 'open',
+		surface: 'toast',
+		expectServerSaved: true,
+		present: [
+			'<OpenPeriodDialog bind:open={showOpen} />',
+			"{#if form?.error && form.action !== 'open'}"
+		],
+		absent: [...NO_SUCCESS_BANNER, 'action="?/open"']
+	},
+	{
 		site: 'settings/roles setActive',
 		page: 'routes/(app)/settings/roles/+page.svelte',
 		server: 'routes/(app)/settings/roles/+page.server.ts',

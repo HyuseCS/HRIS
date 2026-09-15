@@ -31,10 +31,11 @@ function ctxOf(event: RequestEvent) {
 }
 
 /** Map a thrown SvelteKit error from the service into a form `fail`. */
-function toFail(e: unknown) {
+function toFail(e: unknown, action?: string) {
 	const err = e as { status?: number; body?: { message?: string } }
 	if (err?.status && [400, 404, 409].includes(err.status)) {
-		return fail(err.status, { error: err.body?.message ?? 'Action failed' })
+		const error = err.body?.message ?? 'Action failed'
+		return fail(err.status, action ? { action, error } : { error })
 	}
 	throw e
 }
@@ -50,7 +51,7 @@ export const actions: Actions = {
 	open: async (event) => {
 		requirePayrollManage(event.locals.user!.roles)
 		const parsed = openSchema.safeParse(Object.fromEntries(await event.request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid period details' })
+		if (!parsed.success) return fail(400, { action: 'open', error: 'Invalid period details' })
 		try {
 			await openPeriod(
 				event.locals.user!.organizationId,
@@ -63,8 +64,9 @@ export const actions: Actions = {
 				ctxOf(event)
 			)
 		} catch (e) {
-			return toFail(e)
+			return toFail(e, 'open')
 		}
+		return { action: 'open', saved: 'Period opened.' }
 	},
 
 	import: async (event) => {

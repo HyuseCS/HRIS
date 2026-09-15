@@ -66,9 +66,11 @@ test('the /payroll/periods picker posts the RENAMED start/end fields for a cross
 	await login(page, USERS.admin)
 	await page.goto('/payroll/periods', { waitUntil: 'domcontentloaded' })
 	await page.getByRole('button', { name: 'Open Period' }).click()
+	const dialog = page.getByRole('dialog', { name: 'Open a Payroll Period' })
+	await expect(dialog).toBeVisible()
 	await fillCrossMonth(page)
 
-	const form = page.locator('form[action="?/open"]')
+	const form = dialog.locator('form[action="?/open"]')
 	await expect(form.locator('p[aria-live="polite"]')).toHaveText(PREVIEW)
 
 	// The whole point of this test. `openSchema` in `payroll/periods/+page.server.ts` parses
@@ -81,6 +83,22 @@ test('the /payroll/periods picker posts the RENAMED start/end fields for a cross
 	// the zod schema would still parse, hiding the mistake until someone read the payload.
 	await expect(form.locator('input[name="periodStart"]')).toHaveCount(0)
 	await expect(form.locator('input[name="periodEnd"]')).toHaveCount(0)
+})
+
+test('the /payroll/periods Open Period dialog closes on Escape and returns focus to its trigger', async ({
+	page
+}) => {
+	await login(page, USERS.admin)
+	await page.goto('/payroll/periods', { waitUntil: 'domcontentloaded' })
+	const trigger = page.getByRole('button', { name: 'Open Period' })
+	await trigger.click()
+	const dialog = page.getByRole('dialog', { name: 'Open a Payroll Period' })
+	await expect(dialog).toBeVisible()
+
+	await page.keyboard.press('Escape')
+
+	await expect(dialog).toHaveCount(0)
+	await expect(trigger).toBeFocused()
 })
 
 test('the /timesheets New Timesheet dialog accepts a cross-month range', async ({ page }) => {
