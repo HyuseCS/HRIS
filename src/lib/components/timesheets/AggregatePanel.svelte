@@ -80,7 +80,7 @@
 		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
-<section class="space-y-3 rounded-lg border bg-muted/20 p-4">
+<section class="space-y-3 rounded-lg border bg-card p-4">
 	<div>
 		<h2 class="text-lg font-semibold">Aggregate from time logs</h2>
 		<p class="text-sm text-muted-foreground">

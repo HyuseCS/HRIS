@@ -32,3 +32,5 @@ detector flagged a planted side-tab border in a negative control, so it is live)
    match.** `AggregatePanel.svelte:83` is `rounded-lg border bg-muted/20` (dark: `rgba(36,36,36,.2)` over
    bg `rgb(15,15,15)`); the table box is `border bg-card` (`rgb(28,28,28)`). Already on the #20 remaining
    list. Fix: `bg-muted/20` -> `bg-card`. Screen (dark): `timesheets-aggregate-vs-table-bg_15-09-26.png`.
+   **DONE 15-09-26**: both boxes measure `rgb(28,28,28)` dark, `rgb(251,251,251)` light. Screen:
+   `timesheets-aggregate-vs-table-bg_after_light_15-09-26.png`.
