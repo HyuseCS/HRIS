@@ -594,7 +594,7 @@
 
 	{#if data.view === 'team'}
 		<!-- Team-for-a-day table -->
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -816,7 +816,7 @@
 		{/if}
 
 		<!-- Single-employee range table -->
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

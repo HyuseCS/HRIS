@@ -355,7 +355,7 @@
 				Reg and OT are computed from In/Out: regular hours are 8:00 AM–5:00 PM less the unpaid
 				12:00–1:00 PM lunch; time worked outside that window is overtime.
 			</p>
-			<div class="overflow-x-auto rounded-lg border">
+			<div class="overflow-x-auto rounded-lg border bg-card">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>

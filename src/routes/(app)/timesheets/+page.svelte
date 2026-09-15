@@ -123,7 +123,7 @@
 			</div>
 		{/if}
 
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<!-- table-fixed with shared column widths so the right-anchored Total Hours
 			     and Status columns line up between the My/Team tables even though only
 			     the Team table has an Employee column. -->
