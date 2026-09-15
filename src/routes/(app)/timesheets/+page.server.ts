@@ -60,6 +60,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		: null
 	const mineTotal = mineParams ? await countTimesheets(mineParams) : 0
 	const minePagination = paginate(url, mineTotal, { param: 'myPage' })
+	const mineDrafts =
+		mineParams && isManager ? await countTimesheets({ ...mineParams, status: 'DRAFT' }) : 0
 	const myTimesheets = mineParams
 		? listTimesheets(mineParams, { skip: minePagination.skip, take: minePagination.take })
 		: Promise.resolve([])
@@ -93,6 +95,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		myTimesheets,
 		teamTimesheets,
 		minePagination,
+		mineDrafts,
 		teamPagination,
 		myEmployeeId: myEmployee?.id,
 		isManager,
