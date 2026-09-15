@@ -7,9 +7,12 @@
 	let { open = $bindable() }: { open: boolean } = $props()
 
 	const openPeriod = submitFeedback({
-		onSuccess: () => {
-			open = false
-		}
+		inner:
+			() =>
+			async ({ result, update }) => {
+				await update()
+				if (result.type === 'success') open = false
+			}
 	})
 </script>
 

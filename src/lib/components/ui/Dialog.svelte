@@ -139,6 +139,9 @@
 			]} {PADDINGS[padding]} {scroll ? 'flex max-h-[90vh] flex-col overflow-hidden' : ''}"
 			onclick={(e) => e.stopPropagation()}
 			onkeydown={onKeydown}
+			onfocusout={(e) => {
+				if (open && !e.relatedTarget && document.activeElement === document.body) panelEl?.focus()
+			}}
 			{role}
 			aria-modal="true"
 			aria-label={labelledBy ? undefined : title}

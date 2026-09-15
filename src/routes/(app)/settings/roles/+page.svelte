@@ -178,7 +178,7 @@
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
-						<th class="px-4 py-3"><span class="sr-only">Actions</span></th>
+						<th class="relative px-4 py-3"><span class="sr-only">Actions</span></th>
 					</tr>
 				</thead>
 				<tbody class="divide-y">
