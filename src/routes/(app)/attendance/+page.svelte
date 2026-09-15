@@ -6,6 +6,7 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
@@ -155,7 +156,7 @@
 	const CELL =
 		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
 	const CELL_SEL = CELL + ' appearance-none'
-	const CELL_TIME = CELL + ' w-24'
+	const CELL_TIME = CELL + ' w-28'
 
 	const exportHref = $derived(
 		data.view === 'team'
@@ -654,10 +655,10 @@
 								{/if}
 							</td>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable && d}<input
+								>{#if editable && d}<TimePicker
 										name="timeIn"
 										form="c-{d.id}"
-										type="time"
+										aria-label="Time in"
 										bind:value={
 											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
 											(v) => setEdit(d.id, 'timeIn', v)
@@ -666,10 +667,10 @@
 									/>{:else}{fmtTime(d?.timeIn ?? null)}{/if}</td
 							>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable && d}<input
+								>{#if editable && d}<TimePicker
 										name="timeOut"
 										form="c-{d.id}"
-										type="time"
+										aria-label="Time out"
 										bind:value={
 											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
 											(v) => setEdit(d.id, 'timeOut', v)
@@ -872,10 +873,10 @@
 								{/if}
 							</td>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable}<input
+								>{#if editable}<TimePicker
 										name="timeIn"
 										form="c-{d.id}"
-										type="time"
+										aria-label="Time in"
 										bind:value={
 											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
 											(v) => setEdit(d.id, 'timeIn', v)
@@ -884,10 +885,10 @@
 									/>{:else}{fmtTime(d.timeIn)}{/if}</td
 							>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable}<input
+								>{#if editable}<TimePicker
 										name="timeOut"
 										form="c-{d.id}"
-										type="time"
+										aria-label="Time out"
 										bind:value={
 											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
 											(v) => setEdit(d.id, 'timeOut', v)
