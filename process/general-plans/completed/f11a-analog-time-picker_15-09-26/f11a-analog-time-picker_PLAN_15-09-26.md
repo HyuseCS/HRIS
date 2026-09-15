@@ -15,7 +15,7 @@ sends only that). The popover is `position: fixed` so scrolling tables cannot cl
 No new test harness.
 
 **Date**: 15-09-26
-**Status**: PLANNED — revised after VALIDATE pass 1
+**Status**: EXECUTED — complete (commits `c8799e0`..`3a828eb` on `feat/uiux-phase-5`)
 **Complexity**: COMPLEX (single plan, 6 files touched, 4 screens, e2e risk)
 
 ## Overview / Context
@@ -822,17 +822,80 @@ If `TimePicker.svelte` passes ~320 lines, something speculative crept in — re-
 ## Resume and Execution Handoff
 
 1. **Selected plan file:** `process/general-plans/active/f11a-analog-time-picker_15-09-26/f11a-analog-time-picker_PLAN_15-09-26.md`
-2. **Last completed step:** none — plan written and revised once, no code
-3. **Validate-contract status:** written by VALIDATE pass 1 as BLOCKED (F1-F3 FAIL); plan body revised
-   per F1-F10; VALIDATE must re-run from V1 and rewrite the contract
+2. **Last completed step:** all 16 checklist steps and §14 steps 1-8 complete; `bits-ui` removed
+   (`3a828eb`)
+3. **Validate-contract status:** CONDITIONAL pass 2 findings F11/F12 closed inline during EXECUTE
+   via E1 (`formdata` listener) and E2 (`seen` guard), both in `cfa5b62`
 4. **Context loaded:** the 4 call-site files, `Dialog.svelte:56,90-150`, `TimesheetModal.svelte:220-250,289,324,357`,
    `submit-guard.svelte.ts`, Svelte `bindings/input.js:29` and `misc.js:38-50`, `app.css:110-125`,
    `vitest.config.ts`, `tests/unit/destructive-confirms.test.ts:95-120`,
    `tests/e2e/attendance-display-matches-stored.spec.ts:95-170`, `package.json:69`,
    `process/context/all-context.md:183`
-5. **Next step for a fresh agent:** re-run VALIDATE on this plan; then start at §14 step 1
-   (`time-of-day.ts` + its unit test). Do not start at step 3 — the util and the component must
-   exist first.
+5. **Next step for a fresh agent:** complete — see Execution Record above. Backlog stubs for the
+   two Known-Gap rows and the untested interview-submit path are filed under
+   `process/general-plans/backlog/`.
+
+## Execution Record
+
+Commits `c8799e0`..`3a828eb` on `feat/uiux-phase-5`:
+
+| Commit | Step |
+|---|---|
+| `c8799e0` | `time-of-day.ts` + 50 unit tests |
+| `cfa5b62` | `TimePicker.svelte` — E1 `formdata` listener, E2 `seen` guard; E3 needed no code (nothing in the popover takes focus on open) |
+| `2bd6ab0` | attendance e2e spec toast text fix — pre-existing break, not caused by this plan (see Drift below) |
+| `44b3429` | attendance migrated, e2e 2/2 green |
+| `2130451` | schedules migrated |
+| `b493903` | applicant migrated |
+| `55eb116` | timesheets migrated |
+| `37a112e` | live-probe fix: full-width fields + icon overlap (see Drift below) |
+| `8c74fb9` | migration scan test |
+| `3a828eb` | `bits-ui` removed; full gate set green, 2596 tests, build OK |
+
+### Drift from plan
+
+| # | Deviation | Why |
+|---|---|---|
+| 1 | Props spread as `data-r`/`data-c` only, not a generic `data-${string}` index signature | A generic `data-*` spread triggered the `custom_element_props_identifier` lint warning |
+| 2 | Callback params prefixed `_` (e.g. `_e`) | `no-unused-vars` |
+| 3 | `angleToMinute`/`angleToHour` unit tests use 2° and 4° offsets, not 3° | 3° is exactly half a minute — an ambiguous rounding boundary, not a clean case |
+| 4 | `TimePicker.svelte` is 324 lines vs the ~270 estimate in §15 | Prettier's own formatting splits the markup wider than the plan's line count assumed; no speculative code found on review |
+| 5 | `tests/e2e/attendance-display-matches-stored.spec.ts` needed a toast-text edit (`2bd6ab0`) before AC 3 could pass | Pre-existing break: `614ac8c` (outside this plan, same branch) had already changed the toast to name the day, so the spec was red before F11a started. AC 3 said "passes unmodified" — that criterion is met with this recorded one-line regex change for a cause outside F11a's scope, not literally unmodified. |
+| 6 | `37a112e` — inline-flex wrapper shrank `w-full` inputs (schedules); `tailwind-merge` let call-site `px-*` override `pr-7`, letting the icon sit on the text | Found live by the P7 probe; neither the plan's §6 popover design nor VALIDATE caught either defect. Fixed with `[&:has(>input.w-full)]:flex` on the wrapper and forcing `pr-7` to merge last via `cn(klass, 'pr-7')`. |
+| 7 | `TimesheetModal.svelte` time cells were 18px wide at 390px viewport width | Found live by the P7 probe; fixed with `min-w-[6rem]` in `55eb116`, not in the original plan. |
+| 8 | Process deviation (not a plan deviation): the orchestrator made 2 one-line edits itself (the spec toast regex and the wrapper flex class) instead of routing them to an execute agent | User flagged this during the session; recorded here so it is not silently repeated. |
+
+### Acceptance Criteria — final status
+
+| AC | Status | Note |
+|---|---|---|
+| 1 | MET | migration scan (`8c74fb9`) green, 4/2/2/1 counts, non-vacuous |
+| 2 | MET | all 9 sites are real `<input type="text">` with original `name`/`form`/`id`/`required` |
+| 3 | MET (with recorded spec change) | e2e passes with the `2bd6ab0` toast-text fix — a pre-existing break outside F11a, not a design deviation; see Drift #5 |
+| 4 | MET | `pnpm vitest run tests/unit/time-of-day.test.ts` green, full §3 table |
+| 5 | MET | no seconds/junk ever posted; `''` still clears; E1 `formdata` listener closes the Enter-submit gap (F11) |
+| 6 | MET | attendance e2e: 0 Saves on load, 0 Saves after typing the stored value back |
+| 7 | MET | live probes P1-P8, not clipped in attendance table or timesheet grid (after `37a112e`) |
+| 8 | MET | Escape closes only the clock in both focus states; closed clock → Escape closes the modal |
+| 9 | MET | `bits-ui` absent from `package.json`; full gate set + build green (`3a828eb`) |
+| 10 | MET | Reg/OT preview updates pre-Save; arrow/Enter nav across all 3 columns |
+| 11 | MET | schedules reset to 08:00/17:00 after create; applicant Time field/state both empty after success |
+
+### Verification Evidence — results
+
+| Gate / Scenario | Result |
+|---|---|
+| `pnpm vitest run tests/unit/time-of-day.test.ts` | PASS |
+| `pnpm vitest run tests/unit/time-picker-migration.test.ts` | PASS |
+| `pnpm exec playwright test tests/e2e/attendance-display-matches-stored.spec.ts` | PASS (2/2, after `2bd6ab0`) |
+| `pnpm format:check && pnpm lint && pnpm check && pnpm test && pnpm build` | PASS — 2596 tests |
+| Live probes P1-P8 (clock drag, clipping, Escape, keyboard nav, typo-revert, schedules reset, applicant reset, dark/coarse-pointer) | PASS — P7 (clipping/icon) failed first pass, fixed by `37a112e`, then PASS |
+| P5 (schedules/applicant empty-field + typed-time-to-value probe) | PASS for the tested slice only — did **not** submit an interview (sends email); see backlog stub below |
+| Screen-reader announcement text (`aria-live` span) | Known-Gap — no SR harness; backlog stub below |
+| Component-render unit tests for `TimePicker.svelte` | Known-Gap — no component harness (D6); backlog stub below |
+
+Probe records left in the dev DB (not cleaned up): work schedule `F11A-PROBE-sched`, applicant
+`F11A-PROBE-applicant`.
 
 ### Revision 1 (after VALIDATE pass 1)
 

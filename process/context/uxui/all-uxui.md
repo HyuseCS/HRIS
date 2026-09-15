@@ -179,6 +179,21 @@ rejection in **green**. Owner ruling owed —
   effect. The control that actually caught the real bug (F15, PR #13) asserted the state
   immediately BEFORE the click too, so a no-op click shows up as "nothing changed" instead of
   reading as a pass. Assert before and after, not just after.
+- **A control that mirrors an `<input>`'s bound `value` into local `$state` text is not what gets
+  posted on Enter.** `TimePicker.svelte` (`src/lib/components/ui/`) writes its bound `value` on
+  every `input` event, but a form submit reads the input's live DOM text, and Enter never fires a
+  `blur` to normalize that text first (`.fill()` in Playwright doesn't blur either — same gap).
+  Fix: add a `formdata` listener on `input.form` (`e.formData.set(name, value)`) — SvelteKit's
+  `enhance` builds its `FormData` from `new FormData(form, submitter)`, which fires `formdata`, so
+  this always runs before the network call. Native `type="time"`/`type="date"` never had this gap
+  because the browser owns the value; any custom text-based replacement for one does.
+- **An `inline-flex` wrapper around an `<input class="w-full">` silently shrinks the input**, because
+  flex items default to `min-width: auto` / content-based sizing inside an inline-flex row. If a
+  shared control's wrapper needs to support a `w-full` call site, make the wrapper itself
+  `flex`/block when it holds one (e.g. `[&:has(>input.w-full)]:flex`), not just `inline-flex`.
+- **`tailwind-merge`/`cn()` lets a later call-site class override an earlier structural one** (e.g.
+  call-site `px-3` silently dropping a component's own `pr-7` icon padding). If a class must always
+  win, merge it *after* the call-site class inside `cn()`, not before.
 - **Deleting the `enhance` import breaks `use:enhance={someGuard.enhance}` silently.** The
   directive name `use:enhance` resolves to the *imported* SvelteKit action; `someGuard` (e.g. a
   `submitFeedback()` guard) is only the argument passed to it. If the import is removed but a bare

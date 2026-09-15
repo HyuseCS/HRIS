@@ -134,3 +134,18 @@ idempotent: a leftover draft for the same week leaves `Aggregate week` disabled,
 earlier at line 89. Clear the spec's own draft before a re-run.
 
 Recorded 2026-09-11.
+
+## F11a follow-ups (analog TimePicker)
+
+Four stubs filed as separate NOTE files, all recorded 2026-09-15, source:
+`process/general-plans/completed/f11a-analog-time-picker_15-09-26/f11a-analog-time-picker_PLAN_15-09-26.md` §13:
+
+- `timepicker-screen-reader-verification_NOTE_15-09-26.md` — no SR harness to verify the popover's
+  `aria-live` announcement text (Low)
+- `component-render-test-harness_NOTE_15-09-26.md` — `@testing-library/svelte` installed but unused;
+  vitest is `environment: node` (Medium)
+- `applicant-interview-time-no-timezone_NOTE_15-09-26.md` — recruitment applicant server builds
+  `new Date()` with no `+08:00` suffix, pre-existing (High-ish, deploy-timezone dependent)
+- `timepicker-interview-submit-path-untested_NOTE_15-09-26.md` — the P5 probe never submitted a real
+  interview (sends email), so the typed-time-to-stored-value round trip is unproven for that one call
+  site (Low)
