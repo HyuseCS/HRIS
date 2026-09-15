@@ -31,4 +31,7 @@ Sites (`grep -rln "<legend" src`):
 
 Keep `<fieldset>`/`<legend>` for accessibility, but render the legend as an in-card heading (for
 example `float-left w-full` on the legend, or `sr-only` legend plus a visible heading) so it matches the
-other card sections. Owner likes the look, so confirm before changing. Belongs with GitHub #20.
+other card sections.
+
+**DONE 15-09-26** in `bbe3768`: owner asked for the titles inside the container. Legend `float-left mb-4
+w-full font-semibold`, fieldset `rounded-lg p-6 [&>legend+*]:clear-left`, matching `employees/[id]` cards.
