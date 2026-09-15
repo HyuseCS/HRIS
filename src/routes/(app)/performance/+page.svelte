@@ -32,7 +32,7 @@
 	{#if data.isAdmin && data.cycles.length}
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Review Cycles</h2>
-			<div class="overflow-x-auto rounded-lg border">
+			<div class="overflow-x-auto rounded-lg border bg-card">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -78,7 +78,7 @@
 				This is not the same as a review that was never created.
 			</p>
 			{#if data.stalledSignoffs.length}
-				<div class="overflow-x-auto rounded-lg border">
+				<div class="overflow-x-auto rounded-lg border bg-card">
 					<table class="w-full text-sm">
 						<thead class="border-b bg-muted/50">
 							<tr>
@@ -106,7 +106,7 @@
 					</table>
 				</div>
 			{:else}
-				<div class="rounded-lg border">
+				<div class="rounded-lg border bg-card">
 					<EmptyState
 						title="No sign-off is stalled"
 						description="Every review under way has someone who can sign it next."
@@ -119,7 +119,7 @@
 	<!-- My Reviews -->
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold">My Reviews</h2>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -158,7 +158,7 @@
 	{#if data.reviewsToGive.length}
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Reviews to Complete</h2>
-			<div class="overflow-x-auto rounded-lg border">
+			<div class="overflow-x-auto rounded-lg border bg-card">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
