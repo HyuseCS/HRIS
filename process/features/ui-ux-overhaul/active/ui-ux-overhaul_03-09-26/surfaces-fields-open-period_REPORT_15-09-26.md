@@ -272,3 +272,11 @@ None (no src edits). New files: this report and `surfaces-fields-open-period_scr
 
 ### Dependency Changes
 None.
+
+## Addendum 15-09-26: post-report checks
+
+- D1 (focus to body after failed submit), D2 (roles sideways scroll at 390px), D3 (applyAction reset_focus undid focus return) fixed in `ba28e7c`, verified live on 5173 with negative controls.
+- `pnpm check` on `ba28e7c`: 0 errors, 1 old CalculatorWindow warning.
+- AC-S5.2: cross-month e2e 4/4 green. NC-T5.3a went red (2 failed at dialog `toBeVisible`), NC-T5.3b went red (1 failed at Name `toBeFocused`). Both files restored byte-identical, final run 4/4.
+- 11.7 impeccable audit: detector 0 findings on 40 changed files (planted side-tab flagged as a control). Non-blocking items in `backlog/surfaces-fields-open-period-followups_NOTE_15-09-26.md` (`6c6d76e`). D4 moved there.
+- Still owed: owner click-through of the seven pages in both themes.
