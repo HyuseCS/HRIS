@@ -31,7 +31,7 @@
 	{/if}
 
 	<form method="POST" action="?/apply" use:enhance={apply.enhance} class="space-y-6">
-		<fieldset class="rounded-md border p-4 space-y-4">
+		<fieldset class="rounded-md border bg-card p-4 space-y-4">
 			<legend class="px-1 text-sm font-semibold">Personal Information</legend>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div>
@@ -84,7 +84,7 @@
 			</div>
 		</fieldset>
 
-		<fieldset class="rounded-md border p-4 space-y-4">
+		<fieldset class="rounded-md border bg-card p-4 space-y-4">
 			<legend class="px-1 text-sm font-semibold">Application Details</legend>
 			<div class="space-y-4">
 				<div>

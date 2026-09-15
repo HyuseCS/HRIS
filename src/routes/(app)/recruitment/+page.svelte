@@ -109,7 +109,7 @@
 					if (result.type === 'success') showCreate = false
 				}
 			}}
-			class="rounded-lg border p-4 space-y-3"
+			class="rounded-lg border bg-card p-4 space-y-3"
 		>
 			<h2 class="font-semibold">Create Job Posting</h2>
 			<div class="grid gap-3 sm:grid-cols-2">
@@ -162,7 +162,7 @@
 		</form>
 	{/if}
 
-	<div class="overflow-x-auto rounded-lg border">
+	<div class="overflow-x-auto rounded-lg border bg-card">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>

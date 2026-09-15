@@ -204,7 +204,9 @@
 		{:else}
 			<ul class="space-y-2">
 				{#each req.documents as doc (doc.id)}
-					<li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+					<li
+						class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3"
+					>
 						<div class="min-w-0 flex-1">
 							<a
 								href="/api/v1/requests/{req.id}/documents/{doc.id}"
@@ -344,7 +346,7 @@
 		<!-- Origin: the employee's own submission, so "HR pending" doesn't read as if
 		     nothing has happened yet. -->
 		<ol class="space-y-2">
-			<li class="flex items-start gap-3 rounded-lg border p-3">
+			<li class="flex items-start gap-3 rounded-lg border bg-card p-3">
 				<div
 					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-xs font-medium text-green-700 dark:text-green-400"
 				>
@@ -374,7 +376,7 @@
 					<li
 						class="flex items-start gap-3 rounded-lg border p-3 {active
 							? 'border-primary/50 bg-primary/5'
-							: ''}"
+							: 'bg-card'}"
 					>
 						<div
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium

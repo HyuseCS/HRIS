@@ -83,7 +83,7 @@
 			method="POST"
 			action="?/open"
 			use:enhance={open.enhance}
-			class="space-y-4 rounded-lg border p-6"
+			class="space-y-4 rounded-lg border bg-card p-6"
 		>
 			<h2 class="font-semibold">Open a new inquiry</h2>
 			<div class="grid gap-4 sm:grid-cols-2">
@@ -186,7 +186,7 @@
 
 	<!-- Thread list -->
 	{#if data.complaints.length}
-		<div class="overflow-hidden rounded-md border">
+		<div class="overflow-hidden rounded-md border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
