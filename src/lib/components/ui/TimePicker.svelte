@@ -187,7 +187,7 @@
 	}
 </script>
 
-<span bind:this={wrapper} class="relative inline-flex">
+<span bind:this={wrapper} class="relative inline-flex [&:has(>input.w-full)]:flex">
 	<input
 		bind:this={input}
 		type="text"
@@ -206,7 +206,7 @@
 		oninput={() => write(normalizeTime(text))}
 		onblur={() => (text = normalizeTime(text) ?? value)}
 		onkeydown={(e) => onkeydown?.(e)}
-		class={cn('pr-7', klass)}
+		class={cn(klass, 'pr-7')}
 	/>
 	<button
 		type="button"
