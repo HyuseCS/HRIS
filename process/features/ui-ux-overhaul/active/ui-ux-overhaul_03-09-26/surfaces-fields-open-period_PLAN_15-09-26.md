@@ -1069,7 +1069,7 @@ What this coverage does NOT prove:
    `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/surfaces-fields-open-period_PLAN_15-09-26.md`
 2. **Last completed phase or step:** PLAN written. No section started. Branch `feat/uiux-phase-5` at
    `825d3ff`, clean tree.
-3. **Validate-contract status:** pending — VALIDATE has not run.
+3. **Validate-contract status:** CONDITIONAL (outer-pvl, 15-09-26) — see `## Validate Contract`; E1-E8 binding.
 4. **Supporting context files loaded:** `process/context/all-context.md` (router); the brief and the four backlog notes named at the top;
    `process/context/tests/all-tests.md`; `CLAUDE.md`; `phase-05-remediation-A-feedback-statutory_PLAN_11-09-26.md`
    (shape); `phase-03-design-system_PLAN_03-09-26.md` §8.3–8.4 (measurement and modal methods); the
@@ -1088,7 +1088,129 @@ no mid-run talk needed because file ownership is exclusive. Model: sonnet for th
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: CONDITIONAL
+Date: 15-09-26
+date: 2026-09-15
+generated-by: outer-pvl
+
+Parallel strategy: parallel-subagents
+Rationale: 2/7 signals (S7 5+ files; nine disjoint edit lanes). File ownership in the Scope table is
+exclusive (checked: no file in two sections). Two read-only cross-lane test dependencies exist (E6).
+Model: sonnet for S2-S4 and S6-S10, opus for S5 and S1.
+
+Test gates (C3 5-column table):
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-S1.2 | light and dark `--input` edge >= 3:1 on card and background; text >= 4.5:1 on card, background, muted, muted/50; `.input` fills `bg-background` | Fully-Automated | `pnpm vitest run tests/unit/theme-token-contrast.test.ts` + NC-S1a-d (parser must accept decimals, E5) | B |
+| AC-S1.3 | only the named token lines change | Fully-Automated | `git diff -- src/app.css` line audit | B |
+| AC-S1.4, AC-S2.2, AC-S2.3, AC-S3.1-3, AC-S4.1, AC-S5.7, AC-S6.1-2, AC-S7.1-2, AC-S8.1, AC-S9.1, AC-S10.1, AC-S11.2 | built CSS resolves to the measured pairs; fills, list shapes and carve-outs compute as declared | Hybrid | 11.3 computed-style script on `pnpm build` + `pnpm preview --port 4173`, both themes, NC-11.3 + selector control (precondition: owner go-ahead for the dev server to go down) | B |
+| AC-S2.1 | shared Table has no ring | Fully-Automated | `grep -n "ring-black\|ring-white" src/lib/components/ui/Table.svelte` prints nothing | B |
+| AC-S5.1 | `?/open` returns `{ action: 'open', saved }`; failures tagged `open`; release/void failure has no `action` key | Fully-Automated | `pnpm vitest run tests/unit/payroll-period-feedback.test.ts` + NC-T5.1a-c | B |
+| AC-S5.1 | one success surface for `open`; inline form gone from page; page block excludes `open` | Fully-Automated | `pnpm vitest run tests/unit/success-surfaces.test.ts` + NC-T5.2a-d | B |
+| AC-S5.1 | release/void confirms stay in the periods page | Fully-Automated | `pnpm vitest run tests/unit/destructive-confirms.test.ts` (baseline 15-09-26: 3 files, 58 tests green) | A |
+| AC-S5.2 | cross-month rename still posts `start`/`end` from the modal; Escape closes and focus returns | Hybrid | `CI=1 pnpm exec dotenv -e .env.dev -- playwright test tests/e2e/period-picker-cross-month.spec.ts` + NC-T5.3a-b | B |
+| AC-S5.3-6, AC-S11.5 | required-field block, 409 toast with values kept, success toast + close, Escape/Cancel focus return, marker cleanup | Agent-Probe | 11.5 steps 1-5 with psql read-back, plus E4 select-Escape step | B |
+| AC-S11.3, AC-S11.4 | every panel reads as a surface; field edges findable; dialog fits on phone | Agent-Probe | 11.4 screenshots + owner click pass + 11.7 impeccable audit | B |
+| AC-S11.1, AC-P3 | full CI set green on the combined tree | Fully-Automated | `pnpm format:check` -> `pnpm lint` -> `pnpm check` -> `pnpm test` | B |
+| AC-P4 | no explanatory comments added | Fully-Automated | `git diff -U0 -- src tests \| grep -E '^\+\s*(//\|/\*\|<!--)'` prints only `// ponytail:` | B |
+| R2 residual | no committed gate stops a future bare box | Known-Gap (named residual, not a strategy) | none; backlog stub `surface-recipe-source-gate_NOTE_15-09-26.md` | D |
+
+Failing stubs (Fully-Automated rows):
+
+```
+test("should keep the light --input edge at 3:1 or more against card and background", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: theme-token-contrast light input edge")
+})
+test("should keep the dark --input edge at 3:1 or more against card and background", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: theme-token-contrast dark input edge")
+})
+test("should keep muted-foreground at 4.5:1 or more on muted in both themes", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: theme-token-contrast muted text")
+})
+test("should parse a decimal token value such as 0 0% 98.5%", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: theme-token-contrast decimal parse")
+})
+test("should fill .input with bg-background and not bg-input", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: theme-token-contrast .input fill")
+})
+test("should return { action: 'open', saved: 'Period opened.' } on success", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: periods open saved string")
+})
+test("should tag a 409 from openPeriod with action 'open'", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: periods open failure tag")
+})
+test("should return exactly { action: 'open', error: 'Invalid period details' } for an empty name", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: periods open zod failure")
+})
+test("should keep the release failure payload free of an action key", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: release failure shape unchanged")
+})
+test("payroll/periods open (modal) reports as declared (toast)", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: success-surfaces modal row")
+})
+test("payroll/periods open (page) reports as declared (toast)", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub: success-surfaces page row")
+})
+```
+
+Legacy line form:
+- tokens: Fully-automated: `pnpm vitest run tests/unit/theme-token-contrast.test.ts` | hybrid: 11.3 built-bundle measurement + `pnpm preview --port 4173` | agent-probe: G0 owner pick | known-gap: none
+- shared table + sweep: Fully-automated: AC-S2.1 grep | hybrid: 11.1 site scan re-run + 11.3 | agent-probe: 11.4 screenshots, 11.7 audit | known-gap: committed bare-box gate (backlog D)
+- open period: Fully-automated: `pnpm vitest run tests/unit/payroll-period-feedback.test.ts tests/unit/success-surfaces.test.ts tests/unit/destructive-confirms.test.ts` | hybrid: cross-month e2e | agent-probe: 11.5 live probe | known-gap: none
+
+Dimension findings:
+- Infra fit: PASS — dev-server rules (no `pnpm check`/build/e2e without the owner's go-ahead) are in 11.1/11.3/11.6; Tailwind is 3.4.19 so `has-[nav]:` is generated; Pagination's root is `<nav>` (`Pagination.svelte:29`); theme key `theme` matches `app.html:11`; probe SQL names match `@@map("payroll_periods")` and camelCase columns.
+- Test coverage: CONCERN — the S3 step 4 e2e grep cannot fail (edits are in `src/`, so before and after always match, and real e2e locators use dot form such as `div.rounded-lg.border`, `multi-role-sod.spec.ts:110`); S6/S7 lane gates read `success-surfaces.test.ts`/`destructive-confirms.test.ts` while S5 edits that test and the periods page; the token parser must handle `98.5%`. Everything else can fail: T5.1 asserts call args and exact payloads, T5.2 needles are discriminating, NC-S1c goes red even though `html.dark {` (`app.css:87`) also contains `.dark {`.
+- Breaking changes: PASS — `?/open` payload gains `action`/`saved`; only reader of `form` on the page is `+page.svelte:43,48`; release/void/import/generate/lock keep `{ error }`; SvelteKit ActionData makes `form.action` optional on every branch; no API route, schema, auth or money logic changes; e2e scan found no class/color locator on a swept page (hits are `/requests/approvals`, the settings index and a `border-l-4` card, none touched).
+- Security surface: PASS — `requirePayrollManage` stays first in `open`; no trust boundary, secret or RBAC change; the probe deletes by exact marker name only. Not a high-risk class; no evidence pack required.
+- S1 tokens (math): CONCERN — independently recomputed with 8-bit rounding: set B and the dark set match the plan to the hundredth on every listed pair; badges (green 6.08/5.60, red 5.17/4.71, yellow 5.86/5.40, blue 5.47/5.03 on B card/page), `badge-gray` fill (1.36 vs today 1.37), `--primary` text on B page (4.93) all hold. Unlisted pairs: set B puts `--accent` 94% EQUAL to `--background` 94% (1.00:1), so every `hover:bg-accent` on the page itself (for example `BackButton`, outline buttons outside cards) shows no hover fill — the plan's R3 says this only happens in C. Set A puts `--secondary` 96% equal to `--background` 96% (1.00:1). Dark `--muted-foreground` 56% on `--accent` 16% is 4.4985:1 (under 4.5; today 3.94) — no static `bg-accent` + muted-text site found, hover only. Today-table baseline numbers differ from 8-bit math by up to 0.04 (e.g. dark fg on card 14.95, not 14.91); the candidate tables are exact.
+- S1 `border-input`/`bg-input` users: PASS — `bg-input` appears only in `.input` (`app.css:187`); `hsl(var(--input))` only in `tailwind.config.ts:25`; no `ring-input`/`divide-input`. Checkboxes with `rounded border-input` (e.g. `attendance:458`, `recruitment:176`) have no border width, so no visible change. `FileInput.svelte:122,154`, `ReviewFormRender.svelte:76`, `reports/[type]:192` get a 3:1 gray edge on a `bg-background` fill; 11.7 looks at them.
+- S2 shared Table: PASS — anchors `Table.svelte:48,60,111` and `TableSkeleton.svelte:4,10` match; `flush` contract is fixed in the plan.
+- S3 employees: CONCERN — anchors all match; the e2e grep in step 4 is vacuous (see Test coverage).
+- S4 payroll: CONCERN — misses `payroll/[id]/+page.svelte:399`, the approval-chain step `<li>` whose inactive branch is `''` (bare box on the page, under `<div class="space-y-3">` at `:377`).
+- S5 open period: CONCERN — server, toFail, 409 and unit tests are sound (exact duplicate range hits `error(409, ...)` in `periods.ts` before the overlap guard; failure `update()` does not reset a form and the Dialog stays mounted, so typed values stay). Defect: page step 6 puts `<OpenPeriodDialog>` after `</section>` at `:223`, INSIDE `<div class="space-y-6">` (`:36`-`:224`). The Dialog's fixed backdrop (`Dialog.svelte:128-129`) is then a `space-y-6` child and gets `margin-top: 1.5rem`, which with `inset-0` leaves a 24px strip at the top with no dim, no blur and no click-to-close. Precedent puts dialogs outside the root: `timesheets/+page.svelte:261-263`, `settings/roles/+page.svelte:292`. Escape inside an open native `<select>` (`PeriodPicker.svelte:164,172,182`) cannot be proven from source.
+- S6 settings: PASS — anchors match; roles Dialog already outside the root.
+- S7 attendance/time: PASS — anchors match; carve-out `:327` confirmed.
+- S8 leave/benefits/performance: PASS — anchors match.
+- S9 recruitment/requests/complaints: CONCERN — misses `requests/[id]/+page.svelte:375`, the approval-chain step `<li>` with an inactive `''` branch. It is in the SAME `<ol>` as `:347`, which the plan fills, so the list ships half filled. `requests/[id]:173` leave tiles use `bg-background` inside a `bg-card` section (`:163`) and turn into darker wells on B; look item only.
+- S10 reports: PASS — anchors match; `reports/[type]:219` empty box (`bg-muted/30`) stays visually near the page next to a filled results table; look item for 11.4.
+- S11 verification: PASS — measurement, negative controls and probe cleanup are concrete; the probe's `writeAuditLog` CREATE row remains after cleanup (E7).
+- Plan structure: PASS — `validate-plan-artifact.mjs` 0 failures, 0 warnings; site tally 46+4+5+1+1+1 = 58 checks out; every "Now" line anchor re-verified on disk.
+
+Execute-agent instructions (binding):
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | S5 page step 6: render `<OpenPeriodDialog bind:open={showOpen} />` AFTER the root `</div>` (`+page.svelte:224`), not after `</section>`. Add the same to the 11.4 dialog screenshot check: the backdrop must cover the top 24px. | S5 entry |
+| E2 | S9: in `requests/[id]/+page.svelte:375` change the inactive branch `''` to `'bg-card'`. S4: same change at `payroll/[id]/+page.svelte:399`. Add both to the 11.1 scan expectations. | S4, S9 entry |
+| E3 | G0: tell the owner, in the Q-G0a text, that set B makes `--accent` equal the page, so hover on page-level ghost/outline buttons shows no fill, and set A makes `--secondary` equal the page. Correct R3 in the report. Do not change `--accent`/`--secondary` (out of scope); record the owner's answer. 11.7 looks at `BackButton` hover on the page. | G0 |
+| E4 | 11.5: add a step — in the dialog, open the Period `<select>` popup, press Escape once: record whether the popup closes and the dialog stays open. If the dialog closes too, it is a non-blocking backlog note (same Dialog as `NewTimesheetDialog`), not an S5 edit. Use `exact: true` for any locator on the submit button named `Open`. | 11.5 |
+| E5 | S1 token test: parse values with `(\d+(?:\.\d+)?)%`, locate blocks with `:root {` and a line-start `.dark {` match (not `html.dark {`). Add one more negative control: set light `--card` to `0 0% 98.5%` and confirm the parsed number is 98.5. | S1 |
+| E6 | S6 and S7 run `success-surfaces.test.ts` / `destructive-confirms.test.ts` only after S5 has returned; a red from the S5 rows or the periods page during S5's edit is not a lane failure. | S6, S7 gates |
+| E7 | S3 step 4: replace the grep with `grep -rnE "\.(rounded(-md\|-lg)?\|border\|bg-card\|bg-muted)\b\|overflow-x-auto" tests/e2e` and check each hit's page is not in S3-S10. Known hits today: `recruitment.spec.ts:70`, `backup-settings.spec.ts:82`, `multi-role-sod.spec.ts:110,123` — none on a swept page. | S3 step 4 |
+| E8 | 11.5 cleanup: the audit log CREATE row for the marker stays. Record its id in the report; do not delete audit rows. | 11.5 step 5 |
+
+Open gaps:
+- no committed source gate for bare boxes: known-gap, backlog stub `surface-recipe-source-gate_NOTE_15-09-26.md` (resolution D)
+- dark `--muted-foreground` on `--accent` 4.4985:1, hover-only: non-blocking, backlog note in S11 if 11.7 finds a static use
+- pre-existing: `text-red-400` on `bg-destructive/10` error banner is 2.28:1 today, 2.10:1 on set B page (status colour, out of scope): backlog note in S11
+
+What this coverage does NOT prove:
+- `theme-token-contrast.test.ts`: the numbers in `src/app.css` only; not that the built CSS applies them, not `--accent`/`--secondary`/`--popover` pairs, not hover or focus states.
+- `payroll-period-feedback.test.ts`: mocked service; proves payload shape, not that a period reaches Postgres or that a real overlap answers 400 vs 409.
+- `success-surfaces.test.ts`: source text; not that the toast renders, is announced, or appears once.
+- `destructive-confirms.test.ts`: confirm messages exist in source; not that confirm dialogs open.
+- cross-month e2e: no submit; not success/failure behaviour, not phone width, not Escape inside an open `<select>`.
+- 11.3 measurement: named elements on named pages; not every bordered site, not hover fills, not the approval-chain lists unless E2 adds them.
+- 11.5 probe: one run by hand, admin role only, one browser.
+- AC-S2.1 grep: the ring classes are gone from one file; not how the border looks.
+- CI set: types, lint, format and unit tests; nothing visual.
+
+Gate: CONDITIONAL (6 concerns, 0 FAILs; fixes carried as E1-E8, first pass)
+Accepted by: orchestrator under the owner's standing instruction (15-09-26, "if validate is good, you can proceed to execute mode"), E1-E8 carried as binding execute instructions instead of a supplement cycle; E1, E2 and E3 spot-checked in source first. First-pass CONDITIONAL; concerns: (1) S5 dialog inside `space-y-6`, (2) missed approval-chain boxes `requests/[id]:375` and `payroll/[id]:399`, (3) set B `--accent` = page and set A `--secondary` = page not disclosed, (4) vacuous S3 e2e grep, (5) S6/S7 gates read files S5 edits, (6) token parser decimal and `html.dark` traps. Needs a PVL supplement cycle or explicit owner acceptance before EXECUTE.
+
+Goal block: BRANCH B — `ui-ux-overhaul-umbrella_PLAN_03-09-26.md` carries `## Stable Program Goal` (line 79). No `## Autonomous Goal Block` is written to this plan. Reference for latest state: `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/ui-ux-overhaul-umbrella_PLAN_03-09-26.md`.
 
 ## Open Questions
 
