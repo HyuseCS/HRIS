@@ -6,6 +6,7 @@
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -56,13 +57,17 @@
 		})
 
 	let feedbackOpen = $state<string | null>(null)
+	let ivTime = $state('')
 
 	// #108: double-submit guards. Each of these actions is state-mutating and a double-click
 	// would duplicate an interview/offer, or convert the applicant to an employee twice.
 	// Only one feedback form is rendered at a time (feedbackOpen is a single id), so a single
 	// guard is safe here; the same is true for the offer forms (one offer per applicant).
 	const recordFeedback = createSubmitGuard()
-	const scheduleInterview = createSubmitGuard()
+	const scheduleInterview = createSubmitGuard(() => async ({ result, update }) => {
+		await update()
+		if (result.type === 'success') ivTime = ''
+	})
 	const acceptOffer = createSubmitGuard()
 	const declineOffer = createSubmitGuard()
 	const deleteOffer = createSubmitGuard()
@@ -230,10 +235,10 @@
 						</div>
 						<div class="grid gap-1">
 							<label for="iv-time" class="text-xs font-medium text-muted-foreground">Time</label>
-							<input
+							<TimePicker
 								id="iv-time"
 								name="scheduledTime"
-								type="time"
+								bind:value={ivTime}
 								required
 								class="h-9 rounded-md border border-input bg-background px-2 text-sm"
 							/>
