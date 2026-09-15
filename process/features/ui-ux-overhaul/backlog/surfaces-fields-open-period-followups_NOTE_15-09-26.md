@@ -28,3 +28,7 @@ detector flagged a planted side-tab border in a negative control, so it is live)
 5. **R2 residual: no source gate for bare boxes.** Nothing stops a new `rounded-lg border p-4` without
    `bg-card`. A lint or unit scan over class strings (with the carve-outs as an allow-list) would.
    Remaining bare sites are tracked on GitHub #20.
+6. **Owner saw it 15-09-26 (P3 walk): `/timesheets` "Aggregate from time logs" and "My Timesheets" do not
+   match.** `AggregatePanel.svelte:83` is `rounded-lg border bg-muted/20` (dark: `rgba(36,36,36,.2)` over
+   bg `rgb(15,15,15)`); the table box is `border bg-card` (`rgb(28,28,28)`). Already on the #20 remaining
+   list. Fix: `bg-muted/20` -> `bg-card`. Screen (dark): `timesheets-aggregate-vs-table-bg_15-09-26.png`.
