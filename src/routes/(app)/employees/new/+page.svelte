@@ -78,8 +78,8 @@
 	{#key data.organizationId}
 		<form method="POST" action="?/create" use:enhance={create.enhance} class="space-y-8">
 			<!-- Personal Information -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Personal Information</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Personal Information</legend>
 				<div class="grid gap-4 sm:grid-cols-3">
 					<div>
 						<label for="firstName" class="text-sm font-medium"
@@ -126,8 +126,8 @@
 			</fieldset>
 
 			<!-- Contact Information -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Contact Information</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Contact Information</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="contactPhone" class="text-sm font-medium">Phone</label>
@@ -152,8 +152,8 @@
 			</fieldset>
 
 			<!-- Account -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Account</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Account</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="email" class="text-sm font-medium"
@@ -221,8 +221,8 @@
 			</fieldset>
 
 			<!-- Employment -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Employment Details</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Employment Details</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="departmentId" class="text-sm font-medium"
@@ -390,8 +390,8 @@
 			</fieldset>
 
 			<!-- Government IDs -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Government IDs</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Government IDs</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="sssNumber" class="text-sm font-medium">SSS Number</label>
@@ -453,8 +453,8 @@
 			</fieldset>
 
 			<!-- Emergency Contact -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Emergency Contact</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Emergency Contact</legend>
 				<div class="grid gap-4 sm:grid-cols-3">
 					<div>
 						<label for="emergencyContactName" class="text-sm font-medium">Contact Name</label>
@@ -488,8 +488,8 @@
 			</fieldset>
 
 			<!-- Bank / GCash Details -->
-			<fieldset class="rounded-md border bg-card p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Bank / GCash Details</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Bank / GCash Details</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="bankName" class="text-sm font-medium">Bank</label>
