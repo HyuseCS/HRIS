@@ -58,4 +58,11 @@ describe('F11a — every native type="time" input is migrated to TimePicker', ()
 			expect(matches.length).toBe(count)
 		})
 	}
+
+	it('package.json has no bits-ui dependency', () => {
+		const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf8'))
+
+		expect(Object.keys(pkg.dependencies ?? {})).not.toContain('bits-ui')
+		expect(Object.keys(pkg.devDependencies ?? {})).not.toContain('bits-ui')
+	})
 })
