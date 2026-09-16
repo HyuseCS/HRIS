@@ -666,6 +666,8 @@
 		{required}
 		{disabled}
 		{placeholder}
+		{min}
+		{max}
 		aria-label={ariaLabel}
 		aria-invalid={internalInvalid || externalInvalid ? 'true' : undefined}
 		aria-describedby={ariaDescribedby}
