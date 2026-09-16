@@ -55,7 +55,7 @@
 								<input type="hidden" name="departmentId" value={row.departmentId} />
 								<select
 									name="approverId"
-									class="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+									class="h-9 w-full max-w-md rounded-md border border-input bg-background px-2 text-sm"
 								>
 									<option value="">— HR (fallback) —</option>
 									{#each data.employees as e (e.id)}

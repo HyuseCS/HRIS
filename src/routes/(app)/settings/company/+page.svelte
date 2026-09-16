@@ -59,72 +59,74 @@
 		method="POST"
 		action="?/save"
 		use:enhance={save.enhance}
-		class="space-y-4 rounded-lg border bg-card p-6"
+		class="rounded-lg border bg-card p-6"
 	>
-		<div class="grid gap-1.5">
-			<label for="name" class="text-sm font-medium">Company name</label>
-			<input
-				id="name"
-				name="name"
-				type="text"
-				bind:value={nameValue}
-				required
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-			/>
-		</div>
-		<div class="grid gap-1.5">
-			<label for="address" class="text-sm font-medium"
-				>Address <span class="text-muted-foreground">(optional)</span></label
-			>
-			<textarea
-				id="address"
-				name="address"
-				rows="2"
-				bind:value={addressValue}
-				class="rounded-md border border-input bg-background px-3 py-2 text-sm"
-			></textarea>
-		</div>
-		<div class="grid gap-1.5">
-			<label for="logoUrl" class="text-sm font-medium"
-				>Logo URL <span class="text-muted-foreground">(optional)</span></label
-			>
-			<input
-				id="logoUrl"
-				name="logoUrl"
-				type="url"
-				bind:value={logoUrlValue}
-				placeholder="https://…"
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-			/>
-			{#if logoUrlValue}
-				<img
-					src={logoUrlValue}
-					alt="Company logo preview"
-					class="mt-2 h-12 w-auto rounded border object-contain"
+		<div class="max-w-md space-y-4">
+			<div class="grid gap-1.5">
+				<label for="name" class="text-sm font-medium">Company name</label>
+				<input
+					id="name"
+					name="name"
+					type="text"
+					bind:value={nameValue}
+					required
+					class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 				/>
-			{/if}
-		</div>
-		<div class="grid gap-1.5">
-			<label for="discordInviteUrl" class="text-sm font-medium"
-				>Discord invite URL <span class="text-muted-foreground">(optional)</span></label
+			</div>
+			<div class="grid gap-1.5">
+				<label for="address" class="text-sm font-medium"
+					>Address <span class="text-muted-foreground">(optional)</span></label
+				>
+				<textarea
+					id="address"
+					name="address"
+					rows="2"
+					bind:value={addressValue}
+					class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+				></textarea>
+			</div>
+			<div class="grid gap-1.5">
+				<label for="logoUrl" class="text-sm font-medium"
+					>Logo URL <span class="text-muted-foreground">(optional)</span></label
+				>
+				<input
+					id="logoUrl"
+					name="logoUrl"
+					type="url"
+					bind:value={logoUrlValue}
+					placeholder="https://…"
+					class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+				/>
+				{#if logoUrlValue}
+					<img
+						src={logoUrlValue}
+						alt="Company logo preview"
+						class="mt-2 h-12 w-auto rounded border object-contain"
+					/>
+				{/if}
+			</div>
+			<div class="grid gap-1.5">
+				<label for="discordInviteUrl" class="text-sm font-medium"
+					>Discord invite URL <span class="text-muted-foreground">(optional)</span></label
+				>
+				<input
+					id="discordInviteUrl"
+					name="discordInviteUrl"
+					type="url"
+					bind:value={discordInviteValue}
+					placeholder="https://discord.gg/…"
+					class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+				/>
+				<p class="text-xs text-muted-foreground">
+					When set, new hires are emailed an invitation to this Discord server during onboarding.
+				</p>
+			</div>
+			<button
+				type="submit"
+				disabled={save.busy}
+				class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+				>{save.busy ? 'Saving…' : 'Save'}</button
 			>
-			<input
-				id="discordInviteUrl"
-				name="discordInviteUrl"
-				type="url"
-				bind:value={discordInviteValue}
-				placeholder="https://discord.gg/…"
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-			/>
-			<p class="text-xs text-muted-foreground">
-				When set, new hires are emailed an invitation to this Discord server during onboarding.
-			</p>
 		</div>
-		<button
-			type="submit"
-			disabled={save.busy}
-			class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-			>{save.busy ? 'Saving…' : 'Save'}</button
-		>
 	</form>
 </div>

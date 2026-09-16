@@ -196,7 +196,7 @@
 					id="destinationKind"
 					name="destinationKind"
 					bind:value={destinationKind}
-					class="input"
+					class="input max-w-sm"
 				>
 					<option value="LOCAL">Server disk</option>
 					<option value="S3">S3-compatible storage</option>
