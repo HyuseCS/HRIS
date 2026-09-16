@@ -22,7 +22,7 @@ const { dbMock, listReportIdsFor, autoDeriveFromPunches } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
 	autoDeriveFromPunches: vi.fn(),
 	dbMock: {
-		employee: { findFirst: vi.fn(), findMany: vi.fn() },
+		employee: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
 		attendanceDay: { findMany: vi.fn() }
 	}
 }))
@@ -56,6 +56,7 @@ beforeEach(() => {
 	autoDeriveFromPunches.mockResolvedValue(undefined)
 	dbMock.attendanceDay.findMany.mockResolvedValue([])
 	dbMock.employee.findMany.mockResolvedValue([])
+	dbMock.employee.count.mockResolvedValue(0)
 	// Discriminate on the where-shape: the self lookup keys on `userId`, the roster on `id`.
 	dbMock.employee.findFirst.mockImplementation(({ where }: { where: { userId?: string } }) =>
 		Promise.resolve(where.userId ? selfRow : null)

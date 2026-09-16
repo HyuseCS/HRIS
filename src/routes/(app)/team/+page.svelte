@@ -2,6 +2,7 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
@@ -159,6 +160,9 @@
 						{/each}
 					</tbody>
 				</table>
+			</div>
+			<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
+				<Pagination meta={data.pagination} />
 			</div>
 		{/if}
 	</div>

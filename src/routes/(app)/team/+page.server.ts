@@ -3,6 +3,7 @@ import { db } from '$lib/server/db'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { autoDeriveFromPunches } from '$lib/server/services/attendance'
 import { listReportIdsFor } from '$lib/server/services/supervisors'
+import { paginate } from '$lib/server/pagination'
 import type { PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, url, getClientAddress }) => {
@@ -41,13 +42,19 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	if (!isAdmin) {
 		memberScope = { id: { in: myEmployee ? await listReportIdsFor(myEmployee.id) : [] } }
 	}
+	const memberWhere = {
+		organizationId: user.organizationId,
+		user: { isActive: true },
+		...memberScope
+	}
+	const total = await db.employee.count({ where: memberWhere })
+	const pagination = paginate(url, total)
 	const members = await db.employee.findMany({
-		where: {
-			organizationId: user.organizationId,
-			user: { isActive: true },
-			...memberScope
-		},
-		select: { id: true, firstName: true, lastName: true }
+		where: memberWhere,
+		select: { id: true, firstName: true, lastName: true },
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+		skip: pagination.skip,
+		take: pagination.take
 	})
 
 	// Auto-derive from punches over the range so ABSENT/INCOMPLETE days materialise (non-destructive;
@@ -92,6 +99,7 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 
 	return {
 		members,
+		pagination,
 		dates,
 		attendanceMap,
 		startDate: startISO,
