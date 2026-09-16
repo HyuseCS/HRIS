@@ -46,7 +46,7 @@
 	{/if}
 
 	<!-- Add manual step -->
-	<section class="mx-auto max-w-4xl space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-2xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a manual step</h2>
 		<form
 			method="POST"
@@ -87,7 +87,7 @@
 	</section>
 
 	<!-- List -->
-	<section class="mx-auto max-w-4xl space-y-3 rounded-lg border bg-card p-4">
+	<section class="space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Checklist steps</h2>
 		{#if data.items.length === 0}
 			<p class="text-sm text-muted-foreground">No steps yet.</p>
