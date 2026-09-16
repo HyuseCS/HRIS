@@ -43,11 +43,11 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	const canUnlock = canAny(user.roles, 'OVERRIDE_FINALIZED') // reopening locked days is privileged
 
 	const today = manilaDayKey(new Date())
-	const rawFrom = url.searchParams.get('from') ?? manilaDayKey(new Date(Date.now() - 13 * DAY_MS))
-	const rawTo = url.searchParams.get('to') ?? today
+	const rawFrom = url.searchParams.get('from') || manilaDayKey(new Date(Date.now() - 13 * DAY_MS))
+	const rawTo = url.searchParams.get('to') || today
 	// Cap the visible range to ~2 months so derive/list stay bounded.
 	const { from, to } = clampRange(rawFrom, rawTo)
-	const date = url.searchParams.get('date') ?? today
+	const date = url.searchParams.get('date') || today
 
 	// Managers can switch between a single employee's range and the whole team on one day.
 	const view = canManage && url.searchParams.get('view') === 'team' ? 'team' : 'employee'
