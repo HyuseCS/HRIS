@@ -92,6 +92,15 @@
 	const FOCUSABLE =
 		'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node)
+		return {
+			destroy() {
+				node.remove()
+			}
+		}
+	}
+
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			// Must stop here: a nested dialog's Escape would otherwise close its parent too.
@@ -126,7 +135,8 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 flex items-center justify-center whitespace-normal text-left bg-black/50 p-4 backdrop-blur-sm"
+		use:portal
+		class="fixed inset-0 flex items-center justify-center whitespace-normal bg-black/50 p-4 backdrop-blur-sm"
 		style="z-index: {zIndex}"
 		onclick={close}
 		role="presentation"
