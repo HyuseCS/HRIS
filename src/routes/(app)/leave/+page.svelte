@@ -3,7 +3,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { goto } from '$app/navigation'
 	import type { SubmitFunction } from '@sveltejs/kit'
-	import { slide } from 'svelte/transition'
+	import { fly } from 'svelte/transition'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -75,8 +75,8 @@
 	<!-- Bulk actions; appear once rows are selected -->
 	{#if selected.length}
 		<div
-			class="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-2"
-			transition:slide={{ duration: 120 }}
+			class="fixed bottom-4 left-1/2 z-40 inline-flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-full border bg-card px-4 py-2 shadow-lg"
+			transition:fly={{ y: 20, duration: 120 }}
 		>
 			<span class="text-sm font-medium">{selected.length} selected</span>
 			<div class="flex items-center gap-2">

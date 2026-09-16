@@ -256,7 +256,7 @@
 									<div class="flex items-center justify-end gap-2">
 										<button
 											onclick={() => (editingId = holiday.id)}
-											class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+											class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent"
 										>
 											Edit
 										</button>
