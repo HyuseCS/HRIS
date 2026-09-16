@@ -108,6 +108,8 @@
 	let typeTimer: ReturnType<typeof setTimeout> | undefined
 
 	const sel = $derived(parseDay(value))
+	const invalid = $derived(text.trim() !== '' && normalizeDate(text) === null)
+	let touched = $state(false)
 	let view = $state(untrack(() => sel) ?? todayParts())
 	let focused = $state(untrack(() => sel) ?? todayParts())
 
@@ -137,6 +139,10 @@
 			f.removeEventListener('reset', onReset)
 			f.removeEventListener('formdata', onFormData)
 		}
+	})
+
+	$effect(() => {
+		input.setCustomValidity(invalid ? 'Enter a date as YYYY-MM-DD.' : '')
 	})
 
 	$effect(() => {
@@ -226,6 +232,31 @@
 			window.removeEventListener('resize', close)
 		}
 	})
+
+	function maskDate(raw: string): string {
+		const digits = raw.replace(/\D/g, '').slice(0, 8)
+		if (digits.length <= 4) return digits
+		if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`
+		return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
+	}
+
+	function onType(e: Event & { currentTarget: HTMLInputElement }) {
+		touched = false
+		const el = e.currentTarget
+		const caret = el.selectionStart ?? el.value.length
+		const digitsBefore = el.value.slice(0, caret).replace(/\D/g, '').length
+		const masked = maskDate(el.value)
+		text = masked
+		el.value = masked
+		let pos = 0
+		let seenDigits = 0
+		while (pos < masked.length && seenDigits < digitsBefore) {
+			if (masked[pos] >= '0' && masked[pos] <= '9') seenDigits++
+			pos++
+		}
+		el.setSelectionRange(pos, pos)
+		write(normalizeDate(masked))
+	}
 
 	function write(v: string | null) {
 		if (v === null || v === value) return
@@ -547,9 +578,14 @@
 		{disabled}
 		{placeholder}
 		aria-label={ariaLabel}
+		aria-invalid={invalid && (touched || text.length === 10)}
 		bind:value={text}
-		oninput={() => write(normalizeDate(text))}
-		onblur={() => (text = normalizeDate(text) ?? value)}
+		oninput={onType}
+		onblur={() => {
+			touched = true
+			const normalized = normalizeDate(text)
+			if (normalized !== null) text = normalized
+		}}
 		onkeydown={(e) => onkeydown?.(e)}
 		class={cn(klass, 'pr-7')}
 	/>
