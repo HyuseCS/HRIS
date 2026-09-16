@@ -1,10 +1,12 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
-	import { advanceTo } from '$lib/actions/dateRange'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { ActionData, PageData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
+
+	let endPicker: ReturnType<typeof DatePicker> | undefined = $state()
 
 	// `fail()` contributes its own shape to the ActionData union, so narrow before reading.
 	// Without this the 400 from a reveal with no id renders as silence.
@@ -98,20 +100,23 @@
 			<!-- Date range -->
 			<div class="flex flex-col gap-1">
 				<label for="start" class="text-xs font-medium text-muted-foreground">From</label>
-				<input
+				<DatePicker
 					id="start"
 					name="start"
-					type="date"
-					use:advanceTo={'end'}
+					value=""
+					onchange={(v) => {
+						if (v) endPicker?.focusAndOpen()
+					}}
 					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<div class="flex flex-col gap-1">
 				<label for="end" class="text-xs font-medium text-muted-foreground">To</label>
-				<input
+				<DatePicker
+					bind:this={endPicker}
 					id="end"
 					name="end"
-					type="date"
+					value=""
 					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>

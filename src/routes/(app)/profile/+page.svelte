@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDate, formatCurrency } from '$lib/utils/format'
@@ -202,12 +203,11 @@
 						<label for="dateOfBirth" class="text-xs font-medium text-muted-foreground"
 							>Date of Birth</label
 						>
-						<input
+						<DatePicker
 							id="dateOfBirth"
 							name="dateOfBirth"
-							type="date"
 							value={emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0, 10) : ''}
-							class="input"
+							class="input w-full"
 						/>
 					</div>
 

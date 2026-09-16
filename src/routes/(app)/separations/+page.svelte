@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatShortDate } from '$lib/utils/format'
@@ -98,11 +99,11 @@
 					<label for="effectiveDate" class="text-sm font-medium"
 						>Effective date <span class="text-red-500" aria-hidden="true">*</span></label
 					>
-					<input
+					<DatePicker
 						id="effectiveDate"
 						name="effectiveDate"
 						aria-invalid={invalid('effectiveDate')}
-						type="date"
+						value=""
 						required
 						class="h-9 rounded-md border border-input bg-background px-3 text-sm"
 					/>

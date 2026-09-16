@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import { page } from '$app/stores'
 	import { tick } from 'svelte'
@@ -225,10 +226,10 @@
 					>
 						<div class="grid gap-1">
 							<label for="iv-date" class="text-xs font-medium text-muted-foreground">Date</label>
-							<input
+							<DatePicker
 								id="iv-date"
 								name="scheduledDate"
-								type="date"
+								value=""
 								required
 								class="h-9 rounded-md border border-input bg-background px-2 text-sm"
 							/>
@@ -431,10 +432,10 @@
 							<label for="of-start" class="text-xs font-medium text-muted-foreground"
 								>Start date</label
 							>
-							<input
+							<DatePicker
 								id="of-start"
 								name="startDate"
-								type="date"
+								value=""
 								required
 								class="h-9 rounded-md border border-input bg-background px-2 text-sm"
 							/>

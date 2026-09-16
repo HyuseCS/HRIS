@@ -2,7 +2,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
-	import { advanceTo } from '$lib/actions/dateRange'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
 	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -20,6 +20,7 @@
 	// Date guards: start can't be before today; end can't be before start.
 	const today = formatDateISO(new Date())
 	let startDate = $state('')
+	let endPicker: ReturnType<typeof DatePicker> | undefined = $state()
 </script>
 
 <svelte:head>
@@ -77,23 +78,25 @@
 
 			<div class="space-y-1">
 				<label for="startDate" class="text-sm font-medium">Start Date</label>
-				<input
+				<DatePicker
 					id="startDate"
 					name="startDate"
-					type="date"
 					required
 					min={today}
 					bind:value={startDate}
-					use:advanceTo={'endDate'}
+					onchange={(v) => {
+						if (v) endPicker?.focusAndOpen()
+					}}
 					class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<div class="space-y-1">
 				<label for="endDate" class="text-sm font-medium">End Date</label>
-				<input
+				<DatePicker
+					bind:this={endPicker}
 					id="endDate"
 					name="endDate"
-					type="date"
+					value=""
 					required
 					min={startDate || today}
 					class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

@@ -9,6 +9,7 @@
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import TimePicker from '$lib/components/ui/TimePicker.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 
 	// Fields the modal reads. Both the /timesheets list rows and the /requests/timesheets
 	// approvals-load rows satisfy this shape. Decimal columns are typed loosely (they arrive
@@ -244,7 +245,6 @@
 		}
 		if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) return focusCell(r + 1, c)
 		if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) return focusCell(r - 1, c)
-		if (el.type === 'date') return // keep native segment arrows
 		if (e.key === 'ArrowRight' && atEnd(el)) return focusCell(r, c + 1)
 		if (e.key === 'ArrowLeft' && atStart(el)) return focusCell(r, c - 1)
 	}
@@ -373,8 +373,7 @@
 							{#each entries as row, i (i)}
 								<tr>
 									<td class="px-3 py-1.5"
-										><input
-											type="date"
+										><DatePicker
 											bind:value={row.date}
 											data-r={i}
 											data-c={0}

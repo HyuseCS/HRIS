@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import {
 		periodOf,
 		periodShareOf,
@@ -216,9 +217,8 @@
 			<div class="flex flex-wrap gap-3">
 				<div class="w-40 space-y-1.5">
 					<label for="pp-custom-start" class="block text-sm font-medium">Start date</label>
-					<input
+					<DatePicker
 						id="pp-custom-start"
-						type="date"
 						bind:value={customStart}
 						min={capBoundStart}
 						max={customEnd || undefined}
@@ -229,9 +229,8 @@
 				</div>
 				<div class="w-40 space-y-1.5">
 					<label for="pp-custom-end" class="block text-sm font-medium">End date</label>
-					<input
+					<DatePicker
 						id="pp-custom-end"
-						type="date"
 						bind:value={customEnd}
 						min={customStart || undefined}
 						max={capBoundEnd}

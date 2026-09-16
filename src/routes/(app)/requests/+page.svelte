@@ -3,7 +3,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
-	import { advanceTo } from '$lib/actions/dateRange'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { goto } from '$app/navigation'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
@@ -50,6 +50,7 @@
 	// Date guards: start can't be before today; end can't be before start.
 	const today = formatDateISO(new Date())
 	let startDate = $state(submitted?.startDate ?? '')
+	let endPicker: ReturnType<typeof DatePicker> | undefined = $state()
 
 	const isDayHours = (t: string) =>
 		['OVERTIME', 'UNDERTIME', 'REST_DAY_WORK', 'HOLIDAY_WORK'].includes(t)
@@ -244,14 +245,15 @@
 						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 							<div class="grid gap-1.5">
 								<label for="startDate" class="text-sm font-medium">Start {@render req()}</label>
-								<input
+								<DatePicker
 									id="startDate"
 									name="startDate"
-									type="date"
 									required
 									min={today}
 									bind:value={startDate}
-									use:advanceTo={'endDate'}
+									onchange={(v) => {
+										if (v) endPicker?.focusAndOpen()
+									}}
 									aria-invalid={invalid('startDate')}
 									aria-describedby={describedBy('startDate')}
 									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -260,10 +262,10 @@
 							</div>
 							<div class="grid gap-1.5">
 								<label for="endDate" class="text-sm font-medium">End {@render req()}</label>
-								<input
+								<DatePicker
+									bind:this={endPicker}
 									id="endDate"
 									name="endDate"
-									type="date"
 									required
 									min={startDate || today}
 									value={submitted?.endDate ?? ''}
@@ -278,10 +280,9 @@
 						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 							<div class="grid gap-1.5">
 								<label for="date" class="text-sm font-medium">Date {@render req()}</label>
-								<input
+								<DatePicker
 									id="date"
 									name="date"
-									type="date"
 									required
 									value={submitted?.date ?? ''}
 									aria-invalid={invalid('date')}

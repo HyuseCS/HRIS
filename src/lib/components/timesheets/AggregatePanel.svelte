@@ -4,6 +4,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 
 	type Employee = { id: string; firstName: string; lastName: string; employeeNumber: string }
 	type Preview = {
@@ -105,9 +106,8 @@
 		</div>
 		<div>
 			<label for="agg-week" class="text-sm font-medium">Week (any day in it)</label>
-			<input
+			<DatePicker
 				id="agg-week"
-				type="date"
 				bind:value={weekOf}
 				oninput={clearPreview}
 				class="mt-1 {inputClass}"

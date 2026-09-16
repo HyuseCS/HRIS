@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -234,10 +235,10 @@
 			</div>
 			<div class="grid gap-1">
 				<label for="enr-date" class="text-xs font-medium text-muted-foreground">Effective</label>
-				<input
+				<DatePicker
 					id="enr-date"
 					name="effectiveDate"
-					type="date"
+					value=""
 					required
 					class="h-9 rounded-md border border-input bg-background px-2 text-sm"
 				/>

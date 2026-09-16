@@ -18,6 +18,7 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import MaskedField from '$lib/components/ui/MaskedField.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -1547,10 +1548,9 @@
 				<div class="grid gap-3 sm:grid-cols-3">
 					<div>
 						<label for="effectiveDate" class="text-sm font-medium">Effective Date</label>
-						<input
+						<DatePicker
 							id="effectiveDate"
 							name="effectiveDate"
-							type="date"
 							required
 							value={todayInput}
 							min={hireInput}
@@ -1641,10 +1641,9 @@
 				<div class="grid gap-3 sm:grid-cols-3">
 					<div>
 						<label for="promoEffectiveDate" class="text-sm font-medium">Effective Date</label>
-						<input
+						<DatePicker
 							id="promoEffectiveDate"
 							name="effectiveDate"
-							type="date"
 							required
 							value={todayInput}
 							min={hireInput}
@@ -1831,10 +1830,9 @@
 				<div class="flex items-end gap-4">
 					<div>
 						<label for="endDate" class="text-sm font-medium">Last Day</label>
-						<input
+						<DatePicker
 							id="endDate"
 							name="endDate"
-							type="date"
 							required
 							class="mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						/>

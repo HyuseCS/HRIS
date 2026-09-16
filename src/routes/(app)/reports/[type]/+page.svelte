@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { formatCurrency } from '$lib/utils/format'
-	import { advanceTo } from '$lib/actions/dateRange'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import { navigating } from '$app/stores'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -14,6 +14,8 @@
 	let startValue = $state(data.startDate)
 	// svelte-ignore state_referenced_locally
 	let endValue = $state(data.endDate)
+
+	let endPicker: ReturnType<typeof DatePicker> | undefined = $state()
 
 	// #129: reports stay free-form (report data isn't sensitive to period shape), but quick-picks
 	// let HR snap the range to a standard pay period. They only fill the inputs — the user still
@@ -123,22 +125,23 @@
 	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
 		<div class="flex flex-col gap-1">
 			<label for="start" class="text-xs font-medium text-muted-foreground">Start Date</label>
-			<input
+			<DatePicker
 				id="start"
 				name="start"
-				type="date"
 				bind:value={startValue}
 				max={endValue || undefined}
-				use:advanceTo={'end'}
+				onchange={(v) => {
+					if (v) endPicker?.focusAndOpen()
+				}}
 				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
 		<div class="flex flex-col gap-1">
 			<label for="end" class="text-xs font-medium text-muted-foreground">End Date</label>
-			<input
+			<DatePicker
+				bind:this={endPicker}
 				id="end"
 				name="end"
-				type="date"
 				bind:value={endValue}
 				min={startValue || undefined}
 				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import {
@@ -286,11 +287,10 @@
 						<label for="startDate" class="text-sm font-medium"
 							>Start Date <span class="text-destructive">*</span></label
 						>
-						<input
+						<DatePicker
 							id="startDate"
 							name="startDate"
 							aria-invalid={invalid('startDate')}
-							type="date"
 							required
 							value={form?.values?.startDate ?? ''}
 							class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

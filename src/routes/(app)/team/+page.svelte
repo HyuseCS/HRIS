@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
@@ -10,6 +11,8 @@
 	let startValue = $state(data.startDate)
 	// svelte-ignore state_referenced_locally
 	let endValue = $state(data.endDate)
+
+	let rangeForm: HTMLFormElement | undefined = $state()
 
 	// AttendanceDay.status → calendar cell (short code, colour, legend label). Order drives the
 	// legend. These stay one-or-two-letter cells rather than <Badge>: the grid sizes on the code,
@@ -61,28 +64,26 @@
 
 	<div class="overflow-hidden rounded-lg border bg-card">
 		<!-- Date range filter -->
-		<form method="GET" class="flex flex-wrap items-end gap-3 border-b p-4">
+		<form bind:this={rangeForm} method="GET" class="flex flex-wrap items-end gap-3 border-b p-4">
 			<div>
 				<label for="start" class="block text-sm font-medium mb-1">Start Date</label>
-				<input
+				<DatePicker
 					id="start"
 					name="start"
-					type="date"
 					bind:value={startValue}
 					max={endValue || undefined}
-					onchange={(e) => e.currentTarget.form?.requestSubmit()}
+					onchange={() => rangeForm?.requestSubmit()}
 					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<div>
 				<label for="end" class="block text-sm font-medium mb-1">End Date</label>
-				<input
+				<DatePicker
 					id="end"
 					name="end"
-					type="date"
 					bind:value={endValue}
 					min={startValue || undefined}
-					onchange={(e) => e.currentTarget.form?.requestSubmit()}
+					onchange={() => rangeForm?.requestSubmit()}
 					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
