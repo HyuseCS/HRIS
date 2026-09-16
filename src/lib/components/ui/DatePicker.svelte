@@ -124,7 +124,7 @@
 	const sel = $derived(parseDay(value))
 	const invalid = $derived(text.trim() !== '' && normalizeDate(text) === null)
 	let touched = $state(false)
-	let view = $state(untrack(() => sel) ?? todayParts())
+	let view: { y: number; m: number } = $state(untrack(() => sel) ?? todayParts())
 	let focused = $state(untrack(() => sel) ?? todayParts())
 	let committed = untrack(() => value)
 
@@ -738,7 +738,7 @@
 									monthOpen && 'rotate-180'
 								)}
 								aria-hidden="true"
-								tabindex="-1"
+								tabindex={-1}
 							/>
 						</span>
 					</button>
@@ -761,7 +761,7 @@
 									yearOpen && 'rotate-180'
 								)}
 								aria-hidden="true"
-								tabindex="-1"
+								tabindex={-1}
 							/>
 						</span>
 					</button>

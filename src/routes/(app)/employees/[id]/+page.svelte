@@ -1832,6 +1832,7 @@
 						<label for="endDate" class="text-sm font-medium">Last Day</label>
 						<DatePicker
 							id="endDate"
+							value=""
 							name="endDate"
 							required
 							class="mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

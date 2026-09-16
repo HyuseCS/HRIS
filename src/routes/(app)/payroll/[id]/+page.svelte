@@ -80,7 +80,9 @@
 				(g = submitFeedback({
 					success: () => `Net pay overridden for ${overrideName}.`,
 					error: null,
-					onSuccess: () => (overrideEntryId = null)
+					onSuccess: () => {
+						overrideEntryId = null
+					}
 				}))
 			)
 		return g
