@@ -718,19 +718,20 @@
 												>
 											{/if}
 										</form>
-										<ConfirmButton
-											action="?/resetDay"
-											title="Discard the manual edit?"
-											message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
-											confirmText="Reset"
-											triggerLabel="Recalculate"
-											disabled={!d.manuallyEdited}
-											triggerTitle="Recalculate this day from the raw punches"
-											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
-											submit={keepValues}
-										>
-											<input type="hidden" name="id" value={d.id} />
-										</ConfirmButton>
+										{#if d.manuallyEdited}
+											<ConfirmButton
+												action="?/resetDay"
+												title="Discard the manual edit?"
+												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
+												confirmText="Reset"
+												triggerLabel="Recalculate"
+												triggerTitle="Recalculate this day from the raw punches"
+												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
+												submit={keepValues}
+											>
+												<input type="hidden" name="id" value={d.id} />
+											</ConfirmButton>
+										{/if}
 									</div>
 								{:else if d?.isLocked}
 									<span class="inline-flex h-7 items-center text-xs text-muted-foreground"
@@ -943,19 +944,20 @@
 													>
 												{/if}
 											</form>
-											<ConfirmButton
-												action="?/resetDay"
-												title="Discard the manual edit?"
-												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
-												confirmText="Reset"
-												triggerLabel="Recalculate"
-												disabled={!d.manuallyEdited}
-												triggerTitle="Recalculate this day from the raw punches"
-												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
-												submit={keepValues}
-											>
-												<input type="hidden" name="id" value={d.id} />
-											</ConfirmButton>
+											{#if d.manuallyEdited}
+												<ConfirmButton
+													action="?/resetDay"
+													title="Discard the manual edit?"
+													message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
+													confirmText="Reset"
+													triggerLabel="Recalculate"
+													triggerTitle="Recalculate this day from the raw punches"
+													triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
+													submit={keepValues}
+												>
+													<input type="hidden" name="id" value={d.id} />
+												</ConfirmButton>
+											{/if}
 										</div>
 									{/if}
 								</td>
