@@ -152,10 +152,9 @@
 									<button
 										type="submit"
 										disabled={toggle.busy}
-										class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50 {item.status ===
-										'CLEARED'
-											? 'text-green-600 dark:text-green-400'
-											: 'text-muted-foreground'}"
+										class={item.status === 'CLEARED'
+											? 'rounded-md border px-3 py-1 text-xs font-medium text-green-600 hover:bg-accent disabled:pointer-events-none disabled:opacity-50 dark:text-green-400'
+											: 'rounded-md border border-green-700 px-3 py-1 text-xs font-medium text-green-800 hover:bg-green-700/10 disabled:pointer-events-none disabled:opacity-50 dark:text-green-400'}
 									>
 										{item.status === 'CLEARED' ? 'Cleared' : 'Mark cleared'}
 									</button>
