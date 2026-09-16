@@ -48,7 +48,7 @@
 	<title>Leave — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div class="space-y-6 {selected.length ? 'pb-24' : ''}">
 	<!-- The description carries a link, which PageHeader's string `description` cannot, so it
 	     stays its own paragraph directly under the title. -->
 	<PageHeader title="Leave" />
@@ -75,7 +75,7 @@
 	<!-- Bulk actions; appear once rows are selected -->
 	{#if selected.length}
 		<div
-			class="fixed bottom-4 left-1/2 z-40 inline-flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-full border bg-card px-4 py-2 shadow-lg"
+			class="fixed bottom-4 left-1/2 z-30 inline-flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border bg-card px-4 py-2 shadow-lg"
 			transition:fly={{ y: 20, duration: 120 }}
 		>
 			<span class="text-sm font-medium">{selected.length} selected</span>
