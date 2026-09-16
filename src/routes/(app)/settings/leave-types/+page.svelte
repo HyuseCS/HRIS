@@ -28,7 +28,7 @@
 	<title>Leave Types — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Leave Types"
 		description="Master data for the leave/request flow: name, whether it's paid, the default yearly allocation, and carry-over policy. Deactivate a type to hide it from new requests without affecting existing balances."

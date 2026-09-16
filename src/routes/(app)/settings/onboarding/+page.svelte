@@ -25,7 +25,7 @@
 	<title>Onboarding Checklist — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<!-- The description carries emphasis markup, which PageHeader's string `description` cannot,
 	     so it stays its own paragraph directly under the title. -->
 	<PageHeader title="Onboarding Checklist">

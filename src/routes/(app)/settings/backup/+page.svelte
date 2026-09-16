@@ -87,7 +87,7 @@
 	<title>Document Backup — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Document Backup"
 		description="Copies every employee 201 file and request attachment to a second location on a schedule."

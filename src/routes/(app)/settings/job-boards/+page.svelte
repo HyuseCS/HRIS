@@ -22,7 +22,7 @@
 	<title>Job Boards — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Job Boards"
 		description="The sites HR can mark a posting as published to (JobStreet, Indeed, LinkedIn…). Track where a role went on each posting's page. Deactivate a board to hide it from new postings without losing where past roles were advertised."

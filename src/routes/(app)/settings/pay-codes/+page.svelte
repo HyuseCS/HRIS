@@ -26,7 +26,7 @@
 	<title>Earnings & Deductions — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Earnings & Deduction Codes"
 		description="Codes used by the payroll engine. Deactivate instead of deleting — historical payslips reference them."

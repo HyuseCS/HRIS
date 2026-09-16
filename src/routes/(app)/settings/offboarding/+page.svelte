@@ -26,7 +26,7 @@
 	<title>Offboarding Checklist — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Offboarding Checklist"
 		description="The clearance steps every separation case starts with. Each names a task and the clearance area that signs it off, optionally pinned to a specific department. Opening a separation copies the active steps into the case, and the departing employee is emailed a transition notice listing them."
