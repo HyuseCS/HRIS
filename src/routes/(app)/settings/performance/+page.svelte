@@ -31,12 +31,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="mx-auto max-w-3xl rounded bg-destructive/10 px-3 py-2 text-sm text-destructive"
-			role="alert"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" />
 	{:else if form?.success}
 		<Banner kind="success" message="Review schedule saved." class="mx-auto max-w-3xl" />
 	{/if}
