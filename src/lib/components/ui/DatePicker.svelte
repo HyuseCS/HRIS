@@ -26,6 +26,13 @@
 		'aria-label'?: string
 		oninput?: (_v: string) => void
 		onkeydown?: (_e: KeyboardEvent) => void
+		min?: string
+		max?: string
+		onchange?: (_v: string) => void
+		'data-r'?: string | number
+		'data-c'?: string | number
+		'aria-invalid'?: boolean | 'true' | 'false' | null
+		'aria-describedby'?: string | null
 	}
 
 	let {
@@ -39,7 +46,14 @@
 		placeholder = 'YYYY-MM-DD',
 		'aria-label': ariaLabel,
 		oninput,
-		onkeydown
+		onkeydown,
+		min,
+		max,
+		onchange,
+		'data-r': dataR,
+		'data-c': dataC,
+		'aria-invalid': ariaInvalid,
+		'aria-describedby': ariaDescribedby
 	}: Props = $props()
 
 	const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
@@ -112,13 +126,64 @@
 	let touched = $state(false)
 	let view = $state(untrack(() => sel) ?? todayParts())
 	let focused = $state(untrack(() => sel) ?? todayParts())
+	let committed = untrack(() => value)
+
+	const minDay = $derived(min ? normalizeDate(min) : null)
+	const maxDay = $derived(max ? normalizeDate(max) : null)
+
+	function outOfRange(s: string): boolean {
+		if (s === '') return false
+		return (!!minDay && s < minDay) || (!!maxDay && s > maxDay)
+	}
+
+	function monthBlocked(y: number, m: number): boolean {
+		return outOfRange(formatDay(y, m, 1)) && outOfRange(formatDay(y, m, daysInMonth(y, m)))
+	}
+
+	function yearBlocked(y: number): boolean {
+		return outOfRange(formatDay(y, 1, 1)) && outOfRange(formatDay(y, 12, 31))
+	}
+
+	function nearestEnabled(values: number[], target: number): number | null {
+		if (values.length === 0) return null
+		return values.reduce(
+			(best, v) => (Math.abs(v - target) < Math.abs(best - target) ? v : best),
+			values[0]
+		)
+	}
+
+	const rangeMsg = $derived.by(() => {
+		const n = normalizeDate(text)
+		if (n === null || n === '' || !outOfRange(n)) return ''
+		if (minDay && n < minDay) return `Choose a date on or after ${minDay}.`
+		return `Choose a date on or before ${maxDay}.`
+	})
+	const validityMsg = $derived(invalid ? 'Enter a date as YYYY-MM-DD.' : rangeMsg)
+	const externalInvalid = $derived(ariaInvalid === true || ariaInvalid === 'true')
+	const internalInvalid = $derived((invalid || rangeMsg !== '') && (touched || text.length === 10))
+
+	function commit() {
+		const n = normalizeDate(text)
+		if (n === null) return
+		if (n === committed) return
+		committed = n
+		onchange?.(n)
+	}
+
+	export function focusAndOpen() {
+		input.focus()
+		if (!open) toggle()
+	}
 
 	$effect(() => {
 		const v = value
 		if (v === seen) return
 		seen = v
 		untrack(() => {
-			if (normalizeDate(text) !== v) text = v
+			if (normalizeDate(text) !== v) {
+				text = v
+				committed = v
+			}
 		})
 	})
 
@@ -142,7 +207,7 @@
 	})
 
 	$effect(() => {
-		input.setCustomValidity(invalid ? 'Enter a date as YYYY-MM-DD.' : '')
+		input.setCustomValidity(validityMsg)
 	})
 
 	$effect(() => {
@@ -197,6 +262,7 @@
 				const all = focusableIn(document.body)
 				const next = all[all.indexOf(toggleBtn) + 1]
 				close()
+				commit()
 				next?.focus()
 			}
 		}
@@ -211,8 +277,10 @@
 				!popup?.contains(t) &&
 				!monthList?.contains(t) &&
 				!yearList?.contains(t)
-			)
+			) {
 				close()
+				commit()
+			}
 		}
 		// Capture-phase sees any scroll, including the lists' own internal scrolling — ignore
 		// targets inside the popup or either list.
@@ -270,6 +338,7 @@
 		focused = { y, m, d }
 		view = { y, m }
 		done()
+		commit()
 	}
 
 	function done() {
@@ -288,8 +357,11 @@
 		const left = Math.min(Math.max(r.right - W, 8), innerWidth - 8 - W)
 		pos = { top, left }
 		const start = sel ?? focused
-		view = { y: start.y, m: start.m }
-		focused = start
+		const startIso = formatDay(start.y, start.m, start.d)
+		const bound = minDay && startIso < minDay ? minDay : maxDay
+		const clamped = (outOfRange(startIso) && bound ? parseDay(bound) : start) ?? start
+		view = { y: clamped.y, m: clamped.m }
+		focused = clamped
 		open = true
 	}
 
@@ -350,9 +422,13 @@
 		el?.focus({ preventScroll: true })
 	}
 	function clampedStep(values: number[], active: number, delta: number): number {
-		const idx = values.indexOf(active)
+		if (values.length === 0) return active
+		let idx = values.indexOf(active)
+		if (idx === -1) idx = values.indexOf(nearestEnabled(values, active) as number)
 		return values[Math.min(values.length - 1, Math.max(0, idx + delta))]
 	}
+
+	const enabledYears = $derived(YEARS.filter((y) => !yearBlocked(y)))
 
 	function focusYear(y: number) {
 		yearActive = y
@@ -360,7 +436,7 @@
 	}
 
 	function moveYearActive(delta: number) {
-		focusYear(clampedStep(YEARS, yearActive, delta))
+		focusYear(clampedStep(enabledYears, yearActive, delta))
 	}
 
 	function toggleYearList() {
@@ -369,7 +445,7 @@
 			yearOpen = false
 			return
 		}
-		yearActive = view.y
+		yearActive = nearestEnabled(enabledYears, view.y) ?? view.y
 		typeBuffer = ''
 		clearTimeout(typeTimer)
 		yearOpen = true
@@ -387,7 +463,7 @@
 		typeTimer = setTimeout(() => {
 			typeBuffer = ''
 		}, 600)
-		const match = YEARS.find((y) => String(y).startsWith(typeBuffer))
+		const match = enabledYears.find((y) => String(y).startsWith(typeBuffer))
 		if (match !== undefined) focusYear(match)
 	}
 
@@ -406,10 +482,10 @@
 			moveYearActive(-10)
 		} else if (e.key === 'Home') {
 			e.preventDefault()
-			focusYear(YEARS[0])
+			focusYear(enabledYears[0])
 		} else if (e.key === 'End') {
 			e.preventDefault()
-			focusYear(YEARS[YEARS.length - 1])
+			focusYear(enabledYears[enabledYears.length - 1])
 		} else if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault()
 			selectYear(yearActive)
@@ -420,6 +496,7 @@
 	}
 
 	const MONTH_VALUES = MONTHS.map((_, i) => i)
+	const enabledMonths = $derived(MONTH_VALUES.filter((i) => !monthBlocked(view.y, i + 1)))
 
 	function focusMonth(m0: number) {
 		monthActive = m0
@@ -427,7 +504,7 @@
 	}
 
 	function moveMonthActive(delta: number) {
-		focusMonth(clampedStep(MONTH_VALUES, monthActive, delta))
+		focusMonth(clampedStep(enabledMonths, monthActive, delta))
 	}
 
 	function toggleMonthList() {
@@ -436,7 +513,7 @@
 			monthOpen = false
 			return
 		}
-		monthActive = view.m - 1
+		monthActive = nearestEnabled(enabledMonths, view.m - 1) ?? view.m - 1
 		monthOpen = true
 	}
 
@@ -455,10 +532,10 @@
 			moveMonthActive(-1)
 		} else if (e.key === 'Home') {
 			e.preventDefault()
-			focusMonth(MONTH_VALUES[0])
+			focusMonth(enabledMonths[0])
 		} else if (e.key === 'End') {
 			e.preventDefault()
-			focusMonth(MONTH_VALUES[MONTH_VALUES.length - 1])
+			focusMonth(enabledMonths[enabledMonths.length - 1])
 		} else if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault()
 			selectMonth(monthActive)
@@ -502,6 +579,7 @@
 			case 'Enter':
 			case ' ':
 				e.preventDefault()
+				if (outOfRange(formatDay(focused.y, focused.m, focused.d))) return
 				pick(focused.y, focused.m, focused.d)
 				return
 			case 'Escape':
@@ -519,6 +597,17 @@
 			}
 		}
 	}
+
+	const prevBlocked = $derived.by(() => {
+		if (!minDay) return false
+		const { y, m } = addMonths(view.y, view.m, -1)
+		return formatDay(y, m, daysInMonth(y, m)) < minDay
+	})
+	const nextBlocked = $derived.by(() => {
+		if (!maxDay) return false
+		const { y, m } = addMonths(view.y, view.m, 1)
+		return formatDay(y, m, 1) > maxDay
+	})
 
 	const monthLabel = $derived(
 		new Date(view.y, view.m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
@@ -546,7 +635,7 @@
 			if (yearList) yearList.style.maxHeight = `${maxHeight}px`
 			const groupIndex = DECADES.findIndex((d) => d[0] === decadeStartOf(view.y))
 			if (yearList && groupIndex >= 0) yearList.scrollTop = groupIndex * maxHeight
-			focusYear(view.y)
+			focusYear(nearestEnabled(enabledYears, view.y) ?? view.y)
 		})
 	})
 
@@ -560,7 +649,7 @@
 			const height = rowH * MONTH_VALUES.length + LIST_PADDING
 			const { top, left } = flipPosition(monthTrigger, r.width, height)
 			monthPos = { top, left, width: r.width }
-			focusMonth(view.m - 1)
+			focusMonth(nearestEnabled(enabledMonths, view.m - 1) ?? view.m - 1)
 		})
 	})
 </script>
@@ -578,13 +667,18 @@
 		{disabled}
 		{placeholder}
 		aria-label={ariaLabel}
-		aria-invalid={invalid && (touched || text.length === 10)}
+		aria-invalid={internalInvalid || externalInvalid ? 'true' : undefined}
+		aria-describedby={ariaDescribedby}
+		data-r={dataR}
+		data-c={dataC}
 		bind:value={text}
 		oninput={onType}
-		onblur={() => {
+		onblur={(e) => {
 			touched = true
 			const normalized = normalizeDate(text)
 			if (normalized !== null) text = normalized
+			if (e.relatedTarget === toggleBtn) return
+			commit()
 		}}
 		onkeydown={(e) => onkeydown?.(e)}
 		class={cn(klass, 'pr-7')}
@@ -598,6 +692,9 @@
 		aria-expanded={open}
 		{disabled}
 		onclick={toggle}
+		onblur={(e) => {
+			if (e.relatedTarget !== input && !popup?.contains(e.relatedTarget as Node)) commit()
+		}}
 	>
 		<Calendar class="h-4 w-4" />
 	</button>
@@ -613,8 +710,9 @@
 			<div class="flex items-center justify-between gap-1 px-1 py-1">
 				<button
 					type="button"
-					class="shrink-0 rounded p-1 hover:bg-accent"
+					class="shrink-0 rounded p-1 hover:bg-accent disabled:opacity-40"
 					aria-label="Previous month"
+					disabled={prevBlocked}
 					onclick={() => moveMonth(-1)}
 				>
 					‹
@@ -625,10 +723,11 @@
 						bind:this={monthTrigger}
 						id="dp-month"
 						type="button"
-						class={cn(selectClass, 'shrink-0')}
+						class={cn(selectClass, 'shrink-0 disabled:opacity-40')}
 						style="width: {monthWidth}"
 						aria-haspopup="listbox"
 						aria-expanded={monthOpen}
+						disabled={enabledMonths.length === 0}
 						onclick={toggleMonthList}
 					>
 						<span class="flex items-center justify-between gap-1">
@@ -648,9 +747,10 @@
 						bind:this={yearTrigger}
 						id="dp-year"
 						type="button"
-						class={cn(selectClass, 'w-[4.5rem] shrink-0 text-left')}
+						class={cn(selectClass, 'w-[4.5rem] shrink-0 text-left disabled:opacity-40')}
 						aria-haspopup="listbox"
 						aria-expanded={yearOpen}
+						disabled={enabledYears.length === 0}
 						onclick={toggleYearList}
 					>
 						<span class="flex items-center justify-between gap-1">
@@ -668,8 +768,9 @@
 				</div>
 				<button
 					type="button"
-					class="shrink-0 rounded p-1 hover:bg-accent"
+					class="shrink-0 rounded p-1 hover:bg-accent disabled:opacity-40"
 					aria-label="Next month"
+					disabled={nextBlocked}
 					onclick={() => moveMonth(1)}
 				>
 					›
@@ -694,16 +795,20 @@
 							class="snap-start"
 						>
 							{#each decade as y (y)}
+								{@const blocked = yearBlocked(y)}
 								<button
 									type="button"
 									role="option"
 									data-year={y}
 									aria-selected={y === view.y}
+									aria-disabled={blocked ? 'true' : undefined}
+									disabled={blocked}
 									tabindex={y === yearActive ? 0 : -1}
 									class={cn(
 										'flex h-7 w-full shrink-0 items-center rounded px-2 text-sm',
 										y === view.y && 'bg-primary text-primary-foreground',
-										y === yearActive && y !== view.y && 'ring-1 ring-inset ring-ring'
+										y === yearActive && y !== view.y && 'ring-1 ring-inset ring-ring',
+										blocked && 'opacity-40'
 									)}
 									onclick={() => selectYear(y)}
 								>
@@ -726,16 +831,20 @@
 					onkeydown={monthKey}
 				>
 					{#each MONTHS as m, i (m)}
+						{@const blocked = monthBlocked(view.y, i + 1)}
 						<button
 							type="button"
 							role="option"
 							data-month={i}
 							aria-selected={i === view.m - 1}
+							aria-disabled={blocked ? 'true' : undefined}
+							disabled={blocked}
 							tabindex={i === monthActive ? 0 : -1}
 							class={cn(
 								'flex h-7 w-full shrink-0 items-center rounded px-2 text-sm',
 								i === view.m - 1 && 'bg-primary text-primary-foreground',
-								i === monthActive && i !== view.m - 1 && 'ring-1 ring-inset ring-ring'
+								i === monthActive && i !== view.m - 1 && 'ring-1 ring-inset ring-ring',
+								blocked && 'opacity-40'
 							)}
 							onclick={() => selectMonth(i)}
 						>
@@ -763,15 +872,18 @@
 							{@const isSel = !!sel && sel.y === cell.y && sel.m === cell.m && sel.d === cell.d}
 							{@const isFocused =
 								focused.y === cell.y && focused.m === cell.m && focused.d === cell.d}
+							{@const blocked = outOfRange(formatDay(cell.y, cell.m, cell.d))}
 							<div role="gridcell" aria-selected={isSel} class="p-0.5">
 								<button
 									type="button"
 									tabindex={isFocused ? 0 : -1}
+									disabled={blocked}
 									class={cn(
 										'flex h-8 w-8 items-center justify-center rounded-md text-sm',
 										!cell.inMonth && 'text-muted-foreground/50',
 										isFocused && !isSel && 'ring-1 ring-inset ring-ring',
-										isSel && 'bg-primary text-primary-foreground'
+										isSel && 'bg-primary text-primary-foreground',
+										blocked && 'text-muted-foreground/30 line-through'
 									)}
 									onclick={() => pick(cell.y, cell.m, cell.d)}
 								>
