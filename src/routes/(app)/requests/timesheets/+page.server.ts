@@ -90,6 +90,25 @@ function ctxOf(event: RequestEvent) {
 	}
 }
 
+async function reviewedSummary(
+	verb: string,
+	employeeIds: string[],
+	organizationId: string,
+	done: number,
+	skipped: number
+) {
+	const named = employeeIds.length
+		? await db.employee.findMany({
+				where: { id: { in: employeeIds.slice(0, 3) }, organizationId },
+				select: { firstName: true, lastName: true }
+			})
+		: []
+	const names = named.map((e) => `${e.firstName} ${e.lastName}`)
+	const more = done - names.length
+	const list = names.length ? ` (${names.join(', ')}${more > 0 ? ` and ${more} more` : ''})` : ''
+	return `${verb} ${done} timesheet${done === 1 ? '' : 's'}${list}${skipped ? `, ${skipped} skipped` : ''}.`
+}
+
 export const actions: Actions = {
 	// Single approve/reject from the review modal (matches the modal's ?/review contract).
 	review: async (event) => {
@@ -135,12 +154,14 @@ export const actions: Actions = {
 		if (!ids.length) return fail(400, { error: 'No timesheets selected' })
 
 		const ctx = ctxOf(event)
+		const reviewedFor: string[] = []
 		let done = 0
 		let skipped = 0
 		for (const id of ids) {
 			try {
-				await reviewTimesheet(id, user.organizationId, true, undefined, ctx)
+				const row = await reviewTimesheet(id, user.organizationId, true, undefined, ctx)
 				done++
+				if (row?.employeeId) reviewedFor.push(row.employeeId)
 			} catch {
 				skipped++
 			}
@@ -151,7 +172,7 @@ export const actions: Actions = {
 					'No timesheets were approved. They may already have been reviewed, or they are not yours to act on.'
 			})
 		return {
-			saved: `Approved ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
+			saved: await reviewedSummary('Approved', reviewedFor, user.organizationId, done, skipped)
 		}
 	},
 
@@ -172,12 +193,14 @@ export const actions: Actions = {
 		if (reason === '') return fail(400, { error: 'A reason is required to reject.' })
 
 		const ctx = ctxOf(event)
+		const reviewedFor: string[] = []
 		let done = 0
 		let skipped = 0
 		for (const id of ids) {
 			try {
-				await reviewTimesheet(id, user.organizationId, false, reason, ctx)
+				const row = await reviewTimesheet(id, user.organizationId, false, reason, ctx)
 				done++
+				if (row?.employeeId) reviewedFor.push(row.employeeId)
 			} catch {
 				skipped++
 			}
@@ -188,7 +211,7 @@ export const actions: Actions = {
 					'No timesheets were rejected. They may already have been reviewed, or they are not yours to act on.'
 			})
 		return {
-			saved: `Rejected ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
+			saved: await reviewedSummary('Rejected', reviewedFor, user.organizationId, done, skipped)
 		}
 	}
 }

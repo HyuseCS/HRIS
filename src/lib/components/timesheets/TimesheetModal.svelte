@@ -272,6 +272,21 @@
 	const closeFb = submitFeedback({ inner: closeOnSuccess })
 	const keepOpenFb = submitFeedback({ inner: keepOpen })
 
+	let reviewedLabel = 'Timesheet'
+	const reviewSubmit: SubmitFunction = (input) => {
+		if (ts)
+			reviewedLabel = `${ts.employee.firstName} ${ts.employee.lastName}'s timesheet for ${formatShortDate(ts.periodStart)} – ${formatShortDate(ts.periodEnd)}`
+		return closeOnSuccess(input)
+	}
+	const approveFb = submitFeedback({
+		inner: reviewSubmit,
+		success: () => `${reviewedLabel} approved.`
+	})
+	const rejectFb = submitFeedback({
+		inner: reviewSubmit,
+		success: () => `${reviewedLabel} rejected.`
+	})
+
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
 	const inputClass =
 		'h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -498,7 +513,7 @@
 				bind:this={rejectFormEl}
 				method="POST"
 				action="?/review"
-				use:enhance={closeFb.enhance}
+				use:enhance={rejectFb.enhance}
 				class="hidden"
 			>
 				<input type="hidden" name="id" value={ts.id} />
@@ -548,7 +563,7 @@
 						class="rounded-md border border-red-500/20 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50"
 						>Reject</button
 					>
-					<form method="POST" action="?/review" use:enhance={closeFb.enhance}>
+					<form method="POST" action="?/review" use:enhance={approveFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<input type="hidden" name="approved" value="true" />
 						<button
