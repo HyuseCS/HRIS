@@ -33,7 +33,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" />
 	{/if}
 
 	<!-- Add -->

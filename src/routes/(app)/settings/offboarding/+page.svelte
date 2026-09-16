@@ -37,11 +37,11 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" />
 	{/if}
 
 	<!-- Add step -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-4xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a clearance step</h2>
 		<form
 			method="POST"
@@ -89,7 +89,7 @@
 	</section>
 
 	<!-- List -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-4xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Clearance steps</h2>
 		{#if data.items.length === 0}
 			<p class="text-sm text-muted-foreground">No steps yet.</p>
