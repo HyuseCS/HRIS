@@ -683,7 +683,7 @@
 			commit()
 		}}
 		onkeydown={(e) => onkeydown?.(e)}
-		class={cn(klass, 'pr-7')}
+		class={cn(klass, 'flex-1 min-w-0 pr-7')}
 	/>
 	<button
 		bind:this={toggleBtn}
