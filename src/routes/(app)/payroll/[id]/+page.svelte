@@ -74,7 +74,11 @@
 	const overrideGuards = new Map<string, ReturnType<typeof submitFeedback>>()
 	function overrideGuard(entryId: string) {
 		let g = overrideGuards.get(entryId)
-		if (!g) overrideGuards.set(entryId, (g = submitFeedback({ error: null })))
+		if (!g)
+			overrideGuards.set(
+				entryId,
+				(g = submitFeedback({ error: null, onSuccess: () => (overrideEntryId = null) }))
+			)
 		return g
 	}
 
@@ -333,6 +337,7 @@
 											type="number"
 											step="any"
 											min="0"
+											aria-describedby={'netPay-delta-' + entry.id}
 											bind:value={overrideValue}
 											class="mt-1 flex h-8 w-36 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										/>
@@ -361,10 +366,10 @@
 										class="rounded border px-3 h-8 text-xs hover:bg-accent">Cancel</button
 									>
 								</form>
-								<p class="mt-1 text-xs text-muted-foreground">
+								<p id={'netPay-delta-' + entry.id} class="mt-1 text-xs text-muted-foreground">
 									{overrideDelta === 0
 										? 'No change'
-										: `${formatCurrency(overrideBaseline)} ${overrideSignedDelta}`}
+										: `Was ${formatCurrency(overrideBaseline)}, a change of ${overrideSignedDelta}`}
 								</p>
 							</td>
 						</tr>

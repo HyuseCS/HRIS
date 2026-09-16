@@ -63,6 +63,7 @@
 
 	// Nothing changed means nothing to warn about — submit straight through.
 	function submitRates() {
+		if (!ratesFormEl?.reportValidity()) return
 		if (changedRates.length === 0) ratesFormEl?.requestSubmit()
 		else ratesConfirm = true
 	}
