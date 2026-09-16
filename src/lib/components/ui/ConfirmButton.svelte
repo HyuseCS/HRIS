@@ -17,6 +17,15 @@
 		triggerAriaLabel?: string
 		triggerClass?: string
 		disabled?: boolean
+		/**
+		 * Refuse the action but keep the trigger focusable, so a screen reader can reach it and
+		 * read `ariaDescribedby`. Use instead of `disabled` whenever a reason is on the page.
+		 */
+		blocked?: boolean
+		/** `aria-describedby` for the TRIGGER — id(s) of the element(s) stating why it is blocked. */
+		ariaDescribedby?: string
+		/** Confirm button colour in the dialog. `primary` for routine, non-destructive saves. */
+		tone?: 'destructive' | 'primary'
 		/** Optional enhance handler (e.g. to clear a selection / close a modal on success). */
 		submit?: SubmitFunction
 		/** Hidden inputs to include in the form (ids, etc.). */
@@ -36,6 +45,9 @@
 		triggerAriaLabel,
 		triggerClass = 'text-sm font-medium text-destructive hover:underline',
 		disabled = false,
+		blocked = false,
+		ariaDescribedby,
+		tone = 'destructive',
 		submit,
 		children,
 		successMessage = null,
@@ -81,9 +93,13 @@
 	<button
 		type="button"
 		disabled={disabled || fb.busy}
+		aria-disabled={blocked || undefined}
+		aria-describedby={ariaDescribedby}
 		title={triggerTitle}
 		aria-label={triggerAriaLabel}
-		onclick={() => (open = true)}
+		onclick={() => {
+			if (!blocked) open = true
+		}}
 		class={triggerClass}
 	>
 		{#if typeof triggerLabel === 'string'}{triggerLabel}{:else}{@render triggerLabel()}{/if}
@@ -95,5 +111,6 @@
 	{title}
 	{message}
 	confirmText={fb.busy ? 'Working…' : confirmText}
+	{tone}
 	onconfirm={confirmed}
 />

@@ -19,6 +19,11 @@
 	// #297: the reason this actor may not finalize, or null. Computed server-side by the SAME
 	// helper the service guard uses, so the button and the refusal cannot disagree.
 	const finalizeBar = $derived(data.finalizeBar)
+	const finalizeBlockedBy = $derived(
+		[pendingCount > 0 && 'finalize-pending', finalizeBar && 'finalize-bar']
+			.filter(Boolean)
+			.join(' ')
+	)
 
 	const peso = (n: number) => n.toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })
 
@@ -212,7 +217,7 @@
 						undo it (#304).
 					</p>
 					{#if pendingCount > 0}
-						<p class="mt-2 text-sm text-amber-700 dark:text-amber-400">
+						<p id="finalize-pending" class="mt-2 text-sm text-amber-700 dark:text-amber-400">
 							{pendingCount} clearance item{pendingCount === 1 ? '' : 's'} still pending — clear all before
 							finalizing.
 						</p>
@@ -230,8 +235,9 @@
 							confirmText="Finalize"
 							triggerLabel="Finalize & offboard"
 							triggerTitle={finalizeBar ?? undefined}
-							disabled={pendingCount > 0 || !!finalizeBar}
-							triggerClass="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+							blocked={!!finalizeBlockedBy}
+							ariaDescribedby={finalizeBlockedBy || undefined}
+							triggerClass="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-destructive"
 						/>
 					</div>
 				</div>

@@ -7,6 +7,8 @@
 		message?: string
 		confirmText?: string
 		cancelText?: string
+		/** Colour of the confirm button. `primary` for routine saves that cannot be undone. */
+		tone?: 'destructive' | 'primary'
 		onconfirm?: () => void
 	}
 
@@ -16,6 +18,7 @@
 		message = '',
 		confirmText = 'Delete',
 		cancelText = 'Cancel',
+		tone = 'destructive',
 		onconfirm
 	}: Props = $props()
 
@@ -42,7 +45,9 @@
 		<button
 			type="button"
 			onclick={confirm}
-			class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+			class="rounded-md px-4 py-2 text-sm font-medium {tone === 'primary'
+				? 'bg-primary text-primary-foreground hover:bg-primary/90'
+				: 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}"
 			>{confirmText}</button
 		>
 	</div>
