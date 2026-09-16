@@ -113,6 +113,7 @@
 
 	// A save that changes nothing has no consequence to name, so it goes straight through.
 	function submitOverride() {
+		if (!overrideFormEl?.reportValidity()) return
 		if (overrideDelta === 0) overrideFormEl?.requestSubmit()
 		else overrideConfirm = true
 	}
@@ -335,11 +336,6 @@
 											bind:value={overrideValue}
 											class="mt-1 flex h-8 w-36 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										/>
-										<p class="mt-1 text-xs text-muted-foreground">
-											{overrideDelta === 0
-												? 'No change'
-												: `${overrideSignedDelta} vs ${formatCurrency(overrideBaseline)}`}
-										</p>
 									</div>
 									<div class="flex-1">
 										<label for={'note-' + entry.id} class="text-xs font-medium"
@@ -356,15 +352,20 @@
 										type="button"
 										onclick={submitOverride}
 										disabled={overrideG.busy}
-										class="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+										class="rounded bg-primary px-3 h-8 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 										>{overrideG.busy ? 'Saving…' : 'Save'}</button
 									>
 									<button
 										type="button"
 										onclick={() => (overrideEntryId = null)}
-										class="rounded border px-3 py-1.5 text-xs hover:bg-accent">Cancel</button
+										class="rounded border px-3 h-8 text-xs hover:bg-accent">Cancel</button
 									>
 								</form>
+								<p class="mt-1 text-xs text-muted-foreground">
+									{overrideDelta === 0
+										? 'No change'
+										: `${formatCurrency(overrideBaseline)} ${overrideSignedDelta}`}
+								</p>
 							</td>
 						</tr>
 					{/if}
