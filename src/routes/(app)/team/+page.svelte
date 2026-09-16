@@ -71,7 +71,7 @@
 					bind:value={startValue}
 					max={endValue || undefined}
 					onchange={(e) => e.currentTarget.form?.requestSubmit()}
-					class="flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<div>
@@ -83,7 +83,7 @@
 					bind:value={endValue}
 					min={startValue || undefined}
 					onchange={(e) => e.currentTarget.form?.requestSubmit()}
-					class="flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<a
