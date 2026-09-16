@@ -15,7 +15,7 @@
 	const toggleGuard = (id: string) => (toggleGuards[id] ??= createSubmitGuard())
 
 	const inputClass =
-		'h-9 w-full max-w-sm rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
 <svelte:head>
@@ -37,7 +37,7 @@
 	{/if}
 
 	<!-- Add -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-3xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a board</h2>
 		<form
 			method="POST"
@@ -66,7 +66,7 @@
 	</section>
 
 	<!-- List -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-3xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Boards</h2>
 		{#if data.boards.length === 0}
 			<p class="text-sm text-muted-foreground">No boards yet — add one above.</p>

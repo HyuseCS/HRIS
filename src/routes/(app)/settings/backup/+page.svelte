@@ -97,7 +97,7 @@
 		{/snippet}
 	</PageHeader>
 
-	<div class="card">
+	<div class="card mx-auto max-w-4xl">
 		<dl class="grid gap-4 sm:grid-cols-3">
 			<div class="space-y-1">
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
@@ -137,7 +137,12 @@
 		{/if}
 	</div>
 
-	<form method="POST" action="?/save" use:enhance={save.enhance} class="card space-y-5">
+	<form
+		method="POST"
+		action="?/save"
+		use:enhance={save.enhance}
+		class="card mx-auto max-w-4xl space-y-5"
+	>
 		<label class="flex items-start gap-3">
 			<input
 				type="checkbox"

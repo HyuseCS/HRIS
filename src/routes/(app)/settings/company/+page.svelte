@@ -59,9 +59,9 @@
 		method="POST"
 		action="?/save"
 		use:enhance={save.enhance}
-		class="rounded-lg border bg-card p-6"
+		class="mx-auto max-w-2xl rounded-lg border bg-card p-6"
 	>
-		<div class="max-w-md space-y-4">
+		<div class="space-y-4">
 			<div class="grid gap-1.5">
 				<label for="name" class="text-sm font-medium">Company name</label>
 				<input
