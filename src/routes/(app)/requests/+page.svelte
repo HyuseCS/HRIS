@@ -5,6 +5,7 @@
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import RequestCreateDialog, { TYPES } from '$lib/components/requests/RequestCreateDialog.svelte'
 	import { goto } from '$app/navigation'
+	import { page } from '$app/stores'
 	import { formatDateRange, formatShortDate } from '$lib/utils/format'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
@@ -16,7 +17,10 @@
 	const typeLabel = (t: string) => TYPES.find((x) => x.value === t)?.label ?? t
 
 	// svelte-ignore state_referenced_locally
-	let showForm = $state(Boolean((form as { values?: Record<string, string> } | null)?.values))
+	let showForm = $state(
+		Boolean((form as { values?: Record<string, string> } | null)?.values) ||
+			$page.url.searchParams.get('new') === 'leave'
+	)
 
 	// Row actions live inside an `{#each}`, so each row needs its own guard — one shared guard
 	// would grey out every row's button while a single row is in flight.
@@ -62,7 +66,12 @@
 	{/if}
 
 	{#if data.hasEmployee}
-		<RequestCreateDialog bind:open={showForm} leaveTypes={data.leaveTypes} {form} />
+		<RequestCreateDialog
+			bind:open={showForm}
+			leaveTypes={data.leaveTypes}
+			balances={data.balances}
+			{form}
+		/>
 	{/if}
 
 	<div class="overflow-x-auto rounded-lg border bg-card">

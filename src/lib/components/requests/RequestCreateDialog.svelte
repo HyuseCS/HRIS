@@ -13,6 +13,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
+	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import FileInput from '$lib/components/ui/FileInput.svelte'
 	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
@@ -24,6 +25,12 @@
 		minMonthsOfService: number
 		eligible: boolean
 	}
+	type LeaveBalance = {
+		id: string
+		leaveType: { name: string; isPaid: boolean }
+		allocated: number
+		used: number
+	}
 	type CreateResult = {
 		error?: string
 		fieldErrors?: Record<string, string[]>
@@ -33,8 +40,14 @@
 	let {
 		open = $bindable(),
 		leaveTypes,
+		balances,
 		form
-	}: { open: boolean; leaveTypes: LeaveTypeOption[]; form: CreateResult } = $props()
+	}: {
+		open: boolean
+		leaveTypes: LeaveTypeOption[]
+		balances: LeaveBalance[]
+		form: CreateResult
+	} = $props()
 
 	// Pre-select the first type the filer can actually use — defaulting to leaveTypes[0]
 	// would land on a disabled option when that type is tenure-gated (#137).
@@ -90,6 +103,12 @@
 		<h2 class="font-semibold">New Request</h2>
 
 		<div class="min-h-0 flex-1 overflow-y-auto">
+			{#if selectedType === 'LEAVE' && balances.length > 0}
+				<div class="mb-4">
+					<BalanceSummary {balances} />
+				</div>
+			{/if}
+
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<div class="space-y-4">
 					<div class="grid gap-1.5">
