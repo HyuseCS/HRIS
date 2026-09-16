@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -13,6 +14,8 @@
 
 	let showAddForm = $state(false)
 	let editingId = $state<string | null>(null)
+	let newDate = $state('')
+	let editDate = $state('')
 
 	// #108: a double-click would create a duplicate holiday / re-run the update.
 	const createHoliday = createSubmitGuard(() => async ({ result, update }) => {
@@ -69,11 +72,11 @@
 					<label for="date" class="text-sm font-medium">
 						Date <span class="text-destructive">*</span>
 					</label>
-					<input
+					<DatePicker
 						id="date"
 						name="date"
-						type="date"
 						required
+						bind:value={newDate}
 						class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 				</div>
@@ -134,6 +137,7 @@
 					onclick={() => {
 						showAddForm = true
 						editingId = null
+						newDate = ''
 					}}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 				>
@@ -169,12 +173,11 @@
 												for={'date-' + holiday.id}
 												class="text-xs font-medium text-muted-foreground">Date</label
 											>
-											<input
+											<DatePicker
 												id={'date-' + holiday.id}
 												name="date"
-												type="date"
 												required
-												value={new Date(holiday.date).toISOString().slice(0, 10)}
+												bind:value={editDate}
 												class="mt-0.5 h-8 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 											/>
 										</div>
@@ -250,7 +253,10 @@
 								<td class="px-4 py-3">
 									<div class="flex items-center justify-end gap-2">
 										<button
-											onclick={() => (editingId = holiday.id)}
+											onclick={() => {
+												editingId = holiday.id
+												editDate = new Date(holiday.date).toISOString().slice(0, 10)
+											}}
 											class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
 										>
 											Edit
