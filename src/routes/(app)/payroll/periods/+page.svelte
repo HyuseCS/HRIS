@@ -144,6 +144,7 @@
 											title="Release this period to employees?"
 											message="Every payslip in this period becomes visible to the employee it belongs to. Releasing cannot be undone — the only way back is to void the period."
 											confirmText="Release"
+											tone="neutral"
 											triggerLabel="Release"
 											triggerClass="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
 										>

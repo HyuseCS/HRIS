@@ -7,8 +7,8 @@
 		message?: string
 		confirmText?: string
 		cancelText?: string
-		/** Colour of the confirm button. `primary` for routine saves that cannot be undone. */
-		tone?: 'destructive' | 'primary'
+		/** Colour of the confirm button. `neutral` for routine saves that cannot be undone. */
+		tone?: 'destructive' | 'neutral'
 		onconfirm?: () => void
 	}
 
@@ -45,8 +45,8 @@
 		<button
 			type="button"
 			onclick={confirm}
-			class="rounded-md px-4 py-2 text-sm font-medium {tone === 'primary'
-				? 'bg-primary text-primary-foreground hover:bg-primary/90'
+			class="rounded-md px-4 py-2 text-sm font-medium {tone === 'neutral'
+				? 'bg-foreground text-background hover:bg-foreground/90'
 				: 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}"
 			>{confirmText}</button
 		>

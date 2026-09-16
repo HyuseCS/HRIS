@@ -203,6 +203,7 @@
 												title="Deactivate this login?"
 												message="{u.email} is signed out and cannot sign in again until someone re-activates them. Their employee record, payroll history and documents are untouched."
 												confirmText="Deactivate"
+												tone="neutral"
 												triggerLabel="Deactivate"
 												triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 											>
@@ -215,6 +216,7 @@
 												title="Re-activate this login?"
 												message="{u.email} can sign in again immediately and regains access to everything their roles allow."
 												confirmText="Activate"
+												tone="neutral"
 												triggerLabel="Activate"
 												triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 											>

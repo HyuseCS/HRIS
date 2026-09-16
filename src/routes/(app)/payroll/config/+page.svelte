@@ -205,5 +205,6 @@
 	title="Save premium pay multipliers?"
 	message={ratesMessage}
 	confirmText="Save multipliers"
+	tone="neutral"
 	onconfirm={() => ratesFormEl?.requestSubmit()}
 />

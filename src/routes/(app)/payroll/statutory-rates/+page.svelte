@@ -307,6 +307,7 @@
 									title="Apply these statutory rates?"
 									message={`These rates become the live tax and contribution tables for the whole organization and feed every payroll run computed from now on. Runs already computed are not recalculated.\n\nApplying:\n${p.changes.join('\n')}`}
 									confirmText="Apply rates"
+									tone="neutral"
 									triggerLabel="Confirm"
 									triggerClass="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 								>
@@ -665,6 +666,7 @@
 	title={confirmTitle}
 	message={confirmMessage}
 	confirmText={confirmLabel}
+	tone="neutral"
 	onconfirm={() => formEl?.requestSubmit()}
 />
 

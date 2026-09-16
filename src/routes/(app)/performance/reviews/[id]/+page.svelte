@@ -156,6 +156,7 @@
 					message="{r.employee.firstName} {r.employee
 						.lastName} will be able to read every rating, comment and recommendation on this evaluation. There is no un-release — once they can see it, they have seen it."
 					confirmText="Release to employee"
+					tone="neutral"
 					triggerLabel="Release to employee"
 					triggerClass="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 					successMessage="Evaluation released to the employee."

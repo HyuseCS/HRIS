@@ -24,8 +24,8 @@
 		blocked?: boolean
 		/** `aria-describedby` for the TRIGGER — id(s) of the element(s) stating why it is blocked. */
 		ariaDescribedby?: string
-		/** Confirm button colour in the dialog. `primary` for routine, non-destructive saves. */
-		tone?: 'destructive' | 'primary'
+		/** Confirm button colour in the dialog. `neutral` for routine, non-destructive saves. */
+		tone?: 'destructive' | 'neutral'
 		/** Optional enhance handler (e.g. to clear a selection / close a modal on success). */
 		submit?: SubmitFunction
 		/** Hidden inputs to include in the form (ids, etc.). */
