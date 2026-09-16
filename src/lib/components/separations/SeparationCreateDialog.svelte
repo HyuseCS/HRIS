@@ -17,6 +17,7 @@
 
 	const fieldErrors = $derived(form?.fieldErrors)
 	const fe = (name: string) => fieldErrors?.[name]?.[0]
+	// Red-border the specific field(s) the server rejected (#142).
 	const invalid = (name: string) => (fe(name) ? true : undefined)
 </script>
 
