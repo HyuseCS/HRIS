@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import { enhance } from '$app/forms'
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -60,16 +61,10 @@
 		</div>
 	{/if}
 
-	<!-- Add Holiday Form -->
-	{#if showAddForm}
-		<form
-			method="POST"
-			action="?/create"
-			use:enhance={createHoliday.enhance}
-			class="rounded-lg border bg-card p-4 space-y-4"
-		>
+	<Dialog bind:open={showAddForm} title="Add New Holiday" size="lg">
+		<form method="POST" action="?/create" use:enhance={createHoliday.enhance} class="space-y-4">
 			<h2 class="font-semibold">Add New Holiday</h2>
-			<div class="grid gap-4 sm:grid-cols-3">
+			<div class="grid gap-4">
 				<div>
 					<label for="date" class="text-sm font-medium">
 						Date <span class="text-destructive">*</span>
@@ -79,7 +74,7 @@
 						name="date"
 						type="date"
 						required
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 				</div>
 				<div>
@@ -127,7 +122,7 @@
 				</button>
 			</div>
 		</form>
-	{/if}
+	</Dialog>
 
 	<section class="space-y-3">
 		<div class="flex flex-wrap items-center justify-between gap-3">
@@ -137,12 +132,12 @@
 			>
 				<button
 					onclick={() => {
-						showAddForm = !showAddForm
+						showAddForm = true
 						editingId = null
 					}}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 				>
-					{showAddForm ? 'Cancel' : 'Add Holiday'}
+					Add Holiday
 				</button>
 			</div>
 		</div>
@@ -180,7 +175,7 @@
 												type="date"
 												required
 												value={new Date(holiday.date).toISOString().slice(0, 10)}
-												class="mt-0.5 flex h-8 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+												class="mt-0.5 h-8 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 											/>
 										</div>
 										<div class="flex-1 min-w-48">
