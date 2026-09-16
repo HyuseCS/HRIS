@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
@@ -7,6 +8,7 @@
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import TimePicker from '$lib/components/ui/TimePicker.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
@@ -98,14 +100,20 @@
 	// createTimesheet validates it server-side and refuses an overlap with a 409. Quick-picks still
 	// snap to a standard pay period. from/to are YYYY-MM-DD (UTC-midnight days).
 
+	let dayForm: HTMLFormElement | undefined = $state()
+	let rangeForm: HTMLFormElement | undefined = $state()
+	let fromValue = $state(untrack(() => data.from))
+	let toValue = $state(untrack(() => data.to))
+	$effect(() => {
+		fromValue = data.from
+		toValue = data.to
+	})
+
 	// Set the From/To inputs to a range and re-run the GET filter (same path the date inputs use).
 	function applyRange(from: string, to: string) {
-		const f = document.getElementById('from') as HTMLInputElement | null
-		const t = document.getElementById('to') as HTMLInputElement | null
-		if (!f || !t) return
-		f.value = from
-		t.value = to
-		f.form?.requestSubmit()
+		fromValue = from
+		toValue = to
+		rangeForm?.requestSubmit()
 	}
 	function pickPeriod(kind: PeriodKind, monthsBack = 0) {
 		const now = new Date()
@@ -246,22 +254,21 @@
 		<div class="flex flex-wrap items-start justify-between gap-3">
 			<!-- Filters -->
 			{#if data.view === 'team'}
-				<form method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+				<form bind:this={dayForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
 					<input type="hidden" name="view" value="team" />
 					<div class="flex flex-col gap-1">
 						<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
-						<input
+						<DatePicker
 							id="date"
 							name="date"
-							type="date"
 							value={data.date}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							onchange={() => dayForm?.requestSubmit()}
 							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
 						/>
 					</div>
 				</form>
 			{:else}
-				<form method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+				<form bind:this={rangeForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
 					{#if data.canManage}
 						<input type="hidden" name="view" value="employee" />
 						<div class="flex flex-col gap-1">
@@ -284,23 +291,21 @@
 					{/if}
 					<div class="flex flex-col gap-1">
 						<label for="from" class="text-xs font-medium text-muted-foreground">From</label>
-						<input
+						<DatePicker
 							id="from"
 							name="from"
-							type="date"
-							value={data.from}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							bind:value={fromValue}
+							onchange={() => rangeForm?.requestSubmit()}
 							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
 						/>
 					</div>
 					<div class="flex flex-col gap-1">
 						<label for="to" class="text-xs font-medium text-muted-foreground">To</label>
-						<input
+						<DatePicker
 							id="to"
 							name="to"
-							type="date"
-							value={data.to}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							bind:value={toValue}
+							onchange={() => rangeForm?.requestSubmit()}
 							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
 						/>
 					</div>
