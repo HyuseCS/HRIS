@@ -17,7 +17,7 @@
 	// <form> submits exactly the same field names it did with the old date inputs — the
 	// service layer still validates, this just constrains what a user can pick.
 	//
-	// #163 adds a fourth segment, `Custom range`, which reveals two native date inputs. #3 lets
+	// #163 adds a fourth segment, `Custom range`, which reveals two date pickers. #3 lets
 	// that range cross a month boundary, capped at one month of pay. It feeds the SAME two hidden
 	// inputs, so no consumer changes shape, and it is never pre-selected — the 15-day cutoff stays
 	// the path of least resistance.
@@ -94,10 +94,9 @@
 
 	const validCustom = $derived(customRange && !customError ? customRange : null)
 
-	// #3: the size cap expressed as native `min`/`max` on the date inputs, so the browser's own
-	// calendar greys out the unreachable days instead of letting a user pick one and only then
-	// reading an error. The inline message and the server gate both stay — this is the cheap first
-	// line, not the guard.
+	// #3: the size cap expressed as `min`/`max` on the date pickers, so the calendar disables the
+	// unreachable days instead of letting a user pick one and only then reading an error. The
+	// inline message and the server gate both stay — this is the cheap first line, not the guard.
 	//
 	// ponytail: linear probe, ceiling ~40 iterations per keystroke. The cap is one month of pay,
 	// so no acceptable range can be longer than 31 days and the loop always breaks early. Upgrade
