@@ -77,7 +77,11 @@
 		if (!g)
 			overrideGuards.set(
 				entryId,
-				(g = submitFeedback({ error: null, onSuccess: () => (overrideEntryId = null) }))
+				(g = submitFeedback({
+					success: () => `Net pay overridden for ${overrideName}.`,
+					error: null,
+					onSuccess: () => (overrideEntryId = null)
+				}))
 			)
 		return g
 	}

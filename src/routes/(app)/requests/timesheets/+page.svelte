@@ -89,10 +89,16 @@
 	function reviewGuard(id: string) {
 		let g = reviewGuards.get(id)
 		if (!g) {
-			g = submitFeedback()
+			g = submitFeedback({ success: (d) => reviewed(id, 'approved', d) })
 			reviewGuards.set(id, g)
 		}
 		return g
+	}
+
+	function reviewed(id: string, verb: string, d: Record<string, unknown> | undefined) {
+		const ts = data.pendingTimesheets.find((x) => x.id === id)
+		if (!ts) return typeof d?.saved === 'string' ? d.saved : null
+		return `${ts.employee.firstName} ${ts.employee.lastName}'s timesheet for ${formatShortDate(ts.periodStart)} – ${formatShortDate(ts.periodEnd)} ${verb}.`
 	}
 
 	// The bulk rejection reason is collected in a popup (#70 follow-up) — no
@@ -103,7 +109,7 @@
 	let singleForm = $state<HTMLFormElement>()
 	let singleId = $state('')
 	let singleReason = $state('')
-	const singleReject = submitFeedback()
+	const singleReject = submitFeedback({ success: (d) => reviewed(singleId, 'rejected', d) })
 
 	function askReason(target: NonNullable<typeof rejectTarget>) {
 		rejectTarget = target

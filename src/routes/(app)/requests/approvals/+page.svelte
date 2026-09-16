@@ -161,15 +161,26 @@
 	function approveGuard(id: string) {
 		let g = approveGuards.get(id)
 		if (!g) {
-			g = submitFeedback()
+			g = submitFeedback({ success: (d) => decided(id, 'APPROVED', d) })
 			approveGuards.set(id, g)
 		}
 		return g
 	}
 
+	const decisionVerb: Record<string, string> = {
+		APPROVED: 'approved',
+		REJECTED: 'rejected',
+		RETURNED: 'returned to the filer'
+	}
+	function decided(id: string, decision: string, d: Record<string, unknown> | undefined) {
+		const r = data.pendingRequests.find((x) => x.id === id)
+		if (!r) return typeof d?.saved === 'string' ? d.saved : null
+		return `${typeLabel(r.type)} request for ${r.employee.firstName} ${r.employee.lastName} ${decisionVerb[decision] ?? 'updated'}.`
+	}
+
 	// The popup-driven Return/Reject path submits this hidden form via `requestSubmit()`, which
 	// bypasses any button `disabled` — the guard's `cancel()` is what actually stops the double post.
-	const decide = submitFeedback()
+	const decide = submitFeedback({ success: (d) => decided(decideId, decideDecision, d) })
 
 	const unverifiedCount = (docs: { verifiedAt: Date | string | null }[]) =>
 		docs.filter((d) => !d.verifiedAt).length

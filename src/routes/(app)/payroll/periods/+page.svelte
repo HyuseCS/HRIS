@@ -144,6 +144,7 @@
 											title="Release this period to employees?"
 											message="Every payslip in this period becomes visible to the employee it belongs to. Releasing cannot be undone — the only way back is to void the period."
 											confirmText="Release"
+											successMessage="Period {p.name} released to employees."
 											tone="neutral"
 											triggerLabel="Release"
 											triggerClass="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
@@ -162,6 +163,7 @@
 											title="Void this payroll period?"
 											message="The period is marked VOIDED and any loan or cash-advance amortization it collected is credited back to the employees. This cannot be undone, and the same date range cannot be used again."
 											confirmText="Void period"
+											successMessage="Period {p.name} voided."
 											triggerLabel="Void"
 											triggerClass="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
 										>

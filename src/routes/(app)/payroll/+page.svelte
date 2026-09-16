@@ -205,6 +205,9 @@
 											title="Void this payroll run?"
 											message="The run is marked VOIDED and any amortization it collected is credited back. This cannot be undone, and the same exact period cannot be created again."
 											confirmText="Void run"
+											successMessage="Payroll run for {formatShortDate(
+												run.periodStart
+											)} – {formatShortDate(run.periodEnd)} voided."
 											triggerLabel="Void"
 											triggerClass="btn-row-danger"
 										>
