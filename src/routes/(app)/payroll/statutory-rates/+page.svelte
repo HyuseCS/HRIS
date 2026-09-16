@@ -17,7 +17,7 @@
 		inner:
 			() =>
 			async ({ update, result }) => {
-				await update()
+				await update({ reset: false })
 				if (result.type === 'success') baselineStatutory = serviceState()
 			}
 	})
