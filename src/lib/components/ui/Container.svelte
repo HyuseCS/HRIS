@@ -37,10 +37,8 @@
 	{/if}
 
 	<div
-		class="min-h-0 flex-1 overflow-y-auto {flush ? '' : 'p-4'} {empty
-			? emptyState
-				? 'flex flex-col'
-				: 'flex items-center justify-center'
+		class="flex min-h-0 flex-1 flex-col overflow-y-auto {flush ? '' : 'p-4'} {empty && !emptyState
+			? 'items-center justify-center'
 			: ''}"
 	>
 		{@render children()}
