@@ -1,7 +1,8 @@
 <script lang="ts">
 	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
@@ -34,145 +35,155 @@
 	<title>Employees — Veent HRIS</title>
 </svelte:head>
 
-<PanelPage title="Employees" tone="card" flush>
-	{#snippet actions()}
-		<a
-			href="/employees/new"
-			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-		>
-			Add Employee
-		</a>
-	{/snippet}
-
-	{#snippet toolbar()}
-		<!-- Search -->
-		<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
-		<form method="GET" class="flex flex-wrap gap-2">
-			<SearchInput
-				name="search"
-				value={search}
-				placeholder="Search by name or employee number…"
-				class="flex h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-			{#if data.showBranches}
-				<select
-					name="branch"
-					aria-label="Branch"
-					class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					<option value="">All branches</option>
-					{#each data.branches as br (br.id)}
-						<option value={br.id} selected={data.branchFilter === br.id}>{br.name}</option>
-					{/each}
-				</select>
-			{/if}
-			<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent"
-				>Search</button
-			>
-		</form>
-	{/snippet}
-
-	<div class="flex h-full flex-col">
-		<!-- Active / Offboarded tabs (#184) -->
-		<div class="sticky top-0 z-10 flex gap-1 border-b bg-card px-4">
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader title="Employees" />
+		</div>
+		<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
 			<a
-				href={tabHref('active')}
-				class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {data.tab === 'active'
-					? 'border-primary text-foreground'
-					: 'border-transparent text-muted-foreground hover:text-foreground'}"
+				href="/employees/new"
+				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 			>
-				Active <span class="text-xs text-muted-foreground">({data.activeCount})</span>
-			</a>
-			<a
-				href={tabHref('offboarded')}
-				class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {data.tab === 'offboarded'
-					? 'border-primary text-foreground'
-					: 'border-transparent text-muted-foreground hover:text-foreground'}"
-			>
-				Offboarded <span class="text-xs text-muted-foreground">({data.offboardedCount})</span>
+				Add Employee
 			</a>
 		</div>
-
-		<!-- Table -->
-		{#await data.employees}
-			<TableSkeleton rows={6} cols={6} flush />
-		{:then employees}
-			<div class="overflow-x-auto">
-				<table class="w-full min-w-max text-sm">
-					<thead class="border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
-							{#if data.showBranches}
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Branch</th>
-							{/if}
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Start Date</th>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Tenure</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y">
-						{#each employees as emp (emp.id)}
-							<tr
-								class="cursor-pointer hover:bg-muted/30"
-								role="link"
-								tabindex="0"
-								onclick={() => goto(`/employees/${emp.id}`)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault()
-										goto(`/employees/${emp.id}`)
-									}
-								}}
-							>
-								<td class="px-4 py-3">
-									<div class="font-medium">{emp.lastName}, {emp.firstName}</div>
-									<div class="text-xs text-muted-foreground">{emp.employeeNumber}</div>
-								</td>
-								<td class="px-4 py-3 text-muted-foreground">{emp.department.name}</td>
-								{#if data.showBranches}
-									<td class="px-4 py-3 text-muted-foreground">{emp.branch?.name ?? '—'}</td>
-								{/if}
-								<td class="px-4 py-3">{emp.jobTitle}</td>
-								<td class="px-4 py-3 text-muted-foreground"
-									>{emp.employmentType.replace('_', ' ')}</td
-								>
-								<td class="px-4 py-3">
-									<Badge status={emp.employmentStatus} domain="employment" />
-									{#if emp.employmentStatus === 'OFFBOARDED' && emp.endDate}
-										<div class="mt-0.5 text-xs text-muted-foreground">
-											left {formatShortDate(emp.endDate)}
-										</div>
-									{/if}
-								</td>
-								<td class="px-4 py-3 text-muted-foreground">{formatShortDate(emp.startDate)}</td>
-								<td class="px-4 py-3 text-muted-foreground"
-									>{tenureLabel(emp.startDate, emp.endDate ?? undefined)}</td
-								>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-			{#if employees.length === 0}
-				<div class="flex flex-1 items-center justify-center">
-					<EmptyState
-						variant={filtered ? 'no-results' : 'empty'}
-						title={data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}
-						description={filtered ? 'No employee matches your search or branch filter.' : undefined}
-					/>
-				</div>
-			{/if}
-		{:catch}
-			<div class="p-4">
-				<LoadError what="the employee list" />
-			</div>
-		{/await}
 	</div>
 
-	{#snippet footer()}
-		<Pagination meta={data.pagination} />
-	{/snippet}
-</PanelPage>
+	<Container tone="card" flush>
+		{#snippet toolbar()}
+			<!-- Search -->
+			<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
+			<form method="GET" class="flex flex-wrap gap-2">
+				<SearchInput
+					name="search"
+					value={search}
+					placeholder="Search by name or employee number…"
+					class="flex h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+				{#if data.showBranches}
+					<select
+						name="branch"
+						aria-label="Branch"
+						class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						<option value="">All branches</option>
+						{#each data.branches as br (br.id)}
+							<option value={br.id} selected={data.branchFilter === br.id}>{br.name}</option>
+						{/each}
+					</select>
+				{/if}
+				<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent"
+					>Search</button
+				>
+			</form>
+		{/snippet}
+
+		<div class="flex h-full flex-col">
+			<!-- Active / Offboarded tabs (#184) -->
+			<div class="sticky top-0 z-10 flex gap-1 border-b bg-card px-4">
+				<a
+					href={tabHref('active')}
+					class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {data.tab === 'active'
+						? 'border-primary text-foreground'
+						: 'border-transparent text-muted-foreground hover:text-foreground'}"
+				>
+					Active <span class="text-xs text-muted-foreground">({data.activeCount})</span>
+				</a>
+				<a
+					href={tabHref('offboarded')}
+					class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {data.tab ===
+					'offboarded'
+						? 'border-primary text-foreground'
+						: 'border-transparent text-muted-foreground hover:text-foreground'}"
+				>
+					Offboarded <span class="text-xs text-muted-foreground">({data.offboardedCount})</span>
+				</a>
+			</div>
+
+			<!-- Table -->
+			{#await data.employees}
+				<TableSkeleton rows={6} cols={6} flush />
+			{:then employees}
+				<div class="overflow-x-auto">
+					<table class="w-full min-w-max text-sm">
+						<thead class="border-b bg-muted/50">
+							<tr>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
+								{#if data.showBranches}
+									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Branch</th>
+								{/if}
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Start Date</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Tenure</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y">
+							{#each employees as emp (emp.id)}
+								<tr
+									class="cursor-pointer hover:bg-muted/30"
+									role="link"
+									tabindex="0"
+									onclick={() => goto(`/employees/${emp.id}`)}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault()
+											goto(`/employees/${emp.id}`)
+										}
+									}}
+								>
+									<td class="px-4 py-3">
+										<div class="font-medium">{emp.lastName}, {emp.firstName}</div>
+										<div class="text-xs text-muted-foreground">{emp.employeeNumber}</div>
+									</td>
+									<td class="px-4 py-3 text-muted-foreground">{emp.department.name}</td>
+									{#if data.showBranches}
+										<td class="px-4 py-3 text-muted-foreground">{emp.branch?.name ?? '—'}</td>
+									{/if}
+									<td class="px-4 py-3">{emp.jobTitle}</td>
+									<td class="px-4 py-3 text-muted-foreground"
+										>{emp.employmentType.replace('_', ' ')}</td
+									>
+									<td class="px-4 py-3">
+										<Badge status={emp.employmentStatus} domain="employment" />
+										{#if emp.employmentStatus === 'OFFBOARDED' && emp.endDate}
+											<div class="mt-0.5 text-xs text-muted-foreground">
+												left {formatShortDate(emp.endDate)}
+											</div>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-muted-foreground">{formatShortDate(emp.startDate)}</td>
+									<td class="px-4 py-3 text-muted-foreground"
+										>{tenureLabel(emp.startDate, emp.endDate ?? undefined)}</td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+				{#if employees.length === 0}
+					<div class="flex flex-1 items-center justify-center">
+						<EmptyState
+							variant={filtered ? 'no-results' : 'empty'}
+							title={data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}
+							description={filtered
+								? 'No employee matches your search or branch filter.'
+								: undefined}
+						/>
+					</div>
+				{/if}
+			{:catch}
+				<div class="p-4">
+					<LoadError what="the employee list" />
+				</div>
+			{/await}
+		</div>
+
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
+</div>
