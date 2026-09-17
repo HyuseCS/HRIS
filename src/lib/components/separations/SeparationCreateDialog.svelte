@@ -36,12 +36,8 @@
 	>
 		<h2 class="font-semibold">New Separation</h2>
 
-		{#if form?.error}
-			<Banner kind="error" message={form.error} />
-		{/if}
-
-		<div class="grid gap-3 sm:grid-cols-2">
-			<div class="grid gap-1.5">
+		<div class="grid items-start gap-3 sm:grid-cols-2">
+			<div class="grid gap-1.5 sm:col-span-2">
 				<label for="employeeId" class="text-sm font-medium"
 					>Employee <span class="text-red-500" aria-hidden="true">*</span></label
 				>
@@ -50,7 +46,7 @@
 					name="employeeId"
 					aria-invalid={invalid('employeeId')}
 					required
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+					class="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm"
 				>
 					<option value="" disabled selected>Select an employee…</option>
 					{#each employees as e (e.id)}
@@ -84,7 +80,7 @@
 					aria-invalid={invalid('effectiveDate')}
 					value=""
 					required
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+					class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 				/>
 				{#if fe('effectiveDate')}<p class="text-xs text-red-600">{fe('effectiveDate')}</p>{/if}
 			</div>
@@ -101,11 +97,16 @@
 				class="rounded-md border border-input bg-background px-3 py-2 text-sm"
 			></textarea>
 		</div>
-		<button
-			type="submit"
-			disabled={submitting}
-			class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-			>{submitting ? 'Creating…' : 'Start separation'}</button
-		>
+		<div class="flex flex-wrap items-center gap-3">
+			<button
+				type="submit"
+				disabled={submitting}
+				class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+				>{submitting ? 'Creating…' : 'Start separation'}</button
+			>
+			{#if form?.error}
+				<Banner kind="error" message={form.error} class="min-w-48 flex-1" />
+			{/if}
+		</div>
 	</form>
 </Dialog>
