@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Role } from '@prisma/client'
 
 /**
@@ -18,8 +18,9 @@ import type { Role } from '@prisma/client'
  * and still widens, because the widening happens in a different clause. Only this file covers it.
  */
 
-const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
+const { dbMock, listReportIdsFor, autoDeriveFromPunches } = vi.hoisted(() => ({
 	listReportIdsFor: vi.fn(),
+	autoDeriveFromPunches: vi.fn(),
 	dbMock: {
 		employee: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() }
 	}
@@ -27,6 +28,7 @@ const { dbMock, listReportIdsFor } = vi.hoisted(() => ({
 
 vi.mock('$lib/server/db', () => ({ db: dbMock }))
 vi.mock('$lib/server/services/supervisors', () => ({ listReportIdsFor }))
+vi.mock('$lib/server/services/attendance', () => ({ autoDeriveFromPunches }))
 
 // The real rbac module, deliberately: the claim is about the actual capability sets, and mocking
 // `canAny` would let MANAGER drift into ADMINISTER_HR_RECORDS without this file noticing.
@@ -39,7 +41,8 @@ let selfRow: { id: string } | null = null
 const event = (roles: Role[], query = '') =>
 	({
 		locals: { user: { id: 'user-1', roles, organizationId: ORG } },
-		url: new URL(`http://localhost/team${query}`)
+		url: new URL(`http://localhost/team${query}`),
+		getClientAddress: () => '203.0.113.7'
 	}) as never
 
 /** The `where` the roster query actually received. */
@@ -54,6 +57,7 @@ type Row = {
 	lastName: string
 	employeeNumber: string
 	jobTitle: string
+	attendance: { date: string; status: string }[]
 }
 let table: Row[] = []
 
@@ -90,6 +94,7 @@ const row = (id: string, over: Partial<Row> = {}): Row => ({
 	lastName: id,
 	employeeNumber: `EMP-${id}`,
 	jobTitle: 'Cook',
+	attendance: [],
 	...over
 })
 
@@ -112,12 +117,36 @@ beforeEach(() => {
 		Promise.resolve(table.filter((r) => matches(r, where)).length)
 	)
 	dbMock.employee.findMany.mockImplementation(
-		({ where, skip, take }: { where: Where; skip: number; take: number }) =>
+		({
+			where,
+			select,
+			skip,
+			take
+		}: {
+			where: Where
+			select: { attendanceDays: false | { where: { date: Date }; take: number } }
+			skip: number
+			take: number
+		}) =>
 			Promise.resolve(
 				table
 					.filter((r) => matches(r, where))
 					.slice(skip, skip + take)
-					.map((r) => ({ ...r, companyEmail: null, department: { name: 'Kitchen' } }))
+					.map(({ attendance, ...r }) => ({
+						...r,
+						companyEmail: null,
+						department: { name: 'Kitchen' },
+						...(select.attendanceDays && {
+							attendanceDays: attendance
+								.filter(
+									(a) =>
+										a.date ===
+										(select.attendanceDays as { where: { date: Date } }).where.date.toISOString()
+								)
+								.slice(0, select.attendanceDays.take)
+								.map(({ status }) => ({ status }))
+						})
+					}))
 			)
 	)
 	// Discriminate on the where-shape: the self lookup keys on `userId`, the roster on `id`.
@@ -197,17 +226,18 @@ describe('/team roster scoping (#6)', () => {
 		expect(rosterWhere().OR).toBeUndefined()
 	})
 
-	it('pages by the view: 9 on the grid, 12 on the list', async () => {
+	it('pages by the view: 15 on the grid, 10 on the list', async () => {
 		await load(event(['HR_ADMIN']))
-		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(9)
+		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(15)
 		vi.clearAllMocks()
 		await load(event(['HR_ADMIN'], '?view=list'))
-		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(12)
+		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(10)
 	})
 
 	it('selects no sensitive field', async () => {
 		await load(event(['HR_ADMIN']))
 		expect(Object.keys(dbMock.employee.findMany.mock.calls[0][0].select).sort()).toEqual([
+			'attendanceDays',
 			'branch',
 			'companyEmail',
 			'department',
@@ -218,5 +248,62 @@ describe('/team roster scoping (#6)', () => {
 			'jobTitle',
 			'lastName'
 		])
+	})
+})
+
+describe("/team grid shows today's attendance", () => {
+	afterEach(() => vi.useRealTimers())
+
+	const NOW = new Date('2026-09-17T17:30:00Z')
+	const TODAY = '2026-09-18T00:00:00.000Z'
+
+	it('derives the Manila day, then reads its status in the roster query', async () => {
+		vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
+		table = [
+			row('present', {
+				attendance: [
+					{ date: '2026-09-17T00:00:00.000Z', status: 'ABSENT' },
+					{ date: TODAY, status: 'PRESENT' }
+				]
+			}),
+			row('yesterday-only', { attendance: [{ date: '2026-09-17T00:00:00.000Z', status: 'LATE' }] })
+		]
+		const result = (await load(event(['HR_ADMIN']))) as {
+			people: { id: string; todayStatus: string | null }[]
+		}
+
+		expect(autoDeriveFromPunches).toHaveBeenCalledTimes(1)
+		const [org, range, ctx] = autoDeriveFromPunches.mock.calls[0]
+		expect(org).toBe(ORG)
+		expect(range.from.toISOString()).toBe(TODAY)
+		expect(range.to.toISOString()).toBe(TODAY)
+		expect(ctx).toEqual({
+			organizationId: ORG,
+			actorId: 'user-1',
+			actorRoles: ['HR_ADMIN'],
+			ipAddress: '203.0.113.7'
+		})
+		expect(autoDeriveFromPunches.mock.invocationCallOrder[0]).toBeLessThan(
+			dbMock.employee.findMany.mock.invocationCallOrder[0]
+		)
+
+		const { attendanceDays } = dbMock.employee.findMany.mock.calls[0][0].select
+		expect(attendanceDays.where.date.toISOString()).toBe(TODAY)
+		expect(attendanceDays).toMatchObject({ select: { status: true }, take: 1 })
+
+		expect(result.people.map(({ id, todayStatus }) => ({ id, todayStatus }))).toEqual([
+			{ id: 'present', todayStatus: 'PRESENT' },
+			{ id: 'yesterday-only', todayStatus: null }
+		])
+	})
+
+	it('does neither on the list view', async () => {
+		table = [row('present', { attendance: [{ date: TODAY, status: 'PRESENT' }] })]
+		const result = (await load(event(['HR_ADMIN'], '?view=list'))) as {
+			people: Record<string, unknown>[]
+		}
+		expect(autoDeriveFromPunches).not.toHaveBeenCalled()
+		expect(dbMock.employee.findMany.mock.calls[0][0].select.attendanceDays).toBe(false)
+		expect(result.people[0]).not.toHaveProperty('todayStatus')
 	})
 })

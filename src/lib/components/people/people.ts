@@ -1,6 +1,8 @@
+import type { AttendanceStatus } from '@prisma/client'
+
 export type PeopleView = 'grid' | 'list'
 
-export const PEOPLE_PAGE_SIZE: Record<PeopleView, number> = { grid: 9, list: 12 }
+export const PEOPLE_PAGE_SIZE: Record<PeopleView, number> = { grid: 15, list: 10 }
 
 export interface Person {
 	id: string
@@ -11,6 +13,7 @@ export interface Person {
 	companyEmail: string | null
 	employmentStatus: string
 	unit: string | null
+	todayStatus?: AttendanceStatus | null
 }
 
 export function parseView(raw: string | null): { view: PeopleView; pageSize: number } {

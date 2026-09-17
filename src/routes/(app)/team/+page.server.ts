@@ -4,12 +4,14 @@ import { db } from '$lib/server/db'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { listReportIdsFor } from '$lib/server/services/supervisors'
 import { paginate } from '$lib/server/pagination'
+import { autoDeriveFromPunches } from '$lib/server/services/attendance'
+import { manilaDayKey } from '$lib/utils/dates'
 import { parseView, type Person } from '$lib/components/people/people'
 import type { PageServerLoad } from './$types'
 
 const SEARCH_MAX = 100
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, getClientAddress }) => {
 	const user = locals.user!
 	requireAnyCapability(user.roles, 'VIEW_TEAM')
 
@@ -42,6 +44,20 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}))
 	}
 
+	const today = view === 'grid' ? new Date(manilaDayKey(new Date())) : null
+	if (today) {
+		await autoDeriveFromPunches(
+			user.organizationId,
+			{ from: today, to: today },
+			{
+				organizationId: user.organizationId,
+				actorId: user.id,
+				actorRoles: user.roles,
+				ipAddress: getClientAddress()
+			}
+		)
+	}
+
 	const total = await db.employee.count({ where })
 	const pagination = paginate(url, total, { pageSize })
 	const rows = await db.employee.findMany({
@@ -55,16 +71,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			companyEmail: true,
 			employmentStatus: true,
 			department: { select: { name: true } },
-			branch: isFoodService ? { select: { name: true } } : false
+			branch: isFoodService ? { select: { name: true } } : false,
+			attendanceDays: today ? { where: { date: today }, select: { status: true }, take: 1 } : false
 		},
 		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
 		skip: pagination.skip,
 		take: pagination.take
 	})
 
-	const people: Person[] = rows.map(({ department, branch, ...rest }) => ({
+	const people: Person[] = rows.map(({ department, branch, attendanceDays, ...rest }) => ({
 		...rest,
-		unit: isFoodService ? (branch?.name ?? null) : department.name
+		unit: isFoodService ? (branch?.name ?? null) : department.name,
+		...(today && { todayStatus: attendanceDays?.[0]?.status ?? null })
 	}))
 
 	return { people, pagination, search, view, isAdmin, isFoodService }

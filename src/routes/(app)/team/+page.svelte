@@ -36,7 +36,7 @@
 	<PageHeader {title} />
 
 	<div class="overflow-hidden rounded-lg border bg-card">
-		<div class="flex flex-wrap items-center gap-3 border-b p-4">
+		<div class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
 			<form method="GET" role="search" class="w-full sm:w-auto sm:min-w-0 sm:flex-1">
 				<label for="team-search" class="sr-only">Search people</label>
 				<input
@@ -93,7 +93,7 @@
 				hrefFor={employeeHref}
 			/>
 		{:else}
-			<ul class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+			<ul class="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
 				{#each data.people as person (person.id)}
 					<li class="min-w-0"><EmployeeCard {person} href={employeeHref(person)} /></li>
 				{/each}
