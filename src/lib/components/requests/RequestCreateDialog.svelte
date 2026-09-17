@@ -243,7 +243,7 @@
 									}}
 									aria-invalid={invalid('startDate')}
 									aria-describedby={describedBy('startDate')}
-									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+									class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 								/>
 								{@render fieldError('startDate')}
 							</div>
@@ -258,7 +258,7 @@
 									value={submitted?.endDate ?? ''}
 									aria-invalid={invalid('endDate')}
 									aria-describedby={describedBy('endDate')}
-									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+									class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 								/>
 								{@render fieldError('endDate')}
 							</div>
@@ -274,7 +274,7 @@
 									value={submitted?.date ?? ''}
 									aria-invalid={invalid('date')}
 									aria-describedby={describedBy('date')}
-									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+									class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 								/>
 								{@render fieldError('date')}
 							</div>
