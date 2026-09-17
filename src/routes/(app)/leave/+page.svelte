@@ -1,6 +1,6 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import PanelPage from '$lib/components/ui/PanelPage.svelte'
 	import { goto } from '$app/navigation'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { fly } from 'svelte/transition'
@@ -24,8 +24,6 @@
 	let busy = $state(false)
 	const ids = $derived(data.requests.map((r) => r.id))
 	const allSelected = $derived(ids.length > 0 && ids.every((id) => selected.includes(id)))
-	// Checkbox column + Leave Type/Dates/Stage/Status/Filed, plus Employee for managers.
-	const cols = $derived(data.isManager ? 7 : 6)
 
 	function toggle(id: string) {
 		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
@@ -48,59 +46,34 @@
 	<title>Leave — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6 {selected.length ? 'pb-24' : ''}">
+{#snippet actions()}
+	<a href="/leave/balances" class="rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent">
+		View all balances
+	</a>
+{/snippet}
+
+{#snippet notice()}
 	<!-- The description carries a link, which PageHeader's string `description` cannot, so it
 	     stays its own paragraph directly under the title. -->
-	<PageHeader title="Leave" />
 	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
 		Your leave balances and history. File leave from
 		<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
 	</p>
-
-	<!-- Balances. The org-wide link sits beside the balances it widens, not on the title row. -->
-	{#if data.canViewOrgBalances}
-		<div class="flex justify-end">
-			<a
-				href="/leave/balances"
-				class="rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-			>
-				View all balances
-			</a>
-		</div>
-	{/if}
 	{#if data.balances.length > 0}
 		<BalanceSummary balances={data.balances} />
 	{/if}
+{/snippet}
 
-	<!-- Bulk actions; appear once rows are selected -->
-	{#if selected.length}
-		<div
-			class="fixed bottom-4 left-1/2 z-30 inline-flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border bg-card px-4 py-2 shadow-lg"
-			transition:fly={{ y: 20, duration: 120 }}
-		>
-			<span class="text-sm font-medium">{selected.length} selected</span>
-			<div class="flex items-center gap-2">
-				<button
-					onclick={() => (selected = [])}
-					class="mr-1 text-sm text-muted-foreground hover:underline">Clear</button
-				>
-				<ConfirmButton
-					action="?/deleteMany"
-					title="Delete selected leave requests?"
-					message="Selected leave requests will be permanently deleted. Approved requests, and any you're not allowed to remove, are skipped."
-					triggerLabel="Delete selected"
-					triggerClass="rounded-md border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/20 disabled:opacity-50 dark:text-red-400"
-					disabled={busy}
-					submit={clearOnSuccess}
-				>
-					<input type="hidden" name="ids" value={selected.join(',')} />
-				</ConfirmButton>
-			</div>
-		</div>
-	{/if}
-
+<PanelPage
+	title="Leave"
+	tone="card"
+	flush
+	actions={data.canViewOrgBalances ? actions : undefined}
+	{notice}
+	empty={data.requests.length === 0}
+>
 	<!-- Requests table -->
-	<div class="overflow-x-auto rounded-lg border bg-card">
+	<div class="overflow-x-auto">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -173,14 +146,48 @@
 							>{formatShortDate(req.createdAt)}</td
 						>
 					</tr>
-				{:else}
-					<tr>
-						<td colspan={cols} class="p-0"><EmptyState title="No leave requests" /></td>
-					</tr>
 				{/each}
 			</tbody>
 		</table>
 	</div>
 
-	<Pagination meta={data.pagination} />
-</div>
+	{#snippet emptyState()}
+		<EmptyState title="No leave requests" />
+	{/snippet}
+
+	{#snippet footer()}
+		{#if selected.length}
+			<Pagination meta={data.pagination} />
+			<div class="h-12" aria-hidden="true"></div>
+		{:else}
+			<Pagination meta={data.pagination} />
+		{/if}
+	{/snippet}
+</PanelPage>
+
+<!-- Bulk actions; appear once rows are selected -->
+{#if selected.length}
+	<div
+		class="fixed bottom-4 left-1/2 z-30 inline-flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border bg-card px-4 py-2 shadow-lg"
+		transition:fly={{ y: 20, duration: 120 }}
+	>
+		<span class="text-sm font-medium">{selected.length} selected</span>
+		<div class="flex items-center gap-2">
+			<button
+				onclick={() => (selected = [])}
+				class="mr-1 text-sm text-muted-foreground hover:underline">Clear</button
+			>
+			<ConfirmButton
+				action="?/deleteMany"
+				title="Delete selected leave requests?"
+				message="Selected leave requests will be permanently deleted. Approved requests, and any you're not allowed to remove, are skipped."
+				triggerLabel="Delete selected"
+				triggerClass="rounded-md border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/20 disabled:opacity-50 dark:text-red-400"
+				disabled={busy}
+				submit={clearOnSuccess}
+			>
+				<input type="hidden" name="ids" value={selected.join(',')} />
+			</ConfirmButton>
+		</div>
+	</div>
+{/if}

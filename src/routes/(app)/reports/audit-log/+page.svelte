@@ -134,129 +134,129 @@
 	empty={data.logs.length === 0}
 >
 	<!-- Table -->
-	{#if data.logs.length === 0}
-		<div class="text-muted-foreground">No audit log entries match the selected filters.</div>
-	{:else}
-		<div class="overflow-x-auto">
-			<table class="w-full text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-							>Timestamp</th
-						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-							>Actor</th
-						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-							>Action</th
-						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-							>Entity Type</th
-						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-							>Entity ID</th
-						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Changes</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y">
-					{#each data.logs as log (log.id)}
-						<!-- At most one entry is revealed at a time — whichever ?/reveal just returned. -->
-						{@const revealed = form?.revealed}
-						<tr class="hover:bg-muted/30">
-							<td class="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
-								{new Date(log.createdAt).toLocaleString('en-PH', {
-									year: 'numeric',
-									month: 'short',
-									day: 'numeric',
-									hour: '2-digit',
-									minute: '2-digit',
-									second: '2-digit'
-								})}
-							</td>
-							<td class="px-4 py-3 whitespace-nowrap">
-								<span class="font-medium">{log.actor.email}</span>
-								<span class="ml-1 rounded bg-muted px-1 py-0.5 text-xs text-muted-foreground"
-									>{log.actorRoles.join(', ')}</span
+	<div class="overflow-x-auto">
+		<table class="w-full min-w-[70rem] table-fixed text-sm">
+			<thead class="border-b bg-muted/50">
+				<tr>
+					<th class="w-52 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						>Timestamp</th
+					>
+					<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						>Actor</th
+					>
+					<th class="w-44 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						>Action</th
+					>
+					<th class="w-52 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						>Entity Type</th
+					>
+					<th class="w-36 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						>Entity ID</th
+					>
+					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Changes</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y">
+				{#each data.logs as log (log.id)}
+					<!-- At most one entry is revealed at a time — whichever ?/reveal just returned. -->
+					{@const revealed = form?.revealed}
+					<tr class="hover:bg-muted/30">
+						<td class="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
+							{new Date(log.createdAt).toLocaleString('en-PH', {
+								year: 'numeric',
+								month: 'short',
+								day: 'numeric',
+								hour: '2-digit',
+								minute: '2-digit',
+								second: '2-digit'
+							})}
+						</td>
+						<td class="break-words px-4 py-3">
+							<span class="font-medium">{log.actor.email}</span>
+							<span class="ml-1 rounded bg-muted px-1 py-0.5 text-xs text-muted-foreground"
+								>{log.actorRoles.join(', ')}</span
+							>
+						</td>
+						<td class="px-4 py-3 whitespace-nowrap">
+							<span
+								class="rounded px-2 py-0.5 text-xs font-medium {log.action === 'CREATE'
+									? 'bg-green-500/15 text-green-800 dark:text-green-400'
+									: log.action === 'DELETE'
+										? 'bg-red-500/15 text-red-700 dark:text-red-400'
+										: log.action === 'UPDATE'
+											? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+											: log.action === 'LOGIN_FAILED'
+												? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
+												: 'bg-muted text-muted-foreground'}"
+							>
+								{log.action}
+							</span>
+						</td>
+						<td class="px-4 py-3 whitespace-nowrap">{log.entityType}</td>
+						<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
+							{log.entityId.slice(0, 12)}…
+						</td>
+						<!--
+								#242: the payload never arrives with the list. One entry at a time, through the
+								audited ?/reveal action — reaching it is itself a recorded event.
+							-->
+						<td class="px-4 py-3">
+							{#if !log.hasChanges}
+								<span class="text-xs text-muted-foreground">—</span>
+							{:else if revealed && revealed.id === log.id}
+								<div
+									class="space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									aria-live="polite"
+									tabindex="-1"
+									use:focusOnMount
 								>
-							</td>
-							<td class="px-4 py-3 whitespace-nowrap">
-								<span
-									class="rounded px-2 py-0.5 text-xs font-medium {log.action === 'CREATE'
-										? 'bg-green-500/15 text-green-800 dark:text-green-400'
-										: log.action === 'DELETE'
-											? 'bg-red-500/15 text-red-700 dark:text-red-400'
-											: log.action === 'UPDATE'
-												? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
-												: log.action === 'LOGIN_FAILED'
-													? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
-													: 'bg-muted text-muted-foreground'}"
-								>
-									{log.action}
-								</span>
-							</td>
-							<td class="px-4 py-3 whitespace-nowrap">{log.entityType}</td>
-							<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
-								{log.entityId.slice(0, 12)}…
-							</td>
-							<!--
-									#242: the payload never arrives with the list. One entry at a time, through the
-									audited ?/reveal action — reaching it is itself a recorded event.
-								-->
-							<td class="px-4 py-3">
-								{#if !log.hasChanges}
-									<span class="text-xs text-muted-foreground">—</span>
-								{:else if revealed && revealed.id === log.id}
-									<div
-										class="space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										aria-live="polite"
-										tabindex="-1"
-										use:focusOnMount
+									{#if revealed.oldValue !== null}
+										<div>
+											<span class="text-xs font-medium text-red-600">Before:</span>
+											<pre
+												class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
+													revealed.oldValue,
+													null,
+													2
+												)}</pre>
+										</div>
+									{/if}
+									{#if revealed.newValue !== null}
+										<div>
+											<span class="text-xs font-medium text-green-600">After:</span>
+											<pre
+												class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
+													revealed.newValue,
+													null,
+													2
+												)}</pre>
+										</div>
+									{/if}
+								</div>
+							{:else if data.canReveal}
+								<form method="POST" action="?/reveal">
+									<input type="hidden" name="id" value={log.id} />
+									<button
+										type="submit"
+										class="rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										aria-label="Reveal the recorded changes for {log.action} on {log.entityType} {log.entityId} — this reveal is logged"
 									>
-										{#if revealed.oldValue !== null}
-											<div>
-												<span class="text-xs font-medium text-red-600">Before:</span>
-												<pre
-													class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
-														revealed.oldValue,
-														null,
-														2
-													)}</pre>
-											</div>
-										{/if}
-										{#if revealed.newValue !== null}
-											<div>
-												<span class="text-xs font-medium text-green-600">After:</span>
-												<pre
-													class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
-														revealed.newValue,
-														null,
-														2
-													)}</pre>
-											</div>
-										{/if}
-									</div>
-								{:else if data.canReveal}
-									<form method="POST" action="?/reveal">
-										<input type="hidden" name="id" value={log.id} />
-										<button
-											type="submit"
-											class="rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-											aria-label="Reveal the recorded changes for {log.action} on {log.entityType} {log.entityId} — this reveal is logged"
-										>
-											Reveal changes
-										</button>
-									</form>
-								{:else}
-									<span class="text-xs text-muted-foreground">Hidden</span>
-								{/if}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
+										Reveal changes
+									</button>
+								</form>
+							{:else}
+								<span class="text-xs text-muted-foreground">Hidden</span>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+
+	{#snippet emptyState()}
+		<div class="text-muted-foreground">No audit log entries match the selected filters.</div>
+	{/snippet}
 
 	{#snippet footer()}
 		<Pagination meta={data.pagination} />

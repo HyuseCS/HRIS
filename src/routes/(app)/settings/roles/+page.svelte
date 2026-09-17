@@ -179,7 +179,113 @@
 		<BackButton fallback="/settings" label="Settings" preferFallback />
 	{/snippet}
 
-	{#if data.users.length === 0}
+	<div class="overflow-x-auto">
+		<table class="w-full min-w-[67rem] table-fixed text-sm sm:min-w-[76rem]">
+			<thead class="border-b bg-muted/50">
+				<tr>
+					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
+					<th class="w-48 px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
+					<th class="w-52 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+					<th class="w-[19rem] px-4 py-3 text-left font-medium text-muted-foreground sm:w-[28rem]"
+						>Role</th
+					>
+					<th class="relative w-32 px-4 py-3"><span class="sr-only">Actions</span></th>
+				</tr>
+			</thead>
+			<tbody class="divide-y">
+				{#each data.users as u (u.id)}
+					{@const editable = canManageRoles && u.id !== data.user.id}
+					<tr class="hover:bg-muted/30">
+						<td class="break-words px-4 py-3 font-medium">{u.email}</td>
+						<td class="break-words px-4 py-3 text-muted-foreground">{u.employeeName ?? '—'}</td>
+						<td class="px-4 py-3">
+							<div class="flex items-center gap-2">
+								<Badge
+									status={u.isActive ? 'ACTIVE' : 'INACTIVE'}
+									tone={u.isActive ? 'green' : 'gray'}
+								/>
+								{#if canManageActive}
+									{#if u.isActive}
+										<!-- Both directions confirm (owner decision 11-09-26): deactivating locks a person out,
+									     re-activating hands their access back. Each branch names its own consequence.
+									     #108: ConfirmButton's busy state is this form's single-submit guard. -->
+										<ConfirmButton
+											action="?/setActive"
+											title="Deactivate this login?"
+											message="{u.email} is signed out and cannot sign in again until someone re-activates them. Their employee record, payroll history and documents are untouched."
+											confirmText="Deactivate"
+											successMessage="Login for {u.email} deactivated."
+											tone="neutral"
+											triggerLabel="Deactivate"
+											triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+										>
+											<input type="hidden" name="userId" value={u.id} />
+											<input type="hidden" name="isActive" value="false" />
+										</ConfirmButton>
+									{:else}
+										<ConfirmButton
+											action="?/setActive"
+											title="Re-activate this login?"
+											message="{u.email} can sign in again immediately and regains access to everything their roles allow."
+											confirmText="Activate"
+											successMessage="Login for {u.email} activated."
+											tone="neutral"
+											triggerLabel="Activate"
+											triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+										>
+											<input type="hidden" name="userId" value={u.id} />
+											<input type="hidden" name="isActive" value="true" />
+										</ConfirmButton>
+									{/if}
+								{/if}
+							</div>
+						</td>
+						<!-- Read display, for every caller. The pills carry no checkbox, no hover and no
+					     focus ring, because nothing here is a control.
+
+					     #248: `editable` gates on the rule the service actually enforces (no
+					     self-role-change), not on the target being a CEO. The old CEO block was UI-only
+					     — the v1 PATCH twin never had it — and it made CEO a role that could be granted
+					     but never revoked. A CEO row is editable; setUserRoles refuses to remove the
+					     last active one (409). -->
+						<td class="px-4 py-3">
+							<div class="flex w-[17rem] flex-wrap gap-1.5 sm:w-[26rem]">
+								<!-- Truncation only where the overflow is recoverable. An editable row hides the
+							     tail behind a pill that opens the dialog; a read-only row has no dialog to
+							     open, so hiding roles there would just be data the reader cannot get back. -->
+								{#each editable ? u.roles.slice(0, PILL_CAP) : u.roles as r (r)}
+									<span class={PILL}>{label(r)}</span>
+								{/each}
+								{#if editable && u.roles.length > PILL_CAP}
+									<button
+										type="button"
+										onclick={() => openEditor(u.id)}
+										class="{PILL} cursor-pointer transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+									>
+										+{u.roles.length - PILL_CAP} more
+									</button>
+								{/if}
+							</div>
+						</td>
+						<td class="px-4 py-3 text-right">
+							{#if editable}
+								<button
+									type="button"
+									onclick={() => openEditor(u.id)}
+									class="btn-row min-h-11 gap-1.5 sm:min-h-0"
+								>
+									<Pencil class="h-3 w-3 shrink-0" aria-hidden="true" />
+									Edit roles
+								</button>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+
+	{#snippet emptyState()}
 		{#if data.q}
 			<EmptyState variant="no-results" title="No users match ‘{data.q}’.">
 				{#snippet action()}
@@ -194,111 +300,7 @@
 		{:else}
 			<EmptyState title="No users found" />
 		{/if}
-	{:else}
-		<div class="overflow-x-auto">
-			<table class="w-full min-w-max text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
-						<th class="relative px-4 py-3"><span class="sr-only">Actions</span></th>
-					</tr>
-				</thead>
-				<tbody class="divide-y">
-					{#each data.users as u (u.id)}
-						{@const editable = canManageRoles && u.id !== data.user.id}
-						<tr class="hover:bg-muted/30">
-							<td class="px-4 py-3 font-medium">{u.email}</td>
-							<td class="px-4 py-3 text-muted-foreground">{u.employeeName ?? '—'}</td>
-							<td class="px-4 py-3">
-								<div class="flex items-center gap-2">
-									<Badge
-										status={u.isActive ? 'ACTIVE' : 'INACTIVE'}
-										tone={u.isActive ? 'green' : 'gray'}
-									/>
-									{#if canManageActive}
-										{#if u.isActive}
-											<!-- Both directions confirm (owner decision 11-09-26): deactivating locks a person out,
-										     re-activating hands their access back. Each branch names its own consequence.
-										     #108: ConfirmButton's busy state is this form's single-submit guard. -->
-											<ConfirmButton
-												action="?/setActive"
-												title="Deactivate this login?"
-												message="{u.email} is signed out and cannot sign in again until someone re-activates them. Their employee record, payroll history and documents are untouched."
-												confirmText="Deactivate"
-												successMessage="Login for {u.email} deactivated."
-												tone="neutral"
-												triggerLabel="Deactivate"
-												triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-											>
-												<input type="hidden" name="userId" value={u.id} />
-												<input type="hidden" name="isActive" value="false" />
-											</ConfirmButton>
-										{:else}
-											<ConfirmButton
-												action="?/setActive"
-												title="Re-activate this login?"
-												message="{u.email} can sign in again immediately and regains access to everything their roles allow."
-												confirmText="Activate"
-												successMessage="Login for {u.email} activated."
-												tone="neutral"
-												triggerLabel="Activate"
-												triggerClass="rounded-md border px-2 py-0.5 text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-											>
-												<input type="hidden" name="userId" value={u.id} />
-												<input type="hidden" name="isActive" value="true" />
-											</ConfirmButton>
-										{/if}
-									{/if}
-								</div>
-							</td>
-							<!-- Read display, for every caller. The pills carry no checkbox, no hover and no
-						     focus ring, because nothing here is a control.
-
-						     #248: `editable` gates on the rule the service actually enforces (no
-						     self-role-change), not on the target being a CEO. The old CEO block was UI-only
-						     — the v1 PATCH twin never had it — and it made CEO a role that could be granted
-						     but never revoked. A CEO row is editable; setUserRoles refuses to remove the
-						     last active one (409). -->
-							<td class="px-4 py-3">
-								<div class="flex w-[17rem] flex-wrap gap-1.5 sm:w-[26rem]">
-									<!-- Truncation only where the overflow is recoverable. An editable row hides the
-								     tail behind a pill that opens the dialog; a read-only row has no dialog to
-								     open, so hiding roles there would just be data the reader cannot get back. -->
-									{#each editable ? u.roles.slice(0, PILL_CAP) : u.roles as r (r)}
-										<span class={PILL}>{label(r)}</span>
-									{/each}
-									{#if editable && u.roles.length > PILL_CAP}
-										<button
-											type="button"
-											onclick={() => openEditor(u.id)}
-											class="{PILL} cursor-pointer transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-										>
-											+{u.roles.length - PILL_CAP} more
-										</button>
-									{/if}
-								</div>
-							</td>
-							<td class="px-4 py-3 text-right">
-								{#if editable}
-									<button
-										type="button"
-										onclick={() => openEditor(u.id)}
-										class="btn-row min-h-11 gap-1.5 sm:min-h-0"
-									>
-										<Pencil class="h-3 w-3 shrink-0" aria-hidden="true" />
-										Edit roles
-									</button>
-								{/if}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
+	{/snippet}
 
 	{#snippet footer()}
 		<Pagination meta={data.pagination} />
