@@ -125,6 +125,12 @@
 				<span class="sr-only">, {tabs[0].count}</span>
 			{/if}
 		</h2>
-		{@render panel(tabs[0].key)}
+		{#if bare}
+			<div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+				{@render panel(tabs[0].key)}
+			</div>
+		{:else}
+			{@render panel(tabs[0].key)}
+		{/if}
 	{/if}
 </div>
