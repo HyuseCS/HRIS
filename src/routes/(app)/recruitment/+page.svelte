@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import JobPostingCreateDialog from '$lib/components/recruitment/JobPostingCreateDialog.svelte'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
@@ -10,7 +11,6 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
-	let creating = $state(false)
 	let publishing = $state(false)
 	let selectedIds = $state<string[]>([])
 
@@ -38,9 +38,7 @@
 	<title>Recruitment — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Recruitment" />
-
+{#snippet notices()}
 	<!-- The posting actions sit above the list they publish into, not on the title row. -->
 	<div class="flex flex-wrap items-center justify-end gap-2">
 		<div class="flex items-center gap-2">
@@ -72,7 +70,7 @@
 				</form>
 			{/if}
 			<button
-				onclick={() => (showCreate = !showCreate)}
+				onclick={() => (showCreate = true)}
 				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 			>
 				New Job Posting
@@ -88,7 +86,7 @@
 			{form.message}
 		</div>
 	{/if}
-	{#if form?.error}
+	{#if form?.error && !showCreate}
 		<div
 			role="alert"
 			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
@@ -96,73 +94,18 @@
 			{form.error}
 		</div>
 	{/if}
+{/snippet}
 
-	{#if showCreate}
-		<form
-			method="POST"
-			action="?/create"
-			use:enhance={() => {
-				creating = true
-				return async ({ update, result }) => {
-					await update()
-					creating = false
-					if (result.type === 'success') showCreate = false
-				}
-			}}
-			class="rounded-lg border bg-card p-4 space-y-3"
-		>
-			<h2 class="font-semibold">Create Job Posting</h2>
-			<div class="grid gap-3 sm:grid-cols-2">
-				<div>
-					<label for="title" class="text-sm font-medium">Job Title</label>
-					<input
-						id="title"
-						name="title"
-						required
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-				<div>
-					<label for="departmentId" class="text-sm font-medium">Department</label>
-					<select
-						id="departmentId"
-						name="departmentId"
-						required
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						{#each data.departments as dept (dept.id)}
-							<option value={dept.id}>{dept.name}</option>
-						{/each}
-					</select>
-				</div>
-				<div class="sm:col-span-2">
-					<label for="description" class="text-sm font-medium">Description</label>
-					<textarea
-						id="description"
-						name="description"
-						required
-						rows="4"
-						class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					></textarea>
-				</div>
-			</div>
-			<div class="flex gap-2 justify-end">
-				<button
-					type="button"
-					onclick={() => (showCreate = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-				<button
-					type="submit"
-					disabled={creating}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-					>{creating ? 'Creating…' : 'Create Draft'}</button
-				>
-			</div>
-		</form>
-	{/if}
-
-	<div class="overflow-x-auto rounded-lg border bg-card">
+<PanelPage
+	title="Recruitment"
+	tone="card"
+	flush
+	notice={notices}
+	empty={data.postings.length === 0}
+>
+	{#if data.postings.length === 0}
+		<EmptyState title="No job postings yet" />
+	{:else}
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -225,14 +168,14 @@
 							>{jp.postedAt ? formatShortDate(jp.postedAt) : '—'}</td
 						>
 					</tr>
-				{:else}
-					<tr>
-						<td colspan="6" class="p-0"><EmptyState title="No job postings yet" /></td>
-					</tr>
 				{/each}
 			</tbody>
 		</table>
-	</div>
+	{/if}
 
-	<Pagination meta={data.pagination} />
-</div>
+	{#snippet footer()}
+		<Pagination meta={data.pagination} />
+	{/snippet}
+</PanelPage>
+
+<JobPostingCreateDialog bind:open={showCreate} departments={data.departments} {form} />
