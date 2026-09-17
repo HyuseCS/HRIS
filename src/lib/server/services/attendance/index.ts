@@ -105,15 +105,48 @@ export function listAttendanceDays(
 	})
 }
 
+function teamDayWhere(
+	organizationId: string,
+	date: Date,
+	exceptionsOnly: boolean
+): Prisma.EmployeeWhereInput {
+	return {
+		organizationId,
+		employmentStatus: 'ACTIVE',
+		...(exceptionsOnly
+			? {
+					OR: [
+						{ attendanceDays: { none: { date } } },
+						{
+							attendanceDays: {
+								some: { date, status: { in: ['ABSENT', 'INCOMPLETE', 'LATE'] } }
+							}
+						}
+					]
+				}
+			: {})
+	}
+}
+
+export function countTeamDay(organizationId: string, dateKey: string, exceptionsOnly: boolean) {
+	return db.employee.count({
+		where: teamDayWhere(organizationId, new Date(dateKey), exceptionsOnly)
+	})
+}
+
 /**
  * Team view for a single PHT day: every active employee with their AttendanceDay for that
  * day (or null if none derived yet). AttendanceDays are stored keyed at midnight UTC of the
  * PHT day (see deriveRange), so `dateKey` ('YYYY-MM-DD') is matched exactly.
  */
-export async function listTeamDay(organizationId: string, dateKey: string) {
+export async function listTeamDay(
+	organizationId: string,
+	dateKey: string,
+	opts: { exceptionsOnly?: boolean; skip?: number; take?: number } = {}
+) {
 	const date = new Date(dateKey)
 	const employees = await db.employee.findMany({
-		where: { organizationId, employmentStatus: 'ACTIVE' },
+		where: teamDayWhere(organizationId, date, opts.exceptionsOnly ?? false),
 		select: {
 			id: true,
 			firstName: true,
@@ -122,7 +155,9 @@ export async function listTeamDay(organizationId: string, dateKey: string) {
 			department: { select: { name: true } },
 			attendanceDays: { where: { date }, take: 1 }
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+		skip: opts.skip,
+		take: opts.take
 	})
 
 	return employees.map((e) => ({

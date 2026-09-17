@@ -6,6 +6,7 @@ import {
 	countAttendanceDays,
 	listAttendanceDays,
 	listTeamDay,
+	countTeamDay,
 	deriveRange,
 	autoDeriveFromPunches,
 	correctDay,
@@ -94,12 +95,16 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	}
 
 	// #64: paginate the employee-view day rows (one count + one page query); the
-	// team view is a single day and stays unpaginated.
+	// team view is paginated the same way.
+	const exceptionsOnly = view === 'team' && url.searchParams.get('exceptions') === '1'
 	const dayTotal =
 		view === 'employee' && selectedEmployeeId
 			? await countAttendanceDays(selectedEmployeeId, new Date(from), new Date(to))
 			: 0
-	const pagination = paginate(url, dayTotal)
+	const pagination = paginate(
+		url,
+		view === 'team' ? await countTeamDay(user.organizationId, date, exceptionsOnly) : dayTotal
+	)
 
 	const days =
 		view === 'employee' && selectedEmployeeId
@@ -109,7 +114,14 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 				})
 			: []
 
-	const team = view === 'team' ? await listTeamDay(user.organizationId, date) : []
+	const team =
+		view === 'team'
+			? await listTeamDay(user.organizationId, date, {
+					exceptionsOnly,
+					skip: pagination.skip,
+					take: pagination.take
+				})
+			: []
 
 	return {
 		canManage,
@@ -122,6 +134,7 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		date,
 		days,
 		team,
+		exceptionsOnly,
 		pagination,
 		maxRangeDays: MAX_RANGE_DAYS,
 		// #200: the import card states its own limits, so an operator learns them before a 413

@@ -3,6 +3,8 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import { goto } from '$app/navigation'
+	import { page } from '$app/stores'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -177,9 +179,14 @@
 	// whole sheet. A missing team record counts as an exception (no punch = didn't time in).
 	let exceptionsOnly = $state(false)
 	const isException = (s: string) => s === 'ABSENT' || s === 'INCOMPLETE' || s === 'LATE'
-	const teamRows = $derived(
-		exceptionsOnly ? data.team.filter((t) => !t.day || isException(t.day.status)) : data.team
-	)
+	const teamRows = $derived(data.team)
+	function setTeamExceptions(on: boolean) {
+		const url = new URL($page.url)
+		if (on) url.searchParams.set('exceptions', '1')
+		else url.searchParams.delete('exceptions')
+		url.searchParams.delete('page')
+		goto(url)
+	}
 	const dayRows = $derived(
 		exceptionsOnly ? data.days.filter((d) => isException(d.status)) : data.days
 	)
@@ -256,6 +263,7 @@
 			{#if data.view === 'team'}
 				<form bind:this={dayForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
 					<input type="hidden" name="view" value="team" />
+					{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
 					<div class="flex flex-col gap-1">
 						<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
 						<DatePicker
@@ -340,12 +348,12 @@
 							By employee
 						</a>
 						<a
-							href="?view=team&date={data.date}"
+							href="/team"
 							class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
 								? 'bg-primary text-primary-foreground'
 								: 'text-muted-foreground hover:bg-accent'}"
 						>
-							Whole team (day)
+							Whole team
 						</a>
 					</div>
 					{#if data.view === 'team'}
@@ -457,16 +465,25 @@
 			{#if data.canManage}
 				<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
 				<label class="inline-flex cursor-pointer items-center gap-2 text-sm">
-					<input
-						type="checkbox"
-						bind:checked={exceptionsOnly}
-						class="h-4 w-4 rounded border-input"
-					/>
+					{#if data.view === 'team'}
+						<input
+							type="checkbox"
+							checked={data.exceptionsOnly}
+							onchange={(e) => setTeamExceptions(e.currentTarget.checked)}
+							class="h-4 w-4 rounded border-input"
+						/>
+					{:else}
+						<input
+							type="checkbox"
+							bind:checked={exceptionsOnly}
+							class="h-4 w-4 rounded border-input"
+						/>
+					{/if}
 					<span class="font-medium">Exceptions only</span>
 					<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
 				</label>
 				<span class="ml-auto text-xs text-muted-foreground"
-					>{data.view === 'team' ? teamRows.length : dayRows.length} shown</span
+					>{data.view === 'team' ? data.pagination.total : dayRows.length} shown</span
 				>
 			{/if}
 		</div>
@@ -749,9 +766,9 @@
 						<tr
 							><td colspan={data.showAmPm ? 12 : 8} class="p-0"
 								><EmptyState
-									variant={exceptionsOnly ? 'no-results' : 'empty'}
-									title={exceptionsOnly ? 'No exceptions today' : 'No active employees'}
-									description={exceptionsOnly
+									variant={data.exceptionsOnly ? 'no-results' : 'empty'}
+									title={data.exceptionsOnly ? 'No exceptions today' : 'No active employees'}
+									description={data.exceptionsOnly
 										? 'Everyone is accounted for. Clear the exceptions filter to see the whole roster.'
 										: undefined}
 								/></td
@@ -761,6 +778,8 @@
 				</tbody>
 			</table>
 		</div>
+
+		<Pagination meta={data.pagination} />
 	{:else}
 		{#if data.canManage}
 			<div class="flex flex-wrap items-center gap-2">
