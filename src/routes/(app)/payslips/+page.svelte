@@ -11,15 +11,13 @@
 
 	type Payslip = PageData['payslips'][number]
 
-	// Money and status size to their content so the period column takes the slack; without that
-	// the four numeric columns share it equally and the figures drift from their headers.
 	const columns: Column[] = [
-		{ key: 'period', label: 'Period' },
-		{ key: 'gross', label: 'Gross Pay', align: 'right', width: 'min' },
-		{ key: 'deductions', label: 'Deductions', align: 'right', width: 'min' },
-		{ key: 'net', label: 'Net Pay', align: 'right', width: 'min' },
-		{ key: 'status', label: 'Status', width: 'min' },
-		{ key: 'actions', label: '', width: 'min' }
+		{ key: 'period', label: 'Period', width: 'w-[30%]' },
+		{ key: 'gross', label: 'Gross Pay', align: 'right', width: 'w-[16%]' },
+		{ key: 'deductions', label: 'Deductions', align: 'right', width: 'w-[16%]' },
+		{ key: 'net', label: 'Net Pay', align: 'right', width: 'w-[16%]' },
+		{ key: 'status', label: 'Status', width: 'w-[12%]' },
+		{ key: 'actions', label: '', width: 'w-[10%]' }
 	]
 </script>
 

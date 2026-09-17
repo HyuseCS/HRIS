@@ -42,7 +42,8 @@
 		c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left'
 	// w-[1%] collapses a column to its content under `table-auto`. Paired with whitespace-nowrap
 	// so the content it is sized to cannot wrap and defeat the point.
-	const widthClass = (c: Column) => (c.width === 'min' ? 'w-[1%] whitespace-nowrap' : '')
+	const widthClass = (c: Column) =>
+		c.width === 'min' ? 'w-[1%] whitespace-nowrap' : c.width === 'auto' ? '' : (c.width ?? '')
 	const mobileColumns = $derived(columns.filter((c) => !c.hideOnMobile))
 </script>
 
