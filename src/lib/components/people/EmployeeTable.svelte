@@ -26,7 +26,7 @@
 	<tbody class="divide-y">
 		{#each people as person (person.id)}
 			<tr
-				class="relative transition-colors hover:bg-accent/40 has-[a:focus-visible]:outline has-[a:focus-visible]:outline-2 has-[a:focus-visible]:-outline-offset-2 has-[a:focus-visible]:outline-ring"
+				class="relative h-[39.8px] transition-colors hover:bg-accent/40 has-[a:focus-visible]:outline has-[a:focus-visible]:outline-2 has-[a:focus-visible]:-outline-offset-2 has-[a:focus-visible]:outline-ring"
 			>
 				<td class="whitespace-nowrap px-4 py-1">
 					<a
