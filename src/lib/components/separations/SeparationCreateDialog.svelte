@@ -69,6 +69,7 @@
 					<option value="RESIGNATION">Resignation</option>
 					<option value="TERMINATION">Termination</option>
 				</select>
+				{#if fe('type')}<p class="text-xs text-red-600">{fe('type')}</p>{/if}
 			</div>
 			<div class="grid gap-1.5">
 				<label for="effectiveDate" class="text-sm font-medium"
@@ -94,8 +95,10 @@
 				name="reason"
 				aria-invalid={invalid('reason')}
 				rows="2"
+				maxlength="1000"
 				class="rounded-md border border-input bg-background px-3 py-2 text-sm"
 			></textarea>
+			{#if fe('reason')}<p class="text-xs text-red-600">{fe('reason')}</p>{/if}
 		</div>
 		<div class="flex flex-wrap items-center gap-3">
 			<button
