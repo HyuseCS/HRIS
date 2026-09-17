@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import JobPostingCreateDialog from '$lib/components/recruitment/JobPostingCreateDialog.svelte'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
@@ -96,88 +97,90 @@
 	{/if}
 {/snippet}
 
-<PanelPage
-	title="Recruitment"
-	tone="card"
-	flush
-	notice={notices}
-	empty={data.postings.length === 0}
->
-	<div class="overflow-x-auto">
-		<table class="w-full min-w-[52rem] table-fixed text-sm">
-			<thead class="border-b bg-muted/50">
-				<tr>
-					<th class="w-12 px-4 py-3">
-						{#if draftIds.length}
-							<input
-								type="checkbox"
-								checked={allDraftsSelected}
-								onchange={toggleAllDrafts}
-								title="Select all drafts"
-								class="h-4 w-4 rounded border-input"
-							/>
-						{/if}
-					</th>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Position</th>
-					<th class="w-48 px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
-					<th class="w-28 px-4 py-3 text-left font-medium text-muted-foreground">Applicants</th>
-					<th class="w-44 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-					<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Posted</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y">
-				{#each data.postings as jp (jp.id)}
-					<tr
-						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
-						onclick={() => goto(`/recruitment/${jp.id}`)}
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/recruitment/${jp.id}`)
-							}
-						}}
-					>
-						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-							{#if jp.status === 'DRAFT'}
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	<PageHeader title="Recruitment" />
+
+	<div class="flex shrink-0 flex-col gap-3">
+		{@render notices()}
+	</div>
+
+	<Container tone="card" flush empty={data.postings.length === 0}>
+		<div class="overflow-x-auto">
+			<table class="w-full min-w-[52rem] table-fixed text-sm">
+				<thead class="border-b bg-muted/50">
+					<tr>
+						<th class="w-12 px-4 py-3">
+							{#if draftIds.length}
 								<input
 									type="checkbox"
-									checked={selectedIds.includes(jp.id)}
-									onchange={() => toggle(jp.id)}
+									checked={allDraftsSelected}
+									onchange={toggleAllDrafts}
+									title="Select all drafts"
 									class="h-4 w-4 rounded border-input"
 								/>
 							{/if}
-						</td>
-						<td class="break-words px-4 py-3 font-medium">
-							{jp.title}
-							{#if jp.status === 'DRAFT' && jp.rejectionReason}
-								<span class="block text-xs font-normal text-red-400"
-									>Sent back: {jp.rejectionReason}</span
-								>
-							{/if}
-						</td>
-						<td class="break-words px-4 py-3 text-muted-foreground">{jp.department.name}</td>
-						<td class="px-4 py-3">{jp._count.applicants}</td>
-						<td class="px-4 py-3">
-							<Badge status={jp.status} domain="jobPosting" />
-						</td>
-						<td class="px-4 py-3 text-muted-foreground"
-							>{jp.postedAt ? formatShortDate(jp.postedAt) : '—'}</td
-						>
+						</th>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Position</th>
+						<th class="w-48 px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
+						<th class="w-28 px-4 py-3 text-left font-medium text-muted-foreground">Applicants</th>
+						<th class="w-44 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+						<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Posted</th>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+				</thead>
+				<tbody class="divide-y">
+					{#each data.postings as jp (jp.id)}
+						<tr
+							class="cursor-pointer hover:bg-muted/30"
+							role="link"
+							tabindex="0"
+							onclick={() => goto(`/recruitment/${jp.id}`)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault()
+									goto(`/recruitment/${jp.id}`)
+								}
+							}}
+						>
+							<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
+								{#if jp.status === 'DRAFT'}
+									<input
+										type="checkbox"
+										checked={selectedIds.includes(jp.id)}
+										onchange={() => toggle(jp.id)}
+										class="h-4 w-4 rounded border-input"
+									/>
+								{/if}
+							</td>
+							<td class="break-words px-4 py-3 font-medium">
+								{jp.title}
+								{#if jp.status === 'DRAFT' && jp.rejectionReason}
+									<span class="block text-xs font-normal text-red-400"
+										>Sent back: {jp.rejectionReason}</span
+									>
+								{/if}
+							</td>
+							<td class="break-words px-4 py-3 text-muted-foreground">{jp.department.name}</td>
+							<td class="px-4 py-3">{jp._count.applicants}</td>
+							<td class="px-4 py-3">
+								<Badge status={jp.status} domain="jobPosting" />
+							</td>
+							<td class="px-4 py-3 text-muted-foreground"
+								>{jp.postedAt ? formatShortDate(jp.postedAt) : '—'}</td
+							>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 
-	{#snippet emptyState()}
-		<EmptyState title="No job postings yet" />
-	{/snippet}
+		{#snippet emptyState()}
+			<EmptyState title="No job postings yet" />
+		{/snippet}
 
-	{#snippet footer()}
-		<Pagination meta={data.pagination} />
-	{/snippet}
-</PanelPage>
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
+</div>
 
 <JobPostingCreateDialog bind:open={showCreate} departments={data.departments} {form} />

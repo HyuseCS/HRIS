@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import RequestCreateDialog, { TYPES } from '$lib/components/requests/RequestCreateDialog.svelte'
@@ -70,99 +71,108 @@
 	/>
 {/snippet}
 
-<PanelPage
-	title="My Requests"
-	description="File and track your requests."
-	tone="card"
-	flush
-	empty={data.requests.length === 0}
-	{emptyState}
-	actions={data.hasEmployee ? actions : undefined}
-	notice={data.hasEmployee ? undefined : notice}
->
-	<div class="overflow-x-auto">
-		<table class="w-full min-w-[64rem] table-fixed text-sm">
-			<thead class="border-b bg-muted/50">
-				<tr>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-					<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Dates</th>
-					<th class="w-24 px-4 py-3 text-left font-medium text-muted-foreground">Stage</th>
-					<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-					<th class="w-32 px-4 py-3 text-right font-medium text-muted-foreground">Filed</th>
-					<th class="w-60 px-4 py-3"></th>
-				</tr>
-			</thead>
-			<tbody class="divide-y">
-				{#each data.requests as req (req.id)}
-					<tr
-						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
-						onclick={(e) => {
-							// Let the row's action buttons (Resubmit/Cancel) fire without also navigating.
-							if ((e.target as HTMLElement).closest('button, a, form')) return
-							goto(`/requests/${req.id}`)
-						}}
-						onkeydown={(e) => {
-							if ((e.target as HTMLElement).closest('button, a, form')) return
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/requests/${req.id}`)
-							}
-						}}
-					>
-						<td class="px-4 py-3 font-medium">{typeLabel(req.type)}</td>
-						<td class="px-4 py-3 text-muted-foreground">
-							{#if req.dateFrom}
-								{formatDateRange(req.dateFrom, req.dateTo)}
-							{:else}
-								—
-							{/if}
-						</td>
-						<td class="px-4 py-3 text-muted-foreground">
-							{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
-						</td>
-						<td class="px-4 py-3">
-							<Badge status={req.status} domain="request" />
-						</td>
-						<td class="px-4 py-3 text-right text-muted-foreground"
-							>{formatShortDate(req.createdAt)}</td
-						>
-						<td class="px-4 py-3 text-right">
-							<div class="flex items-center justify-end gap-2">
-								{#if req.status === 'RETURNED'}
-									{@const resubmit = resubmitGuard(req.id)}
-									<form method="POST" action="?/resubmit" use:enhance={resubmit.enhance}>
-										<input type="hidden" name="id" value={req.id} />
-										<button
-											type="submit"
-											disabled={resubmit.busy}
-											class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
-											>{resubmit.busy ? 'Resubmitting…' : 'Resubmit'}</button
-										>
-									</form>
-								{/if}
-								{#if req.status === 'PENDING' || req.status === 'RETURNED'}
-									{@const cancel = cancelGuard(req.id)}
-									<form method="POST" action="?/cancel" use:enhance={cancel.enhance}>
-										<input type="hidden" name="id" value={req.id} />
-										<button
-											type="submit"
-											disabled={cancel.busy}
-											class="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-											>{cancel.busy ? 'Cancelling…' : 'Cancel'}</button
-										>
-									</form>
-								{/if}
-							</div>
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	{#if data.hasEmployee}
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<PageHeader title="My Requests" description="File and track your requests." />
+			</div>
+			<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
+				{@render actions()}
+			</div>
+		</div>
+	{:else}
+		<PageHeader title="My Requests" description="File and track your requests." />
+		<div class="flex shrink-0 flex-col gap-3">
+			{@render notice()}
+		</div>
+	{/if}
 
-	{#snippet footer()}
-		<Pagination meta={data.pagination} />
-	{/snippet}
-</PanelPage>
+	<Container tone="card" flush empty={data.requests.length === 0} {emptyState}>
+		<div class="overflow-x-auto">
+			<table class="w-full min-w-[64rem] table-fixed text-sm">
+				<thead class="border-b bg-muted/50">
+					<tr>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
+						<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Dates</th>
+						<th class="w-24 px-4 py-3 text-left font-medium text-muted-foreground">Stage</th>
+						<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+						<th class="w-32 px-4 py-3 text-right font-medium text-muted-foreground">Filed</th>
+						<th class="w-60 px-4 py-3"></th>
+					</tr>
+				</thead>
+				<tbody class="divide-y">
+					{#each data.requests as req (req.id)}
+						<tr
+							class="cursor-pointer hover:bg-muted/30"
+							role="link"
+							tabindex="0"
+							onclick={(e) => {
+								// Let the row's action buttons (Resubmit/Cancel) fire without also navigating.
+								if ((e.target as HTMLElement).closest('button, a, form')) return
+								goto(`/requests/${req.id}`)
+							}}
+							onkeydown={(e) => {
+								if ((e.target as HTMLElement).closest('button, a, form')) return
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault()
+									goto(`/requests/${req.id}`)
+								}
+							}}
+						>
+							<td class="px-4 py-3 font-medium">{typeLabel(req.type)}</td>
+							<td class="px-4 py-3 text-muted-foreground">
+								{#if req.dateFrom}
+									{formatDateRange(req.dateFrom, req.dateTo)}
+								{:else}
+									—
+								{/if}
+							</td>
+							<td class="px-4 py-3 text-muted-foreground">
+								{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
+							</td>
+							<td class="px-4 py-3">
+								<Badge status={req.status} domain="request" />
+							</td>
+							<td class="px-4 py-3 text-right text-muted-foreground"
+								>{formatShortDate(req.createdAt)}</td
+							>
+							<td class="px-4 py-3 text-right">
+								<div class="flex items-center justify-end gap-2">
+									{#if req.status === 'RETURNED'}
+										{@const resubmit = resubmitGuard(req.id)}
+										<form method="POST" action="?/resubmit" use:enhance={resubmit.enhance}>
+											<input type="hidden" name="id" value={req.id} />
+											<button
+												type="submit"
+												disabled={resubmit.busy}
+												class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
+												>{resubmit.busy ? 'Resubmitting…' : 'Resubmit'}</button
+											>
+										</form>
+									{/if}
+									{#if req.status === 'PENDING' || req.status === 'RETURNED'}
+										{@const cancel = cancelGuard(req.id)}
+										<form method="POST" action="?/cancel" use:enhance={cancel.enhance}>
+											<input type="hidden" name="id" value={req.id} />
+											<button
+												type="submit"
+												disabled={cancel.busy}
+												class="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+												>{cancel.busy ? 'Cancelling…' : 'Cancel'}</button
+											>
+										</form>
+									{/if}
+								</div>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
+</div>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import ComplaintCreateDialog, {
 		CATEGORY_LABELS
@@ -71,78 +72,99 @@
 	</div>
 {/snippet}
 
-<PanelPage
-	title={data.isHr ? 'HR Inquiries' : 'HR Inquiries about you'}
-	description={data.isHr
-		? 'Raise a question or concern to an employee and track their response.'
-		: 'Questions HR has raised with you. Open one to reply.'}
-	tone="card"
-	flush
-	actions={data.isHr ? actions : undefined}
-	notice={form?.message || (form?.error && !showForm) ? notices : undefined}
-	toolbar={data.isHr ? statusFilter : undefined}
-	empty={data.complaints.length === 0}
->
-	<!-- Thread list -->
-	<div class="overflow-x-auto">
-		<table class="w-full {data.isHr ? 'min-w-[52rem]' : 'min-w-[40rem]'} table-fixed text-sm">
-			<thead class="border-b bg-muted/50">
-				<tr>
-					{#if data.isHr}
-						<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Employee</th>
-					{/if}
-					<th class="px-3 py-2 text-left font-medium text-muted-foreground">Subject</th>
-					<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Category</th>
-					<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-					<th class="w-32 px-3 py-2 text-left font-medium text-muted-foreground">Updated</th>
-					<th class="w-24 px-3 py-2"></th>
-				</tr>
-			</thead>
-			<tbody class="divide-y">
-				{#each data.complaints as c (c.id)}
-					<tr class="hover:bg-muted/30">
-						{#if data.isHr}
-							<td class="break-words px-3 py-2 font-medium">
-								{c.employee.lastName}, {c.employee.firstName}
-							</td>
-						{/if}
-						<td class="break-words px-3 py-2">{c.subject}</td>
-						<td class="break-words px-3 py-2 text-muted-foreground">
-							{CATEGORY_LABELS[c.category] ?? c.category}
-						</td>
-						<td class="px-3 py-2">
-							<Badge status={c.status} domain="complaint" />
-						</td>
-						<td class="px-3 py-2 text-muted-foreground">{formatShortDate(c.updatedAt)}</td>
-						<td class="px-3 py-2 text-right">
-							<a
-								href="/complaints/{c.id}"
-								class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent"
-							>
-								Open
-							</a>
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-
-	{#snippet emptyState()}
-		<EmptyState
-			title="No inquiries yet"
-			description={data.isHr
-				? 'Open one to ask an employee about an issue.'
-				: 'HR has not raised anything with you.'}
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	{#if data.isHr}
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<PageHeader
+					title="HR Inquiries"
+					description="Raise a question or concern to an employee and track their response."
+				/>
+			</div>
+			<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
+				{@render actions()}
+			</div>
+		</div>
+	{:else}
+		<PageHeader
+			title="HR Inquiries about you"
+			description="Questions HR has raised with you. Open one to reply."
 		/>
-	{/snippet}
+	{/if}
 
-	{#snippet footer()}
-		{#if data.complaints.length && data.isHr && data.pagination}
-			<Pagination meta={data.pagination} />
-		{/if}
-	{/snippet}
-</PanelPage>
+	{#if form?.message || (form?.error && !showForm)}
+		<div class="flex shrink-0 flex-col gap-3">
+			{@render notices()}
+		</div>
+	{/if}
+
+	<Container
+		tone="card"
+		flush
+		toolbar={data.isHr ? statusFilter : undefined}
+		empty={data.complaints.length === 0}
+	>
+		<!-- Thread list -->
+		<div class="overflow-x-auto">
+			<table class="w-full {data.isHr ? 'min-w-[52rem]' : 'min-w-[40rem]'} table-fixed text-sm">
+				<thead class="border-b bg-muted/50">
+					<tr>
+						{#if data.isHr}
+							<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Employee</th>
+						{/if}
+						<th class="px-3 py-2 text-left font-medium text-muted-foreground">Subject</th>
+						<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Category</th>
+						<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+						<th class="w-32 px-3 py-2 text-left font-medium text-muted-foreground">Updated</th>
+						<th class="w-24 px-3 py-2"></th>
+					</tr>
+				</thead>
+				<tbody class="divide-y">
+					{#each data.complaints as c (c.id)}
+						<tr class="hover:bg-muted/30">
+							{#if data.isHr}
+								<td class="break-words px-3 py-2 font-medium">
+									{c.employee.lastName}, {c.employee.firstName}
+								</td>
+							{/if}
+							<td class="break-words px-3 py-2">{c.subject}</td>
+							<td class="break-words px-3 py-2 text-muted-foreground">
+								{CATEGORY_LABELS[c.category] ?? c.category}
+							</td>
+							<td class="px-3 py-2">
+								<Badge status={c.status} domain="complaint" />
+							</td>
+							<td class="px-3 py-2 text-muted-foreground">{formatShortDate(c.updatedAt)}</td>
+							<td class="px-3 py-2 text-right">
+								<a
+									href="/complaints/{c.id}"
+									class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent"
+								>
+									Open
+								</a>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		{#snippet emptyState()}
+			<EmptyState
+				title="No inquiries yet"
+				description={data.isHr
+					? 'Open one to ask an employee about an issue.'
+					: 'HR has not raised anything with you.'}
+			/>
+		{/snippet}
+
+		{#snippet footer()}
+			{#if data.complaints.length && data.isHr && data.pagination}
+				<Pagination meta={data.pagination} />
+			{/if}
+		{/snippet}
+	</Container>
+</div>
 
 <!-- HR: new-inquiry form -->
 {#if data.isHr}
