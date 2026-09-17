@@ -226,12 +226,12 @@ describe('/team roster scoping (#6)', () => {
 		expect(rosterWhere().OR).toBeUndefined()
 	})
 
-	it('pages by the view: 15 on the grid, 10 on the list', async () => {
+	it('pages by the view: 15 on the grid, 12 on the list', async () => {
 		await load(event(['HR_ADMIN']))
 		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(15)
 		vi.clearAllMocks()
 		await load(event(['HR_ADMIN'], '?view=list'))
-		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(10)
+		expect(dbMock.employee.findMany.mock.calls[0][0].take).toBe(12)
 	})
 
 	it('selects no sensitive field', async () => {

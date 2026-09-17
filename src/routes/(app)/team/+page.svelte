@@ -93,7 +93,7 @@
 				hrefFor={employeeHref}
 			/>
 		{:else}
-			<ul class="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
+			<ul class="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
 				{#each data.people as person (person.id)}
 					<li class="min-w-0"><EmployeeCard {person} href={employeeHref(person)} /></li>
 				{/each}

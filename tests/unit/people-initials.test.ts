@@ -30,8 +30,8 @@ describe('parseView', () => {
 		expect(parseView(null)).toEqual({ view: 'grid', pageSize: 15 })
 	})
 
-	it('reads list as 10 per page', () => {
-		expect(parseView('list')).toEqual({ view: 'list', pageSize: 10 })
+	it('reads list as 12 per page', () => {
+		expect(parseView('list')).toEqual({ view: 'list', pageSize: 12 })
 	})
 
 	it('treats anything else as the grid', () => {

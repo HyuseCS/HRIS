@@ -2,7 +2,7 @@ import type { AttendanceStatus } from '@prisma/client'
 
 export type PeopleView = 'grid' | 'list'
 
-export const PEOPLE_PAGE_SIZE: Record<PeopleView, number> = { grid: 15, list: 10 }
+export const PEOPLE_PAGE_SIZE: Record<PeopleView, number> = { grid: 15, list: 12 }
 
 export interface Person {
 	id: string
