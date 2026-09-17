@@ -159,7 +159,7 @@ const SITES: Row[] = [
 		present: [
 			'action="?/override"',
 			'use:enhance={overrideG.enhance}',
-			'submitFeedback({ error: null })'
+			'`Net pay overridden for ${overrideName}.`, error: null,'
 		],
 		absent: NO_SUCCESS_BANNER
 	},
