@@ -27,7 +27,7 @@
 	<title>Salary Grades — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Salary Grades"
 		description="Pay bands assignable to positions. Employees inherit their band via their position; HR is warned when a basic salary falls outside it."

@@ -4,6 +4,7 @@
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { tick } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
@@ -70,7 +71,22 @@
 	<title>Pay Changes — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
+{#snippet notices()}
+	{#if form?.error}
+		<div
+			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+			role="alert"
+		>
+			{form.error}
+		</div>
+	{/if}
+
+	{#if form?.success}
+		<Banner kind="success" message={form.success} />
+	{/if}
+{/snippet}
+
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
 	<PageHeader
 		title="Pay Changes"
 		description="Pay and promotion changes someone else filed that need your confirmation. You cannot decide one you filed, or one about your own pay."
@@ -84,159 +100,152 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			role="alert"
-		>
-			{form.error}
+	{#if form?.error || form?.success}
+		<div class="flex shrink-0 flex-col gap-3">
+			{@render notices()}
 		</div>
 	{/if}
 
-	{#if form?.success}
-		<Banner kind="success" message={form.success} />
-	{/if}
-
-	<div class="rounded-lg border bg-muted/50">
-		<div class="p-4">
-			{#if data.proposals.length === 0}
-				<EmptyState
-					title="No pay changes are waiting for you."
-					description="Compensation and promotion changes filed by someone who cannot make them alone appear here for a second qualified person to confirm."
-				/>
-			{:else}
-				<div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-					{#each data.proposals as p (p.id)}
-						{@const confirm = guardFor(p.id)}
-						{@const revealed = form?.revealedId === p.id ? form.amounts : null}
-						<div class="flex flex-col rounded-lg border bg-card">
-							<div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
-								<div>
-									<p class="font-medium leading-tight break-words">
-										{p.target.lastName}, {p.target.firstName}
-									</p>
-									<p class="mt-0.5 text-xs text-muted-foreground">
-										{p.target.employeeNumber} · waiting {waitingFor(p.createdAt)}
-										{#if isStale(p.createdAt)}
-											<span class="ml-1 font-medium text-amber-500">· overdue</span>
-										{/if}
-									</p>
-								</div>
-
-								<div class="flex flex-wrap items-center gap-2">
-									<span
-										class="rounded-full bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-500"
-									>
-										{domainLabels[p.domain] ?? p.domain}
-									</span>
-									<!-- Text, not colour alone: which capability this row demands turns on it. -->
-									<span
-										class="rounded-full px-2 py-0.5 text-xs font-medium {p.isSelfAction
-											? 'bg-rose-500/15 text-rose-500'
-											: 'bg-slate-500/15 text-slate-400'}"
-									>
-										{p.isSelfAction ? 'Self-filed' : 'Filed for someone else'}
-									</span>
-								</div>
-
-								{#if p.unreadable}
-									<p class="rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-500">
-										⚠ Unreadable proposal payload — reject it and ask for a fresh filing.
-									</p>
-								{/if}
-
-								<dl class="space-y-1 text-sm">
-									{#each p.changes as change (change.label)}
-										<div class="flex flex-wrap gap-x-2">
-											<dt class="text-muted-foreground">{change.label}</dt>
-											<dd>
-												<span class="text-muted-foreground">{change.from}</span> → {change.to}
-											</dd>
-										</div>
-									{/each}
-
-									{#if p.hasAmount}
-										<div class="flex flex-wrap items-center gap-x-2">
-											<dt class="text-muted-foreground">Salary</dt>
-											<dd class="font-medium">
-												{#if revealed}
-													<span class="text-muted-foreground"
-														>{revealed.current == null
-															? '—'
-															: formatCurrency(revealed.current)}</span
-													>
-													→ {revealed.proposed == null ? '—' : formatCurrency(revealed.proposed)}
-												{:else}
-													{MASKED_SALARY} → {MASKED_SALARY}
-												{/if}
-											</dd>
-											{#if !revealed}
-												<form method="POST" action="?/revealAmount" use:enhance>
-													<input type="hidden" name="proposalId" value={p.id} />
-													<button
-														type="submit"
-														class="flex h-6 w-6 items-center justify-center rounded-md text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-														aria-label="Reveal salary for {p.target.lastName}, {p.target.firstName}"
-													>
-														<Eye class="h-4 w-4" aria-hidden="true" />
-													</button>
-												</form>
-											{/if}
-										</div>
+	<Container empty={data.proposals.length === 0}>
+		{#if data.proposals.length === 0}
+			<EmptyState
+				title="No pay changes are waiting for you."
+				description="Compensation and promotion changes filed by someone who cannot make them alone appear here for a second qualified person to confirm."
+			/>
+		{:else}
+			<div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
+				{#each data.proposals as p (p.id)}
+					{@const confirm = guardFor(p.id)}
+					{@const revealed = form?.revealedId === p.id ? form.amounts : null}
+					<div class="flex flex-col rounded-lg border bg-card">
+						<div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
+							<div>
+								<p class="font-medium leading-tight break-words">
+									{p.target.lastName}, {p.target.firstName}
+								</p>
+								<p class="mt-0.5 text-xs text-muted-foreground">
+									{p.target.employeeNumber} · waiting {waitingFor(p.createdAt)}
+									{#if isStale(p.createdAt)}
+										<span class="ml-1 font-medium text-amber-500">· overdue</span>
 									{/if}
-
-									{#if p.effectiveDate}
-										<div class="flex flex-wrap gap-x-2">
-											<dt class="text-muted-foreground">Effective</dt>
-											<dd>{formatShortDate(p.effectiveDate)}</dd>
-										</div>
-									{/if}
-								</dl>
-
-								{#if p.note}
-									<p class="text-xs text-muted-foreground">“{p.note}”</p>
-								{/if}
-
-								<p class="mt-auto pt-1 text-xs text-muted-foreground">
-									Proposed by {p.initiator}
 								</p>
 							</div>
 
-							<form
-								method="POST"
-								action="?/confirm"
-								use:enhance={confirm.enhance}
-								class="flex shrink-0 gap-2 border-t bg-muted/20 p-3"
-							>
-								<input type="hidden" name="proposalId" value={p.id} />
-								<button
-									type="submit"
-									disabled={confirm.busy}
-									aria-label="Confirm and apply the change for {p.target.firstName} {p.target
-										.lastName}"
-									class="flex-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
-									>{confirm.busy ? 'Confirming…' : 'Confirm & apply'}</button
+							<div class="flex flex-wrap items-center gap-2">
+								<span
+									class="rounded-full bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-500"
 								>
-								<button
-									type="button"
-									disabled={reject.busy}
-									aria-label="Reject the change for {p.target.firstName} {p.target.lastName}"
-									onclick={() => {
-										noteTargetId = p.id
-										noteDialogOpen = true
-									}}
-									class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-									>Reject</button
+									{domainLabels[p.domain] ?? p.domain}
+								</span>
+								<!-- Text, not colour alone: which capability this row demands turns on it. -->
+								<span
+									class="rounded-full px-2 py-0.5 text-xs font-medium {p.isSelfAction
+										? 'bg-rose-500/15 text-rose-500'
+										: 'bg-slate-500/15 text-slate-400'}"
 								>
-							</form>
-						</div>
-					{/each}
-				</div>
+									{p.isSelfAction ? 'Self-filed' : 'Filed for someone else'}
+								</span>
+							</div>
 
+							{#if p.unreadable}
+								<p class="rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-500">
+									⚠ Unreadable proposal payload — reject it and ask for a fresh filing.
+								</p>
+							{/if}
+
+							<dl class="space-y-1 text-sm">
+								{#each p.changes as change (change.label)}
+									<div class="flex flex-wrap gap-x-2">
+										<dt class="text-muted-foreground">{change.label}</dt>
+										<dd>
+											<span class="text-muted-foreground">{change.from}</span> → {change.to}
+										</dd>
+									</div>
+								{/each}
+
+								{#if p.hasAmount}
+									<div class="flex flex-wrap items-center gap-x-2">
+										<dt class="text-muted-foreground">Salary</dt>
+										<dd class="font-medium">
+											{#if revealed}
+												<span class="text-muted-foreground"
+													>{revealed.current == null ? '—' : formatCurrency(revealed.current)}</span
+												>
+												→ {revealed.proposed == null ? '—' : formatCurrency(revealed.proposed)}
+											{:else}
+												{MASKED_SALARY} → {MASKED_SALARY}
+											{/if}
+										</dd>
+										{#if !revealed}
+											<form method="POST" action="?/revealAmount" use:enhance>
+												<input type="hidden" name="proposalId" value={p.id} />
+												<button
+													type="submit"
+													class="flex h-6 w-6 items-center justify-center rounded-md text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+													aria-label="Reveal salary for {p.target.lastName}, {p.target.firstName}"
+												>
+													<Eye class="h-4 w-4" aria-hidden="true" />
+												</button>
+											</form>
+										{/if}
+									</div>
+								{/if}
+
+								{#if p.effectiveDate}
+									<div class="flex flex-wrap gap-x-2">
+										<dt class="text-muted-foreground">Effective</dt>
+										<dd>{formatShortDate(p.effectiveDate)}</dd>
+									</div>
+								{/if}
+							</dl>
+
+							{#if p.note}
+								<p class="text-xs text-muted-foreground">“{p.note}”</p>
+							{/if}
+
+							<p class="mt-auto pt-1 text-xs text-muted-foreground">
+								Proposed by {p.initiator}
+							</p>
+						</div>
+
+						<form
+							method="POST"
+							action="?/confirm"
+							use:enhance={confirm.enhance}
+							class="flex shrink-0 gap-2 border-t bg-muted/20 p-3"
+						>
+							<input type="hidden" name="proposalId" value={p.id} />
+							<button
+								type="submit"
+								disabled={confirm.busy}
+								aria-label="Confirm and apply the change for {p.target.firstName} {p.target
+									.lastName}"
+								class="flex-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
+								>{confirm.busy ? 'Confirming…' : 'Confirm & apply'}</button
+							>
+							<button
+								type="button"
+								disabled={reject.busy}
+								aria-label="Reject the change for {p.target.firstName} {p.target.lastName}"
+								onclick={() => {
+									noteTargetId = p.id
+									noteDialogOpen = true
+								}}
+								class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
+								>Reject</button
+							>
+						</form>
+					</div>
+				{/each}
+			</div>
+		{/if}
+
+		{#snippet footer()}
+			{#if data.proposals.length > 0}
 				<Pagination meta={data.pagination} />
 			{/if}
-		</div>
-	</div>
+		{/snippet}
+	</Container>
 </div>
 
 <!-- Submission target for the popup-collected rejection reason. -->

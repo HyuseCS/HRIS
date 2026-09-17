@@ -331,12 +331,11 @@ async function seedFoodServiceOrg(
 export async function seedProd(db: PrismaClient) {
 	const org = await db.organization.upsert({
 		where: { id: 'org_seed' },
-		// Per-org branding (#135/#139): logo + brand colour. Veent keeps the red palette.
-		update: { name: 'Veent', logoUrl: '/veent-logo.png', themePrimary: '0 79% 45%' },
+		// Per-org branding (#135/#139): brand colour. Veent keeps the red palette.
+		update: { name: 'Veent', themePrimary: '0 79% 45%' },
 		create: {
 			id: 'org_seed',
 			name: 'Veent',
-			logoUrl: '/veent-logo.png',
 			themePrimary: '0 79% 45%',
 			address: 'Makati City, Metro Manila, Philippines'
 		}
@@ -350,7 +349,6 @@ export async function seedProd(db: PrismaClient) {
 		// that took the 'EMP' column default when the column was added.
 		update: {
 			name: 'JoJo Potato',
-			logoUrl: '/jojo-logo.png',
 			themePrimary: '32 95% 44%', // amber
 			address: 'Quezon City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'JJ'
@@ -358,7 +356,6 @@ export async function seedProd(db: PrismaClient) {
 		create: {
 			id: 'org_jojo',
 			name: 'JoJo Potato',
-			logoUrl: '/jojo-logo.png',
 			themePrimary: '32 95% 44%',
 			address: 'Quezon City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'JJ'
@@ -368,7 +365,6 @@ export async function seedProd(db: PrismaClient) {
 		where: { id: 'org_sweetleaf' },
 		update: {
 			name: 'Sweetleaf',
-			logoUrl: '/sweetleaf-logo.png',
 			themePrimary: '142 71% 42%', // green
 			address: 'Pasig City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'SL'
@@ -376,7 +372,6 @@ export async function seedProd(db: PrismaClient) {
 		create: {
 			id: 'org_sweetleaf',
 			name: 'Sweetleaf',
-			logoUrl: '/sweetleaf-logo.png',
 			themePrimary: '142 71% 42%',
 			address: 'Pasig City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'SL'

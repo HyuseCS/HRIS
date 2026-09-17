@@ -33,12 +33,12 @@ describe('computeEmployeeResult (shared run/calculator engine)', () => {
 		const r = computeEmployeeResult(comp, att({ regularHours: FULL_PERIOD_HOURS }), {}, cfg())
 		expect(r.grossPay).toBeCloseTo(15000, 2)
 		expect(r.basicPay).toBeCloseTo(15000, 2)
-		// monthly statutory (SSS 900 / PH 750 / PI 200 / tax 1463.4) × 0.5 period share
+		// monthly statutory (SSS 900 / PH 750 / PI 200 / tax 1097.55) × 0.5 period share
 		expect(r.statutory.sssEe).toBeCloseTo(450, 2)
 		expect(r.statutory.philhealthEe).toBeCloseTo(375, 2)
 		expect(r.statutory.pagibigEe).toBeCloseTo(100, 2)
-		expect(r.statutory.withholdingTax).toBeCloseTo(731.7, 2)
-		expect(r.totalDeductions).toBeCloseTo(1656.7, 2)
+		expect(r.statutory.withholdingTax).toBeCloseTo(548.78, 2)
+		expect(r.totalDeductions).toBeCloseTo(1473.78, 2)
 		expect(r.netPay).toBeCloseTo(r.grossPay - r.totalDeductions, 2)
 	})
 
@@ -61,7 +61,7 @@ describe('computeEmployeeResult (shared run/calculator engine)', () => {
 			cfg({ loans: [{ refId: 'L1', label: 'Loan', installment: 1000, balance: 3000 }] })
 		)
 		expect(r.deductions.find((c) => c.code === 'LOAN')?.amount).toBe(1000)
-		expect(r.totalDeductions).toBeCloseTo(1656.7 + 1000, 2)
+		expect(r.totalDeductions).toBeCloseTo(1473.78 + 1000, 2)
 		expect(r.netPay).toBeCloseTo(r.grossPay - r.totalDeductions, 2)
 	})
 

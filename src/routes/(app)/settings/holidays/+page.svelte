@@ -1,10 +1,13 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Dialog from '$lib/components/ui/Dialog.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -12,6 +15,8 @@
 
 	let showAddForm = $state(false)
 	let editingId = $state<string | null>(null)
+	let newDate = $state('')
+	let editDate = $state('')
 
 	// #108: a double-click would create a duplicate holiday / re-run the update.
 	const createHoliday = createSubmitGuard(() => async ({ result, update }) => {
@@ -45,7 +50,15 @@
 	<title>Public Holidays — Settings — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
+{#snippet notice()}
+	<div
+		class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{form?.error}
+	</div>
+{/snippet}
+
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
 	<PageHeader title="Public Holidays" description="Manage public holidays for payroll computation.">
 		{#snippet back()}
 			<BackButton fallback="/settings" label="Settings" preferFallback />
@@ -53,108 +66,32 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
-		>
-			{form.error}
+		<div class="flex shrink-0 flex-col gap-3">
+			{@render notice()}
 		</div>
 	{/if}
 
-	<!-- Add Holiday Form -->
-	{#if showAddForm}
-		<form
-			method="POST"
-			action="?/create"
-			use:enhance={createHoliday.enhance}
-			class="rounded-lg border p-4 space-y-4"
-		>
-			<h2 class="font-semibold">Add New Holiday</h2>
-			<div class="grid gap-4 sm:grid-cols-3">
-				<div>
-					<label for="date" class="text-sm font-medium">
-						Date <span class="text-destructive">*</span>
-					</label>
-					<input
-						id="date"
-						name="date"
-						type="date"
-						required
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-				<div>
-					<label for="name" class="text-sm font-medium">
-						Holiday Name <span class="text-destructive">*</span>
-					</label>
-					<input
-						id="name"
-						name="name"
-						required
-						placeholder="e.g. New Year's Day"
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-				<div>
-					<label for="type" class="text-sm font-medium">
-						Type <span class="text-destructive">*</span>
-					</label>
-					<select
-						id="type"
-						name="type"
-						required
-						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						<option value="REGULAR">Regular</option>
-						<option value="SPECIAL_NON_WORKING">Special Non-Working</option>
-						<option value="SPECIAL_WORKING">Special Working</option>
-					</select>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2">
-				<button
-					type="button"
-					onclick={() => (showAddForm = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-				>
-					Cancel
-				</button>
-				<button
-					type="submit"
-					disabled={createHoliday.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-				>
-					{createHoliday.busy ? 'Saving…' : 'Save Holiday'}
-				</button>
-			</div>
-		</form>
-	{/if}
-
-	<section class="space-y-3">
-		<div class="flex flex-wrap items-center justify-between gap-3">
-			<h2 class="text-lg font-semibold">Holidays</h2>
-			<div
-				class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-			>
-				<button
-					onclick={() => {
-						showAddForm = !showAddForm
-						editingId = null
-					}}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-				>
-					{showAddForm ? 'Cancel' : 'Add Holiday'}
-				</button>
-			</div>
-		</div>
+	<Container tone="card" flush empty={data.holidays.length === 0}>
 		<!-- Holiday List -->
-		<div class="overflow-x-auto rounded-lg border">
-			<table class="w-full text-sm">
+		<div class="overflow-x-auto">
+			<table class="w-full min-w-[40rem] table-fixed text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
+						<th class="w-40 px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Holiday Name</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-						<th class="px-4 py-3"></th>
+						<th class="w-48 px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
+						<th class="w-44 px-4 py-1 text-right">
+							<button
+								onclick={() => {
+									showAddForm = true
+									editingId = null
+									newDate = ''
+								}}
+								class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+							>
+								Add Holiday
+							</button>
+						</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y">
@@ -174,13 +111,12 @@
 												for={'date-' + holiday.id}
 												class="text-xs font-medium text-muted-foreground">Date</label
 											>
-											<input
+											<DatePicker
 												id={'date-' + holiday.id}
 												name="date"
-												type="date"
 												required
-												value={new Date(holiday.date).toISOString().slice(0, 10)}
-												class="mt-0.5 flex h-8 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+												bind:value={editDate}
+												class="mt-0.5 h-8 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 											/>
 										</div>
 										<div class="flex-1 min-w-48">
@@ -242,7 +178,7 @@
 						{:else}
 							<tr class="hover:bg-muted/30">
 								<td class="px-4 py-3 text-muted-foreground">{formatShortDate(holiday.date)}</td>
-								<td class="px-4 py-3 font-medium">{holiday.name}</td>
+								<td class="break-words px-4 py-3 font-medium">{holiday.name}</td>
 								<td class="px-4 py-3">
 									<span
 										class="rounded-full px-2 py-0.5 text-xs font-medium {typeBadgeClass(
@@ -255,8 +191,11 @@
 								<td class="px-4 py-3">
 									<div class="flex items-center justify-end gap-2">
 										<button
-											onclick={() => (editingId = holiday.id)}
-											class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+											onclick={() => {
+												editingId = holiday.id
+												editDate = new Date(holiday.date).toISOString().slice(0, 10)
+											}}
+											class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent"
 										>
 											Edit
 										</button>
@@ -264,7 +203,7 @@
 											action="?/delete"
 											title="Delete holiday?"
 											message="“{holiday.name}” will be removed from the calendar."
-											triggerClass="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10"
+											triggerClass="rounded-md border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10"
 										>
 											<input type="hidden" name="id" value={holiday.id} />
 										</ConfirmButton>
@@ -272,15 +211,76 @@
 								</td>
 							</tr>
 						{/if}
-					{:else}
-						<tr>
-							<td colspan="4" class="p-0"
-								><EmptyState title="No public holidays configured yet" /></td
-							>
-						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
-	</section>
+
+		{#snippet emptyState()}
+			<EmptyState title="No public holidays configured yet" />
+		{/snippet}
+	</Container>
 </div>
+
+<Dialog bind:open={showAddForm} title="Add New Holiday" size="lg">
+	<form method="POST" action="?/create" use:enhance={createHoliday.enhance} class="space-y-4">
+		<h2 class="font-semibold">Add New Holiday</h2>
+		<div class="grid gap-4">
+			<div>
+				<label for="date" class="text-sm font-medium">
+					Date <span class="text-destructive">*</span>
+				</label>
+				<DatePicker
+					id="date"
+					name="date"
+					required
+					bind:value={newDate}
+					class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			</div>
+			<div>
+				<label for="name" class="text-sm font-medium">
+					Holiday Name <span class="text-destructive">*</span>
+				</label>
+				<input
+					id="name"
+					name="name"
+					required
+					placeholder="e.g. New Year's Day"
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			</div>
+			<div>
+				<label for="type" class="text-sm font-medium">
+					Type <span class="text-destructive">*</span>
+				</label>
+				<select
+					id="type"
+					name="type"
+					required
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<option value="REGULAR">Regular</option>
+					<option value="SPECIAL_NON_WORKING">Special Non-Working</option>
+					<option value="SPECIAL_WORKING">Special Working</option>
+				</select>
+			</div>
+		</div>
+		<div class="flex justify-end gap-2">
+			<button
+				type="button"
+				onclick={() => (showAddForm = false)}
+				class="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+			>
+				Cancel
+			</button>
+			<button
+				type="submit"
+				disabled={createHoliday.busy}
+				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+			>
+				{createHoliday.busy ? 'Saving…' : 'Save Holiday'}
+			</button>
+		</div>
+	</form>
+</Dialog>

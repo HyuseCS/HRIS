@@ -90,7 +90,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      731.7,
+			      548.78,
 			    ],
 			    [
 			      "LOAN",
@@ -104,7 +104,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 15000,
-			  "netPay": 12343.3,
+			  "netPay": 12526.22,
 			  "periodShare": 0.5,
 			  "statutory": {
 			    "pagibigEe": 100,
@@ -113,10 +113,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 375,
 			    "sssEe": 450,
 			    "sssEr": 990,
-			    "withholdingTax": 731.7,
+			    "withholdingTax": 548.78,
 			  },
 			  "taxableGross": 15000,
-			  "totalDeductions": 2656.7,
+			  "totalDeductions": 2473.78,
 			  "uncollected": 0,
 			}
 		`)
@@ -140,7 +140,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      731.7,
+			      548.78,
 			    ],
 			    [
 			      "LOAN",
@@ -154,7 +154,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 15000,
-			  "netPay": 12343.3,
+			  "netPay": 12526.22,
 			  "periodShare": 0.5,
 			  "statutory": {
 			    "pagibigEe": 100,
@@ -163,10 +163,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 375,
 			    "sssEe": 450,
 			    "sssEr": 990,
-			    "withholdingTax": 731.7,
+			    "withholdingTax": 548.78,
 			  },
 			  "taxableGross": 15000,
-			  "totalDeductions": 2656.7,
+			  "totalDeductions": 2473.78,
 			  "uncollected": 0,
 			}
 		`)
@@ -190,7 +190,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      1463.4,
+			      1097.55,
 			    ],
 			    [
 			      "LOAN",
@@ -204,7 +204,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 30000,
-			  "netPay": 25686.6,
+			  "netPay": 26052.45,
 			  "periodShare": 1,
 			  "statutory": {
 			    "pagibigEe": 200,
@@ -213,10 +213,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 750,
 			    "sssEe": 900,
 			    "sssEr": 1980,
-			    "withholdingTax": 1463.4,
+			    "withholdingTax": 1097.55,
 			  },
 			  "taxableGross": 30000,
-			  "totalDeductions": 4313.4,
+			  "totalDeductions": 3947.55,
 			  "uncollected": 0,
 			}
 		`)
@@ -240,7 +240,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      731.7,
+			      548.78,
 			    ],
 			    [
 			      "LOAN",
@@ -254,7 +254,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 15000,
-			  "netPay": 12343.3,
+			  "netPay": 12526.22,
 			  "periodShare": 0.5,
 			  "statutory": {
 			    "pagibigEe": 100,
@@ -263,10 +263,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 375,
 			    "sssEe": 450,
 			    "sssEr": 990,
-			    "withholdingTax": 731.7,
+			    "withholdingTax": 548.78,
 			  },
 			  "taxableGross": 15000,
-			  "totalDeductions": 2656.7,
+			  "totalDeductions": 2473.78,
 			  "uncollected": 0,
 			}
 		`)
@@ -290,7 +290,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      731.7,
+			      548.78,
 			    ],
 			    [
 			      "LOAN",
@@ -304,7 +304,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 15000,
-			  "netPay": 12343.3,
+			  "netPay": 12526.22,
 			  "periodShare": 0.5,
 			  "statutory": {
 			    "pagibigEe": 100,
@@ -313,10 +313,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 375,
 			    "sssEe": 450,
 			    "sssEr": 990,
-			    "withholdingTax": 731.7,
+			    "withholdingTax": 548.78,
 			  },
 			  "taxableGross": 15000,
-			  "totalDeductions": 2656.7,
+			  "totalDeductions": 2473.78,
 			  "uncollected": 0,
 			}
 		`)
@@ -340,7 +340,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      1463.4,
+			      1097.55,
 			    ],
 			    [
 			      "LOAN",
@@ -354,7 +354,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 30000,
-			  "netPay": 25686.6,
+			  "netPay": 26052.45,
 			  "periodShare": 1,
 			  "statutory": {
 			    "pagibigEe": 200,
@@ -363,10 +363,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 750,
 			    "sssEe": 900,
 			    "sssEr": 1980,
-			    "withholdingTax": 1463.4,
+			    "withholdingTax": 1097.55,
 			  },
 			  "taxableGross": 30000,
-			  "totalDeductions": 4313.4,
+			  "totalDeductions": 3947.55,
 			  "uncollected": 0,
 			}
 		`)
@@ -397,7 +397,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      731.7,
+			      548.78,
 			    ],
 			    [
 			      "LOAN",
@@ -411,7 +411,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 15000,
-			  "netPay": 11893.3,
+			  "netPay": 12076.22,
 			  "periodShare": 0.5,
 			  "statutory": {
 			    "pagibigEe": 100,
@@ -420,10 +420,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 375,
 			    "sssEe": 900,
 			    "sssEr": 990,
-			    "withholdingTax": 731.7,
+			    "withholdingTax": 548.78,
 			  },
 			  "taxableGross": 15000,
-			  "totalDeductions": 3106.7,
+			  "totalDeductions": 2923.78,
 			  "uncollected": 0,
 			}
 		`)
@@ -447,7 +447,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			    [
 			      "TAX",
-			      731.7,
+			      548.78,
 			    ],
 			    [
 			      "LOAN",
@@ -461,7 +461,7 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    ],
 			  ],
 			  "grossPay": 15000,
-			  "netPay": 12793.3,
+			  "netPay": 12976.22,
 			  "periodShare": 0.5,
 			  "statutory": {
 			    "pagibigEe": 100,
@@ -470,10 +470,10 @@ describe('#163 golden — standard periods produce byte-identical pesos', () => 
 			    "philhealthEr": 375,
 			    "sssEe": 0,
 			    "sssEr": 990,
-			    "withholdingTax": 731.7,
+			    "withholdingTax": 548.78,
 			  },
 			  "taxableGross": 15000,
-			  "totalDeductions": 2206.7,
+			  "totalDeductions": 2023.78,
 			  "uncollected": 0,
 			}
 		`)

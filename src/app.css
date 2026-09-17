@@ -5,10 +5,10 @@
 @layer base {
 	/* Light theme (default) */
 	:root {
-		--background: 0 0% 98%;
+		--background: 0 0% 94%;
 		--foreground: 0 0% 9%;
 
-		--card: 0 0% 100%;
+		--card: 0 0% 98.5%;
 		--card-foreground: 0 0% 9%;
 
 		--popover: 0 0% 100%;
@@ -20,8 +20,8 @@
 		--secondary: 0 0% 96%;
 		--secondary-foreground: 0 0% 9%;
 
-		--muted: 0 0% 96%;
-		--muted-foreground: 0 0% 45%;
+		--muted: 0 0% 95%;
+		--muted-foreground: 0 0% 41%;
 
 		--accent: 0 0% 94%;
 		--accent-foreground: 0 0% 9%;
@@ -29,8 +29,8 @@
 		--destructive: 0 70% 50%;
 		--destructive-foreground: 0 0% 100%;
 
-		--border: 0 0% 89%;
-		--input: 0 0% 94%;
+		--border: 0 0% 86%;
+		--input: 0 0% 53%;
 		--ring: 0 79% 45%;
 		/* 10px — between the previous 6px and the ~14px of the BordUp reference. md/sm derive
 		   from this in tailwind.config.ts, so buttons and inputs stay proportionally crisper. */
@@ -62,7 +62,7 @@
 		--secondary-foreground: 0 0% 94%;
 
 		--muted: 0 0% 14%;
-		--muted-foreground: 0 0% 52%;
+		--muted-foreground: 0 0% 56%;
 
 		--accent: 0 0% 16%;
 		--accent-foreground: 0 0% 94%;
@@ -71,7 +71,7 @@
 		--destructive-foreground: 0 0% 100%;
 
 		--border: 0 0% 18%;
-		--input: 0 0% 13%;
+		--input: 0 0% 43%;
 		--ring: 0 79% 45%;
 	}
 }
@@ -173,7 +173,7 @@
 	.badge-blue {
 		@apply badge bg-blue-500/15 text-blue-700 dark:text-blue-400;
 	}
-	/* `bg-muted` is 96% in light and 14% in dark — two to four points from the card and the page
+	/* `bg-muted` is 95% in light and 14% in dark — two to four points from the card and the page
 	   behind it, so the gray pill had a fill nobody could see. Every other variant here is a tint
 	   of its own hue; gray has no hue, which is how it ended up transparent. A tint of the
 	   foreground is the neutral equivalent and needs no dark twin: it composites to ~#E6E6E6 on a
@@ -184,7 +184,7 @@
 
 	/* Input base style */
 	.input {
-		@apply flex h-9 w-full rounded-md border border-input bg-input px-3 py-1 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
+		@apply flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
 	}
 
 	/* A missing or invalid form control is flagged with a red border + focus ring.
@@ -220,24 +220,22 @@
 		@apply inline-flex items-center justify-center rounded-md border border-muted-foreground/30 bg-secondary px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
 	}
 	.btn-row-positive {
-		@apply inline-flex items-center justify-center rounded-md border border-green-600/40 px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-green-400;
+		@apply inline-flex items-center justify-center rounded-md border border-green-700 px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-green-400 dark:text-green-400;
 	}
 	.btn-row-warning {
-		@apply inline-flex items-center justify-center rounded-md border border-yellow-600/40 px-2.5 py-1 text-xs font-medium text-yellow-600 transition-colors hover:bg-yellow-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-yellow-500;
+		@apply inline-flex items-center justify-center rounded-md border border-yellow-700 px-2.5 py-1 text-xs font-medium text-yellow-600 transition-colors hover:bg-yellow-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-yellow-500 dark:text-yellow-500;
 	}
 	.btn-row-danger {
-		@apply inline-flex items-center justify-center rounded-md border border-red-600/40 bg-red-600/10 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:text-red-400;
+		@apply inline-flex items-center justify-center rounded-md border border-red-600 bg-red-600/10 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-red-400 dark:text-red-400;
 	}
 
-	/* Card — separated by tone and elevation rather than a hard outline. The hairline ring
-	   keeps definition where tone alone is too subtle (light theme, overlapping surfaces);
-	   it is an order of magnitude softer than the old border. */
-	/* The card edge carries the grouping, so it has to be visible. On light the page is 98% and
-	   the card 100% — two percent of tone, which the ring alone has to make up for; a 5% black
-	   ring did not. Dark separates on tone as well as the ring, so it needs less, but the old
-	   6% was still under the threshold where an edge registers. */
+	/* Card — separated by tone and the same border every other panel uses, so the whole app
+	   has one surface recipe instead of a ring here and a border everywhere else. */
+	/* The card edge carries the grouping, so it has to be visible. On light the page is 94% and
+	   the card 98.5% — enough tone to read as a surface, with the border marking its edge. Dark
+	   separates on tone as well as the border, with the card two steps above the page. */
 	.card {
-		@apply rounded-lg bg-card p-5 shadow-sm ring-1 ring-black/[0.12] dark:shadow-none dark:ring-white/10;
+		@apply rounded-lg border bg-card p-5 shadow-sm dark:shadow-none;
 	}
 
 	/* Data table */

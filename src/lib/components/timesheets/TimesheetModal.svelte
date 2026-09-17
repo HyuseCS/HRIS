@@ -8,6 +8,8 @@
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import TimePicker from '$lib/components/ui/TimePicker.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 
 	// Fields the modal reads. Both the /timesheets list rows and the /requests/timesheets
 	// approvals-load rows satisfy this shape. Decimal columns are typed loosely (they arrive
@@ -243,7 +245,6 @@
 		}
 		if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) return focusCell(r + 1, c)
 		if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) return focusCell(r - 1, c)
-		if (el.type === 'date' || el.type === 'time') return // keep native segment arrows
 		if (e.key === 'ArrowRight' && atEnd(el)) return focusCell(r, c + 1)
 		if (e.key === 'ArrowLeft' && atStart(el)) return focusCell(r, c - 1)
 	}
@@ -270,6 +271,21 @@
 	// wrapping there would toast twice.
 	const closeFb = submitFeedback({ inner: closeOnSuccess })
 	const keepOpenFb = submitFeedback({ inner: keepOpen })
+
+	let reviewedLabel = 'Timesheet'
+	const reviewSubmit: SubmitFunction = (input) => {
+		if (ts)
+			reviewedLabel = `${ts.employee.firstName} ${ts.employee.lastName}'s timesheet for ${formatShortDate(ts.periodStart)} – ${formatShortDate(ts.periodEnd)}`
+		return closeOnSuccess(input)
+	}
+	const approveFb = submitFeedback({
+		inner: reviewSubmit,
+		success: () => `${reviewedLabel} approved.`
+	})
+	const rejectFb = submitFeedback({
+		inner: reviewSubmit,
+		success: () => `${reviewedLabel} rejected.`
+	})
 
 	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
 	const inputClass =
@@ -354,7 +370,7 @@
 				Reg and OT are computed from In/Out: regular hours are 8:00 AM–5:00 PM less the unpaid
 				12:00–1:00 PM lunch; time worked outside that window is overtime.
 			</p>
-			<div class="overflow-x-auto rounded-lg border">
+			<div class="overflow-x-auto rounded-lg border bg-card">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -372,9 +388,9 @@
 							{#each entries as row, i (i)}
 								<tr>
 									<td class="px-3 py-1.5"
-										><input
-											type="date"
+										><DatePicker
 											bind:value={row.date}
+											aria-label="Date, row {i + 1}"
 											data-r={i}
 											data-c={0}
 											onkeydown={(e) => cellKeydown(e, i, 0)}
@@ -382,25 +398,25 @@
 										/></td
 									>
 									<td class="px-3 py-1.5"
-										><input
-											type="time"
+										><TimePicker
 											bind:value={row.timeIn}
 											oninput={() => recalcRow(row)}
+											aria-label="Time in, row {i + 1}"
 											data-r={i}
 											data-c={1}
 											onkeydown={(e) => cellKeydown(e, i, 1)}
-											class={inputClass}
+											class="{inputClass} min-w-[6rem]"
 										/></td
 									>
 									<td class="px-3 py-1.5"
-										><input
-											type="time"
+										><TimePicker
 											bind:value={row.timeOut}
 											oninput={() => recalcRow(row)}
+											aria-label="Time out, row {i + 1}"
 											data-r={i}
 											data-c={2}
 											onkeydown={(e) => cellKeydown(e, i, 2)}
-											class={inputClass}
+											class="{inputClass} min-w-[6rem]"
 										/></td
 									>
 									<!-- Reg/OT are derived from In/Out (read-only); edit the times to change them. -->
@@ -498,7 +514,7 @@
 				bind:this={rejectFormEl}
 				method="POST"
 				action="?/review"
-				use:enhance={closeFb.enhance}
+				use:enhance={rejectFb.enhance}
 				class="hidden"
 			>
 				<input type="hidden" name="id" value={ts.id} />
@@ -548,7 +564,7 @@
 						class="rounded-md border border-red-500/20 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50"
 						>Reject</button
 					>
-					<form method="POST" action="?/review" use:enhance={closeFb.enhance}>
+					<form method="POST" action="?/review" use:enhance={approveFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<input type="hidden" name="approved" value="true" />
 						<button

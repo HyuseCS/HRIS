@@ -22,7 +22,7 @@
 	<title>Job Boards — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Job Boards"
 		description="The sites HR can mark a posting as published to (JobStreet, Indeed, LinkedIn…). Track where a role went on each posting's page. Deactivate a board to hide it from new postings without losing where past roles were advertised."
@@ -33,11 +33,11 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" />
 	{/if}
 
 	<!-- Add -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-3xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a board</h2>
 		<form
 			method="POST"
@@ -66,7 +66,7 @@
 	</section>
 
 	<!-- List -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-3xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Boards</h2>
 		{#if data.boards.length === 0}
 			<p class="text-sm text-muted-foreground">No boards yet — add one above.</p>

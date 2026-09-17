@@ -18,14 +18,14 @@
 	const toggleGuard = (id: string) => (toggleGuards[id] ??= createSubmitGuard())
 
 	const inputClass =
-		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+		'h-9 w-full max-w-sm rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
 <svelte:head>
 	<title>Onboarding Checklist — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<!-- The description carries emphasis markup, which PageHeader's string `description` cannot,
 	     so it stays its own paragraph directly under the title. -->
 	<PageHeader title="Onboarding Checklist">
@@ -42,11 +42,11 @@
 	</p>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" />
 	{/if}
 
 	<!-- Add manual step -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-2xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a manual step</h2>
 		<form
 			method="POST"

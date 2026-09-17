@@ -1,14 +1,21 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import { goto } from '$app/navigation'
+	import { page } from '$app/stores'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import TimePicker from '$lib/components/ui/TimePicker.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import TeamMatrix from '$lib/components/attendance/TeamMatrix.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
+	import { manilaShortDay } from '$lib/utils/dates'
 	import type { PageData, ActionData } from './$types'
 
 	// Don't reset the form on success: enhance's default form.reset() clears the cross-cell
@@ -45,18 +52,71 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	type DayRow = NonNullable<PageData['team'][number]['day']>
+	type RowState = { timeIn?: string; timeOut?: string; status?: string; saved?: DayRow }
+	type EditField = 'timeIn' | 'timeOut' | 'status'
+
+	const rowState: Record<string, RowState> = $state({})
+
+	function rowOf(d: DayRow): DayRow {
+		const s = rowState[d.id]?.saved
+		return s && new Date(s.updatedAt) > new Date(d.updatedAt) ? s : d
+	}
+	function editOf(id: string, field: EditField, base: string) {
+		return rowState[id]?.[field] ?? base
+	}
+	function setEdit(id: string, field: EditField, value: string) {
+		rowState[id] = { ...rowState[id], [field]: value }
+	}
+	function isDirty(d: DayRow) {
+		const e = rowState[d.id]
+		if (!e) return false
+		return (
+			(e.timeIn !== undefined && e.timeIn !== toTimeInput(d.timeIn)) ||
+			(e.timeOut !== undefined && e.timeOut !== toTimeInput(d.timeOut)) ||
+			(e.status !== undefined && e.status !== d.status)
+		)
+	}
+	type BulkResult = { id: string; date: string; ok: boolean; reason?: string }
+	const clearOkRows: SubmitFunction =
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success')
+				for (const r of (result.data as { results?: BulkResult[] } | undefined)?.results ?? [])
+					if (r.ok) delete rowState[r.id]
+			await update({ reset: false })
+		}
+	const saveAll = submitFeedback({ inner: clearOkRows })
+
+	const correctRow =
+		(id: string): SubmitFunction =>
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success') {
+				const day = (result.data as { day?: DayRow } | undefined)?.day
+				if (day) rowState[id] = { saved: day }
+			}
+			await update({ reset: false })
+		}
+
 	// #163: the range stays free-form and "Save as timesheet" now accepts any same-month span —
 	// createTimesheet validates it server-side and refuses an overlap with a 409. Quick-picks still
 	// snap to a standard pay period. from/to are YYYY-MM-DD (UTC-midnight days).
 
+	let dayForm: HTMLFormElement | undefined = $state()
+	let rangeForm: HTMLFormElement | undefined = $state()
+	let fromValue = $state(untrack(() => data.from))
+	let toValue = $state(untrack(() => data.to))
+	$effect(() => {
+		fromValue = data.from
+		toValue = data.to
+	})
+
 	// Set the From/To inputs to a range and re-run the GET filter (same path the date inputs use).
 	function applyRange(from: string, to: string) {
-		const f = document.getElementById('from') as HTMLInputElement | null
-		const t = document.getElementById('to') as HTMLInputElement | null
-		if (!f || !t) return
-		f.value = from
-		t.value = to
-		f.form?.requestSubmit()
+		fromValue = from
+		toValue = to
+		rangeForm?.requestSubmit()
 	}
 	function pickPeriod(kind: PeriodKind, monthsBack = 0) {
 		const now = new Date()
@@ -78,14 +138,6 @@
 
 	const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY']
 
-	function fmtDate(d: string | Date) {
-		return new Date(d).toLocaleDateString('en-PH', {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric',
-			timeZone: 'Asia/Manila'
-		})
-	}
 	function fmtTime(d: string | Date | null) {
 		if (!d) return '—'
 		return new Date(d).toLocaleTimeString('en-PH', {
@@ -95,30 +147,6 @@
 		})
 	}
 	const n = (x: unknown) => Number(x)
-
-	// When In/Out are entered manually, auto-fill Reg (and OT overflow) to mirror the derive
-	// engine: worked = (Out − In) − 1h break past 5h; Reg = min(worked, 8), OT = the rest.
-	// HR can still override the numbers afterward.
-	function recalcHours(e: Event) {
-		const el = e.currentTarget as HTMLInputElement
-		const fid = el.getAttribute('form')
-		if (!fid) return
-		const q = (name: string) =>
-			document.querySelector<HTMLInputElement>(`input[name="${name}"][form="${fid}"]`)
-		const tin = q('timeIn')?.value
-		const tout = q('timeOut')?.value
-		const reg = q('regularHours')
-		const ot = q('overtimeHours')
-		if (!tin || !tout || !reg || !ot) return
-		const [ih, im] = tin.split(':').map(Number)
-		const [oh, om] = tout.split(':').map(Number)
-		let mins = oh * 60 + om - (ih * 60 + im)
-		if (mins < 0) mins += 1440 // overnight out
-		const gross = mins / 60
-		const worked = Math.max(0, gross - (gross > 5 ? 1 : 0))
-		reg.value = Math.min(worked, 8).toFixed(2)
-		ot.value = Math.max(0, worked - 8).toFixed(2)
-	}
 
 	// 24h HH:MM for a <input type="time">, in Manila time; '' when no punch.
 	function toTimeInput(d: string | Date | null) {
@@ -138,11 +166,8 @@
 	// Content-sized (not w-full) so the table columns spread evenly instead of one ballooning.
 	const CELL =
 		'h-7 rounded border border-input bg-background px-1 text-xs hover:border-ring focus:border-input focus:outline-none focus:ring-1 focus:ring-ring'
-	const CELL_NUM =
-		CELL +
-		' w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 	const CELL_SEL = CELL + ' appearance-none'
-	const CELL_TIME = CELL + ' w-24'
+	const CELL_TIME = CELL + ' w-28'
 
 	const exportHref = $derived(
 		data.view === 'team'
@@ -153,14 +178,41 @@
 	// "Exceptions only" — surface the rows that need HR action (failed to time in,
 	// incomplete logs, tardiness) so the morning fail-check doesn't mean scrolling the
 	// whole sheet. A missing team record counts as an exception (no punch = didn't time in).
-	let exceptionsOnly = $state(false)
-	const isException = (s: string) => s === 'ABSENT' || s === 'INCOMPLETE' || s === 'LATE'
-	const teamRows = $derived(
-		exceptionsOnly ? data.team.filter((t) => !t.day || isException(t.day.status)) : data.team
+	const teamRows = $derived(data.team)
+	function setTeamExceptions(on: boolean) {
+		const url = new URL($page.url)
+		if (on) url.searchParams.set('exceptions', '1')
+		else url.searchParams.delete('exceptions')
+		url.searchParams.delete('page')
+		goto(url)
+	}
+	const dayRows = $derived(data.days)
+	const dirtyDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && isDirty(d)))
+	const dirtyRowsField = $derived(
+		JSON.stringify(
+			dirtyDays.map((d) => ({
+				id: d.id,
+				date: toDateKey(d.date),
+				timeIn: editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+				timeOut: editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+				status: editOf(d.id, 'status', d.status)
+			}))
+		)
 	)
-	const dayRows = $derived(
-		exceptionsOnly ? data.days.filter((d) => isException(d.status)) : data.days
+	const editedDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && d.manuallyEdited))
+	const editedRowsField = $derived(
+		JSON.stringify(editedDays.map((d) => ({ id: d.id, date: toDateKey(d.date) })))
 	)
+	const editedSpan = $derived.by(() => {
+		const times = editedDays.map((d) => new Date(d.date).getTime())
+		if (times.length === 0) return ''
+		return `between ${manilaShortDay(new Date(Math.min(...times)))} and ${manilaShortDay(new Date(Math.max(...times)))} `
+	})
+	const selectedEmployeeName = $derived.by(() => {
+		const e = data.employees.find((x) => x.id === data.selectedEmployeeId)
+		return e ? `${e.firstName} ${e.lastName}` : 'this employee'
+	})
+	const editedCount = $derived(`${editedDays.length} ${editedDays.length === 1 ? 'day' : 'days'}`)
 
 	// Heroicons (outline, 24×24) — match the inline-SVG convention used in the app nav.
 	const IC = {
@@ -194,238 +246,243 @@
 	</svg>
 {/snippet}
 
-<div class="space-y-6">
-	<PageHeader
-		title="Attendance"
-		description={data.canManage
-			? 'Daily records & corrections. For a multi-day team matrix, see Team Attendance.'
-			: undefined}
-	/>
-
-	<div class="space-y-4 rounded-lg border bg-card p-4">
-		<div class="flex flex-wrap items-start justify-between gap-3">
-			<!-- Filters -->
-			{#if data.view === 'team'}
-				<form method="GET" class="flex flex-1 flex-wrap items-end gap-3">
-					<input type="hidden" name="view" value="team" />
-					<div class="flex flex-col gap-1">
-						<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
-						<input
-							id="date"
-							name="date"
-							type="date"
-							value={data.date}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-					</div>
-				</form>
-			{:else}
-				<form method="GET" class="flex flex-1 flex-wrap items-end gap-3">
-					{#if data.canManage}
-						<input type="hidden" name="view" value="employee" />
-						<div class="flex flex-col gap-1">
-							<label for="employeeId" class="text-xs font-medium text-muted-foreground"
-								>Employee</label
-							>
-							<select
-								id="employeeId"
-								name="employeeId"
-								onchange={(e) => e.currentTarget.form?.requestSubmit()}
-								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-							>
-								{#each data.employees as e (e.id)}
-									<option value={e.id} selected={e.id === data.selectedEmployeeId}
-										>{e.lastName}, {e.firstName} ({e.employeeNumber})</option
-									>
-								{/each}
-							</select>
-						</div>
-					{/if}
-					<div class="flex flex-col gap-1">
-						<label for="from" class="text-xs font-medium text-muted-foreground">From</label>
-						<input
-							id="from"
-							name="from"
-							type="date"
-							value={data.from}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-					</div>
-					<div class="flex flex-col gap-1">
-						<label for="to" class="text-xs font-medium text-muted-foreground">To</label>
-						<input
-							id="to"
-							name="to"
-							type="date"
-							value={data.to}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-						/>
-					</div>
-					<div class="flex w-full flex-wrap items-center gap-1.5">
-						<span class="text-xs font-medium text-muted-foreground">Quick pick:</span>
-						{#each QUICK_PICKS as q (q.label)}
-							<button
-								type="button"
-								onclick={() => pickPeriod(q.kind, q.monthsBack)}
-								class="rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent"
-								>{q.label}</button
-							>
-						{/each}
-					</div>
-					<p class="w-full text-xs text-muted-foreground">
-						Range is capped at {data.maxRangeDays} days (~2 months); longer spans are trimmed automatically.
-					</p>
-				</form>
-			{/if}
-			{#if data.canManage}
-				<div
-					class="order-first flex w-full flex-wrap items-center gap-3 sm:order-none sm:w-auto sm:pt-5"
-				>
-					<div class="inline-flex rounded-lg border p-1 text-sm">
-						<a
-							href="?view=employee&employeeId={data.selectedEmployeeId ??
-								''}&from={data.from}&to={data.to}"
-							class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
-								? 'bg-primary text-primary-foreground'
-								: 'text-muted-foreground hover:bg-accent'}"
-						>
-							By employee
-						</a>
-						<a
-							href="?view=team&date={data.date}"
-							class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
-								? 'bg-primary text-primary-foreground'
-								: 'text-muted-foreground hover:bg-accent'}"
-						>
-							Whole team (day)
-						</a>
-					</div>
-					{#if data.view === 'team'}
-						<a
-							href="/team"
-							class="whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-							>Multi-day matrix →</a
-						>
-					{/if}
-				</div>
-			{/if}
+<div
+	class={data.view === 'matrix'
+		? 'flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0'
+		: 'space-y-6'}
+>
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader
+				title="Attendance"
+				description={data.canManage ? 'Team overview, daily records & corrections.' : undefined}
+			/>
 		</div>
+		{#if data.canManage}
+			<div class="inline-flex w-full max-w-full flex-wrap rounded-lg border p-1 text-sm sm:w-auto">
+				<a
+					href="?view=matrix"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'matrix'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					Whole team
+				</a>
+				<a
+					href="?view=team&date={data.date}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					Team day
+				</a>
+				<a
+					href="?view=employee&employeeId={data.selectedEmployeeId ??
+						''}&from={data.from}&to={data.to}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					By employee
+				</a>
+			</div>
+		{/if}
+	</div>
 
-		<!-- Bulk actions -->
-		<div class="flex flex-wrap items-center gap-2 border-t pt-4">
-			{#if data.canManage && data.view === 'employee' && data.selectedEmployeeId}
-				<form method="POST" action="?/derive" use:enhance={derive.enhance}>
-					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-					<input type="hidden" name="from" value={data.from} />
-					<input type="hidden" name="to" value={data.to} />
-					<button
-						title="Re-pull from punches (updates unlocked days)"
-						disabled={derive.busy}
-						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{@render icon(IC.refresh)}Refresh</button
-					>
-				</form>
-				<form method="POST" action="?/lock" use:enhance={lock.enhance}>
-					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-					<input type="hidden" name="from" value={data.from} />
-					<input type="hidden" name="to" value={data.to} />
-					<button
-						disabled={lock.busy}
-						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{lock.busy ? 'Locking…' : 'Lock range'}</button
-					>
-				</form>
-				{#if data.canUnlock}
-					<form method="POST" action="?/unlock" use:enhance={unlock.enhance}>
+	{#if data.view !== 'matrix'}
+		<div class="space-y-4 rounded-lg border bg-card p-4">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<!-- Filters -->
+				{#if data.view === 'team'}
+					<form bind:this={dayForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+						<input type="hidden" name="view" value="team" />
+						{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
+						<div class="flex flex-col gap-1">
+							<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
+							<DatePicker
+								id="date"
+								name="date"
+								value={data.date}
+								onchange={() => dayForm?.requestSubmit()}
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+						</div>
+					</form>
+				{:else if data.view === 'employee'}
+					<form bind:this={rangeForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+						{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
+						{#if data.canManage}
+							<input type="hidden" name="view" value="employee" />
+							<div class="flex flex-col gap-1">
+								<label for="employeeId" class="text-xs font-medium text-muted-foreground"
+									>Employee</label
+								>
+								<select
+									id="employeeId"
+									name="employeeId"
+									onchange={(e) => e.currentTarget.form?.requestSubmit()}
+									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								>
+									{#each data.employees as e (e.id)}
+										<option value={e.id} selected={e.id === data.selectedEmployeeId}
+											>{e.lastName}, {e.firstName} ({e.employeeNumber})</option
+										>
+									{/each}
+								</select>
+							</div>
+						{/if}
+						<div class="flex flex-col gap-1">
+							<label for="from" class="text-xs font-medium text-muted-foreground">From</label>
+							<DatePicker
+								id="from"
+								name="from"
+								bind:value={fromValue}
+								onchange={() => rangeForm?.requestSubmit()}
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+						</div>
+						<div class="flex flex-col gap-1">
+							<label for="to" class="text-xs font-medium text-muted-foreground">To</label>
+							<DatePicker
+								id="to"
+								name="to"
+								bind:value={toValue}
+								onchange={() => rangeForm?.requestSubmit()}
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+						</div>
+						<div class="flex w-full flex-wrap items-center gap-1.5">
+							<span class="text-xs font-medium text-muted-foreground">Quick pick:</span>
+							{#each QUICK_PICKS as q (q.label)}
+								<button
+									type="button"
+									onclick={() => pickPeriod(q.kind, q.monthsBack)}
+									class="rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent"
+									>{q.label}</button
+								>
+							{/each}
+						</div>
+						<p class="w-full text-xs text-muted-foreground">
+							Range is capped at {data.maxRangeDays} days (~2 months); longer spans are trimmed automatically.
+						</p>
+					</form>
+				{/if}
+			</div>
+
+			<!-- Bulk actions -->
+			<div class="flex flex-wrap items-center gap-2 border-t pt-4">
+				{#if data.canManage && data.view === 'employee' && data.selectedEmployeeId}
+					<form method="POST" action="?/derive" use:enhance={derive.enhance}>
 						<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
 						<input type="hidden" name="from" value={data.from} />
 						<input type="hidden" name="to" value={data.to} />
 						<button
-							title="Reopen locked days (super admin)"
-							disabled={unlock.busy}
-							class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
-							>{@render icon(IC.lockOpen)}Unlock range</button
+							title="Re-pull from punches (updates unlocked days)"
+							disabled={derive.busy}
+							class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+							>{@render icon(IC.refresh)}Refresh</button
 						>
 					</form>
-				{/if}
-				<a
-					href={exportHref}
-					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-					>{@render icon(IC.download)}Export CSV</a
-				>
-				<form method="POST" action="?/saveTimesheet" use:enhance={saveTimesheet.enhance}>
-					<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
-					<input type="hidden" name="from" value={data.from} />
-					<input type="hidden" name="to" value={data.to} />
-					<button
-						title="Persist this range as a Timesheet record"
-						disabled={saveTimesheet.busy}
-						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{@render icon(IC.document)}Save as timesheet</button
+					<form method="POST" action="?/lock" use:enhance={lock.enhance}>
+						<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+						<input type="hidden" name="from" value={data.from} />
+						<input type="hidden" name="to" value={data.to} />
+						<button
+							disabled={lock.busy}
+							class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+							>{lock.busy ? 'Locking…' : 'Lock range'}</button
+						>
+					</form>
+					{#if data.canUnlock}
+						<form method="POST" action="?/unlock" use:enhance={unlock.enhance}>
+							<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+							<input type="hidden" name="from" value={data.from} />
+							<input type="hidden" name="to" value={data.to} />
+							<button
+								title="Reopen locked days (super admin)"
+								disabled={unlock.busy}
+								class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+								>{@render icon(IC.lockOpen)}Unlock range</button
+							>
+						</form>
+					{/if}
+					<a
+						href={exportHref}
+						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+						>{@render icon(IC.download)}Export CSV</a
 					>
-				</form>
-			{:else if data.canManage && data.view === 'team'}
-				<form method="POST" action="?/deriveTeam" use:enhance={deriveTeam.enhance}>
-					<input type="hidden" name="date" value={data.date} />
-					<button
-						title="Re-pull from punches (updates unlocked days)"
-						disabled={deriveTeam.busy}
-						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{@render icon(IC.refresh)}Refresh</button
-					>
-				</form>
-				<form method="POST" action="?/lockTeam" use:enhance={lockTeam.enhance}>
-					<input type="hidden" name="date" value={data.date} />
-					<button
-						disabled={lockTeam.busy}
-						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						>{lockTeam.busy ? 'Locking…' : 'Lock day'}</button
-					>
-				</form>
-				{#if data.canUnlock}
-					<form method="POST" action="?/unlockTeam" use:enhance={unlockTeam.enhance}>
+					<form method="POST" action="?/saveTimesheet" use:enhance={saveTimesheet.enhance}>
+						<input type="hidden" name="employeeId" value={data.selectedEmployeeId} />
+						<input type="hidden" name="from" value={data.from} />
+						<input type="hidden" name="to" value={data.to} />
+						<button
+							title="Persist this range as a Timesheet record"
+							disabled={saveTimesheet.busy}
+							class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+							>{@render icon(IC.document)}Save as timesheet</button
+						>
+					</form>
+				{:else if data.canManage && data.view === 'team'}
+					<form method="POST" action="?/deriveTeam" use:enhance={deriveTeam.enhance}>
 						<input type="hidden" name="date" value={data.date} />
 						<button
-							title="Reopen locked days (super admin)"
-							disabled={unlockTeam.busy}
-							class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
-							>{@render icon(IC.lockOpen)}Unlock day</button
+							title="Re-pull from punches (updates unlocked days)"
+							disabled={deriveTeam.busy}
+							class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+							>{@render icon(IC.refresh)}Refresh</button
 						>
 					</form>
+					<form method="POST" action="?/lockTeam" use:enhance={lockTeam.enhance}>
+						<input type="hidden" name="date" value={data.date} />
+						<button
+							disabled={lockTeam.busy}
+							class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+							>{lockTeam.busy ? 'Locking…' : 'Lock day'}</button
+						>
+					</form>
+					{#if data.canUnlock}
+						<form method="POST" action="?/unlockTeam" use:enhance={unlockTeam.enhance}>
+							<input type="hidden" name="date" value={data.date} />
+							<button
+								title="Reopen locked days (super admin)"
+								disabled={unlockTeam.busy}
+								class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+								>{@render icon(IC.lockOpen)}Unlock day</button
+							>
+						</form>
+					{/if}
+					<a
+						href={exportHref}
+						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+						>{@render icon(IC.download)}Export CSV</a
+					>
+				{:else}
+					<!-- Employees can export their own timesheet -->
+					<a
+						href={exportHref}
+						class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+						>{@render icon(IC.download)}Export CSV</a
+					>
 				{/if}
-				<a
-					href={exportHref}
-					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-					>{@render icon(IC.download)}Export CSV</a
-				>
-			{:else}
-				<!-- Employees can export their own timesheet -->
-				<a
-					href={exportHref}
-					class="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-					>{@render icon(IC.download)}Export CSV</a
-				>
-			{/if}
-			{#if data.canManage}
-				<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
-				<label class="inline-flex cursor-pointer items-center gap-2 text-sm">
-					<input
-						type="checkbox"
-						bind:checked={exceptionsOnly}
-						class="h-4 w-4 rounded border-input"
-					/>
-					<span class="font-medium">Exceptions only</span>
-					<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
-				</label>
-				<span class="ml-auto text-xs text-muted-foreground"
-					>{data.view === 'team' ? teamRows.length : dayRows.length} shown</span
-				>
-			{/if}
+				{#if data.canManage}
+					<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
+					<label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+						<input
+							type="checkbox"
+							checked={data.exceptionsOnly}
+							onchange={(e) => setTeamExceptions(e.currentTarget.checked)}
+							class="h-4 w-4 rounded border-input"
+						/>
+						<span class="font-medium">Exceptions only</span>
+						<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
+					</label>
+					<span class="ml-auto text-xs text-muted-foreground"
+						>{data.view === 'team' ? data.pagination.total : dayRows.length} shown</span
+					>
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- #200: CSV backlog import. Food-service tenants only; the action re-checks both gates. -->
 	{#if data.canManage && data.showAmPm}
@@ -535,7 +592,7 @@
 		</div>
 	{/if}
 
-	{#if data.showAmPm && data.canManage}
+	{#if data.showAmPm && data.canManage && data.view !== 'matrix'}
 		<!-- m-6: the AM/PM split is read-only by design (#162). Without saying so, an HR user in edit
 		     mode clicks an AM In cell and nothing happens. Gated on canManage: an employee has no
 		     correction door, so the second sentence would be a false instruction. -->
@@ -545,9 +602,18 @@
 		</p>
 	{/if}
 
-	{#if data.view === 'team'}
+	{#if data.canManage && data.view !== 'matrix'}
+		<p class="text-xs text-muted-foreground">
+			Reg and OT are worked out from the punches and the approved overtime, and cannot be typed in.
+			Correct a day by editing its In and Out.
+		</p>
+	{/if}
+
+	{#if data.view === 'matrix' && data.matrix}
+		<TeamMatrix matrix={data.matrix} />
+	{:else if data.view === 'team'}
 		<!-- Team-for-a-day table -->
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -572,7 +638,7 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each teamRows as t (t.id)}
-						{@const d = t.day}
+						{@const d = t.day ? rowOf(t.day) : null}
 						{@const editable = data.canManage && d && !d.isLocked}
 						<tr
 							class="hover:bg-muted/30 {d && (d.status === 'ABSENT' || d.status === 'INCOMPLETE')
@@ -586,9 +652,15 @@
 							<td class="px-3 py-2 text-muted-foreground">{t.departmentName ?? '—'}</td>
 							<td class="px-3 py-2">
 								{#if editable && d}
-									<select name="status" form="c-{d.id}" class={CELL_SEL}>
-										{#each STATUSES as s (s)}<option value={s} selected={s === d.status}>{s}</option
-											>{/each}
+									<select
+										name="status"
+										form="c-{d.id}"
+										class={CELL_SEL}
+										bind:value={
+											() => editOf(d.id, 'status', d.status), (v) => setEdit(d.id, 'status', v)
+										}
+									>
+										{#each STATUSES as s (s)}<option value={s}>{s}</option>{/each}
 									</select>
 								{:else if d}
 									<Badge status={d.status} domain="attendance" />
@@ -602,46 +674,40 @@
 								{/if}
 							</td>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable && d}<input
+								>{#if editable && d}<TimePicker
 										name="timeIn"
 										form="c-{d.id}"
-										type="time"
-										value={toTimeInput(d.timeIn)}
-										oninput={recalcHours}
+										aria-label="Time in"
+										bind:value={
+											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+											(v) => setEdit(d.id, 'timeIn', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeIn ?? null)}{/if}</td
 							>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable && d}<input
+								>{#if editable && d}<TimePicker
 										name="timeOut"
 										form="c-{d.id}"
-										type="time"
-										value={toTimeInput(d.timeOut)}
-										oninput={recalcHours}
+										aria-label="Time out"
+										bind:value={
+											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+											(v) => setEdit(d.id, 'timeOut', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d?.timeOut ?? null)}{/if}</td
 							>
 							<td class="px-3 py-2 text-right font-mono"
-								>{#if editable && d}<input
-										name="regularHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.regularHours)}
-										class={CELL_NUM}
-									/>{:else}{d ? n(d.regularHours).toFixed(2) : '—'}{/if}</td
+								>{d ? n(d.regularHours).toFixed(2) : '—'}</td
 							>
 							<td class="px-3 py-2 text-right font-mono"
-								>{#if editable && d}<input
-										name="overtimeHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.overtimeHours)}
-										class={CELL_NUM}
-									/>{:else}{d ? n(d.overtimeHours).toFixed(2) : '—'}{/if}</td
+								>{#if d}{n(d.overtimeHours).toFixed(
+										2
+									)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+											class="ml-1 text-xs text-amber-600 dark:text-amber-400"
+											title="unapproved OT"
+											>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
+										>{/if}{:else}—{/if}</td
 							>
 							{#if data.showAmPm}
 								<!-- M-15: after Reg/OT, mirroring the header order. -->
@@ -652,30 +718,39 @@
 							{/if}
 							<td class="w-[1%] whitespace-nowrap px-3 py-2">
 								{#if editable && d}
-									{@const save = rowGuard(`correct:${d.id}`, keepValues)}
+									{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 									<div class="flex items-center gap-1">
-										<form id="c-{d.id}" method="POST" action="?/correct" use:enhance={save.enhance}>
-											<input type="hidden" name="id" value={d.id} />
-											<input type="hidden" name="date" value={toDateKey(d.date)} />
-											<button
-												disabled={save.busy}
-												class="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-												>{save.busy ? 'Saving…' : 'Save'}</button
-											>
-										</form>
-										<ConfirmButton
-											action="?/resetDay"
-											title="Discard the manual edit?"
-											message="This day goes back to the values derived from its punch records. The manual correction is lost."
-											confirmText="Reset"
-											triggerLabel="Reset"
-											disabled={!d.manuallyEdited}
-											triggerTitle="Discard manual edit and re-derive from punches"
-											triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
-											submit={keepValues}
+										<form
+											id="c-{d.id}"
+											method="POST"
+											action="?/correct"
+											use:enhance={save.enhance}
+											class="w-[4.5rem]"
 										>
 											<input type="hidden" name="id" value={d.id} />
-										</ConfirmButton>
+											<input type="hidden" name="date" value={toDateKey(d.date)} />
+											{#if isDirty(d)}
+												<button
+													disabled={save.busy}
+													class="w-full rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+													>{save.busy ? 'Saving…' : 'Save'}</button
+												>
+											{/if}
+										</form>
+										{#if d.manuallyEdited}
+											<ConfirmButton
+												action="?/resetDay"
+												title="Discard the manual edit?"
+												message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
+												confirmText="Reset"
+												triggerLabel="Recalculate"
+												triggerTitle="Recalculate this day from the raw punches"
+												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
+												submit={keepValues}
+											>
+												<input type="hidden" name="id" value={d.id} />
+											</ConfirmButton>
+										{/if}
 									</div>
 								{:else if d?.isLocked}
 									<span class="inline-flex h-7 items-center text-xs text-muted-foreground"
@@ -688,9 +763,9 @@
 						<tr
 							><td colspan={data.showAmPm ? 12 : 8} class="p-0"
 								><EmptyState
-									variant={exceptionsOnly ? 'no-results' : 'empty'}
-									title={exceptionsOnly ? 'No exceptions today' : 'No active employees'}
-									description={exceptionsOnly
+									variant={data.exceptionsOnly ? 'no-results' : 'empty'}
+									title={data.exceptionsOnly ? 'No exceptions today' : 'No active employees'}
+									description={data.exceptionsOnly
 										? 'Everyone is accounted for. Clear the exceptions filter to see the whole roster.'
 										: undefined}
 								/></td
@@ -700,9 +775,70 @@
 				</tbody>
 			</table>
 		</div>
+
+		<Pagination meta={data.pagination} />
 	{:else}
+		{#if data.canManage}
+			<div class="flex flex-wrap items-center gap-2">
+				<form method="POST" action="?/saveAll" use:enhance={saveAll.enhance}>
+					<input type="hidden" name="rows" value={dirtyRowsField} />
+					<button
+						disabled={saveAll.busy || dirtyDays.length === 0}
+						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						>{saveAll.busy
+							? 'Saving…'
+							: `Save ${dirtyDays.length} changed ${dirtyDays.length === 1 ? 'day' : 'days'} on this page`}</button
+					>
+				</form>
+				<ConfirmButton
+					action="?/resetAll"
+					title="Discard {editedDays.length} manual {editedDays.length === 1 ? 'edit' : 'edits'}?"
+					message="{editedCount} for {selectedEmployeeName} {editedSpan}{editedDays.length === 1
+						? 'is'
+						: 'are'} thrown away and re-derived from the raw punches. Anything typed by hand on those days is lost. Only the days shown on this page are affected."
+					confirmText="Recalculate"
+					triggerLabel="Recalculate {editedCount} on this page"
+					disabled={editedDays.length === 0}
+					triggerTitle="Recalculate every manually edited day shown on this page"
+					triggerClass="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					submit={clearOkRows}
+				>
+					<input type="hidden" name="rows" value={editedRowsField} />
+				</ConfirmButton>
+			</div>
+			{#if form && 'results' in form && (form.action === 'saveAll' || form.action === 'resetAll') && form.results}
+				{@const res = form.results}
+				{@const failed = res.filter((r) => !r.ok)}
+				{#if failed.length > 0}
+					{@const verb = form.action === 'resetAll' ? 'recalculated' : 'saved'}
+					{@const okCount = res.length - failed.length}
+					{@const nothing = okCount === 0}
+					<div
+						role="status"
+						class="rounded-md border px-3 py-2 text-sm {nothing
+							? 'border-destructive/20 bg-destructive/10 text-red-400'
+							: 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'}"
+					>
+						<p class="font-medium">
+							{#if nothing}No days were {verb} — {failed.length}
+								{failed.length === 1 ? 'day' : 'days'} could not be {verb}.{:else}Partly {verb}
+								— {okCount} of {res.length} days {verb}, {failed.length} failed.{/if}
+						</p>
+						<details class="mt-1" open={nothing}>
+							<summary class="cursor-pointer text-xs font-medium">Why days were not {verb}</summary>
+							<ul class="mt-1 space-y-0.5 text-xs">
+								{#each failed as r (r.id)}
+									<li>{manilaShortDay(r.date)} — {r.reason}</li>
+								{/each}
+							</ul>
+						</details>
+					</div>
+				{/if}
+			{/if}
+		{/if}
+
 		<!-- Single-employee range table -->
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -726,7 +862,8 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y">
-					{#each dayRows as d (d.id)}
+					{#each dayRows as src (src.id)}
+						{@const d = rowOf(src)}
 						{@const editable = data.canManage && !d.isLocked}
 						<tr
 							class="hover:bg-muted/30 {d.status === 'ABSENT' || d.status === 'INCOMPLETE'
@@ -734,7 +871,7 @@
 								: ''}"
 						>
 							<td class="px-3 py-2 whitespace-nowrap"
-								>{fmtDate(d.date)}
+								>{manilaShortDay(d.date)}
 								{#if d.isLocked}<span
 										title="locked"
 										class="inline-flex align-middle text-muted-foreground"
@@ -743,66 +880,54 @@
 							>
 							<td class="px-3 py-2">
 								{#if editable}
-									<select name="status" form="c-{d.id}" class={CELL_SEL}>
-										{#each STATUSES as s (s)}<option value={s} selected={s === d.status}>{s}</option
-											>{/each}
+									<select
+										name="status"
+										form="c-{d.id}"
+										class={CELL_SEL}
+										bind:value={
+											() => editOf(d.id, 'status', d.status), (v) => setEdit(d.id, 'status', v)
+										}
+									>
+										{#each STATUSES as s (s)}<option value={s}>{s}</option>{/each}
 									</select>
 								{:else}
 									<Badge status={d.status} domain="attendance" />
 								{/if}
 							</td>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable}<input
+								>{#if editable}<TimePicker
 										name="timeIn"
 										form="c-{d.id}"
-										type="time"
-										value={toTimeInput(d.timeIn)}
-										oninput={recalcHours}
+										aria-label="Time in"
+										bind:value={
+											() => editOf(d.id, 'timeIn', toTimeInput(d.timeIn)),
+											(v) => setEdit(d.id, 'timeIn', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeIn)}{/if}</td
 							>
 							<td class="px-3 py-2 text-muted-foreground"
-								>{#if editable}<input
+								>{#if editable}<TimePicker
 										name="timeOut"
 										form="c-{d.id}"
-										type="time"
-										value={toTimeInput(d.timeOut)}
-										oninput={recalcHours}
+										aria-label="Time out"
+										bind:value={
+											() => editOf(d.id, 'timeOut', toTimeInput(d.timeOut)),
+											(v) => setEdit(d.id, 'timeOut', v)
+										}
 										class={CELL_TIME}
 									/>{:else}{fmtTime(d.timeOut)}{/if}</td
 							>
-							<td class="px-3 py-2 text-right font-mono">
-								{#if editable}
-									<input
-										name="regularHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.regularHours)}
-										class={CELL_NUM}
-									/>
-								{:else}{n(d.regularHours).toFixed(2)}{/if}
-							</td>
-							<td class="px-3 py-2 text-right font-mono">
-								{#if editable}
-									<input
-										name="overtimeHours"
-										form="c-{d.id}"
-										type="number"
-										step="0.25"
-										min="0"
-										value={n(d.overtimeHours)}
-										class={CELL_NUM}
-									/>
-								{:else}{n(d.overtimeHours).toFixed(
-										2
-									)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
-											class="ml-1 text-xs text-amber-600 dark:text-amber-400"
-											title="unapproved OT"
-											>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
-										>{/if}{/if}
-							</td>
+							<td class="px-3 py-2 text-right font-mono">{n(d.regularHours).toFixed(2)}</td>
+							<td class="px-3 py-2 text-right font-mono"
+								>{n(d.overtimeHours).toFixed(
+									2
+								)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+										class="ml-1 text-xs text-amber-600 dark:text-amber-400"
+										title="unapproved OT"
+										>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span
+									>{/if}</td
+							>
 							<td class="px-3 py-2 text-right font-mono">{n(d.nightDiffHours).toFixed(2)}</td>
 							<td class="px-3 py-2 text-right font-mono text-muted-foreground"
 								>{d.lateMinutes}/{d.undertimeMinutes}</td
@@ -821,35 +946,39 @@
 											>locked</span
 										>
 									{:else}
-										{@const save = rowGuard(`correct:${d.id}`, keepValues)}
+										{@const save = rowGuard(`correct:${d.id}`, correctRow(d.id))}
 										<div class="flex items-center gap-1">
 											<form
 												id="c-{d.id}"
 												method="POST"
 												action="?/correct"
 												use:enhance={save.enhance}
+												class="w-[4.5rem]"
 											>
 												<input type="hidden" name="id" value={d.id} />
 												<input type="hidden" name="date" value={toDateKey(d.date)} />
-												<button
-													disabled={save.busy}
-													class="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-													>{save.busy ? 'Saving…' : 'Save'}</button
-												>
+												{#if isDirty(d)}
+													<button
+														disabled={save.busy}
+														class="w-full rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+														>{save.busy ? 'Saving…' : 'Save'}</button
+													>
+												{/if}
 											</form>
-											<ConfirmButton
-												action="?/resetDay"
-												title="Discard the manual edit?"
-												message="This day goes back to the values derived from its punch records. The manual correction is lost."
-												confirmText="Reset"
-												triggerLabel="Reset"
-												disabled={!d.manuallyEdited}
-												triggerTitle="Discard manual edit and re-derive from punches"
-												triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
-												submit={keepValues}
-											>
-												<input type="hidden" name="id" value={d.id} />
-											</ConfirmButton>
+											{#if d.manuallyEdited}
+												<ConfirmButton
+													action="?/resetDay"
+													title="Discard the manual edit?"
+													message="The hours you corrected for this day are thrown away and re-derived from the raw punches. Anything typed by hand is lost."
+													confirmText="Reset"
+													triggerLabel="Recalculate"
+													triggerTitle="Recalculate this day from the raw punches"
+													triggerClass="rounded bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground"
+													submit={keepValues}
+												>
+													<input type="hidden" name="id" value={d.id} />
+												</ConfirmButton>
+											{/if}
 										</div>
 									{/if}
 								</td>
@@ -859,11 +988,11 @@
 						<tr
 							><td colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)} class="p-0"
 								><EmptyState
-									variant={exceptionsOnly ? 'no-results' : 'empty'}
-									title={exceptionsOnly
+									variant={data.exceptionsOnly ? 'no-results' : 'empty'}
+									title={data.exceptionsOnly
 										? 'No exceptions in this range'
 										: 'No attendance for this range'}
-									description={exceptionsOnly
+									description={data.exceptionsOnly
 										? 'Everyone in this range is accounted for. Clear the exceptions filter to see every day.'
 										: data.canManage
 											? 'No punches yet, or use Refresh.'

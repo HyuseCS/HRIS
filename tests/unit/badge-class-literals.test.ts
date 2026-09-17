@@ -22,7 +22,7 @@ const SRC = 'src'
 // The tone classes are used as class names and need a literal in `src/`; that is what the first
 // describe block asserts. The base `.badge` survives twice over: `@apply` inlines it at build time,
 // AND Tailwind's content scanner is a naive text scan, so the bare token in
-// `{@const badge = ...}` at `src/routes/(app)/team/+page.svelte:143` counts as a literal too.
+// `{@const badge = ...}` in `src/lib/components/attendance/TeamMatrix.svelte` counts as a literal too.
 const appCss = readFileSync('src/app.css', 'utf8')
 // One tone-discovery regex for both describe blocks, so the two cannot drift apart.
 const toneRules = [...appCss.matchAll(/\.badge-(\w+)\s*\{/g)].map((m) => ({

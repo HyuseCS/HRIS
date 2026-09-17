@@ -31,8 +31,8 @@
 	{/if}
 
 	<form method="POST" action="?/apply" use:enhance={apply.enhance} class="space-y-6">
-		<fieldset class="rounded-md border p-4 space-y-4">
-			<legend class="px-1 text-sm font-semibold">Personal Information</legend>
+		<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+			<legend class="float-left mb-4 w-full font-semibold">Personal Information</legend>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div>
 					<label for="firstName" class="text-sm font-medium">
@@ -84,8 +84,8 @@
 			</div>
 		</fieldset>
 
-		<fieldset class="rounded-md border p-4 space-y-4">
-			<legend class="px-1 text-sm font-semibold">Application Details</legend>
+		<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+			<legend class="float-left mb-4 w-full font-semibold">Application Details</legend>
 			<div class="space-y-4">
 				<div>
 					<label for="resumeUrl" class="text-sm font-medium">Resume URL</label>

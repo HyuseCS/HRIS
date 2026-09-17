@@ -4,13 +4,22 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
+	let start = $state('08:00')
+	let end = $state('17:00')
 
 	// #108: a double-click would create a duplicate work schedule.
-	const createSchedule = createSubmitGuard()
+	const createSchedule = createSubmitGuard(() => async ({ result, update }) => {
+		await update()
+		if (result.type === 'success') {
+			start = '08:00'
+			end = '17:00'
+		}
+	})
 	// #162: same guard on the threshold form — a double submit writes (and audits) it twice.
 	const saveAmPmGap = createSubmitGuard()
 
@@ -50,7 +59,7 @@
 	{/if}
 
 	<!-- #190: org-wide master switch. ANDs with each schedule's own flag in the table below. -->
-	<div class="flex items-center justify-between gap-4 rounded-lg border p-4">
+	<div class="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
 		<div>
 			<p class="text-sm font-medium">Track tardiness organization-wide</p>
 			<p class="text-xs text-muted-foreground">
@@ -74,7 +83,7 @@
 		     below are a convenience, NOT the validation — the action re-checks the bounds server-side
 		     and must keep doing so even though the input appears to limit them. -->
 		{@const gapError = form?.field === 'minutes' ? form.error : undefined}
-		<div class="space-y-3 rounded-lg border p-4">
+		<div class="space-y-3 rounded-lg border bg-card p-4">
 			<div>
 				<p class="text-sm font-medium">AM / PM break length</p>
 				<!-- The columns this controls are labelled PM In / PM Out, so the copy says
@@ -128,7 +137,7 @@
 			method="POST"
 			action="?/create"
 			use:enhance={createSchedule.enhance}
-			class="rounded-lg border p-4 space-y-4"
+			class="rounded-lg border bg-card p-4 space-y-4"
 		>
 			<h2 class="font-semibold">New Work Schedule</h2>
 			<div class="grid gap-3 sm:grid-cols-4">
@@ -144,22 +153,20 @@
 				</div>
 				<div>
 					<label for="start" class="text-sm font-medium">Start</label>
-					<input
+					<TimePicker
 						id="start"
 						name="start"
-						type="time"
-						value="08:00"
+						bind:value={start}
 						required
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 					/>
 				</div>
 				<div>
 					<label for="end" class="text-sm font-medium">End</label>
-					<input
+					<TimePicker
 						id="end"
 						name="end"
-						type="time"
-						value="17:00"
+						bind:value={end}
 						required
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 					/>
@@ -223,7 +230,7 @@
 				>
 			</div>
 		</div>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

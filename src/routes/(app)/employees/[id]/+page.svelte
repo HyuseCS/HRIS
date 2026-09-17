@@ -15,8 +15,10 @@
 	import { isValidGovId, govIdError, type GovIdField } from '$lib/utils/gov-ids'
 	import { LOAN_TYPES } from '$lib/utils/loan-types'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import MaskedField from '$lib/components/ui/MaskedField.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 
@@ -111,7 +113,7 @@
 	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
 	const reveal = submitFeedback({ error: null })
 	const update = submitFeedback({ error: null })
-	const offboard = submitFeedback({ error: null })
+	const offboard = submitFeedback({ error: null, success: null })
 	const setSupervisors = submitFeedback({ error: null })
 	const deleteEmergencyContact = submitFeedback({ error: null })
 	const addEmergencyContact = submitFeedback({ error: null })
@@ -166,6 +168,16 @@
 	// phase 03 remediation because most of these actions return `success: true` with no
 	// message for submitFeedback's toast to read.
 	const savedNotice = $derived(form?.success ? (DONE[form.action as string] ?? null) : null)
+
+	// Offboarding disables a person's employment record and their login, so it confirms first. The
+	// form keeps its own `use:enhance` and busy gating: the Last Day field is typed by the user and
+	// cannot move into ConfirmButton's own form. `reportValidity()` runs before the dialog opens so
+	// a missing Last Day is refused where the user is looking, not after they confirm.
+	let offboardFormEl = $state<HTMLFormElement>()
+	let offboardConfirm = $state(false)
+	function openOffboardConfirm() {
+		if (offboardFormEl?.reportValidity()) offboardConfirm = true
+	}
 </script>
 
 {#snippet actionError(names: string[])}
@@ -535,7 +547,7 @@
 				method="POST"
 				action="?/update"
 				use:enhance={update.enhance}
-				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
+				class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">Update Profile</h2>
 				<!--
@@ -1514,7 +1526,7 @@
 				method="POST"
 				action="?/changeCompensation"
 				use:enhance={changeCompensation.enhance}
-				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
+				class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">
 					Change Salary / Pay Type
@@ -1536,14 +1548,13 @@
 				<div class="grid gap-3 sm:grid-cols-3">
 					<div>
 						<label for="effectiveDate" class="text-sm font-medium">Effective Date</label>
-						<input
+						<DatePicker
 							id="effectiveDate"
 							name="effectiveDate"
-							type="date"
 							required
 							value={todayInput}
 							min={hireInput}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						/>
 						<p class="mt-1 text-xs text-muted-foreground">
 							When it takes effect. Backdating and future-dating are both allowed.
@@ -1608,7 +1619,7 @@
 				method="POST"
 				action="?/promote"
 				use:enhance={promote.enhance}
-				class="rounded-lg border p-6 space-y-4 lg:col-span-2"
+				class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
 			>
 				<h2 class="font-semibold">
 					Promote
@@ -1630,14 +1641,13 @@
 				<div class="grid gap-3 sm:grid-cols-3">
 					<div>
 						<label for="promoEffectiveDate" class="text-sm font-medium">Effective Date</label>
-						<input
+						<DatePicker
 							id="promoEffectiveDate"
 							name="effectiveDate"
-							type="date"
 							required
 							value={todayInput}
 							min={hireInput}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						/>
 					</div>
 					<div>
@@ -1810,6 +1820,7 @@
 		{/if}
 		{#if canManage && employee.employmentStatus === 'ACTIVE'}
 			<form
+				bind:this={offboardFormEl}
 				method="POST"
 				action="?/offboard"
 				use:enhance={offboard.enhance}
@@ -1819,17 +1830,18 @@
 				<div class="flex items-end gap-4">
 					<div>
 						<label for="endDate" class="text-sm font-medium">Last Day</label>
-						<input
+						<DatePicker
 							id="endDate"
+							value=""
 							name="endDate"
-							type="date"
 							required
-							class="mt-1 flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							class="mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						/>
 					</div>
 					<button
-						type="submit"
+						type="button"
 						disabled={offboard.busy}
+						onclick={openOffboardConfirm}
 						class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50"
 						>{offboard.busy ? 'Offboarding…' : 'Offboard'}</button
 					>
@@ -1838,3 +1850,11 @@
 		{/if}
 	</div>
 </div>
+
+<ConfirmDialog
+	bind:open={offboardConfirm}
+	title="Offboard this employee?"
+	message="{employee.firstName} {employee.lastName} is marked OFFBOARDED as of the last day you entered, their login is disabled, and they stop appearing in active-employee lists and payroll runs. Reversing this needs a Super Admin."
+	confirmText="Offboard"
+	onconfirm={() => offboardFormEl?.requestSubmit()}
+/>

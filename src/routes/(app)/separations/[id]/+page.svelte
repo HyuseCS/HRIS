@@ -5,6 +5,8 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import { CLEARANCE_AREA_LABELS } from '$lib/utils/clearance-area'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -17,6 +19,11 @@
 	// #297: the reason this actor may not finalize, or null. Computed server-side by the SAME
 	// helper the service guard uses, so the button and the refusal cannot disagree.
 	const finalizeBar = $derived(data.finalizeBar)
+	const finalizeBlockedBy = $derived(
+		[pendingCount > 0 && 'finalize-pending', finalizeBar && 'finalize-bar']
+			.filter(Boolean)
+			.join(' ')
+	)
 
 	const peso = (n: number) => n.toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })
 
@@ -26,30 +33,23 @@
 	const clearanceGuard = (id: string) => (clearanceGuards[id] ??= createSubmitGuard())
 
 	// #108: finalize snapshots final pay and offboards — a second submit must never land.
-	// The guard releases `busy` when an inner handler cancels, so the confirm composes normally.
-	const finalize = createSubmitGuard((input) => {
-		if (
-			!confirm(
-				'Finalize this separation? This snapshots final pay, offboards the employee, and disables their login. Only a Super Admin can undo it.'
-			)
-		)
-			input.cancel()
-	})
+	// The dialog now gates the submit, so there is nothing to cancel: ConfirmButton only posts
+	// after the user confirms, and its own busy state is the single-submit guard.
 
-	// #304: the undo re-enables a login and moves money back. Same single-submit guard as
-	// finalize, with its own confirm — the guard releases `busy` when the inner handler cancels.
+	// #304: the undo re-enables a login and moves money back. The dialog gates this submit too, so
+	// the guard here is only the single-submit lock; the confirm no longer composes into it.
+	// The `reopenClearance` checkbox is posted by this form, so the dialog sits beside the form
+	// rather than inside ConfirmButton's own — and the message reads the box's live value.
 	let reopenClearance = $state(false)
-	const undo = createSubmitGuard((input) => {
-		if (
-			!confirm(
-				'Undo this finalization? This restores the loan and cash-advance balances, puts the employee back to their previous employment status, and RE-ENABLES their login.' +
-					(reopenClearance
-						? '\n\nClearance will also be RE-OPENED: the case returns to OPEN and every item goes back to pending.'
-						: '')
-			)
-		)
-			input.cancel()
-	})
+	const undo = createSubmitGuard()
+	let undoFormEl = $state<HTMLFormElement>()
+	let undoConfirm = $state(false)
+	const undoMessage = $derived(
+		'This restores the loan and cash-advance balances, puts the employee back to their previous employment status, and RE-ENABLES their login.' +
+			(reopenClearance
+				? '\n\nClearance will also be RE-OPENED: the case returns to OPEN and every item goes back to pending.'
+				: '')
+	)
 </script>
 
 <svelte:head>
@@ -152,10 +152,9 @@
 									<button
 										type="submit"
 										disabled={toggle.busy}
-										class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50 {item.status ===
-										'CLEARED'
-											? 'text-green-600 dark:text-green-400'
-											: 'text-muted-foreground'}"
+										class={item.status === 'CLEARED'
+											? 'rounded-md border px-3 py-1 text-xs font-medium text-green-600 hover:bg-accent disabled:pointer-events-none disabled:opacity-50 dark:text-green-400'
+											: 'rounded-md border border-green-700 px-3 py-1 text-xs font-medium text-green-800 hover:bg-green-700/10 disabled:pointer-events-none disabled:opacity-50 dark:text-green-400'}
 									>
 										{item.status === 'CLEARED' ? 'Cleared' : 'Mark cleared'}
 									</button>
@@ -192,6 +191,18 @@
 						Negative total means the employee owes the company after offsets.
 					</p>
 				{/if}
+				{#if isFinalized}
+					<div class="border-t px-4 py-3">
+						<p class="text-base font-semibold">
+							Settled at <span class="font-mono">{peso(Number(s.finalPayAmount ?? 0))}</span>
+						</p>
+						{#if s.finalizedAt}
+							<p class="mt-1 text-xs text-muted-foreground">
+								Finalized on {formatShortDate(s.finalizedAt)}
+							</p>
+						{/if}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Finalize -->
@@ -205,7 +216,7 @@
 						undo it (#304).
 					</p>
 					{#if pendingCount > 0}
-						<p class="mt-2 text-sm text-amber-700 dark:text-amber-400">
+						<p id="finalize-pending" class="mt-2 text-sm text-amber-700 dark:text-amber-400">
 							{pendingCount} clearance item{pendingCount === 1 ? '' : 's'} still pending — clear all before
 							finalizing.
 						</p>
@@ -215,56 +226,68 @@
 							{finalizeBar}
 						</p>
 					{/if}
-					<form method="POST" action="?/finalize" use:enhance={finalize.enhance} class="mt-3">
+					<div class="mt-3">
+						<ConfirmButton
+							action="?/finalize"
+							title="Finalize this separation?"
+							message="This snapshots final pay, offboards the employee, and disables their login. Only a Super Admin can undo it."
+							confirmText="Finalize"
+							triggerLabel="Finalize & offboard"
+							triggerTitle={finalizeBar ?? undefined}
+							blocked={!!finalizeBlockedBy}
+							ariaDescribedby={finalizeBlockedBy || undefined}
+							triggerClass="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-destructive"
+						/>
+					</div>
+				</div>
+			{:else if data.canUndo}
+				<div class="rounded-lg border border-destructive/30 bg-card p-4">
+					<h2 class="font-semibold text-destructive">Undo finalization</h2>
+					<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
+						Restores the loan and cash-advance balances this finalize wrote off, sets the employee
+						back to their previous employment status, and <strong>re-enables their login</strong>.
+						Every undo is recorded in the audit log.
+					</p>
+					<form
+						bind:this={undoFormEl}
+						method="POST"
+						action="?/undo"
+						use:enhance={undo.enhance}
+						class="mt-3 space-y-3"
+					>
+						<div class="flex items-center gap-2">
+							<input
+								id="reopenClearance"
+								name="reopenClearance"
+								type="checkbox"
+								value="true"
+								bind:checked={reopenClearance}
+								class="h-4 w-4 rounded border-input"
+							/>
+							<label for="reopenClearance" class="text-sm">
+								Re-open clearance items — the case returns to <strong>OPEN</strong> and every item goes
+								back to pending. Whoever cleared an item stays barred from finalizing this case.
+							</label>
+						</div>
 						<button
-							type="submit"
-							aria-describedby={finalizeBar ? 'finalize-bar' : undefined}
-							disabled={pendingCount > 0 || !!finalizeBar || finalize.busy}
+							type="button"
+							aria-describedby="undo-warning"
+							disabled={undo.busy}
+							onclick={() => (undoConfirm = true)}
 							class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-							>{finalize.busy ? 'Finalizing…' : 'Finalize & offboard'}</button
+							>{undo.busy ? 'Undoing…' : 'Undo finalization'}</button
 						>
 					</form>
 				</div>
-			{:else}
-				<div class="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-					Finalized{s.finalizedAt ? ` on ${formatShortDate(s.finalizedAt)}` : ''}. Final pay settled
-					at
-					<span class="font-mono">{peso(Number(s.finalPayAmount ?? 0))}</span>.
-				</div>
-				{#if data.canUndo}
-					<div class="rounded-lg border border-destructive/30 bg-card p-4">
-						<h2 class="font-semibold text-destructive">Undo finalization</h2>
-						<p id="undo-warning" class="mt-1 text-sm text-muted-foreground">
-							Restores the loan and cash-advance balances this finalize wrote off, sets the employee
-							back to their previous employment status, and <strong>re-enables their login</strong>.
-							Every undo is recorded in the audit log.
-						</p>
-						<form method="POST" action="?/undo" use:enhance={undo.enhance} class="mt-3 space-y-3">
-							<div class="flex items-center gap-2">
-								<input
-									id="reopenClearance"
-									name="reopenClearance"
-									type="checkbox"
-									value="true"
-									bind:checked={reopenClearance}
-									class="h-4 w-4 rounded border-input"
-								/>
-								<label for="reopenClearance" class="text-sm">
-									Re-open clearance items — the case returns to <strong>OPEN</strong> and every item goes
-									back to pending. Whoever cleared an item stays barred from finalizing this case.
-								</label>
-							</div>
-							<button
-								type="submit"
-								aria-describedby="undo-warning"
-								disabled={undo.busy}
-								class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-								>{undo.busy ? 'Undoing…' : 'Undo finalization'}</button
-							>
-						</form>
-					</div>
-				{/if}
 			{/if}
 		</div>
 	</div>
 </div>
+
+<ConfirmDialog
+	bind:open={undoConfirm}
+	title="Undo this finalization?"
+	message={undoMessage}
+	confirmText="Undo finalization"
+	onconfirm={() => undoFormEl?.requestSubmit()}
+/>

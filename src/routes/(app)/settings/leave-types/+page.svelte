@@ -21,14 +21,14 @@
 	const toggleGuard = (id: string) => (toggleGuards[id] ??= createSubmitGuard())
 
 	const inputClass =
-		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+		'h-9 w-full max-w-sm rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
 <svelte:head>
 	<title>Leave Types — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Leave Types"
 		description="Master data for the leave/request flow: name, whether it's paid, the default yearly allocation, and carry-over policy. Deactivate a type to hide it from new requests without affecting existing balances."

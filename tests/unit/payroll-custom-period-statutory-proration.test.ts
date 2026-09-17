@@ -29,7 +29,7 @@ const cfg = (over: Partial<EmployeeComputeConfig> = {}): EmployeeComputeConfig =
 })
 
 // Monthly figures for a 30,000 MONTHLY employee (see payroll-calculator.test.ts).
-const MONTHLY = { sssEe: 900, philhealthEe: 750, pagibigEe: 200, withholdingTax: 1463.4 }
+const MONTHLY = { sssEe: 900, philhealthEe: 750, pagibigEe: 200, withholdingTax: 1097.55 }
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`)
 
 describe('custom same-month range — statutory proration', () => {

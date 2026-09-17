@@ -1,0 +1,13 @@
+{
+  "riskClass": "schema/data migration or destructive data mutation",
+  "secondaryRiskClass": "money engine — BIR withholding tax computation for every employee",
+  "workDescription": "S2/D1: replace BIR_MONTHLY_TAX_TABLE with the table in force since 1 Jan 2023, add scripts/migrate-bir-tax-table-2023.ts to move existing StatutoryRateConfig rows, and recompute every unit expectation the change moves.",
+  "section": "phase-05-remediation-A S2",
+  "approver": "execute session 11-09-26",
+  "mustStopBeforeFinalize": true,
+  "scope": {
+    "destructive": false,
+    "reason": "The migration writes one JSONB column on rows it positively matches by rate+floor vector. No delete, no schema change, no Prisma migration. Non-matching rows are read and skipped.",
+    "environment": "dev only — veent-db-5434. There is no production environment for this project."
+  }
+}

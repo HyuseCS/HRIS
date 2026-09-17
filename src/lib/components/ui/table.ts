@@ -13,7 +13,7 @@ export interface Column {
 	 * `min` sizes the column to its content and stops it absorbing the table's slack — use it
 	 * for money, dates, status and the action column, so the descriptive column takes the space.
 	 */
-	width?: 'auto' | 'min'
+	width?: 'auto' | 'min' | `w-[${string}]`
 	/** Drop the column from the stacked mobile layout, where space is scarce. */
 	hideOnMobile?: boolean
 }

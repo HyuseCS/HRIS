@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
@@ -115,14 +116,14 @@
 				>
 			</div>
 		</div>
-		<input
+		<SearchInput
 			bind:value={query}
 			placeholder="Search people…"
 			class="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		/>
 
 		{#if query.trim()}
-			<div class="rounded-lg border">
+			<div class="rounded-lg border bg-card">
 				<ul class="divide-y">
 					{#each matches as m (m.id)}
 						<li class="px-4 py-2">
@@ -138,7 +139,7 @@
 				</ul>
 			</div>
 		{:else if roots.length}
-			<div class="rounded-lg border p-4">
+			<div class="rounded-lg border bg-card p-4">
 				<ul class="space-y-1">
 					{#each roots as root (root.id)}
 						{@render nodeRow(root, [])}

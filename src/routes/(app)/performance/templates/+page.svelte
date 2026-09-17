@@ -44,7 +44,7 @@
 	<title>Evaluation Templates — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Evaluation Templates"
 		description="The evaluation forms HR issues. Each one prints the categories, criteria, rating scale and signing order you compose here."
@@ -150,10 +150,10 @@
 								greyed-out control would be a permanently dead affordance HR keeps retrying; the
 								reason and the alternative are written out instead.
 							-->
-							<span class="px-3 py-1.5 text-xs text-muted-foreground">
+							<p class="w-full text-xs text-muted-foreground">
 								Used by {template.reviewCount}
 								{template.reviewCount === 1 ? 'review' : 'reviews'} — deactivate instead of deleting
-							</span>
+							</p>
 						{:else}
 							<ConfirmButton
 								action="?/deleteTemplate"

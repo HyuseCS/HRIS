@@ -1,10 +1,13 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
-	import { advanceTo } from '$lib/actions/dateRange'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { ActionData, PageData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
+
+	let endPicker: ReturnType<typeof DatePicker> | undefined = $state()
 
 	// `fail()` contributes its own shape to the ActionData union, so narrow before reading.
 	// Without this the 400 from a reveal with no id renders as silence.
@@ -38,30 +41,27 @@
 	<title>Audit Log — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Audit Log" />
+{#snippet failureNotice()}
+	<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
+		{failure}
+	</div>
+{/snippet}
 
-	{#if failure}
-		<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
-			{failure}
-		</div>
-	{/if}
-
+{#snippet filters()}
 	<!-- Filter form -->
-	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
+	<form method="GET" class="flex flex-wrap items-end gap-3">
 		<!-- Actor -->
 		<div class="flex flex-col gap-1">
 			<label for="actor" class="text-xs font-medium text-muted-foreground">Actor</label>
-			<select
+			<input
 				id="actor"
 				name="actor"
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">All Users</option>
-				{#each data.actors as actor (actor.id)}
-					<option value={actor.id}>{actor.email}</option>
-				{/each}
-			</select>
+				type="search"
+				maxlength="100"
+				value={data.filters.actor}
+				placeholder="Search actor name or email…"
+				class="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
 		</div>
 
 		<!-- Entity type -->
@@ -74,7 +74,7 @@
 			>
 				<option value="">All Types</option>
 				{#each data.entityTypes as et (et)}
-					<option value={et}>{et}</option>
+					<option value={et} selected={data.filters.entity === et}>{et}</option>
 				{/each}
 			</select>
 		</div>
@@ -89,7 +89,7 @@
 			>
 				<option value="">All Actions</option>
 				{#each ACTIONS as a (a)}
-					<option value={a}>{a}</option>
+					<option value={a} selected={data.filters.action === a}>{a}</option>
 				{/each}
 			</select>
 		</div>
@@ -97,21 +97,24 @@
 		<!-- Date range -->
 		<div class="flex flex-col gap-1">
 			<label for="start" class="text-xs font-medium text-muted-foreground">From</label>
-			<input
+			<DatePicker
 				id="start"
 				name="start"
-				type="date"
-				use:advanceTo={'end'}
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				value={data.filters.start}
+				onchange={(v) => {
+					if (v) endPicker?.focusAndOpen()
+				}}
+				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
 		<div class="flex flex-col gap-1">
 			<label for="end" class="text-xs font-medium text-muted-foreground">To</label>
-			<input
+			<DatePicker
+				bind:this={endPicker}
 				id="end"
 				name="end"
-				type="date"
-				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				value={data.filters.end}
+				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
 
@@ -122,38 +125,36 @@
 			Filter
 		</button>
 	</form>
+{/snippet}
 
-	<!-- Summary -->
-	<p class="text-sm text-muted-foreground">
-		{data.pagination.total.toLocaleString()} total entries — page {data.pagination.page} of {data
-			.pagination.totalPages}
-	</p>
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	<PageHeader title="Audit Log" />
 
-	<!-- Table -->
-	{#if data.logs.length === 0}
-		<div
-			class="flex h-40 items-center justify-center rounded-lg border bg-muted/30 text-muted-foreground"
-		>
-			No audit log entries match the selected filters.
+	{#if failure}
+		<div class="flex shrink-0 flex-col gap-3">
+			{@render failureNotice()}
 		</div>
-	{:else}
-		<div class="overflow-x-auto rounded-lg border">
-			<table class="w-full text-sm">
+	{/if}
+
+	<Container tone="card" flush toolbar={filters} empty={data.logs.length === 0}>
+		<!-- Table -->
+		<div class="overflow-x-auto">
+			<table class="w-full min-w-[70rem] table-fixed text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th class="w-52 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
 							>Timestamp</th
 						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
 							>Actor</th
 						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th class="w-44 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
 							>Action</th
 						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th class="w-52 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
 							>Entity Type</th
 						>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+						<th class="w-36 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
 							>Entity ID</th
 						>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Changes</th>
@@ -174,7 +175,7 @@
 									second: '2-digit'
 								})}
 							</td>
-							<td class="px-4 py-3 whitespace-nowrap">
+							<td class="break-words px-4 py-3">
 								<span class="font-medium">{log.actor.email}</span>
 								<span class="ml-1 rounded bg-muted px-1 py-0.5 text-xs text-muted-foreground"
 									>{log.actorRoles.join(', ')}</span
@@ -257,6 +258,12 @@
 			</table>
 		</div>
 
-		<Pagination meta={data.pagination} />
-	{/if}
+		{#snippet emptyState()}
+			<div class="text-muted-foreground">No audit log entries match the selected filters.</div>
+		{/snippet}
+
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
 </div>

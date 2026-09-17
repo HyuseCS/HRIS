@@ -68,19 +68,21 @@ test.describe('Back navigation', () => {
 
 	test('employee files a leave request for the approvals flow', async ({ page }) => {
 		await login(page, USERS.employee)
-		await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+		await page.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 		// Wait for hydration before touching the bound <select>; otherwise Svelte's
 		// bind:value re-initialises it to empty after our selection.
 		await page.waitForLoadState('networkidle')
 
-		const leaveType = page.getByLabel('Leave Type')
+		const dialog = page.getByRole('dialog', { name: 'New Request' })
+		const leaveType = dialog.getByLabel('Leave type')
 		await leaveType.selectOption({ label: 'Vacation Leave' })
 		await expect(leaveType).not.toHaveValue('')
 		const day = nextWeekdayISO()
-		await page.getByLabel('Start Date').fill(day)
-		await page.getByLabel('End Date').fill(day)
-		await page.getByRole('button', { name: 'Submit Request' }).click()
-		await page.waitForURL('**/leave')
+		await dialog.locator('#startDate').fill(day)
+		await dialog.locator('#endDate').fill(day)
+		await dialog.getByRole('button', { name: 'Submit request' }).click()
+		await expect(dialog).toBeHidden()
+		await expect(page.locator('tbody tr', { hasText: 'Leave' }).first()).toBeVisible()
 	})
 
 	test('request detail returns to approvals, including via ?from on hard load', async ({

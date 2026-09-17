@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Role } from '@prisma/client'
 
 /**
- * All three request-filing paths pass the full role set to `createRequest` (#247).
+ * Both request-filing paths pass the full role set to `createRequest` (#247).
  *
  * There is no 403 to observe here — the observable is the SHAPE of the maker-checker chain.
  * `createRequest` decides `filerIsMaker = canAny(rolesOf(ctx), 'MANAGE_HR')`, and
@@ -14,7 +14,9 @@ import type { Role } from '@prisma/client'
  * Asserted against `request.create`'s argument — a real write reaching the mocked client — rather
  * than against a spy on `createRequest`, which would survive any mutation to the service.
  *
- * OVERTIME for the two non-leave paths so the LEAVE balance/eligibility branch needs no fixtures.
+ * OVERTIME for the API path so the LEAVE balance/eligibility branch needs no fixtures; the
+ * `/requests` action is driven with both, because it is the only page-level filing path left
+ * after `/leave/new` was retired to a redirect and its two leave cases moved here.
  *
  * #279 adds the deletion half. `deleteRequest` resolves privilege through the same `rolesOf(ctx)`,
  * so the leave list's bulk delete needs `actorRoles` for the identical reason — and its `ctxOf`
@@ -55,7 +57,6 @@ vi.mock('$lib/server/services/requests/leave', () => leaveHelpers)
 
 const { POST: apiRoute } = await import('../../src/routes/api/v1/requests/+server')
 const { actions: requestActions } = await import('../../src/routes/(app)/requests/+page.server')
-const { actions: leaveActions } = await import('../../src/routes/(app)/leave/new/+page.server')
 const { actions: leaveListActions } = await import('../../src/routes/(app)/leave/+page.server')
 
 const ACTOR_USER = 'user-actor'
@@ -165,12 +166,11 @@ describe('(app)/requests ?/create', () => {
 	})
 })
 
-describe('(app)/leave/new ?/create', () => {
-	// The action redirects on success, so the handler throws a 303 rather than returning.
-	const file = async (roles: Role[]) =>
-		expect(leaveActions.create!(formEvent(roles, LEAVE_FIELDS))).rejects.toMatchObject({
-			status: 303
-		})
+describe('(app)/requests ?/create with leave fields', () => {
+	const file = async (roles: Role[]) => {
+		const res = await requestActions.create!(formEvent(roles, { type: 'LEAVE', ...LEAVE_FIELDS }))
+		expect(res).toMatchObject({ saved: expect.any(String) })
+	}
 
 	it('leaves MAKE open for a plain [EMPLOYEE] filer', async () => {
 		await file(['EMPLOYEE'])

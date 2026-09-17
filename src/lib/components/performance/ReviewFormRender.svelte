@@ -188,7 +188,7 @@
 		and picks the band. `maximum` below is printed and range-checked on the server, never added.
 	-->
 	{#each structure.sections as section, si (section.id)}
-		<section class="space-y-2 rounded-lg border p-3">
+		<section class="space-y-2 rounded-lg border bg-card p-3">
 			<div class="flex flex-wrap items-baseline justify-between gap-2">
 				<h3 class="text-sm font-semibold">
 					{si + 1}. {section.name || 'Untitled category'}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import {
@@ -78,8 +79,8 @@
 	{#key data.organizationId}
 		<form method="POST" action="?/create" use:enhance={create.enhance} class="space-y-8">
 			<!-- Personal Information -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Personal Information</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Personal Information</legend>
 				<div class="grid gap-4 sm:grid-cols-3">
 					<div>
 						<label for="firstName" class="text-sm font-medium"
@@ -126,8 +127,8 @@
 			</fieldset>
 
 			<!-- Contact Information -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Contact Information</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Contact Information</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="contactPhone" class="text-sm font-medium">Phone</label>
@@ -152,8 +153,8 @@
 			</fieldset>
 
 			<!-- Account -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Account</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Account</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="email" class="text-sm font-medium"
@@ -221,8 +222,8 @@
 			</fieldset>
 
 			<!-- Employment -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Employment Details</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Employment Details</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="departmentId" class="text-sm font-medium"
@@ -286,14 +287,13 @@
 						<label for="startDate" class="text-sm font-medium"
 							>Start Date <span class="text-destructive">*</span></label
 						>
-						<input
+						<DatePicker
 							id="startDate"
 							name="startDate"
 							aria-invalid={invalid('startDate')}
-							type="date"
 							required
 							value={form?.values?.startDate ?? ''}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						/>
 						{#if form?.fieldErrors?.startDate}
 							<p class="mt-1 text-xs text-destructive">{form.fieldErrors.startDate[0]}</p>
@@ -390,8 +390,8 @@
 			</fieldset>
 
 			<!-- Government IDs -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Government IDs</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Government IDs</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="sssNumber" class="text-sm font-medium">SSS Number</label>
@@ -453,8 +453,8 @@
 			</fieldset>
 
 			<!-- Emergency Contact -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Emergency Contact</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Emergency Contact</legend>
 				<div class="grid gap-4 sm:grid-cols-3">
 					<div>
 						<label for="emergencyContactName" class="text-sm font-medium">Contact Name</label>
@@ -488,8 +488,8 @@
 			</fieldset>
 
 			<!-- Bank / GCash Details -->
-			<fieldset class="rounded-md border p-4 space-y-4">
-				<legend class="px-1 text-sm font-semibold">Bank / GCash Details</legend>
+			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+				<legend class="float-left mb-4 w-full font-semibold">Bank / GCash Details</legend>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<label for="bankName" class="text-sm font-medium">Bank</label>

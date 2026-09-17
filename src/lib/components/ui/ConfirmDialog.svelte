@@ -7,6 +7,8 @@
 		message?: string
 		confirmText?: string
 		cancelText?: string
+		/** Colour of the confirm button. `neutral` for routine saves that cannot be undone. */
+		tone?: 'destructive' | 'neutral'
 		onconfirm?: () => void
 	}
 
@@ -16,6 +18,7 @@
 		message = '',
 		confirmText = 'Delete',
 		cancelText = 'Cancel',
+		tone = 'destructive',
 		onconfirm
 	}: Props = $props()
 
@@ -31,7 +34,7 @@
 <Dialog bind:open {title} role="alertdialog" size="sm" zIndex={60}>
 	<h2 class="text-lg font-semibold">{title}</h2>
 	{#if message}
-		<p class="mt-2 text-sm text-muted-foreground">{message}</p>
+		<p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">{message}</p>
 	{/if}
 	<div class="mt-6 flex justify-end gap-2">
 		<button
@@ -42,7 +45,9 @@
 		<button
 			type="button"
 			onclick={confirm}
-			class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+			class="rounded-md px-4 py-2 text-sm font-medium {tone === 'neutral'
+				? 'bg-foreground text-background hover:bg-foreground/90'
+				: 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}"
 			>{confirmText}</button
 		>
 	</div>

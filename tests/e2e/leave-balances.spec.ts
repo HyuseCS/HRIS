@@ -58,7 +58,7 @@ test.describe('Leave balances', () => {
 			})
 
 			await login(page, USERS.employee)
-			await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+			await page.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 			await page.waitForLoadState('networkidle')
 
 			const sil = page.locator('#leaveTypeId option', { hasText: 'Service Incentive Leave' })
@@ -71,6 +71,14 @@ test.describe('Leave balances', () => {
 			await db.employee.update({ where: { id: elena.id }, data: { startDate: originalStart } })
 			await db.$disconnect()
 		}
+	})
+
+	test('the retired /leave/new redirects onto the canonical requests form', async ({ page }) => {
+		await login(page, USERS.employee)
+		await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+
+		await expect(page).toHaveURL(/\/requests\?new=leave$/)
+		await expect(page.getByRole('dialog', { name: 'New Request' })).toBeVisible()
 	})
 
 	test('the 201 file shows the employee leave ledger', async ({ page }) => {
@@ -108,17 +116,18 @@ test.describe('Leave balances', () => {
 		const filer = await filerCtx.newPage()
 		try {
 			await login(filer, USERS.employee)
-			await filer.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+			await filer.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 			await filer.waitForLoadState('networkidle')
 
-			const leaveType = filer.getByLabel('Leave Type')
+			const dialog = filer.getByRole('dialog', { name: 'New Request' })
+			const leaveType = dialog.getByLabel('Leave type')
 			await leaveType.selectOption({ label: 'Sick Leave' })
 			await expect(leaveType).not.toHaveValue('')
 			const day = nextWeekdayISO()
-			await filer.getByLabel('Start Date').fill(day)
-			await filer.getByLabel('End Date').fill(day)
-			await filer.getByRole('button', { name: 'Submit Request' }).click()
-			await filer.waitForURL('**/leave')
+			await dialog.locator('#startDate').fill(day)
+			await dialog.locator('#endDate').fill(day)
+			await dialog.getByRole('button', { name: 'Submit request' }).click()
+			await expect(dialog).toBeHidden()
 		} finally {
 			await filerCtx.close()
 		}

@@ -72,7 +72,7 @@
 
 <div class="space-y-6">
 	<!-- Posting Header -->
-	<div class="rounded-lg border p-6 space-y-4">
+	<div class="rounded-lg border bg-card p-6 space-y-4">
 		<div class="space-y-2">
 			<PageHeader title={posting.title}>
 				{#snippet badge()}
@@ -160,7 +160,7 @@
 
 	<!-- Posted on — manual job-board tracking (#117) -->
 	{#if isHrAdmin}
-		<div class="min-h-[16rem] space-y-3 rounded-lg border p-4">
+		<div class="min-h-[16rem] space-y-3 rounded-lg border bg-card p-4">
 			<h2 class="text-sm font-semibold">Posted on</h2>
 
 			<!-- Close-the-loop: a CLOSED role still live somewhere needs a takedown. -->
@@ -303,7 +303,7 @@
 
 	<!-- Hired Applicants — Convert to Employee -->
 	{#if isHrAdmin && hiredApplicants.length > 0}
-		<div class="rounded-lg border p-4 space-y-3">
+		<div class="rounded-lg border bg-card p-4 space-y-3">
 			<h2 class="text-sm font-semibold">Hired Applicants — Convert to Employee</h2>
 			{#if form?.action === 'convert' && form?.error}
 				<Banner kind="error" message={form.error} />

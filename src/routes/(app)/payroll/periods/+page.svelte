@@ -2,23 +2,22 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
-	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import OpenPeriodDialog from '$lib/components/payroll/OpenPeriodDialog.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showOpen = $state(false)
 
-	// #108: a double-submitted period open creates a duplicate payroll period.
-	const openPeriod = createSubmitGuard()
-
-	// #108: the row actions (import/generate/lock/release/void) live inside an {#each}, so each
-	// row needs its OWN guard — a single shared one would disable every row's button at once.
-	// Memoised by `${periodId}:${action}` so the identity is stable across re-renders.
+	// #108: the row actions (import/generate/lock) live inside an {#each}, so each row needs its
+	// OWN guard — a single shared one would disable every row's button at once. Memoised by
+	// `${periodId}:${action}` so the identity is stable across re-renders.
+	// Release and void are NOT here: ConfirmButton renders its own form with its own per-instance
+	// busy state, which is already a per-row single-submit guard.
 	const guards = new Map<string, ReturnType<typeof createSubmitGuard>>()
 	function guard(key: string) {
 		let g = guards.get(key)
@@ -38,53 +37,13 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if form?.error}
+	{#if form?.error && form.action !== 'open'}
 		<div
 			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
 		</div>
-	{/if}
-
-	{#if showOpen}
-		<form
-			method="POST"
-			action="?/open"
-			use:enhance={openPeriod.enhance}
-			class="rounded-lg border p-4 space-y-3"
-		>
-			<h2 class="font-semibold">Open a Payroll Period</h2>
-			<div class="space-y-4">
-				<div class="max-w-sm space-y-1.5">
-					<label for="name" class="block text-sm font-medium">Name</label>
-					<input
-						id="name"
-						name="name"
-						required
-						placeholder="Jul 1–15 2026"
-						class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					/>
-				</div>
-				<PeriodPicker startName="start" endName="end">
-					{#snippet actions()}
-						<div class="flex gap-2">
-							<button
-								type="button"
-								onclick={() => (showOpen = false)}
-								class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-							>
-							<button
-								type="submit"
-								disabled={openPeriod.busy}
-								class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-								>{openPeriod.busy ? 'Opening…' : 'Open'}</button
-							>
-						</div>
-					{/snippet}
-				</PeriodPicker>
-			</div>
-		</form>
 	{/if}
 
 	<section class="space-y-3">
@@ -94,14 +53,15 @@
 				class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
 			>
 				<button
-					onclick={() => (showOpen = !showOpen)}
+					type="button"
+					onclick={() => (showOpen = true)}
 					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 				>
 					Open Period
 				</button>
 			</div>
 		</div>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -176,18 +136,18 @@
 										</form>
 									{/if}
 									{#if p.status === 'LOCKED'}
-										{@const releaseG = guard(`${p.id}:release`)}
-										<!-- submit={releaseG.enhance} is load-bearing: ConfirmButton renders its own
-										     form, so dropping it loses the per-row #108 double-submit guard. -->
+										<!-- #108: no per-row `guard()` here — ConfirmButton owns its own form and its
+										     own per-instance busy state, which disables this row's trigger while the
+										     release is in flight. That IS the double-submit guard. -->
 										<ConfirmButton
 											action="?/release"
-											title="Release this period?"
-											message="Payslips for this period become visible to every employee in it, and the period leaves LOCKED."
-											confirmText="Release period"
-											triggerLabel={releaseG.busy ? 'Releasing…' : 'Release'}
+											title="Release this period to employees?"
+											message="Every payslip in this period becomes visible to the employee it belongs to. Releasing cannot be undone — the only way back is to void the period."
+											confirmText="Release"
+											successMessage="Period {p.name} released to employees."
+											tone="neutral"
+											triggerLabel="Release"
 											triggerClass="btn-row-positive disabled:pointer-events-none disabled:opacity-50"
-											disabled={releaseG.busy}
-											submit={releaseG.enhance}
 										>
 											<input type="hidden" name="id" value={p.id} />
 										</ConfirmButton>
@@ -196,16 +156,16 @@
 										<a href="/payroll/{run.id}" class="btn-row">Detail</a>
 									{/if}
 									{#if data.canVoid && p.status !== 'VOIDED'}
-										{@const voidG = guard(`${p.id}:void`)}
+										<!-- #108: same as release above — ConfirmButton's per-instance busy state is
+										     this row's double-submit guard, so no `guard()` entry is needed. -->
 										<ConfirmButton
 											action="?/void"
 											title="Void this payroll period?"
-											message="The period is marked VOIDED. This cannot be undone, and the same exact period cannot be created again."
+											message="The period is marked VOIDED and any loan or cash-advance amortization it collected is credited back to the employees. This cannot be undone, and the same date range cannot be used again."
 											confirmText="Void period"
-											triggerLabel={voidG.busy ? 'Voiding…' : 'Void'}
+											successMessage="Period {p.name} voided."
+											triggerLabel="Void"
 											triggerClass="btn-row-danger disabled:pointer-events-none disabled:opacity-50"
-											disabled={voidG.busy}
-											submit={voidG.enhance}
 										>
 											<input type="hidden" name="id" value={p.id} />
 										</ConfirmButton>
@@ -223,3 +183,5 @@
 		</div>
 	</section>
 </div>
+
+<OpenPeriodDialog bind:open={showOpen} />

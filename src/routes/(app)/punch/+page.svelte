@@ -302,7 +302,7 @@
 			{#if data.punches.length === 0}
 				<p class="text-sm text-muted-foreground">No punches recorded in this window.</p>
 			{:else}
-				<ul class="divide-y divide-border rounded-lg border border-border">
+				<ul class="divide-y divide-border rounded-lg border border-border bg-card">
 					{#each data.punches as p (p.id)}
 						<li class="flex flex-wrap items-baseline justify-between gap-2 p-3 text-sm">
 							<span class="font-medium">{p.punchType === 'IN' ? 'Clock in' : 'Clock out'}</span>

@@ -8,7 +8,7 @@ import { requireAnyCapability } from '$lib/server/rbac'
 import { isFoodServiceOrg } from '$lib/orgs'
 import type { AuditContext } from '../types'
 import { Prisma } from '@prisma/client'
-import type { HolidayType } from '@prisma/client'
+import type { AttendanceStatus, HolidayType } from '@prisma/client'
 
 /**
  * Attendance service (Slice 2): derive AttendanceDay records from TimeLog punches against each
@@ -85,9 +85,20 @@ function groupPunchesByDay(
 	return byDay
 }
 
-export function countAttendanceDays(employeeId: string, from: Date, to: Date) {
+const EXCEPTION_STATUSES: AttendanceStatus[] = ['ABSENT', 'INCOMPLETE', 'LATE']
+
+export function countAttendanceDays(
+	employeeId: string,
+	from: Date,
+	to: Date,
+	exceptionsOnly = false
+) {
 	return db.attendanceDay.count({
-		where: { employeeId, date: { gte: from, lte: to } }
+		where: {
+			employeeId,
+			date: { gte: from, lte: to },
+			...(exceptionsOnly && { status: { in: EXCEPTION_STATUSES } })
+		}
 	})
 }
 
@@ -96,12 +107,45 @@ export function listAttendanceDays(
 	from: Date,
 	to: Date,
 	order: 'asc' | 'desc' = 'asc',
-	pageArgs?: { skip: number; take: number }
+	pageArgs?: { skip: number; take: number; exceptionsOnly?: boolean }
 ) {
 	return db.attendanceDay.findMany({
-		where: { employeeId, date: { gte: from, lte: to } },
+		where: {
+			employeeId,
+			date: { gte: from, lte: to },
+			...(pageArgs?.exceptionsOnly && { status: { in: EXCEPTION_STATUSES } })
+		},
 		orderBy: { date: order },
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
+	})
+}
+
+function teamDayWhere(
+	organizationId: string,
+	date: Date,
+	exceptionsOnly: boolean
+): Prisma.EmployeeWhereInput {
+	return {
+		organizationId,
+		employmentStatus: 'ACTIVE',
+		...(exceptionsOnly
+			? {
+					OR: [
+						{ attendanceDays: { none: { date } } },
+						{
+							attendanceDays: {
+								some: { date, status: { in: EXCEPTION_STATUSES } }
+							}
+						}
+					]
+				}
+			: {})
+	}
+}
+
+export function countTeamDay(organizationId: string, dateKey: string, exceptionsOnly: boolean) {
+	return db.employee.count({
+		where: teamDayWhere(organizationId, new Date(dateKey), exceptionsOnly)
 	})
 }
 
@@ -110,10 +154,14 @@ export function listAttendanceDays(
  * day (or null if none derived yet). AttendanceDays are stored keyed at midnight UTC of the
  * PHT day (see deriveRange), so `dateKey` ('YYYY-MM-DD') is matched exactly.
  */
-export async function listTeamDay(organizationId: string, dateKey: string) {
+export async function listTeamDay(
+	organizationId: string,
+	dateKey: string,
+	opts: { exceptionsOnly?: boolean; skip?: number; take?: number } = {}
+) {
 	const date = new Date(dateKey)
 	const employees = await db.employee.findMany({
-		where: { organizationId, employmentStatus: 'ACTIVE' },
+		where: teamDayWhere(organizationId, date, opts.exceptionsOnly ?? false),
 		select: {
 			id: true,
 			firstName: true,
@@ -122,7 +170,9 @@ export async function listTeamDay(organizationId: string, dateKey: string) {
 			department: { select: { name: true } },
 			attendanceDays: { where: { date }, take: 1 }
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+		skip: opts.skip,
+		take: opts.take
 	})
 
 	return employees.map((e) => ({
@@ -761,7 +811,7 @@ export async function resetDayToDerived(id: string, organizationId: string, ctx:
 		ctx
 	)
 
-	return { reset: true }
+	return { reset: true, date: day.date }
 }
 
 /** Lock AttendanceDays in a range so payroll can import them (read-only thereafter). */

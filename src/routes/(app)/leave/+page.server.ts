@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		requests,
 		leaveTypes,
-		// Same shape as /leave/new so both pages render the one BalanceSummary component.
+		// Same shape as /requests so both pages render the one BalanceSummary component.
 		balances: balances.map((b) => ({
 			...b,
 			allocated: Number(b.allocated),

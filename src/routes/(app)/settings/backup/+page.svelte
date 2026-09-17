@@ -22,7 +22,7 @@
 	// page with `effect_update_depth_exceeded`. Written that way the save succeeded (HTTP 200,
 	// row committed) while the toast never rendered and the console filled with errors.
 	const save = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
+		await update({ reset: false })
 		if (result.type === 'success') addToast('Backup schedule saved.', { kind: 'success' })
 		else if (result.type === 'failure') {
 			const d = result.data as { error?: string } | undefined
@@ -87,7 +87,7 @@
 	<title>Document Backup — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Document Backup"
 		description="Copies every employee 201 file and request attachment to a second location on a schedule."
@@ -97,7 +97,7 @@
 		{/snippet}
 	</PageHeader>
 
-	<div class="card">
+	<div class="card mx-auto max-w-4xl">
 		<dl class="grid gap-4 sm:grid-cols-3">
 			<div class="space-y-1">
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
@@ -137,7 +137,12 @@
 		{/if}
 	</div>
 
-	<form method="POST" action="?/save" use:enhance={save.enhance} class="card space-y-5">
+	<form
+		method="POST"
+		action="?/save"
+		use:enhance={save.enhance}
+		class="card mx-auto max-w-4xl space-y-5"
+	>
 		<label class="flex items-start gap-3">
 			<input
 				type="checkbox"
@@ -196,7 +201,7 @@
 					id="destinationKind"
 					name="destinationKind"
 					bind:value={destinationKind}
-					class="input"
+					class="input max-w-sm"
 				>
 					<option value="LOCAL">Server disk</option>
 					<option value="S3">S3-compatible storage</option>

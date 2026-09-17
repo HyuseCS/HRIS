@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDate, formatCurrency } from '$lib/utils/format'
@@ -174,16 +175,31 @@
 						</div>
 					</div>
 
-					<div class="space-y-1.5">
-						<label for="contactPhone" class="text-xs font-medium text-muted-foreground">Phone</label
-						>
-						<input
-							id="contactPhone"
-							name="contactPhone"
-							type="tel"
-							value={emp.contactPhone ?? ''}
-							class="input"
-						/>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-1.5">
+							<label for="contactPhone" class="text-xs font-medium text-muted-foreground"
+								>Phone</label
+							>
+							<input
+								id="contactPhone"
+								name="contactPhone"
+								type="tel"
+								value={emp.contactPhone ?? ''}
+								class="input"
+							/>
+						</div>
+
+						<div class="space-y-1.5">
+							<label for="dateOfBirth" class="text-xs font-medium text-muted-foreground"
+								>Date of Birth</label
+							>
+							<DatePicker
+								id="dateOfBirth"
+								name="dateOfBirth"
+								value={emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0, 10) : ''}
+								class="input w-full"
+							/>
+						</div>
 					</div>
 
 					<div class="space-y-1.5">
@@ -196,19 +212,6 @@
 							rows="2"
 							class="input h-auto resize-none py-2">{emp.contactAddress ?? ''}</textarea
 						>
-					</div>
-
-					<div class="space-y-1.5">
-						<label for="dateOfBirth" class="text-xs font-medium text-muted-foreground"
-							>Date of Birth</label
-						>
-						<input
-							id="dateOfBirth"
-							name="dateOfBirth"
-							type="date"
-							value={emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0, 10) : ''}
-							class="input"
-						/>
 					</div>
 
 					<div class="pt-2">

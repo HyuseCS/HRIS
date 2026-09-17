@@ -209,3 +209,13 @@ export function regularizationStatus(startDate: Date, asOf: Date = new Date()) {
 	const daysUntil = daysBetween(asOf, date)
 	return { date, daysUntil, overdue: daysUntil < 0 }
 }
+
+/** Weekday + short date in Philippine Standard Time, e.g. "Thu, Sep 10". */
+export function manilaShortDay(date: Date | string): string {
+	return new Date(date).toLocaleDateString('en-PH', {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+		timeZone: 'Asia/Manila'
+	})
+}

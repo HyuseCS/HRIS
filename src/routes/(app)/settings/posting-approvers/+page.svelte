@@ -17,7 +17,7 @@
 	<title>Posting Approvers — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Posting Approvers"
 		description="Job postings must be approved before they go live. Choose who signs off each department's postings (for example, the Senior Developer for Software Developers). Departments left unset fall back to HR."
@@ -31,7 +31,7 @@
 		<Banner kind="error" message={form.error} />
 	{/if}
 
-	<div class="overflow-x-auto rounded-lg border">
+	<div class="overflow-x-auto rounded-lg border bg-card">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -55,7 +55,7 @@
 								<input type="hidden" name="departmentId" value={row.departmentId} />
 								<select
 									name="approverId"
-									class="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+									class="h-9 w-full max-w-md rounded-md border border-input bg-background px-2 text-sm"
 								>
 									<option value="">— HR (fallback) —</option>
 									{#each data.employees as e (e.id)}

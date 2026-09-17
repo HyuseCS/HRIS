@@ -19,14 +19,14 @@
 	const toggleGuard = (id: string) => (toggleGuards[id] ??= createSubmitGuard())
 
 	const inputClass =
-		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+		'h-9 w-full max-w-sm rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
 <svelte:head>
 	<title>Offboarding Checklist — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Offboarding Checklist"
 		description="The clearance steps every separation case starts with. Each names a task and the clearance area that signs it off, optionally pinned to a specific department. Opening a separation copies the active steps into the case, and the departing employee is emailed a transition notice listing them."
@@ -37,11 +37,11 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" />
 	{/if}
 
 	<!-- Add step -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-4xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a clearance step</h2>
 		<form
 			method="POST"
@@ -89,7 +89,7 @@
 	</section>
 
 	<!-- List -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-4xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Clearance steps</h2>
 		{#if data.items.length === 0}
 			<p class="text-sm text-muted-foreground">No steps yet.</p>

@@ -1,0 +1,44 @@
+{
+  "snippets": [
+    {
+      "file": "src/lib/server/services/payroll/ph-statutory.ts",
+      "lines": "289-296",
+      "description": "BIR_MONTHLY_TAX_TABLE — the engine default, moved from the 2018 TRAIN rates to the 2023 rates. The comment at :307 already named the 2023 rates and was left untouched; the data moved to meet it."
+    },
+    {
+      "file": "src/lib/server/services/payroll/ph-statutory.ts",
+      "lines": "298-307",
+      "description": "computeWithholdingTax — unchanged. Selects the bracket by floor/ceiling and returns baseTax + (income - excessOver) * rate in exact decimal."
+    },
+    {
+      "file": "src/lib/server/services/payroll/ph-statutory.ts",
+      "lines": "339-346",
+      "description": "taxBracketsToWire — converts the Infinity top ceiling to null for JSON/DB transport. The migration script writes through this, so the persisted shape cannot diverge from the engine's."
+    },
+    {
+      "file": "src/lib/server/services/payroll/statutory-rates.ts",
+      "lines": "221-235",
+      "description": "deriveTaxBrackets — baseTax[0]=0; baseTax[n] = baseTax[n-1] + (floor[n]-floor[n-1]) * rate[n-1], quantized once per bracket. This is the helper the D1 proof runs against the shipped table."
+    },
+    {
+      "file": "src/lib/server/services/payroll/calculator.ts",
+      "lines": "216-226",
+      "description": "The proration boundary — monthly statutory comes back exact and is quantized once with q2n after multiplying by periodShare. This is where 1097.55 * 0.5 = 548.775 becomes 548.78."
+    },
+    {
+      "file": "src/lib/server/services/payroll/money.ts",
+      "lines": "47",
+      "description": "q2 — toDecimalPlaces(2, ROUND_HALF_UP). The named rounding mode behind the one new quantization event this change creates."
+    },
+    {
+      "file": "scripts/migrate-bir-tax-table-2023.ts",
+      "lines": "23-36",
+      "description": "The migration guard. Matches on the 2018 rate vector AND the floor vector, never on baseTax — a drifted baseTax is the symptom the migration exists to clear, so a full-table equality guard would skip the row most needing it. Also recognises the 2023 vector so an idempotent re-run does not misreport migrated rows as customized."
+    },
+    {
+      "file": "tests/unit/payroll-statutory-config.test.ts",
+      "lines": "301-316 (pre-change)",
+      "description": "The #220 DERIVED_PARITY block. The '250000' override (tax 66348.06) existed only because the 2018 table's exact-thirds boundaries could not be re-derived from its integer floors. Deleted, not repointed."
+    }
+  ]
+}

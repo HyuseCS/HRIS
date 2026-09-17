@@ -4,6 +4,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 
 	type Employee = { id: string; firstName: string; lastName: string; employeeNumber: string }
 	type Preview = {
@@ -80,7 +81,7 @@
 		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
-<section class="space-y-3 rounded-lg border bg-muted/20 p-4">
+<section class="space-y-3 rounded-lg border bg-card p-4">
 	<div>
 		<h2 class="text-lg font-semibold">Aggregate from time logs</h2>
 		<p class="text-sm text-muted-foreground">
@@ -105,9 +106,8 @@
 		</div>
 		<div>
 			<label for="agg-week" class="text-sm font-medium">Week (any day in it)</label>
-			<input
+			<DatePicker
 				id="agg-week"
-				type="date"
 				bind:value={weekOf}
 				oninput={clearPreview}
 				class="mt-1 {inputClass}"

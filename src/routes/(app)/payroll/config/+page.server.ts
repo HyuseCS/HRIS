@@ -43,7 +43,11 @@ export const actions: Actions = {
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = configSchema.safeParse(raw)
 		if (!parsed.success) {
-			return fail(400, { error: 'Invalid configuration values', details: parsed.error.flatten() })
+			return fail(400, {
+				action: 'update',
+				error: 'Invalid configuration values',
+				details: parsed.error.flatten()
+			})
 		}
 
 		const { payFrequency, cutoffDay1, cutoffDay2 } = parsed.data
@@ -101,7 +105,7 @@ export const actions: Actions = {
 			)
 		})
 
-		return { success: true }
+		return { action: 'update', saved: 'Payroll configuration saved.' }
 	},
 
 	updateRates: async ({ request, locals, getClientAddress }) => {
@@ -110,7 +114,10 @@ export const actions: Actions = {
 
 		const parsed = ratesSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success) {
-			return fail(400, { error: 'Invalid multiplier values (each must be between 0 and 10).' })
+			return fail(400, {
+				action: 'updateRates',
+				error: 'Invalid multiplier values (each must be between 0 and 10).'
+			})
 		}
 
 		await db.$transaction(async (tx) => {
@@ -151,6 +158,6 @@ export const actions: Actions = {
 			)
 		})
 
-		return { success: true }
+		return { action: 'updateRates', saved: 'Multipliers saved.' }
 	}
 }

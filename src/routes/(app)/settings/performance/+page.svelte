@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -19,7 +20,7 @@
 	<title>Review Schedule — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Review Schedule"
 		description="How often performance reviews are opened for everyone, and how long evaluators have to finish them."
@@ -30,16 +31,17 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" />
 	{:else if form?.success}
-		<div class="rounded bg-primary/10 px-3 py-2 text-sm text-primary" role="status">
-			Review schedule saved.
-		</div>
+		<Banner kind="success" message="Review schedule saved." class="mx-auto max-w-3xl" />
 	{/if}
 
-	<form method="POST" action="?/saveConfig" use:enhance={save.enhance} class="card space-y-5">
+	<form
+		method="POST"
+		action="?/saveConfig"
+		use:enhance={save.enhance}
+		class="card mx-auto max-w-3xl space-y-5"
+	>
 		<label class="flex items-start gap-3">
 			<input
 				type="checkbox"
