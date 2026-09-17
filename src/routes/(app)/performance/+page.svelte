@@ -2,6 +2,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import type { PageData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -13,7 +14,11 @@
 	<title>Performance — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div
+	class={data.isAdmin
+		? 'space-y-6'
+		: 'flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0'}
+>
 	<PageHeader title="Performance" />
 
 	<!-- #178 readiness note. Informational, never a gate: it disables nothing and blocks no
@@ -116,76 +121,164 @@
 		</section>
 	{/if}
 
-	<!-- My Reviews -->
-	<section class="space-y-3">
-		<h2 class="text-lg font-semibold">My Reviews</h2>
-		<div class="overflow-x-auto rounded-lg border bg-card">
-			<table class="w-full text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Reviewer</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y">
-					{#each data.myReviews as review (review.id)}
-						<tr class="hover:bg-muted/30">
-							<td class="px-4 py-3"
-								><a
-									href="/performance/reviews/{review.id}"
-									class="font-medium text-primary hover:underline">{review.cycle.name}</a
-								></td
-							>
-							<td class="px-4 py-3 text-muted-foreground">
-								{review.reviewer.lastName}, {review.reviewer.firstName}
-							</td>
-							<td class="px-4 py-3">
-								<Badge status={review.status} domain="review" />
-							</td>
-						</tr>
-					{:else}
-						<tr>
-							<td colspan="3" class="p-0"><EmptyState title="No reviews" /></td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	</section>
-
-	<!-- Reviews to Complete (reviewer) -->
-	{#if data.reviewsToGive.length}
+	{#if data.isAdmin}
+		<!-- My Reviews -->
 		<section class="space-y-3">
-			<h2 class="text-lg font-semibold">Reviews to Complete</h2>
+			<h2 class="text-lg font-semibold">My Reviews</h2>
 			<div class="overflow-x-auto rounded-lg border bg-card">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
+							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Reviewer</th>
 							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y">
-						{#each data.reviewsToGive as review (review.id)}
+						{#each data.myReviews as review (review.id)}
 							<tr class="hover:bg-muted/30">
 								<td class="px-4 py-3"
 									><a
 										href="/performance/reviews/{review.id}"
-										class="font-medium text-primary hover:underline"
-										>{review.employee.lastName}, {review.employee.firstName}</a
+										class="font-medium text-primary hover:underline">{review.cycle.name}</a
 									></td
 								>
-								<td class="px-4 py-3 text-muted-foreground">{review.cycle.name}</td>
+								<td class="px-4 py-3 text-muted-foreground">
+									{review.reviewer.lastName}, {review.reviewer.firstName}
+								</td>
 								<td class="px-4 py-3">
 									<Badge status={review.status} domain="review" />
 								</td>
+							</tr>
+						{:else}
+							<tr>
+								<td colspan="3" class="p-0"><EmptyState title="No reviews" /></td>
 							</tr>
 						{/each}
 					</tbody>
 				</table>
 			</div>
 		</section>
+
+		<!-- Reviews to Complete (reviewer) -->
+		{#if data.reviewsToGive.length}
+			<section class="space-y-3">
+				<h2 class="text-lg font-semibold">Reviews to Complete</h2>
+				<div class="overflow-x-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<thead class="border-b bg-muted/50">
+							<tr>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y">
+							{#each data.reviewsToGive as review (review.id)}
+								<tr class="hover:bg-muted/30">
+									<td class="px-4 py-3"
+										><a
+											href="/performance/reviews/{review.id}"
+											class="font-medium text-primary hover:underline"
+											>{review.employee.lastName}, {review.employee.firstName}</a
+										></td
+									>
+									<td class="px-4 py-3 text-muted-foreground">{review.cycle.name}</td>
+									<td class="px-4 py-3">
+										<Badge status={review.status} domain="review" />
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</section>
+		{/if}
+	{:else}
+		<!-- My Reviews -->
+		<section
+			class={data.reviewsToGive.length
+				? 'flex shrink-0 flex-col gap-3'
+				: 'flex min-h-0 flex-1 flex-col gap-3'}
+		>
+			<h2 class="text-lg font-semibold">My Reviews</h2>
+			<Container
+				tone="card"
+				flush
+				class={data.reviewsToGive.length ? 'flex-none' : undefined}
+				empty={data.myReviews.length === 0}
+			>
+				<div class="overflow-x-auto">
+					<table class="w-full text-sm">
+						<thead class="border-b bg-muted/50">
+							<tr>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Reviewer</th>
+								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y">
+							{#each data.myReviews as review (review.id)}
+								<tr class="hover:bg-muted/30">
+									<td class="px-4 py-3"
+										><a
+											href="/performance/reviews/{review.id}"
+											class="font-medium text-primary hover:underline">{review.cycle.name}</a
+										></td
+									>
+									<td class="px-4 py-3 text-muted-foreground">
+										{review.reviewer.lastName}, {review.reviewer.firstName}
+									</td>
+									<td class="px-4 py-3">
+										<Badge status={review.status} domain="review" />
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+
+				{#snippet emptyState()}
+					<EmptyState title="No reviews" />
+				{/snippet}
+			</Container>
+		</section>
+
+		<!-- Reviews to Complete (reviewer) -->
+		{#if data.reviewsToGive.length}
+			<section class="flex min-h-0 flex-1 flex-col gap-3">
+				<h2 class="text-lg font-semibold">Reviews to Complete</h2>
+				<Container tone="card" flush>
+					<div class="overflow-x-auto">
+						<table class="w-full text-sm">
+							<thead class="border-b bg-muted/50">
+								<tr>
+									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
+									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
+									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y">
+								{#each data.reviewsToGive as review (review.id)}
+									<tr class="hover:bg-muted/30">
+										<td class="px-4 py-3"
+											><a
+												href="/performance/reviews/{review.id}"
+												class="font-medium text-primary hover:underline"
+												>{review.employee.lastName}, {review.employee.firstName}</a
+											></td
+										>
+										<td class="px-4 py-3 text-muted-foreground">{review.cycle.name}</td>
+										<td class="px-4 py-3">
+											<Badge status={review.status} domain="review" />
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</Container>
+			</section>
+		{/if}
 	{/if}
 </div>
