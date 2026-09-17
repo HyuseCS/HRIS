@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -41,7 +42,7 @@
 	<form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
 		<div class="flex-1 min-w-[12rem]">
 			<label for="f-search" class="text-xs font-medium text-muted-foreground">Search</label>
-			<input
+			<SearchInput
 				id="f-search"
 				name="search"
 				value={data.filter.search}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
@@ -39,12 +40,11 @@
 		<div class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
 			<form method="GET" role="search" class="w-full sm:w-auto sm:min-w-0 sm:flex-1">
 				<label for="team-search" class="sr-only">Search people</label>
-				<input
+				<SearchInput
 					id="team-search"
-					type="search"
 					name="search"
 					value={data.search}
-					maxlength="100"
+					maxlength={100}
 					placeholder="Search by name, employee number or job title…"
 					class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-sm"
 				/>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import { tick } from 'svelte'
@@ -148,7 +149,7 @@
 			<label for="roles-q" class="text-xs font-medium text-muted-foreground"
 				>Filter by email or name</label
 			>
-			<input
+			<SearchInput
 				id="roles-q"
 				name="q"
 				value={data.q}

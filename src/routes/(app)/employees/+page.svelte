@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { page } from '$app/stores'
@@ -40,7 +41,7 @@
 		<!-- Search -->
 		<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
 		<form method="GET" class="flex flex-wrap gap-2 border-b p-4">
-			<input
+			<SearchInput
 				name="search"
 				value={search}
 				placeholder="Search by name or employee number…"

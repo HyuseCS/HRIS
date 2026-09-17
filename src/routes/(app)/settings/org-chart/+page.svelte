@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
@@ -115,7 +116,7 @@
 				>
 			</div>
 		</div>
-		<input
+		<SearchInput
 			bind:value={query}
 			placeholder="Search people…"
 			class="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -35,7 +36,7 @@
 
 	<div class="overflow-hidden rounded-lg border bg-card">
 		<form method="GET" class="flex flex-wrap gap-2 border-b p-4">
-			<input
+			<SearchInput
 				name="search"
 				value={data.search}
 				placeholder="Search by name or employee number…"
