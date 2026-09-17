@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	requireAnyCapability(user.roles, 'MANAGE_HR')
 	const isSuperAdmin = canAny(user.roles, 'ADMINISTER_SYSTEM')
 
-	const actorId = url.searchParams.get('actor') ?? undefined
+	const actorSearch = (url.searchParams.get('actor') ?? '').trim().slice(0, 100)
 	const entityType = url.searchParams.get('entity') ?? undefined
 	const action = url.searchParams.get('action') ?? undefined
 	const startDate = url.searchParams.get('start')
@@ -21,7 +21,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const where = {
 		organizationId: user.organizationId,
-		...(actorId && { actorId }),
+		...(actorSearch && {
+			actor: {
+				OR: [
+					{ email: { contains: actorSearch, mode: 'insensitive' as const } },
+					{ employee: { firstName: { contains: actorSearch, mode: 'insensitive' as const } } },
+					{ employee: { lastName: { contains: actorSearch, mode: 'insensitive' as const } } }
+				]
+			}
+		}),
 		...(entityType && { entityType }),
 		...(action && { action: action as never }),
 		...(startDate || endDate ? { createdAt: { gte: startDate, lte: endDate } } : {})
@@ -32,35 +40,29 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const total = await db.auditLog.count({ where })
 	const pagination = paginate(url, total, { pageSize: 50 })
 
-	const [logs, actors] = await Promise.all([
-		db.auditLog.findMany({
-			where,
-			orderBy: { createdAt: 'desc' },
-			skip: pagination.skip,
-			take: pagination.take,
-			// An explicit select, not `include`: `include` returns every scalar, and the rows are
-			// spread wholesale below, so `ipAddress`, `userAgent` and `actorId` would
-			// ship to the client. The same bare-`include` shape was the dashboard leak this issue
-			// fixed (#242) — the type annotation on the map below hides it, it does not prevent it.
-			select: {
-				id: true,
-				action: true,
-				entityType: true,
-				entityId: true,
-				oldValue: true,
-				newValue: true,
-				createdAt: true,
-				// The actor's role set AS RECORDED AT THE TIME (#282). The `actor` relation would
-				// show today's roles on a year-old entry.
-				actorRoles: true,
-				actor: { select: { email: true } }
-			}
-		}),
-		db.user.findMany({
-			where: { organizationId: user.organizationId },
-			select: { id: true, email: true }
-		})
-	])
+	const logs = await db.auditLog.findMany({
+		where,
+		orderBy: { createdAt: 'desc' },
+		skip: pagination.skip,
+		take: pagination.take,
+		// An explicit select, not `include`: `include` returns every scalar, and the rows are
+		// spread wholesale below, so `ipAddress`, `userAgent` and `actorId` would
+		// ship to the client. The same bare-`include` shape was the dashboard leak this issue
+		// fixed (#242) — the type annotation on the map below hides it, it does not prevent it.
+		select: {
+			id: true,
+			action: true,
+			entityType: true,
+			entityId: true,
+			oldValue: true,
+			newValue: true,
+			createdAt: true,
+			// The actor's role set AS RECORDED AT THE TIME (#282). The `actor` relation would
+			// show today's roles on a year-old entry.
+			actorRoles: true,
+			actor: { select: { email: true } }
+		}
+	})
 
 	// #242: the payload is masked for everyone, ADMINISTER_SYSTEM included. Reaching it is an
 	// audited event — the `reveal` action below. `hasChanges` is all the page needs to know
@@ -89,7 +91,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// Cosmetic (Constitution P2) — the action re-checks. This only keeps a caller who cannot
 		// reveal from being shown a button that will 403.
 		canReveal: isSuperAdmin,
-		actors,
 		pagination,
 		// Hand-maintained — extend it whenever a new entityType starts being audited, or that
 		// entity's rows cannot be filtered for at all. `PayrollPeriod` was missing until #298.

@@ -26,8 +26,7 @@ import type { Role } from '@prisma/client'
 const { dbMock, writeAuditLog } = vi.hoisted(() => ({
 	writeAuditLog: vi.fn(),
 	dbMock: {
-		auditLog: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
-		user: { findMany: vi.fn() }
+		auditLog: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() }
 	}
 }))
 
@@ -123,7 +122,6 @@ beforeEach(() => {
 	dbMock.auditLog.findMany.mockImplementation(async (args: Record<string, unknown>) =>
 		[ENTRY, BARE_ENTRY].map((row) => project(row as Record<string, unknown>, args))
 	)
-	dbMock.user.findMany.mockResolvedValue([])
 	// Scoped like the real query: an entry outside the caller's organization is simply not found.
 	dbMock.auditLog.findFirst.mockImplementation(
 		async ({ where }: { where: { id: string; organizationId?: string } }) =>
@@ -205,6 +203,52 @@ describe('/reports/audit-log load — the list never carries the payload (#242)'
 
 	it('still refuses the page to a caller without MANAGE_HR', async () => {
 		await expect(load(loadEvent(['EMPLOYEE']))).rejects.toMatchObject({ status: 403 })
+	})
+})
+
+describe('/reports/audit-log load — actor search', () => {
+	const searchWhere = async (actor: string) => {
+		const url = new URL('http://localhost/reports/audit-log')
+		url.searchParams.set('actor', actor)
+		await load({
+			locals: { user: { id: ACTOR, organizationId: ORG_A, roles: ['SUPER_ADMIN'] } },
+			url
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} as any)
+		const countWhere = dbMock.auditLog.count.mock.calls[0][0].where
+		expect(dbMock.auditLog.findMany.mock.calls[0][0].where).toEqual(countWhere)
+		return countWhere
+	}
+
+	const actorMatch = (term: string) => ({
+		OR: [
+			{ email: { contains: term, mode: 'insensitive' } },
+			{ employee: { firstName: { contains: term, mode: 'insensitive' } } },
+			{ employee: { lastName: { contains: term, mode: 'insensitive' } } }
+		]
+	})
+
+	it('matches the actor email or employee name, case-insensitively, inside the org', async () => {
+		expect(await searchWhere('  Dela Cruz ')).toEqual({
+			organizationId: ORG_A,
+			actor: actorMatch('Dela Cruz')
+		})
+	})
+
+	it('ignores an empty or whitespace-only search', async () => {
+		expect(await searchWhere('   ')).toEqual({ organizationId: ORG_A })
+	})
+
+	it('caps the search at 100 characters', async () => {
+		const where = await searchWhere('a'.repeat(250))
+
+		expect(where).toEqual({ organizationId: ORG_A, actor: actorMatch('a'.repeat(100)) })
+	})
+
+	it('no longer loads an actor list for a dropdown', async () => {
+		const data = await loadData(['SUPER_ADMIN'])
+
+		expect(data).not.toHaveProperty('actors')
 	})
 })
 

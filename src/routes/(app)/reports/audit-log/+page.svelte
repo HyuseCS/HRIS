@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import PanelPage from '$lib/components/ui/PanelPage.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { ActionData, PageData } from './$types'
@@ -40,230 +40,225 @@
 	<title>Audit Log — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Audit Log" />
+{#snippet failureNotice()}
+	<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
+		{failure}
+	</div>
+{/snippet}
 
-	{#if failure}
-		<div role="alert" class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
-			{failure}
+{#snippet filters()}
+	<!-- Filter form -->
+	<form method="GET" class="flex flex-wrap items-end gap-3">
+		<!-- Actor -->
+		<div class="flex flex-col gap-1">
+			<label for="actor" class="text-xs font-medium text-muted-foreground">Actor</label>
+			<input
+				id="actor"
+				name="actor"
+				type="search"
+				maxlength="100"
+				placeholder="Search actor name or email…"
+				class="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
 		</div>
-	{/if}
 
-	<div class="overflow-hidden rounded-lg border bg-card">
-		<!-- Filter form -->
-		<form method="GET" class="flex flex-wrap items-end gap-3 border-b p-4">
-			<!-- Actor -->
-			<div class="flex flex-col gap-1">
-				<label for="actor" class="text-xs font-medium text-muted-foreground">Actor</label>
-				<select
-					id="actor"
-					name="actor"
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					<option value="">All Users</option>
-					{#each data.actors as actor (actor.id)}
-						<option value={actor.id}>{actor.email}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Entity type -->
-			<div class="flex flex-col gap-1">
-				<label for="entity" class="text-xs font-medium text-muted-foreground">Entity Type</label>
-				<select
-					id="entity"
-					name="entity"
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					<option value="">All Types</option>
-					{#each data.entityTypes as et (et)}
-						<option value={et}>{et}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Action -->
-			<div class="flex flex-col gap-1">
-				<label for="action" class="text-xs font-medium text-muted-foreground">Action</label>
-				<select
-					id="action"
-					name="action"
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					<option value="">All Actions</option>
-					{#each ACTIONS as a (a)}
-						<option value={a}>{a}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Date range -->
-			<div class="flex flex-col gap-1">
-				<label for="start" class="text-xs font-medium text-muted-foreground">From</label>
-				<DatePicker
-					id="start"
-					name="start"
-					value=""
-					onchange={(v) => {
-						if (v) endPicker?.focusAndOpen()
-					}}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				/>
-			</div>
-			<div class="flex flex-col gap-1">
-				<label for="end" class="text-xs font-medium text-muted-foreground">To</label>
-				<DatePicker
-					bind:this={endPicker}
-					id="end"
-					name="end"
-					value=""
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				/>
-			</div>
-
-			<button
-				type="submit"
-				class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+		<!-- Entity type -->
+		<div class="flex flex-col gap-1">
+			<label for="entity" class="text-xs font-medium text-muted-foreground">Entity Type</label>
+			<select
+				id="entity"
+				name="entity"
+				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			>
-				Filter
-			</button>
-		</form>
+				<option value="">All Types</option>
+				{#each data.entityTypes as et (et)}
+					<option value={et}>{et}</option>
+				{/each}
+			</select>
+		</div>
 
-		<!-- Summary -->
-		<p class="px-4 py-3 text-sm text-muted-foreground">
-			{data.pagination.total.toLocaleString()} total entries — page {data.pagination.page} of {data
-				.pagination.totalPages}
-		</p>
+		<!-- Action -->
+		<div class="flex flex-col gap-1">
+			<label for="action" class="text-xs font-medium text-muted-foreground">Action</label>
+			<select
+				id="action"
+				name="action"
+				class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				<option value="">All Actions</option>
+				{#each ACTIONS as a (a)}
+					<option value={a}>{a}</option>
+				{/each}
+			</select>
+		</div>
 
-		<!-- Table -->
-		{#if data.logs.length === 0}
-			<div class="flex h-40 items-center justify-center border-t bg-muted/30 text-muted-foreground">
-				No audit log entries match the selected filters.
-			</div>
-		{:else}
-			<div class="overflow-x-auto border-t">
-				<table class="w-full text-sm">
-					<thead class="border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-								>Timestamp</th
-							>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-								>Actor</th
-							>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-								>Action</th
-							>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-								>Entity Type</th
-							>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-								>Entity ID</th
-							>
-							<th class="px-4 py-3 text-left font-medium text-muted-foreground">Changes</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y">
-						{#each data.logs as log (log.id)}
-							<!-- At most one entry is revealed at a time — whichever ?/reveal just returned. -->
-							{@const revealed = form?.revealed}
-							<tr class="hover:bg-muted/30">
-								<td class="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
-									{new Date(log.createdAt).toLocaleString('en-PH', {
-										year: 'numeric',
-										month: 'short',
-										day: 'numeric',
-										hour: '2-digit',
-										minute: '2-digit',
-										second: '2-digit'
-									})}
-								</td>
-								<td class="px-4 py-3 whitespace-nowrap">
-									<span class="font-medium">{log.actor.email}</span>
-									<span class="ml-1 rounded bg-muted px-1 py-0.5 text-xs text-muted-foreground"
-										>{log.actorRoles.join(', ')}</span
-									>
-								</td>
-								<td class="px-4 py-3 whitespace-nowrap">
-									<span
-										class="rounded px-2 py-0.5 text-xs font-medium {log.action === 'CREATE'
-											? 'bg-green-500/15 text-green-800 dark:text-green-400'
-											: log.action === 'DELETE'
-												? 'bg-red-500/15 text-red-700 dark:text-red-400'
-												: log.action === 'UPDATE'
-													? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
-													: log.action === 'LOGIN_FAILED'
-														? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
-														: 'bg-muted text-muted-foreground'}"
-									>
-										{log.action}
-									</span>
-								</td>
-								<td class="px-4 py-3 whitespace-nowrap">{log.entityType}</td>
-								<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
-									{log.entityId.slice(0, 12)}…
-								</td>
-								<!--
+		<!-- Date range -->
+		<div class="flex flex-col gap-1">
+			<label for="start" class="text-xs font-medium text-muted-foreground">From</label>
+			<DatePicker
+				id="start"
+				name="start"
+				value=""
+				onchange={(v) => {
+					if (v) endPicker?.focusAndOpen()
+				}}
+				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
+		</div>
+		<div class="flex flex-col gap-1">
+			<label for="end" class="text-xs font-medium text-muted-foreground">To</label>
+			<DatePicker
+				bind:this={endPicker}
+				id="end"
+				name="end"
+				value=""
+				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
+		</div>
+
+		<button
+			type="submit"
+			class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+		>
+			Filter
+		</button>
+	</form>
+{/snippet}
+
+<PanelPage
+	title="Audit Log"
+	tone="card"
+	flush
+	notice={failure ? failureNotice : undefined}
+	toolbar={filters}
+	empty={data.logs.length === 0}
+>
+	<!-- Table -->
+	{#if data.logs.length === 0}
+		<div class="text-muted-foreground">No audit log entries match the selected filters.</div>
+	{:else}
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead class="border-b bg-muted/50">
+					<tr>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+							>Timestamp</th
+						>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+							>Actor</th
+						>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+							>Action</th
+						>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+							>Entity Type</th
+						>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+							>Entity ID</th
+						>
+						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Changes</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y">
+					{#each data.logs as log (log.id)}
+						<!-- At most one entry is revealed at a time — whichever ?/reveal just returned. -->
+						{@const revealed = form?.revealed}
+						<tr class="hover:bg-muted/30">
+							<td class="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
+								{new Date(log.createdAt).toLocaleString('en-PH', {
+									year: 'numeric',
+									month: 'short',
+									day: 'numeric',
+									hour: '2-digit',
+									minute: '2-digit',
+									second: '2-digit'
+								})}
+							</td>
+							<td class="px-4 py-3 whitespace-nowrap">
+								<span class="font-medium">{log.actor.email}</span>
+								<span class="ml-1 rounded bg-muted px-1 py-0.5 text-xs text-muted-foreground"
+									>{log.actorRoles.join(', ')}</span
+								>
+							</td>
+							<td class="px-4 py-3 whitespace-nowrap">
+								<span
+									class="rounded px-2 py-0.5 text-xs font-medium {log.action === 'CREATE'
+										? 'bg-green-500/15 text-green-800 dark:text-green-400'
+										: log.action === 'DELETE'
+											? 'bg-red-500/15 text-red-700 dark:text-red-400'
+											: log.action === 'UPDATE'
+												? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+												: log.action === 'LOGIN_FAILED'
+													? 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
+													: 'bg-muted text-muted-foreground'}"
+								>
+									{log.action}
+								</span>
+							</td>
+							<td class="px-4 py-3 whitespace-nowrap">{log.entityType}</td>
+							<td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">
+								{log.entityId.slice(0, 12)}…
+							</td>
+							<!--
 									#242: the payload never arrives with the list. One entry at a time, through the
 									audited ?/reveal action — reaching it is itself a recorded event.
 								-->
-								<td class="px-4 py-3">
-									{#if !log.hasChanges}
-										<span class="text-xs text-muted-foreground">—</span>
-									{:else if revealed && revealed.id === log.id}
-										<div
-											class="space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-											aria-live="polite"
-											tabindex="-1"
-											use:focusOnMount
+							<td class="px-4 py-3">
+								{#if !log.hasChanges}
+									<span class="text-xs text-muted-foreground">—</span>
+								{:else if revealed && revealed.id === log.id}
+									<div
+										class="space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										aria-live="polite"
+										tabindex="-1"
+										use:focusOnMount
+									>
+										{#if revealed.oldValue !== null}
+											<div>
+												<span class="text-xs font-medium text-red-600">Before:</span>
+												<pre
+													class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
+														revealed.oldValue,
+														null,
+														2
+													)}</pre>
+											</div>
+										{/if}
+										{#if revealed.newValue !== null}
+											<div>
+												<span class="text-xs font-medium text-green-600">After:</span>
+												<pre
+													class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
+														revealed.newValue,
+														null,
+														2
+													)}</pre>
+											</div>
+										{/if}
+									</div>
+								{:else if data.canReveal}
+									<form method="POST" action="?/reveal">
+										<input type="hidden" name="id" value={log.id} />
+										<button
+											type="submit"
+											class="rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											aria-label="Reveal the recorded changes for {log.action} on {log.entityType} {log.entityId} — this reveal is logged"
 										>
-											{#if revealed.oldValue !== null}
-												<div>
-													<span class="text-xs font-medium text-red-600">Before:</span>
-													<pre
-														class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
-															revealed.oldValue,
-															null,
-															2
-														)}</pre>
-												</div>
-											{/if}
-											{#if revealed.newValue !== null}
-												<div>
-													<span class="text-xs font-medium text-green-600">After:</span>
-													<pre
-														class="mt-0.5 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">{JSON.stringify(
-															revealed.newValue,
-															null,
-															2
-														)}</pre>
-												</div>
-											{/if}
-										</div>
-									{:else if data.canReveal}
-										<form method="POST" action="?/reveal">
-											<input type="hidden" name="id" value={log.id} />
-											<button
-												type="submit"
-												class="rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-												aria-label="Reveal the recorded changes for {log.action} on {log.entityType} {log.entityId} — this reveal is logged"
-											>
-												Reveal changes
-											</button>
-										</form>
-									{:else}
-										<span class="text-xs text-muted-foreground">Hidden</span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+											Reveal changes
+										</button>
+									</form>
+								{:else}
+									<span class="text-xs text-muted-foreground">Hidden</span>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
 
-			<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
-				<Pagination meta={data.pagination} />
-			</div>
-		{/if}
-	</div>
-</div>
+	{#snippet footer()}
+		<Pagination meta={data.pagination} />
+	{/snippet}
+</PanelPage>
