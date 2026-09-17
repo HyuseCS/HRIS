@@ -144,3 +144,11 @@ masked-reveal regression and the Playwright baseline are the gates left. See
 already on staging in a newer form (dialog-based `/requests`, tabbed timesheets, New Timesheet on
 the title row) and were dropped in favour of staging; only `tests/unit/leave-new-redirect.test.ts`,
 the `/attendance` hint, the AggregatePanel copy, S1 and S4 replayed.
+
+## Task — `dashboard-layout` (17-09-26)
+
+**Claim date:** 17-09-26 · **Branch:** `feat/uiux-phase-6` · **Plan:** `../dashboard-layout_17-09-26/dashboard-layout_PLAN_17-09-26.md`
+
+| File | Section |
+|---|---|
+| `src/routes/(app)/dashboard/+page.svelte` | S1, S2 — alert-card min/max height + scroll body; four-zone reorder with derived grid columns |
