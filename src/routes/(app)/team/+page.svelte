@@ -35,7 +35,7 @@
 <div class="space-y-6">
 	<PageHeader {title} />
 
-	<div class="overflow-hidden rounded-lg border bg-card">
+	<div class="flex flex-col overflow-hidden rounded-lg border bg-card lg:h-[39.75rem]">
 		<div class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
 			<form method="GET" role="search" class="w-full sm:w-auto sm:min-w-0 sm:flex-1">
 				<label for="team-search" class="sr-only">Search people</label>
@@ -72,33 +72,35 @@
 			</div>
 		</div>
 
-		{#if data.people.length === 0}
-			{#if data.search}
-				<EmptyState variant="no-results" title="No one matches “{data.search}”">
-					{#snippet action()}
-						<a
-							href={teamHref(data.view, '')}
-							class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
-							>Clear search</a
-						>
-					{/snippet}
-				</EmptyState>
+		<div class="min-h-0 flex-1">
+			{#if data.people.length === 0}
+				{#if data.search}
+					<EmptyState variant="no-results" title="No one matches “{data.search}”">
+						{#snippet action()}
+							<a
+								href={teamHref(data.view, '')}
+								class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+								>Clear search</a
+							>
+						{/snippet}
+					</EmptyState>
+				{:else}
+					<EmptyState title={data.isAdmin ? 'No active employees' : 'No one reports to you yet'} />
+				{/if}
+			{:else if data.view === 'list'}
+				<EmployeeTable
+					people={data.people}
+					unitLabel={data.isFoodService ? 'Branch' : 'Department'}
+					hrefFor={employeeHref}
+				/>
 			{:else}
-				<EmptyState title={data.isAdmin ? 'No active employees' : 'No one reports to you yet'} />
+				<ul class="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
+					{#each data.people as person (person.id)}
+						<li class="min-w-0"><EmployeeCard {person} href={employeeHref(person)} /></li>
+					{/each}
+				</ul>
 			{/if}
-		{:else if data.view === 'list'}
-			<EmployeeTable
-				people={data.people}
-				unitLabel={data.isFoodService ? 'Branch' : 'Department'}
-				hrefFor={employeeHref}
-			/>
-		{:else}
-			<ul class="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
-				{#each data.people as person (person.id)}
-					<li class="min-w-0"><EmployeeCard {person} href={employeeHref(person)} /></li>
-				{/each}
-			</ul>
-		{/if}
+		</div>
 
 		<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
 			<Pagination meta={data.pagination} />

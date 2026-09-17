@@ -28,16 +28,17 @@
 			<tr
 				class="relative transition-colors hover:bg-accent/40 has-[a:focus-visible]:outline has-[a:focus-visible]:outline-2 has-[a:focus-visible]:-outline-offset-2 has-[a:focus-visible]:outline-ring"
 			>
-				<td class="px-4 py-1">
+				<td class="whitespace-nowrap px-4 py-1">
 					<a
 						href={hrefFor(person)}
+						title="{person.lastName}, {person.firstName}"
 						class="flex min-w-0 items-center gap-2.5 font-medium text-foreground after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none"
 					>
 						<Monogram firstName={person.firstName} lastName={person.lastName} size="sm" />
-						<span class="min-w-0 break-words">{person.lastName}, {person.firstName}</span>
+						<span class="min-w-0 truncate">{person.lastName}, {person.firstName}</span>
 					</a>
 				</td>
-				<td class="break-words px-4 py-1 text-muted-foreground">{person.jobTitle}</td>
+				<td class="truncate px-4 py-1 text-muted-foreground">{person.jobTitle}</td>
 				<td class="hidden truncate px-4 py-1 text-muted-foreground md:table-cell"
 					>{person.unit ?? '—'}</td
 				>
