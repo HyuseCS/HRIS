@@ -7,6 +7,7 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import HelpTip from '$lib/components/ui/HelpTip.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { ROLE_DESCRIPTIONS, ROLE_GROUPS, ROLE_LABELS, canAny } from '$lib/rbac'
 	import Check from 'lucide-svelte/icons/check'
@@ -162,12 +163,18 @@
 
 <PanelPage
 	title="Roles & Permissions"
-	description="Manage each user's access level and account status. You cannot change your own role or deactivate yourself, and the last active super admin and CEO are protected. Assigning a role replaces the user's full role set."
 	tone="card"
 	flush
 	toolbar={filter}
 	empty={data.users.length === 0}
 >
+	{#snippet badge()}
+		<HelpTip label="About roles and permissions">
+			Manage each user's access level and account status. You cannot change your own role or
+			deactivate yourself, and the last active super admin and CEO are protected. Assigning a role
+			replaces the user's full role set.
+		</HelpTip>
+	{/snippet}
 	{#snippet back()}
 		<BackButton fallback="/settings" label="Settings" preferFallback />
 	{/snippet}

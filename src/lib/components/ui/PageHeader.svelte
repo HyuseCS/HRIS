@@ -22,16 +22,17 @@
 	} = $props()
 </script>
 
-<!-- Title-row rule: the title, its description and the Back link. A page whose only page-level
-     action is a single button may put it on the title row through PanelPage's `actions` slot.
-     Pages with several actions keep each one on the heading row of the section it acts on
-     (right-aligned, level with that heading), so each action sits beside the thing it changes.
+<!-- Title-row rule: the title, its description and at most ONE control — the Back link counts
+     as that control. A page with no Back link may put its single page-level action (or one
+     filter-like control) on the title row through PanelPage's `actions` slot. Everything else
+     goes on the panel's toolbar or on the heading row of the section it acts on (right-aligned,
+     level with that heading), so each action sits beside the thing it changes.
      This component itself takes no actions prop.
      `ml-auto` keeps the Back cluster flush right on whatever line it lands on, and below `sm`
      it takes a full-width row of its own so a long title is never squeezed against it. -->
 <div class="flex flex-wrap items-start justify-between gap-3">
 	<div class="min-w-0 flex-1 space-y-1">
-		<div class="flex flex-wrap items-center gap-2">
+		<div class="relative flex flex-wrap items-center gap-2">
 			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
 			{#if badge}{@render badge()}{/if}
 		</div>
