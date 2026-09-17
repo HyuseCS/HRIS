@@ -272,6 +272,12 @@ taken.
   `/reports/audit-log`), but the plan's own `VERIFIED` bar additionally requires a CEO role pass,
   screenshots in the phase report, and an `impeccable` audit pass — none of those three ran. Stays
   in `active/`.
+- **Phase 5 (`destructive-actions`): DONE, closed 17-09-26, PR #14 pending merge.** Archived to
+  `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`. Covers the owner live pass,
+  remediation A/B, the surfaces/fields/open-period pass, the datepicker rollout, the Container
+  rollout and attendance/team restructure, and the CodeRabbit CLI review remediation (19 confirmed
+  findings fixed). Final gates (17-09-26, at efe96ce): format:check clean; lint 0 errors; svelte-check 0 errors; unit 227 files / 2681 tests passed; e2e 148/148 passed.. See
+  `completed/ui-ux-overhaul_03-09-26/phase-05-close_REPORT_17-09-26.md`.
 
 ### Phase 1 — `p0-fixes`
 
@@ -372,7 +378,7 @@ success flags, and add `{:catch}` to all four `{#await}` blocks. Copy the in-rep
 
 ### Phase 5 — `destructive-actions`
 
-**Plan:** `phase-05-destructive-actions_PLAN_03-09-26.md`
+**Plan:** `../../completed/ui-ux-overhaul_03-09-26/phase-05-destructive-actions_PLAN_03-09-26.md`
 
 Apply one confirm rule to the inverted-protection table in §T3: anything irreversible or
 money/person-affecting goes through `ConfirmButton`/`ConfirmDialog` with a consequence-naming

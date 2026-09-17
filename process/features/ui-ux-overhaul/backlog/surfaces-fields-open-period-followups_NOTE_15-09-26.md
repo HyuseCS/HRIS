@@ -7,14 +7,14 @@ feature: ui-ux-overhaul
 
 # Follow-ups: surfaces, field edges, Open Period
 
-Source: `active/ui-ux-overhaul_03-09-26/surfaces-fields-open-period_REPORT_15-09-26.md` and the 11.7
+Source: `completed/ui-ux-overhaul_03-09-26/surfaces-fields-open-period_REPORT_15-09-26.md` and the 11.7
 impeccable audit. None of these breaks a brief ruling, a contrast target or an anti-goal.
 
 Audit: impeccable detector on the 40 `src` files changed since `825d3ff` returned 0 findings (the
 detector flagged a planted side-tab border in a negative control, so it is live). `pnpm check` 0 errors.
 
 1. **Pagination labels wrap on phone.** At 390px "← Previous" and "Page 1 of 3" break onto two lines on
-   `/settings/roles`, `/employees`, audit-log. Screens: `surfaces-fields-open-period_screens/*_390.png`.
+   `/settings/roles`, `/employees`, audit-log. Screens: `completed/ui-ux-overhaul_03-09-26/surfaces-fields-open-period_screens/*_390.png`.
 2. **Open Period dialog is wider than its content.** `size="wide"` gives ~896px, the form uses ~545px.
    Try the default size.
 3. **Other dialogs that close on success may lose focus like D3.** SvelteKit `applyAction` calls

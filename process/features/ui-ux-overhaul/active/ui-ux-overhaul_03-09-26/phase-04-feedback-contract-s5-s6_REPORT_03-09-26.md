@@ -327,7 +327,7 @@ nothing.
 - **Best next state:** **`Keep in active/testing`.** The phase is CODE DONE and not archivable —
   no Hybrid gate has been executed live, so AC-2, AC-3, AC-5, AC-7, AC-8, AC-9 and AC-10 rest on
   code review plus the automated subset, not on live evidence.
-- **Next plan path:** `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-05-destructive-actions_PLAN_03-09-26.md`
+- **Next plan path:** `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/phase-05-destructive-actions_PLAN_03-09-26.md`
   — unblocked, since S2 is committed and `ConfirmButton`'s API is frozen with `successMessage` and
   `triggerTitle` in place for phase 05 site 15.
 

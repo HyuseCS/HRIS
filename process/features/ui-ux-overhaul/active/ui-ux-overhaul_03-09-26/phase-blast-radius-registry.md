@@ -22,7 +22,7 @@ Status vocabulary: *(no status)* / `BLOCKED-skipped` / `DONE` / `SUPERSEDED`.
 
 ## Phase 5 — `destructive-actions`
 
-**Plan:** `phase-05-destructive-actions_PLAN_03-09-26.md`
+**Plan:** `../../completed/ui-ux-overhaul_03-09-26/phase-05-destructive-actions_PLAN_03-09-26.md`
 **Claimed:** 03-09-26
 
 **Files claimed (9 `.svelte` + 1 new test file):**
@@ -69,7 +69,9 @@ orchestrator as a **phase 03 amendment**, committed alone as `3c7c08e`. This is 
 exception to the "out of bounds: `src/lib/components/ui/**`" rule above; nothing else in that
 directory was touched.
 
-**Status:** DONE (CODE DONE, not ✅ VERIFIED) — sections 0-3 executed 03-09-26 (sites 2, 3,
-4-verify, 5, 6); sections 4-7 executed 03-09-26 (sites 1, 7-16 and
-`tests/unit/destructive-confirms.test.ts`). CI gate set green; the owner's live P1 matrix is the
-only gate left. See `phase-05-destructive-actions_REPORT_03-09-26.md`.
+**Status:** DONE — closed 17-09-26, PR #14 pending merge. Sections 0-3 executed 03-09-26
+(sites 2, 3, 4-verify, 5, 6); sections 4-7 executed 03-09-26 (sites 1, 7-16 and
+`tests/unit/destructive-confirms.test.ts`); owner live pass, remediation A/B, surfaces/fields/
+open-period, datepicker rollout, Container rollout, attendance/team restructure and CodeRabbit
+remediation followed. See
+`../../completed/ui-ux-overhaul_03-09-26/phase-05-close_REPORT_17-09-26.md`.
