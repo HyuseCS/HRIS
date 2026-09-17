@@ -390,6 +390,7 @@
 									<td class="px-3 py-1.5"
 										><DatePicker
 											bind:value={row.date}
+											aria-label="Date, row {i + 1}"
 											data-r={i}
 											data-c={0}
 											onkeydown={(e) => cellKeydown(e, i, 0)}
