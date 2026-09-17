@@ -23,7 +23,7 @@ import {
 import { listReportIdsFor } from '$lib/server/services/supervisors'
 import { paginate } from '$lib/server/pagination'
 import { isFoodServiceOrg } from '$lib/orgs'
-import { manilaDayKey, manilaShortDay } from '$lib/utils/dates'
+import { manilaDayKey, manilaShortDay, manilaWeekEnd, manilaWeekStart } from '$lib/utils/dates'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
 const DAY_MS = 86_400_000
@@ -51,19 +51,11 @@ async function loadMatrix(
 	const isAdmin = canAny(user.roles, 'ADMINISTER_HR_RECORDS')
 
 	// Date range from URL params, default to current week (Mon-Sun)
-	const today = new Date()
-	const weekDay = today.getDay()
-	const weekStart = new Date(today)
-	weekStart.setDate(today.getDate() - (weekDay === 0 ? 6 : weekDay - 1))
-	weekStart.setHours(0, 0, 0, 0)
-	const weekEnd = new Date(weekStart)
-	weekEnd.setDate(weekStart.getDate() + 6)
-	weekEnd.setHours(23, 59, 59, 999)
-
+	const now = new Date()
 	const startParam = url.searchParams.get('start')
 	const endParam = url.searchParams.get('end')
-	const startDate = startParam ? new Date(startParam) : weekStart
-	const endDate = endParam ? new Date(endParam) : weekEnd
+	const startDate = new Date(startParam || manilaDayKey(manilaWeekStart(now)))
+	const endDate = new Date(endParam || manilaDayKey(manilaWeekEnd(now)))
 	const startISO = startDate.toISOString().slice(0, 10)
 	const endISO = endDate.toISOString().slice(0, 10)
 
