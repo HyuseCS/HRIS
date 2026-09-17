@@ -7,6 +7,7 @@
 		description,
 		badge,
 		back,
+		notice,
 		toolbar,
 		children,
 		footer,
@@ -18,6 +19,7 @@
 		description?: string
 		badge?: Snippet
 		back?: Snippet
+		notice?: Snippet
 		toolbar?: Snippet
 		children: Snippet
 		footer?: Snippet
@@ -29,6 +31,12 @@
 
 <div class="flex flex-col gap-6 lg:h-[calc(100dvh-4rem)]">
 	<PageHeader {title} {description} {badge} {back} />
+
+	{#if notice}
+		<div class="flex shrink-0 flex-col gap-3">
+			{@render notice()}
+		</div>
+	{/if}
 
 	<div
 		class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border {tone === 'card'
