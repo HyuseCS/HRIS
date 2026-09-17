@@ -133,8 +133,12 @@
 							class="cursor-pointer hover:bg-muted/30"
 							role="link"
 							tabindex="0"
-							onclick={() => goto(`/recruitment/${jp.id}`)}
+							onclick={(e) => {
+								if ((e.target as HTMLElement).closest('input, label')) return
+								goto(`/recruitment/${jp.id}`)
+							}}
 							onkeydown={(e) => {
+								if ((e.target as HTMLElement).closest('input, label')) return
 								if (e.key === 'Enter' || e.key === ' ') {
 									e.preventDefault()
 									goto(`/recruitment/${jp.id}`)
