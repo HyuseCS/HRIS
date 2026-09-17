@@ -1,4 +1,4 @@
-import { chromium } from '/home/hyuse/Desktop/VeentApps/hris/node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core/index.mjs'
+import { chromium } from '@playwright/test'
 
 export const BASE = 'http://localhost:4173'
 

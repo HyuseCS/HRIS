@@ -1,6 +1,7 @@
 import { session, go } from './lib.mjs'
 import fs from 'fs'
-const DIR = '/home/hyuse/Desktop/VeentApps/hris/process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/surfaces-fields-open-period_screens'
+import { fileURLToPath } from 'url'
+const DIR = fileURLToPath(new URL('..', import.meta.url))
 fs.mkdirSync(DIR, { recursive: true })
 const pages = [
 	['settings-roles', '/settings/roles'],
@@ -50,5 +51,5 @@ for (const [w, h] of [[1440, 900], [390, 844]]) {
 	if (w === 1440) for (const [n, p] of looks) await shoot(page, n, p, 'light', w)
 	await browser.close()
 }
-fs.writeFileSync('shots-metrics.json', JSON.stringify(metrics, null, 1))
+fs.writeFileSync(`${DIR}/shots-metrics.json`, JSON.stringify(metrics, null, 1))
 for (const m of metrics) console.log(m.file, JSON.stringify({ over: m.doc.scrollW > m.doc.vw ? m.doc : 0, dlg: m.dlg, clipped: m.clipped, emptyPag: m.emptyPag }))

@@ -1,8 +1,12 @@
 import { session, go } from './lib.mjs'
 
-const MARKER = 'PROBE open-period 15-09-26'
-const START = '2031-02-02'
-const END = '2031-02-08'
+const RUN = Date.now()
+const MARKER = `PROBE open-period 15-09-26 ${RUN}`
+const WEEKS_AHEAD = Math.floor(RUN / 1000) % 1000
+const START_DATE = new Date(Date.UTC(2031, 0, 6) + WEEKS_AHEAD * 7 * 86400000)
+const END_DATE = new Date(START_DATE.getTime() + 6 * 86400000)
+const START = START_DATE.toISOString().slice(0, 10)
+const END = END_DATE.toISOString().slice(0, 10)
 const log = (...a) => console.log(new Date().toISOString(), ...a)
 
 const { browser, page } = await session()
