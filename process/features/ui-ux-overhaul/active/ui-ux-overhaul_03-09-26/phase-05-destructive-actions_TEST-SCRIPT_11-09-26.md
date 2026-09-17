@@ -40,7 +40,9 @@ calls to hand to Claude). Pick one per stage; do not mix within a stage.
   ```
   docker exec -i veent-db-5434 psql -U veent -d veent_hris -p 5434 -c "SELECT 1"
   ```
-- Branch: `feat/uiux-phase-5`, head `1bf99af`. Phase 5 range is `b3334f0..1bf99af`.
+- Branch: `feat/uiux-phase-5`, head `1bf99af`. Phase 5 range is `b3334f0..1bf99af`. **Historical
+  snapshot**: `1bf99af` is from 03-09-26 and is now 345 commits behind — read this doc as a record
+  of that pass, not current state.
 - `pnpm check` kills the dev server. Do not run the CI gates while a pass is in progress.
 
 ### One-click dev login (no password)
@@ -795,9 +797,11 @@ The **Reset** trigger renders only when `d.manuallyEdited` is true, so you must 
 **Playwright MCP**
 
 1. login-as `hr@veent.ph`, `browser_navigate` `/attendance`
-2. `browser_fill_form` the row's `regularHours` input = `7.25`; `browser_click` "Save button"
+2. `browser_fill_form` the row's **In**/**Out** fields = `09:00`/`17:00` (Reg is read-only and
+   derived, matching the manual step); `browser_click` "Save button"
 3. `browser_click` "Reset button" → `browser_wait_for` `Discard this manual edit?`
-4. `browser_click` "Cancel button"; Bash psql — `7.25` / `manuallyEdited` = `t`
+4. `browser_click` "Cancel button"; Bash psql — `timeIn`/`timeOut` `09:00`/`17:00`, `regularHours`
+   `7.25` / `manuallyEdited` = `t`
 5. `browser_click` "Reset button" → `browser_click` the alertdialog's `Discard and re-derive` button
 6. `browser_wait_for` text `Day reset to the derived values.`
 7. Bash psql — `manuallyEdited` = `f`
@@ -1077,7 +1081,9 @@ CI=1 pnpm test:e2e
 - **The filter is ignored.** `pnpm test:e2e -- tests/e2e/separations.spec.ts` runs the whole suite
   anyway. Do not read a "scoped" run as scoped.
 - Expect the **pre-existing attendance e2e failure**. It predates phase 5 and is not a phase-5
-  defect. Anything else red: **read the error text**, do not re-run blindly.
+  defect. It later passed — see `phase-05-destructive-actions_REPORT_03-09-26.md:453-458` for the
+  separate `timesheet-punch.spec.ts:104` failure. Anything else red: **read the error text**, do
+  not re-run blindly.
 - `tests/e2e/separations.spec.ts` is the spec that covers sites 13/14; it already drives the kit
   dialog through `page.getByRole('alertdialog').getByRole('button', { name })`. If it is red, that
   is a phase-5 signal.

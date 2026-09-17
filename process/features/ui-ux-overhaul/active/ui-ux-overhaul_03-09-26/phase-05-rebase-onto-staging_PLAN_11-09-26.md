@@ -17,7 +17,7 @@ fails `tests/unit/destructive-confirms.test.ts` site 15. The other trap is 8fd0e
 Nothing is pushed by this plan.
 
 **Date**: 11-09-26
-**Status**: PLANNED — PVL complete, see `## Validate Contract`. No refs changed.
+**Status**: EXECUTED (`9165b9d`, `47252f9`, `d82cc54`; `origin/staging` is an ancestor).
 **Complexity**: SIMPLE (single mechanical operation, 10 commits, 3 conflicted files)
 **Feature**: ui-ux-overhaul
 **Phase**: 05 — branch update only, no product behavior change
@@ -267,7 +267,7 @@ remote ref in the worst case. Never reach for `git reset --hard` as a first move
 ## Post-Rebase Shape Checks
 
 ```bash
-git log --oneline origin/staging..HEAD          # MUST be exactly 10 lines
+git log --oneline origin/staging..HEAD          # MUST be exactly 11 lines
 git diff origin/staging...HEAD --stat            # see allow-list below
 ```
 
@@ -337,10 +337,10 @@ which re-hits the known attendance failure and invites mis-attribution.
 
 ## Acceptance Criteria
 
-1. `git log --oneline origin/staging..HEAD` prints exactly 10 lines, and the subjects match the
+1. `git log --oneline origin/staging..HEAD` prints exactly 11 lines, and the subjects match the
    phase 05 replay order above.
 2. `75d88c1`, `c487adc`, `eab4c57` do not appear in `origin/staging..HEAD`.
-3. `git diff origin/staging...HEAD --stat` lists only the 14 allow-listed paths.
+3. `git diff origin/staging...HEAD --stat` lists only the 15 allow-listed paths.
 4. `grep -rn "^<<<<<<<" src/ tests/` returns nothing.
 5. `pnpm format:check`, `pnpm lint`, `pnpm check`, `pnpm test` all green.
 6. `CI=1 pnpm test:e2e` green except the one known pre-existing attendance failure, named by spec
@@ -391,7 +391,7 @@ user-visible contract is confirm-dialog **copy**, which `destructive-confirms.te
 
 ## Blast Radius
 
-14 files in the resulting diff (10 svelte, 2 test, 2 docs). One local branch ref. Risk class:
+15 files in the resulting diff (11 svelte, 2 test, 2 docs). One local branch ref. Risk class:
 **history rewrite on a pushed branch** — mitigated by never pushing and by `1bf99af` remaining on
 `origin/feat/uiux-phase-5`. No production surface; the project has no live deployment.
 
@@ -399,7 +399,7 @@ user-visible contract is confirm-dialog **copy**, which `destructive-confirms.te
 
 | Gate / Scenario | Strategy | Proves SPEC criterion |
 |---|---|---|
-| `git log --oneline origin/staging..HEAD` is 10 lines | Fully-Automated | The 3 trap commits did not replay and none of the 10 was lost |
+| `git log --oneline origin/staging..HEAD` is 11 lines | Fully-Automated | The 3 trap commits did not replay and none of the 11 was lost |
 | `git diff origin/staging...HEAD --stat` matches the allow-list | Fully-Automated | No foreign content entered via a resolution |
 | `grep -rn "^<<<<<<<" src/ tests/` empty | Fully-Automated | No marker shipped |
 | `pnpm format:check` / `pnpm lint` / `pnpm check` | Fully-Automated | Resolutions are syntactically and type-wise sound; no orphan/duplicate imports (T3) |
@@ -504,8 +504,8 @@ test-gates:
   - pnpm test
   - CI=1 pnpm test:e2e
 shape-gates:
-  - "git log --oneline origin/staging..HEAD | wc -l == 10"
-  - "git diff origin/staging...HEAD --stat matches the 14-path allow-list"
+  - "git log --oneline origin/staging..HEAD | wc -l == 11"
+  - "git diff origin/staging...HEAD --stat matches the 15-path allow-list"
   - "grep -rn \"^<<<<<<<\" src/ tests/ is empty"
 hard-stops:
   - never git push (any form)

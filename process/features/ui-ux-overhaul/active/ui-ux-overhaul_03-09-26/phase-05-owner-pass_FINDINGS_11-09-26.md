@@ -291,7 +291,7 @@ before. `pagibigCap` went 200.00 → 99999.00 as intended. This is no longer a p
 payload; it is the live state of the table.
 
 **Live-data note.** The seeded `org_seed` statutory config was backed up before this stage to
-`scratchpad/statutory-backup-org_seed.json`. **Restore it** — the tax table is currently holding the
+`phase-05-owner-pass_statutory-backup-org_seed.json`. **Restore it** — the tax table is currently holding the
 drifted figures and the ₱99,999 test cap.
 
 ---

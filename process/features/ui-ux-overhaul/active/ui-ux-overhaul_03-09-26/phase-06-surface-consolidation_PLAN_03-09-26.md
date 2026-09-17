@@ -139,6 +139,8 @@ settings.
    - `{n} timesheet{s}` → `/requests/timesheets`
    - `{n} pay change{s}` → `/requests/proposals`
    - `{n} payroll run{s}` → `/payroll`
+   Note: `/requests/proposals` lists `listActionableProposals` rows only. `statutoryRateProposal`
+   rows have no route named for them yet.
    Render the whole card **only when `metrics.pendingApprovals > 0`**, matching the existing
    dashboard convention at `:518-519` ("`0 pending` is noise on a card whose job is to say what
    needs doing"). Reuse the `.card` class and the phase-3 `Badge` for the counts.

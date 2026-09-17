@@ -271,7 +271,7 @@ work** and are listed below rather than done, exactly as the orchestrator scoped
 | 10 | Statutory dirty guard | HR_ADMIN | stays on page, edits intact | navigates away, edits discarded |
 | 11 | Release review | reviewer w/ `canRelease` | not released | released + success |
 | 12 | Deactivate login | Super Admin | user still ACTIVE | INACTIVE + success |
-| 12b | **Activate** login | Super Admin | — | ACTIVE — **assert no dialog appears** |
+| 12b | **Activate** login | Super Admin | — | ACTIVE — **assert `"Re-activate this login?"` confirm dialog** (`89de0fa`, owner decision 11-09-26; supersedes "no dialog appears") |
 | 13 | Separation finalize | HR_ADMIN | not finalized | FINALIZED + banner |
 | 14 | Separation undo | Super Admin | still finalized | undone + banner; re-open clause shown only when ticked |
 | 15 | Attendance reset | HR_ADMIN | manual edit intact | re-derived; other cells kept |

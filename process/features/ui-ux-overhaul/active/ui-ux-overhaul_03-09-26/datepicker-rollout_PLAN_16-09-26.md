@@ -13,7 +13,7 @@ feature: ui-ux-overhaul
 Complexity: **COMPLEX**.
 
 **Date**: 16-09-26
-**Status**: PLANNED — not executed
+**Status**: PLANNED — NEW-FAIL-C fixed (`DatePicker.svelte:699-701` onblur, `2f5fb25`)
 **Complexity**: COMPLEX
 **Feature**: ui-ux-overhaul
 **Branch**: `feat/uiux-phase-5`
@@ -1770,7 +1770,7 @@ Plan claims re-verified as CORRECT in source (do not re-litigate):
 - No coverage at any tier: Safari/Firefox popup rendering; screen-reader announcement of disabled cells and options; the orphaned popup on TimesheetModal cell nav; the nine uncovered sites.
 
 Gate: BLOCKED (1 unresolved FAIL — NEW-FAIL-C, the Tab → glyph → Tab keyboard path commits nothing. Both cycle-2 FAILs are closed; attacks 1, 2, 3 and 5 all pass; both pointer edits verified. The fix is a three-line `onblur` on `toggleBtn`, written out in full above, plus naming it as the fifth commit point in Step 1.2 and checklist item 7. NEW-WARN-H, NEW-WARN-D, NEW-WARN-E and WARN-9 all ride as documented residuals and need no amendment.)
-Accepted by: not accepted — BLOCKED on NEW-FAIL-C alone. Return to PLAN for Step 1.2 and checklist item 7 only. Do not re-open Steps 1.1, 1.3, 1.4, 1.6, 1.7, 1.8, any batch, or anything already cleared in cycles 2 and 3.
+Accepted by: not accepted — BLOCKED on NEW-FAIL-C alone. NEW-FAIL-C is now fixed (`DatePicker.svelte:699-701` onblur, `2f5fb25`). Return to PLAN for Step 1.2 and checklist item 7 only. Do not re-open Steps 1.1, 1.3, 1.4, 1.6, 1.7, 1.8, any batch, or anything already cleared in cycles 2 and 3.
 
 ### Recommended execution order
 
@@ -1803,7 +1803,7 @@ PHASE 3 (after B6, B7, B8, B9 commit)
 
 1. **Selected plan file path:**
    `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/datepicker-rollout_PLAN_16-09-26.md`
-2. **Last completed phase or step:** none — plan authored, nothing executed. Repo is clean at
+2. **Last completed phase or step:** NEW-FAIL-C fixed (`DatePicker.svelte:699-701` onblur, `2f5fb25`); Steps 1.1-1.8 not yet executed. Repo is clean at
    `4062844` on `feat/uiux-phase-5`.
 3. **Validate-contract status:** written, verdict BLOCKED at V1 (3 FAILs, 11 WARNs), then amended by
    this PLAN pass. All 3 FAILs are closed (FAIL-1 → Step 1.7; FAIL-2 → B8 reclassified hand-click-only

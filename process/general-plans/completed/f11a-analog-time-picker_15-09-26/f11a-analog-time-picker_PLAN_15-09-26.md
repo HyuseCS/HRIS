@@ -682,7 +682,7 @@ unambiguously attributable.
 
 ## 13. Backlog stubs and UPDATE-PROCESS items
 
-Create these backlog stubs as short notes under `process/general-plans/active/` during
+Create these backlog stubs as short notes under `process/general-plans/backlog/` during
 UPDATE-PROCESS — not now:
 
 1. **Screen-reader verification for TimePicker** — no SR harness exists; §7 announcements are
@@ -821,7 +821,7 @@ If `TimePicker.svelte` passes ~320 lines, something speculative crept in — re-
 
 ## Resume and Execution Handoff
 
-1. **Selected plan file:** `process/general-plans/active/f11a-analog-time-picker_15-09-26/f11a-analog-time-picker_PLAN_15-09-26.md`
+1. **Selected plan file:** `process/general-plans/completed/f11a-analog-time-picker_15-09-26/f11a-analog-time-picker_PLAN_15-09-26.md`
 2. **Last completed step:** all 16 checklist steps and §14 steps 1-8 complete; `bits-ui` removed
    (`3a828eb`)
 3. **Validate-contract status:** CONDITIONAL pass 2 findings F11/F12 closed inline during EXECUTE
@@ -1009,5 +1009,5 @@ What this coverage does NOT prove:
 - gate set: any runtime behaviour.
 - agent probes: repeatability; nothing automated guards clipping, Escape, Enter-submit or reset regressions after this run.
 
-Gate: CONDITIONAL (0 FAILs; F11, F12 as EXECUTE instructions E1-E5)
-Accepted by: pending — the orchestrator or owner must accept F11 (E1) and F12 (E2) as inline EXECUTE conditions. This is a first-pass CONDITIONAL for this contract unless the orchestrator counts pass 1 → Revision 1 as the recorded fix cycle. No Autonomous Goal Block written: this pass was limited to the Validate Contract section.
+Gate: CONDITIONAL (0 FAILs; F11, F12 as EXECUTE instructions E1-E5) — closed by execution: F11 and F12 shipped in `cfa5b62`.
+Accepted by: EXECUTED — F11 (E1) and F12 (E2) accepted and closed in `cfa5b62`. No Autonomous Goal Block written: this pass was limited to the Validate Contract section.
