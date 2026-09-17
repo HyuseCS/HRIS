@@ -323,7 +323,9 @@
 			pos++
 		}
 		el.setSelectionRange(pos, pos)
-		write(normalizeDate(masked))
+		const normalized = normalizeDate(masked)
+		if (open && masked.length === 10 && normalized !== null) open = false
+		write(normalized)
 	}
 
 	function write(v: string | null) {
