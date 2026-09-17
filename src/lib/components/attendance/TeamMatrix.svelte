@@ -86,7 +86,7 @@
 					bind:value={startValue}
 					max={endValue || undefined}
 					onchange={() => rangeForm?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<div class="flex items-center gap-2">
@@ -97,7 +97,7 @@
 					bind:value={endValue}
 					min={startValue || undefined}
 					onchange={() => rangeForm?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 		</form>

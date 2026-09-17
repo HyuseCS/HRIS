@@ -304,7 +304,7 @@
 								name="date"
 								value={data.date}
 								onchange={() => dayForm?.requestSubmit()}
-								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
 							/>
 						</div>
 					</form>
@@ -337,7 +337,7 @@
 								name="from"
 								bind:value={fromValue}
 								onchange={() => rangeForm?.requestSubmit()}
-								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
 							/>
 						</div>
 						<div class="flex flex-col gap-1">
@@ -347,7 +347,7 @@
 								name="to"
 								bind:value={toValue}
 								onchange={() => rangeForm?.requestSubmit()}
-								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
 							/>
 						</div>
 						<div class="flex w-full flex-wrap items-center gap-1.5">
