@@ -24,7 +24,7 @@
 
 <!-- Title-row rule: the title, its description and at most ONE control — the Back link counts
      as that control. A page with no Back link may put its single page-level action (or one
-     filter-like control) on the title row through PanelPage's `actions` slot. Everything else
+     filter-like control) on the title row, laid out by the page beside its PageHeader. Everything else
      goes on the panel's toolbar or on the heading row of the section it acts on (right-aligned,
      level with that heading), so each action sits beside the thing it changes.
      This component itself takes no actions prop.
