@@ -31,7 +31,7 @@
 	} = $props()
 </script>
 
-<div class="flex flex-col gap-6 lg:h-[calc(100dvh-4rem)]">
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
 	{#if actions}
 		<div class="flex flex-wrap items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
