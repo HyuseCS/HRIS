@@ -2,6 +2,7 @@
 	import type { ComponentProps } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import HelpTip from '$lib/components/ui/HelpTip.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 
@@ -65,18 +66,20 @@
 </script>
 
 <div class="overflow-hidden rounded-lg border bg-card">
-	<div class="border-b px-4 pt-4">
-		<h2 class="text-base font-semibold">
-			{matrix.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
-		</h2>
-		<p class="text-sm text-muted-foreground">
-			Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across
-			a date range.
-		</p>
+	<div class="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+		<div class="relative flex items-center gap-2">
+			<h2 class="text-base font-semibold">
+				{matrix.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
+			</h2>
+			<HelpTip label="About team attendance">
+				Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day
+				across a date range.
+			</HelpTip>
+		</div>
 		<!-- Date range filter -->
-		<form bind:this={rangeForm} method="GET" class="flex flex-wrap items-end gap-3 py-4">
-			<div>
-				<label for="start" class="block text-sm font-medium mb-1">Start Date</label>
+		<form bind:this={rangeForm} method="GET" class="flex flex-wrap items-center gap-3">
+			<div class="flex items-center gap-2">
+				<label for="start" class="text-sm font-medium">Start</label>
 				<DatePicker
 					id="start"
 					name="start"
@@ -86,8 +89,8 @@
 					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
-			<div>
-				<label for="end" class="block text-sm font-medium mb-1">End Date</label>
+			<div class="flex items-center gap-2">
+				<label for="end" class="text-sm font-medium">End</label>
 				<DatePicker
 					id="end"
 					name="end"
