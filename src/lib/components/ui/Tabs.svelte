@@ -16,13 +16,15 @@
 		active = $bindable(),
 		label,
 		param,
-		panel
+		panel,
+		bare = false
 	}: {
 		tabs: Tab[]
 		active: string
 		label: string
 		param?: string
 		panel: Snippet<[string]>
+		bare?: boolean
 	} = $props()
 
 	const base = `tabs-${param ?? tabs.map((t) => t.key).join('-')}`
@@ -63,12 +65,18 @@
 	}
 </script>
 
-<div class="overflow-hidden border bg-card {tabs.length > 1 ? 'rounded-b-lg' : 'rounded-lg'}">
+<div
+	class={bare
+		? 'flex min-h-0 flex-1 flex-col'
+		: `overflow-hidden border bg-card ${tabs.length > 1 ? 'rounded-b-lg' : 'rounded-lg'}`}
+>
 	{#if tabs.length > 1}
 		<div
 			role="tablist"
 			aria-label={label}
-			class="flex gap-1 overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+			class="flex gap-1 overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden{bare
+				? ' shrink-0'
+				: ''}"
 		>
 			{#each tabs as t, i (t.key)}
 				<button
@@ -97,11 +105,20 @@
 				</button>
 			{/each}
 		</div>
-		<div role="tabpanel" id="{base}-panel" aria-labelledby="{base}-tab-{active}">
+		<div
+			role="tabpanel"
+			id="{base}-panel"
+			aria-labelledby="{base}-tab-{active}"
+			class={bare ? 'flex min-h-0 flex-1 flex-col overflow-y-auto' : undefined}
+		>
 			{@render panel(active)}
 		</div>
 	{:else if tabs.length === 1}
-		<h2 class="flex items-center gap-2 border-b px-4 py-3 text-sm font-semibold">
+		<h2
+			class="flex items-center gap-2 border-b px-4 py-3 text-sm font-semibold{bare
+				? ' shrink-0'
+				: ''}"
+		>
 			{tabs[0].label}
 			{#if tabs[0].count}
 				<span aria-hidden="true" class="{pill} {pillTone(tabs[0], false)}">{tabs[0].count}</span>
