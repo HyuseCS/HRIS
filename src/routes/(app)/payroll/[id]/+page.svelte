@@ -110,8 +110,8 @@
 		overrideName = name
 	}
 
-	// An empty input reads as `null`; treat it as "unchanged" so a blank field behaves exactly as
-	// it did before this dialog existed rather than claiming a delta it cannot know.
+	// An empty input reads as `null`; `required` stops it from submitting, so show it as
+	// "unchanged" rather than claiming a delta it cannot know.
 	const overrideEntered = $derived(overrideValue ?? overrideBaseline)
 	const overrideDelta = $derived(overrideEntered - overrideBaseline)
 	const overrideSignedDelta = $derived(
@@ -336,13 +336,14 @@
 											>Override Net Pay</label
 										>
 										<!-- min="0" matches the server's existing z.coerce.number().finite().min(0) so the
-										     browser refuses a negative before the round-trip. The schema is not touched. -->
+										     browser refuses a negative before the round-trip. -->
 										<input
 											id={'netPay-' + entry.id}
 											name="netPay"
 											type="number"
 											step="any"
 											min="0"
+											required
 											aria-describedby={'netPay-delta-' + entry.id}
 											bind:value={overrideValue}
 											class="mt-1 flex h-8 w-36 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

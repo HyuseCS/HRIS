@@ -141,6 +141,23 @@ describe('money-adjacent actions report their outcome', () => {
 		expect(svc.overridePayrollEntry).toHaveBeenCalledOnce()
 	})
 
+	it.each(['', '   '])(
+		'payroll/[id] ?/override refuses a blank net pay (%j) instead of writing ₱0',
+		async (netPay) => {
+			const res = await run(payrollRun.actions.override, { entryId: 'e1', netPay, note: 'why' })
+			expect(res?.status).toBe(422)
+			expect(svc.overridePayrollEntry).not.toHaveBeenCalled()
+		}
+	)
+
+	it('payroll/[id] ?/override still accepts an explicit 0', async () => {
+		expectFeedback(
+			await run(payrollRun.actions.override, { entryId: 'e1', netPay: '0', note: 'why' }),
+			'override'
+		)
+		expect(svc.overridePayrollEntry).toHaveBeenCalledOnce()
+	})
+
 	it('payroll/[id] ?/decide distinguishes a sign-off from a return', async () => {
 		const approved = await run(payrollRun.actions.decide, { action: 'approve' })
 		const returned = await run(payrollRun.actions.decide, { action: 'return', note: 'redo' })
