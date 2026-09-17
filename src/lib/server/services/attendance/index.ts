@@ -8,7 +8,7 @@ import { requireAnyCapability } from '$lib/server/rbac'
 import { isFoodServiceOrg } from '$lib/orgs'
 import type { AuditContext } from '../types'
 import { Prisma } from '@prisma/client'
-import type { HolidayType } from '@prisma/client'
+import type { AttendanceStatus, HolidayType } from '@prisma/client'
 
 /**
  * Attendance service (Slice 2): derive AttendanceDay records from TimeLog punches against each
@@ -85,9 +85,20 @@ function groupPunchesByDay(
 	return byDay
 }
 
-export function countAttendanceDays(employeeId: string, from: Date, to: Date) {
+const EXCEPTION_STATUSES: AttendanceStatus[] = ['ABSENT', 'INCOMPLETE', 'LATE']
+
+export function countAttendanceDays(
+	employeeId: string,
+	from: Date,
+	to: Date,
+	exceptionsOnly = false
+) {
 	return db.attendanceDay.count({
-		where: { employeeId, date: { gte: from, lte: to } }
+		where: {
+			employeeId,
+			date: { gte: from, lte: to },
+			...(exceptionsOnly && { status: { in: EXCEPTION_STATUSES } })
+		}
 	})
 }
 
@@ -96,10 +107,14 @@ export function listAttendanceDays(
 	from: Date,
 	to: Date,
 	order: 'asc' | 'desc' = 'asc',
-	pageArgs?: { skip: number; take: number }
+	pageArgs?: { skip: number; take: number; exceptionsOnly?: boolean }
 ) {
 	return db.attendanceDay.findMany({
-		where: { employeeId, date: { gte: from, lte: to } },
+		where: {
+			employeeId,
+			date: { gte: from, lte: to },
+			...(pageArgs?.exceptionsOnly && { status: { in: EXCEPTION_STATUSES } })
+		},
 		orderBy: { date: order },
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
@@ -119,7 +134,7 @@ function teamDayWhere(
 						{ attendanceDays: { none: { date } } },
 						{
 							attendanceDays: {
-								some: { date, status: { in: ['ABSENT', 'INCOMPLETE', 'LATE'] } }
+								some: { date, status: { in: EXCEPTION_STATUSES } }
 							}
 						}
 					]

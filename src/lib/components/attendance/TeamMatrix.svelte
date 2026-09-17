@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ComponentProps } from 'svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import HelpTip from '$lib/components/ui/HelpTip.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
@@ -63,48 +64,53 @@
 	// The dash cell = no AttendanceDay record for that day (no punch / not yet derived).
 	const NO_DATA = { code: '–', label: 'No data', class: 'bg-muted text-muted-foreground' }
 	const legend = [...Object.values(STATUS), NO_DATA]
+	const fill = $derived(matrix.members.length >= matrix.pagination.pageSize)
 </script>
 
-<div class="overflow-hidden rounded-lg border bg-card">
-	<div class="flex flex-wrap items-center justify-between gap-3 border-b p-4">
-		<div class="relative flex items-center gap-2">
-			<h2 class="text-base font-semibold">
-				{matrix.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
-			</h2>
-			<HelpTip label="About team attendance">
-				Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day
-				across a date range.
-			</HelpTip>
-		</div>
-		<!-- Date range filter -->
-		<form bind:this={rangeForm} method="GET" class="flex flex-wrap items-center gap-3">
-			<div class="flex items-center gap-2">
-				<label for="start" class="text-sm font-medium">Start</label>
-				<DatePicker
-					id="start"
-					name="start"
-					bind:value={startValue}
-					max={endValue || undefined}
-					onchange={() => rangeForm?.requestSubmit()}
-					class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				/>
-			</div>
-			<div class="flex items-center gap-2">
-				<label for="end" class="text-sm font-medium">End</label>
-				<DatePicker
-					id="end"
-					name="end"
-					bind:value={endValue}
-					min={startValue || undefined}
-					onchange={() => rangeForm?.requestSubmit()}
-					class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				/>
-			</div>
-		</form>
+{#snippet toolbar()}
+	<div class="relative flex items-center gap-2">
+		<h2 class="text-base font-semibold">
+			{matrix.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
+		</h2>
+		<HelpTip label="About team attendance">
+			Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across
+			a date range.
+		</HelpTip>
 	</div>
+	<!-- Date range filter -->
+	<form bind:this={rangeForm} method="GET" class="flex flex-wrap items-center gap-3">
+		<div class="flex items-center gap-2">
+			<label for="start" class="text-sm font-medium">Start</label>
+			<DatePicker
+				id="start"
+				name="start"
+				bind:value={startValue}
+				max={endValue || undefined}
+				onchange={() => rangeForm?.requestSubmit()}
+				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
+		</div>
+		<div class="flex items-center gap-2">
+			<label for="end" class="text-sm font-medium">End</label>
+			<DatePicker
+				id="end"
+				name="end"
+				bind:value={endValue}
+				min={startValue || undefined}
+				onchange={() => rangeForm?.requestSubmit()}
+				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
+		</div>
+	</form>
+{/snippet}
 
+{#snippet emptyState()}
+	<EmptyState title="No team members found" />
+{/snippet}
+
+<Container tone="card" flush {toolbar} empty={matrix.members.length === 0} {emptyState}>
 	<!-- Legend -->
-	<div class="flex flex-wrap gap-4 border-b px-4 py-3 text-xs text-muted-foreground">
+	<div class="flex flex-wrap gap-4 border-b px-4 py-2 text-xs text-muted-foreground">
 		{#each legend as item (item.code)}
 			<span class="flex items-center gap-1.5">
 				<span
@@ -117,23 +123,19 @@
 	</div>
 
 	<!-- Attendance table -->
-	{#if matrix.members.length === 0}
-		<div class="bg-muted/50">
-			<EmptyState title="No team members found" />
-		</div>
-	{:else}
-		<div class="overflow-x-auto">
-			<table class="w-full text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
+	{#if matrix.members.length > 0}
+		<div class="min-h-0 flex-1 overflow-auto">
+			<table class="w-full text-sm {fill ? 'lg:h-full' : ''}">
+				<thead class="sticky top-0 z-20 border-b bg-card">
+					<tr class="bg-muted/50 {fill ? 'lg:h-[37px]' : ''}">
 						<th
-							class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/50 z-10"
+							class="px-4 py-2 text-left font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/50 z-10"
 						>
 							Employee
 						</th>
 						{#each matrix.dates as date (date)}
 							<th
-								class="px-2 py-3 text-center font-medium text-muted-foreground whitespace-nowrap min-w-[64px]"
+								class="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap min-w-[64px]"
 							>
 								{formatShortDate(date)}
 							</th>
@@ -142,8 +144,10 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each matrix.members as member (member.id)}
-						<tr class="hover:bg-muted/30">
-							<td class="px-4 py-3 font-medium whitespace-nowrap sticky left-0 bg-background z-10">
+						<tr class="h-10 hover:bg-muted/30 {fill ? 'lg:h-auto' : ''}">
+							<td
+								class="px-4 py-1.5 font-medium whitespace-nowrap sticky left-0 bg-background z-10"
+							>
 								<!-- ?from so the shared employee page's Back returns here, not the role-based
 								     /employees fallback, even on reload/direct entry (#113). -->
 								<a
@@ -155,7 +159,7 @@
 							</td>
 							{#each matrix.dates as date (date)}
 								{@const badge = STATUS[matrix.attendanceMap[member.id]?.[date]] ?? NO_DATA}
-								<td class="px-2 py-3 text-center">
+								<td class="px-2 py-1.5 text-center">
 									<span
 										class="inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-xs font-bold {badge.class}"
 										title={badge.label}
@@ -170,8 +174,9 @@
 				</tbody>
 			</table>
 		</div>
-		<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
-			<Pagination meta={matrix.pagination} />
-		</div>
 	{/if}
-</div>
+
+	{#snippet footer()}
+		<Pagination meta={matrix.pagination} />
+	{/snippet}
+</Container>

@@ -178,8 +178,6 @@
 	// "Exceptions only" — surface the rows that need HR action (failed to time in,
 	// incomplete logs, tardiness) so the morning fail-check doesn't mean scrolling the
 	// whole sheet. A missing team record counts as an exception (no punch = didn't time in).
-	let exceptionsOnly = $state(false)
-	const isException = (s: string) => s === 'ABSENT' || s === 'INCOMPLETE' || s === 'LATE'
 	const teamRows = $derived(data.team)
 	function setTeamExceptions(on: boolean) {
 		const url = new URL($page.url)
@@ -188,9 +186,7 @@
 		url.searchParams.delete('page')
 		goto(url)
 	}
-	const dayRows = $derived(
-		exceptionsOnly ? data.days.filter((d) => isException(d.status)) : data.days
-	)
+	const dayRows = $derived(data.days)
 	const dirtyDays = $derived(dayRows.map(rowOf).filter((d) => !d.isLocked && isDirty(d)))
 	const dirtyRowsField = $derived(
 		JSON.stringify(
@@ -250,7 +246,11 @@
 	</svg>
 {/snippet}
 
-<div class="space-y-6">
+<div
+	class={data.view === 'matrix'
+		? 'flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0'
+		: 'space-y-6'}
+>
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div class="min-w-0 flex-1">
 			<PageHeader
@@ -310,6 +310,7 @@
 					</form>
 				{:else if data.view === 'employee'}
 					<form bind:this={rangeForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
+						{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
 						{#if data.canManage}
 							<input type="hidden" name="view" value="employee" />
 							<div class="flex flex-col gap-1">
@@ -466,20 +467,12 @@
 				{#if data.canManage}
 					<!-- Exceptions filter for the daily fail-check / incomplete-log review -->
 					<label class="inline-flex cursor-pointer items-center gap-2 text-sm">
-						{#if data.view === 'team'}
-							<input
-								type="checkbox"
-								checked={data.exceptionsOnly}
-								onchange={(e) => setTeamExceptions(e.currentTarget.checked)}
-								class="h-4 w-4 rounded border-input"
-							/>
-						{:else}
-							<input
-								type="checkbox"
-								bind:checked={exceptionsOnly}
-								class="h-4 w-4 rounded border-input"
-							/>
-						{/if}
+						<input
+							type="checkbox"
+							checked={data.exceptionsOnly}
+							onchange={(e) => setTeamExceptions(e.currentTarget.checked)}
+							class="h-4 w-4 rounded border-input"
+						/>
 						<span class="font-medium">Exceptions only</span>
 						<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
 					</label>
@@ -995,11 +988,11 @@
 						<tr
 							><td colspan={(data.canManage ? 9 : 8) + (data.showAmPm ? 4 : 0)} class="p-0"
 								><EmptyState
-									variant={exceptionsOnly ? 'no-results' : 'empty'}
-									title={exceptionsOnly
+									variant={data.exceptionsOnly ? 'no-results' : 'empty'}
+									title={data.exceptionsOnly
 										? 'No exceptions in this range'
 										: 'No attendance for this range'}
-									description={exceptionsOnly
+									description={data.exceptionsOnly
 										? 'Everyone in this range is accounted for. Clear the exceptions filter to see every day.'
 										: data.canManage
 											? 'No punches yet, or use Refresh.'

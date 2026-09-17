@@ -199,10 +199,11 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 
 	// #64: paginate the employee-view day rows (one count + one page query); the
 	// team view is paginated the same way.
-	const exceptionsOnly = view === 'team' && url.searchParams.get('exceptions') === '1'
+	const exceptionsOnly =
+		(view === 'team' || view === 'employee') && url.searchParams.get('exceptions') === '1'
 	const dayTotal =
 		view === 'employee' && selectedEmployeeId
-			? await countAttendanceDays(selectedEmployeeId, new Date(from), new Date(to))
+			? await countAttendanceDays(selectedEmployeeId, new Date(from), new Date(to), exceptionsOnly)
 			: 0
 	const pagination = paginate(
 		url,
@@ -213,7 +214,8 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		view === 'employee' && selectedEmployeeId
 			? await listAttendanceDays(selectedEmployeeId, new Date(from), new Date(to), 'desc', {
 					skip: pagination.skip,
-					take: pagination.take
+					take: pagination.take,
+					exceptionsOnly
 				})
 			: []
 
