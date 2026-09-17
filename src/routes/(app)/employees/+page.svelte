@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import PanelPage from '$lib/components/ui/PanelPage.svelte'
 	import { page } from '$app/stores'
 	import { goto } from '$app/navigation'
 	import { formatShortDate } from '$lib/utils/format'
@@ -34,13 +34,20 @@
 	<title>Employees — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="Employees" />
+<PanelPage title="Employees" tone="card" flush>
+	{#snippet actions()}
+		<a
+			href="/employees/new"
+			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+		>
+			Add Employee
+		</a>
+	{/snippet}
 
-	<div class="overflow-hidden rounded-lg border bg-card">
+	{#snippet toolbar()}
 		<!-- Search -->
 		<!-- One GET form: a sibling form would submit on its own and drop the search term. -->
-		<form method="GET" class="flex flex-wrap gap-2 border-b p-4">
+		<form method="GET" class="flex flex-wrap gap-2">
 			<SearchInput
 				name="search"
 				value={search}
@@ -62,16 +69,12 @@
 			<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent"
 				>Search</button
 			>
-			<a
-				href="/employees/new"
-				class="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-			>
-				Add Employee
-			</a>
 		</form>
+	{/snippet}
 
+	<div class="flex h-full flex-col">
 		<!-- Active / Offboarded tabs (#184) -->
-		<div class="flex gap-1 border-b px-4">
+		<div class="sticky top-0 z-10 flex gap-1 border-b bg-card px-4">
 			<a
 				href={tabHref('active')}
 				class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {data.tab === 'active'
@@ -149,32 +152,27 @@
 									>{tenureLabel(emp.startDate, emp.endDate ?? undefined)}</td
 								>
 							</tr>
-						{:else}
-							<tr>
-								<td colspan={data.showBranches ? 8 : 7} class="p-0">
-									<EmptyState
-										variant={filtered ? 'no-results' : 'empty'}
-										title={data.tab === 'offboarded'
-											? 'No offboarded employees'
-											: 'No employees found'}
-										description={filtered
-											? 'No employee matches your search or branch filter.'
-											: undefined}
-									/>
-								</td>
-							</tr>
 						{/each}
 					</tbody>
 				</table>
 			</div>
+			{#if employees.length === 0}
+				<div class="flex flex-1 items-center justify-center">
+					<EmptyState
+						variant={filtered ? 'no-results' : 'empty'}
+						title={data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}
+						description={filtered ? 'No employee matches your search or branch filter.' : undefined}
+					/>
+				</div>
+			{/if}
 		{:catch}
 			<div class="p-4">
 				<LoadError what="the employee list" />
 			</div>
 		{/await}
-
-		<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
-			<Pagination meta={data.pagination} />
-		</div>
 	</div>
-</div>
+
+	{#snippet footer()}
+		<Pagination meta={data.pagination} />
+	{/snippet}
+</PanelPage>

@@ -103,13 +103,11 @@
 	notice={notices}
 	empty={data.postings.length === 0}
 >
-	{#if data.postings.length === 0}
-		<EmptyState title="No job postings yet" />
-	{:else}
-		<table class="w-full text-sm">
+	<div class="overflow-x-auto">
+		<table class="w-full min-w-[52rem] table-fixed text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
-					<th class="w-10 px-4 py-3">
+					<th class="w-12 px-4 py-3">
 						{#if draftIds.length}
 							<input
 								type="checkbox"
@@ -121,10 +119,10 @@
 						{/if}
 					</th>
 					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Position</th>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Applicants</th>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Posted</th>
+					<th class="w-48 px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
+					<th class="w-28 px-4 py-3 text-left font-medium text-muted-foreground">Applicants</th>
+					<th class="w-44 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+					<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Posted</th>
 				</tr>
 			</thead>
 			<tbody class="divide-y">
@@ -151,7 +149,7 @@
 								/>
 							{/if}
 						</td>
-						<td class="px-4 py-3 font-medium">
+						<td class="break-words px-4 py-3 font-medium">
 							{jp.title}
 							{#if jp.status === 'DRAFT' && jp.rejectionReason}
 								<span class="block text-xs font-normal text-red-400"
@@ -159,7 +157,7 @@
 								>
 							{/if}
 						</td>
-						<td class="px-4 py-3 text-muted-foreground">{jp.department.name}</td>
+						<td class="break-words px-4 py-3 text-muted-foreground">{jp.department.name}</td>
 						<td class="px-4 py-3">{jp._count.applicants}</td>
 						<td class="px-4 py-3">
 							<Badge status={jp.status} domain="jobPosting" />
@@ -171,7 +169,11 @@
 				{/each}
 			</tbody>
 		</table>
-	{/if}
+	</div>
+
+	{#snippet emptyState()}
+		<EmptyState title="No job postings yet" />
+	{/snippet}
 
 	{#snippet footer()}
 		<Pagination meta={data.pagination} />

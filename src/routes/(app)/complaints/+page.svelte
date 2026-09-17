@@ -84,30 +84,30 @@
 	empty={data.complaints.length === 0}
 >
 	<!-- Thread list -->
-	{#if data.complaints.length}
-		<table class="w-full text-sm">
+	<div class="overflow-x-auto">
+		<table class="w-full {data.isHr ? 'min-w-[52rem]' : 'min-w-[40rem]'} table-fixed text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
 					{#if data.isHr}
-						<th class="px-3 py-2 text-left font-medium text-muted-foreground">Employee</th>
+						<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Employee</th>
 					{/if}
 					<th class="px-3 py-2 text-left font-medium text-muted-foreground">Subject</th>
-					<th class="px-3 py-2 text-left font-medium text-muted-foreground">Category</th>
-					<th class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-					<th class="px-3 py-2 text-left font-medium text-muted-foreground">Updated</th>
-					<th class="px-3 py-2"></th>
+					<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Category</th>
+					<th class="w-44 px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+					<th class="w-32 px-3 py-2 text-left font-medium text-muted-foreground">Updated</th>
+					<th class="w-24 px-3 py-2"></th>
 				</tr>
 			</thead>
 			<tbody class="divide-y">
 				{#each data.complaints as c (c.id)}
 					<tr class="hover:bg-muted/30">
 						{#if data.isHr}
-							<td class="px-3 py-2 font-medium">
+							<td class="break-words px-3 py-2 font-medium">
 								{c.employee.lastName}, {c.employee.firstName}
 							</td>
 						{/if}
-						<td class="px-3 py-2">{c.subject}</td>
-						<td class="px-3 py-2 text-muted-foreground">
+						<td class="break-words px-3 py-2">{c.subject}</td>
+						<td class="break-words px-3 py-2 text-muted-foreground">
 							{CATEGORY_LABELS[c.category] ?? c.category}
 						</td>
 						<td class="px-3 py-2">
@@ -126,14 +126,16 @@
 				{/each}
 			</tbody>
 		</table>
-	{:else}
+	</div>
+
+	{#snippet emptyState()}
 		<EmptyState
 			title="No inquiries yet"
 			description={data.isHr
 				? 'Open one to ask an employee about an issue.'
 				: 'HR has not raised anything with you.'}
 		/>
-	{/if}
+	{/snippet}
 
 	{#snippet footer()}
 		{#if data.complaints.length && data.isHr && data.pagination}
