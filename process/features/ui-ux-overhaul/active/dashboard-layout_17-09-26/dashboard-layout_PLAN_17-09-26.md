@@ -18,7 +18,8 @@ S4 is the owner's live probe checklist. **No server load, query or data shape ch
 - **Status**: PLANNED
 - **Complexity**: SIMPLE (4 sections, 4 commits, 2 files)
 - **Feature**: ui-ux-overhaul
-- **Upstream**: `dashboard-layout_RESEARCH_17-09-26.md`, `dashboard-layout_INNOVATE_17-09-26.md` (option **O2**)
+- **Upstream**: `dashboard-layout_RESEARCH_17-09-26.md`, `dashboard-layout_INNOVATE_17-09-26.md` (option **O2**),
+  `dashboard-layout_INNOVATE-SUPPLEMENT_18-09-26.md`, `screens/README.md`
 - **Branch**: `feat/uiux-phase-6`
 
 ## Context Envelope
@@ -52,7 +53,10 @@ existing `<script>`), one new `tests/e2e/dashboard-layout.spec.ts`.
 **Out of scope (binding):** `+page.server.ts`, every service under `src/lib/server/services/`,
 `src/lib/rbac.ts`, `src/app.css`, `Container.svelte` (recipe copied inline, component not adopted),
 the O1 right-rail and O3 tabbed action-queue ideas (backlog if the owner wants more later), the
-ungated `Onboard Employee` quick action (a gating question, not a layout one).
+ungated `Onboard Employee` quick action (a gating question, not a layout one), and a "view all" /
+count link on either alert card — `/employees` has no `employmentType` filter (only `search`,
+`department`, `branch`, `status=offboarded`) and `+page.server.ts` is out of scope, so the link would
+be new server scope. Backlog note at UPDATE-PROCESS.
 
 ## Hard contracts (must still hold after every section)
 
@@ -136,6 +140,11 @@ the card's border/background tone and break the amber/blue coding).
 
 The postings card's `Banner` (`:659-661`) and both cards' heading/description blocks stay as
 fixed-height flex children above the scroll body. `max-h-80` = 20rem, `min-h-[7rem]` = 7rem.
+
+At real volume the rows are visually near-identical (the dev DB's 255 residue rows all read "QA
+Engineer · Human Resources", "Overdue by 15 days", same date), so an "8+ rows" check proves the card
+is **bounded**, not that the capped list is a legible decision tool. Legibility at volume is the
+backlog "view all" question (Scope), not an S1 acceptance criterion.
 
 **Acceptance check** (dev server already running, owner's):
 ```
@@ -229,8 +238,12 @@ shared code), so a S2 revert does not reopen the owner's original complaint.
 
 **File:** new `tests/e2e/dashboard-layout.spec.ts`. Imports `{ login, USERS }` from `./helpers`.
 
-**(a) Height + scroll bounds.** Fixtures, both built through the real UI (the seed has **no**
-`PROBATIONARY` employee and no pending posting, so neither card renders under a bare seed):
+**(a) Height + scroll bounds.** Fixtures, both built through the real UI (a **fresh seed** has **no**
+`PROBATIONARY` employee and no pending posting, so neither card renders under a bare seed).
+**Correction (18-09-26 supplement):** that is true of a fresh seed and **false of this dev DB**, which
+carries e2e residue — 255 `PROBATIONARY` `Testcase …` employees and 27 `PENDING_APPROVAL`
+`E2E-F4-self-…` postings, so both cards already render. The test logic is unchanged: it asserts
+computed style, not row count, and the fixtures still guarantee at least one row on a clean DB.
 
 - Regularizations: as `USERS.admin`, `/employees/new` → create `E2E-LAYOUT-probie-${Date.now()}`
   with `employmentType` `PROBATIONARY` (the form default) and a `startDate` ~6 months ago minus a
@@ -286,7 +299,7 @@ Log in via the real login form or `POST /api/v1/_dev/login-as`.
 | # | Role | Width | Theme | Check |
 |---|---|---|---|---|
 | 1 | HR_ADMIN | 1440 | light | Four zone headings in order; no row ends with a lone stretched card |
-| 2 | HR_ADMIN | 1440 | dark | Amber and blue card borders/fills still readable against `bg-card` |
+| 2 | HR_ADMIN | 1440 | both | Post-S2 the amber regularizations card and the blue postings card sit **adjacent in the same NEEDS A DECISION row** for the first time — check both cards together, in that row, in **each** theme: borders/fills still readable against `bg-card` and the two colour codes still distinguishable side by side |
 | 3 | HR_ADMIN | 1440 | both | Regularizations with **1** row: card is ~112px, does not look broken next to its siblings |
 | 4 | HR_ADMIN | 1440 | both | Regularizations with **8+** rows: card stops at 320px, list scrolls, heading stays put |
 | 5 | HR_ADMIN | 1440 | both | Postings with **8+** rows, one "Send back" note expanded: card still 320px, the note grows inside the scroll body |
@@ -296,6 +309,7 @@ Log in via the real login form or `POST /api/v1/_dev/login-as`.
 | 9 | EMPLOYEE | 1440 | both | No `NEEDS A DECISION` zone; glance tiles are a clean 2-up; doors are a clean 2-up |
 | 10 | EMPLOYEE | 390 | both | Single column, no orphan, no horizontal scroll |
 | 11 | PAYROLL_OFFICER | 1440 | both | Sees `Last Payroll` and `Awaiting you`, but no regularizations card and no `New Timesheet` door; zone counts still fill their rows |
+| 12 | HR_ADMIN | 1440 | both | Walk the Regularizations card against the **existing 255-row residue** in this dev DB (no fixture needed — the worst case is already on screen): card stays 320px, the scrollbar is present, the heading stays fixed |
 
 Record findings in `dashboard-layout_REPORT_17-09-26.md` in this task folder.
 
@@ -348,6 +362,11 @@ Record findings in `dashboard-layout_REPORT_17-09-26.md` in this task folder.
 - Nothing in this repo can mount a Svelte component (`vitest.config.ts` is `environment: 'node'`),
   so every layout claim costs a Playwright run. Already tracked in
   `backlog/component-test-dom-environment_NOTE_03-09-26.md`.
+- The notification toast stack overlaps the Upcoming Events card top-right for PAYROLL_OFFICER
+  (`screens/payroll_officer_light_1440_top.png`, five stacked `e2e byline … · New` toasts). It is a
+  separate notification component, not a Touchpoint of this plan, so it is out of scope here.
+  **Backlog stub to write at UPDATE-PROCESS:**
+  `process/features/ui-ux-overhaul/backlog/toast-stack-overlaps-upcoming-events_NOTE_18-09-26.md`.
 - No shared helper asserts "element is bounded / scrollable". S3 hand-rolls it; if a third surface
   ever needs it, extract it to `tests/e2e/helpers.ts` then — not now (ponytail).
 
@@ -405,6 +424,17 @@ Record findings in `dashboard-layout_REPORT_17-09-26.md` in this task folder.
 5. **Next step for a fresh agent:** confirm D1–D3 with the owner, then run checklist step 1
    (the e2e baseline) before touching `+page.svelte`. Sections are independently committable and
    strictly ordered S1 → S2 → S3 → S4.
+
+## Inner Loop Refresh Note
+
+**18-09-26** — amended **A1–A6** from `dashboard-layout_INNOVATE-SUPPLEMENT_18-09-26.md`, the
+screenshot-fed INNOVATE refresh (24 role × theme × width captures in `screens/`). All six are
+doc-only: A1 corrects the S3 fixture premise (this dev DB already holds 255 probationary employees
+and 27 pending postings), A2 adds S4 probe row 12 against that residue, A3 rewords S4 row 2 for the
+newly adjacent amber/blue cards, A4 states what an "8+ rows" check does and does not prove, A5 rules
+a "view all" link out of scope, A6 adds the F7 toast-overlap backlog stub. **No code, no
+checkpoint, no class string, no zone rule and no checklist step changed; D1–D3 stay locked.**
+VALIDATE has not yet run — the Validate Contract below is still a placeholder.
 
 ## Validate Contract
 
