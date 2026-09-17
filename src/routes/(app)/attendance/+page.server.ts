@@ -20,6 +20,7 @@ import {
 	MAX_IMPORT_BYTES,
 	MAX_IMPORT_ROWS
 } from '$lib/server/services/attendance/import'
+import { listReportIdsFor } from '$lib/server/services/supervisors'
 import { paginate } from '$lib/server/pagination'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { manilaDayKey, manilaShortDay } from '$lib/utils/dates'
@@ -38,6 +39,101 @@ function clampRange(fromKey: string, toKey: string) {
 	return { from: fromKey, to: toKey }
 }
 
+async function loadMatrix(
+	user: NonNullable<App.Locals['user']>,
+	url: URL,
+	ctx: Parameters<typeof autoDeriveFromPunches>[2]
+) {
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
+	const isAdmin = canAny(user.roles, 'ADMINISTER_HR_RECORDS')
+
+	// Date range from URL params, default to current week (Mon-Sun)
+	const today = new Date()
+	const weekDay = today.getDay()
+	const weekStart = new Date(today)
+	weekStart.setDate(today.getDate() - (weekDay === 0 ? 6 : weekDay - 1))
+	weekStart.setHours(0, 0, 0, 0)
+	const weekEnd = new Date(weekStart)
+	weekEnd.setDate(weekStart.getDate() + 6)
+	weekEnd.setHours(23, 59, 59, 999)
+
+	const startParam = url.searchParams.get('start')
+	const endParam = url.searchParams.get('end')
+	const startDate = startParam ? new Date(startParam) : weekStart
+	const endDate = endParam ? new Date(endParam) : weekEnd
+	const startISO = startDate.toISOString().slice(0, 10)
+	const endISO = endDate.toISOString().slice(0, 10)
+
+	// Get team members. A manager's team is everyone who reports to them as primary OR
+	// additional supervisor (#176); HR/Super Admin see the whole org.
+	let memberScope: { id?: { in: string[] } } = {}
+	// #6: `{}` here means "no filter", which returns the whole org. A non-admin with no employee
+	// row in the ACTIVE org has no reports, so the answer is the empty list — never the
+	// unfiltered one. Same `[]`-not-`undefined` discipline as leave/+page.server.ts:38.
+	if (!isAdmin) {
+		memberScope = { id: { in: myEmployee ? await listReportIdsFor(myEmployee.id) : [] } }
+	}
+	const memberWhere = {
+		organizationId: user.organizationId,
+		user: { isActive: true },
+		...memberScope
+	}
+	const total = await db.employee.count({ where: memberWhere })
+	const pagination = paginate(url, total)
+	const members = await db.employee.findMany({
+		where: memberWhere,
+		select: { id: true, firstName: true, lastName: true },
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+		skip: pagination.skip,
+		take: pagination.take
+	})
+
+	// Auto-derive from punches over the range so ABSENT/INCOMPLETE days materialise (non-destructive;
+	// fills only missing days). This is what makes the "who failed to time in" check work — otherwise
+	// a no-punch day is invisible until someone opens that employee's attendance.
+	await autoDeriveFromPunches(user.organizationId, { from: startDate, to: endDate }, ctx)
+
+	// Presence comes from the derived AttendanceDay records (same source as the single-employee
+	// attendance view), so ABSENT / INCOMPLETE / ON_LEAVE / HOLIDAY / REST_DAY each render distinctly
+	// instead of collapsing to a blank "no data" cell.
+	const days = await db.attendanceDay.findMany({
+		where: {
+			employeeId: { in: members.map((m) => m.id) },
+			date: { gte: new Date(startISO), lte: new Date(endISO) }
+		},
+		select: { employeeId: true, date: true, status: true }
+	})
+
+	// attendanceMap: { [employeeId]: { [dateISO]: AttendanceStatus } }
+	const attendanceMap: Record<string, Record<string, string>> = {}
+	for (const d of days) {
+		const dateISO = d.date.toISOString().slice(0, 10)
+		;(attendanceMap[d.employeeId] ??= {})[dateISO] = d.status
+	}
+
+	// Build date columns array
+	const dates: string[] = []
+	const cur = new Date(startDate)
+	while (cur <= endDate) {
+		dates.push(cur.toISOString().slice(0, 10))
+		cur.setDate(cur.getDate() + 1)
+	}
+
+	return {
+		members,
+		pagination,
+		dates,
+		attendanceMap,
+		startDate: startISO,
+		endDate: endISO,
+		// Food-service tenants label this roster "Branches" (#182), so the heading follows suit.
+		isFoodService: isFoodServiceOrg(user.organizationId)
+	}
+}
+
 export const load: PageServerLoad = async ({ locals, url, getClientAddress }) => {
 	const user = locals.user!
 	const canManage = canAny(user.roles, 'MANAGE_HR')
@@ -51,19 +147,24 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	const date = url.searchParams.get('date') || today
 
 	// Managers can switch between a single employee's range and the whole team on one day.
-	const view = canManage && url.searchParams.get('view') === 'team' ? 'team' : 'employee'
+	const viewParam = url.searchParams.get('view')
+	const view: 'matrix' | 'team' | 'employee' = !canManage
+		? 'employee'
+		: viewParam === 'team' || viewParam === 'employee'
+			? viewParam
+			: 'matrix'
 
 	let employees: { id: string; firstName: string; lastName: string; employeeNumber: string }[] = []
 	let selectedEmployeeId: string | null = null
 
-	if (canManage) {
+	if (canManage && view !== 'matrix') {
 		employees = await db.employee.findMany({
 			where: { organizationId: user.organizationId, employmentStatus: 'ACTIVE' },
 			select: { id: true, firstName: true, lastName: true, employeeNumber: true },
 			orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
 		})
-		selectedEmployeeId = url.searchParams.get('employeeId') ?? employees[0]?.id ?? null
-	} else {
+		selectedEmployeeId = url.searchParams.get('employeeId') || employees[0]?.id || null
+	} else if (!canManage) {
 		const me = await db.employee.findFirst({
 			where: { userId: user.id, organizationId: user.organizationId },
 			select: { id: true }
@@ -93,6 +194,8 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 			ctx
 		)
 	}
+
+	const matrix = view === 'matrix' ? await loadMatrix(user, url, ctx) : null
 
 	// #64: paginate the employee-view day rows (one count + one page query); the
 	// team view is paginated the same way.
@@ -134,6 +237,7 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		date,
 		days,
 		team,
+		matrix,
 		exceptionsOnly,
 		pagination,
 		maxRangeDays: MAX_RANGE_DAYS,
