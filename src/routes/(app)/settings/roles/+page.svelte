@@ -5,7 +5,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
-	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import PanelPage from '$lib/components/ui/PanelPage.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import { ROLE_DESCRIPTIONS, ROLE_GROUPS, ROLE_LABELS, canAny } from '$lib/rbac'
 	import Check from 'lucide-svelte/icons/check'
@@ -142,34 +142,51 @@
 	<title>Roles &amp; Permissions — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader
-		title="Roles & Permissions"
-		description="Manage each user's access level and account status. You cannot change your own role or deactivate yourself, and the last active super admin and CEO are protected. Assigning a role replaces the user's full role set."
-	>
-		{#snippet back()}
-			<BackButton fallback="/settings" label="Settings" preferFallback />
-		{/snippet}
-	</PageHeader>
-
-	<div class="overflow-hidden rounded-lg border bg-card">
-		<form method="GET" class="flex flex-wrap items-end gap-2 border-b p-4">
-			<div>
-				<label for="roles-q" class="text-xs font-medium text-muted-foreground"
-					>Filter by email or name</label
-				>
-				<input
-					id="roles-q"
-					name="q"
-					value={data.q}
-					class="mt-1 flex h-9 w-72 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				/>
-			</div>
-			<button type="submit" class="h-9 rounded-md border px-3 text-sm hover:bg-accent"
-				>Filter</button
+{#snippet filter()}
+	<form method="GET" class="flex flex-wrap items-end gap-2">
+		<div>
+			<label for="roles-q" class="text-xs font-medium text-muted-foreground"
+				>Filter by email or name</label
 			>
-		</form>
+			<input
+				id="roles-q"
+				name="q"
+				value={data.q}
+				class="mt-1 flex h-9 w-72 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			/>
+		</div>
+		<button type="submit" class="h-9 rounded-md border px-3 text-sm hover:bg-accent">Filter</button>
+	</form>
+{/snippet}
 
+<PanelPage
+	title="Roles & Permissions"
+	description="Manage each user's access level and account status. You cannot change your own role or deactivate yourself, and the last active super admin and CEO are protected. Assigning a role replaces the user's full role set."
+	tone="card"
+	flush
+	toolbar={filter}
+	empty={data.users.length === 0}
+>
+	{#snippet back()}
+		<BackButton fallback="/settings" label="Settings" preferFallback />
+	{/snippet}
+
+	{#if data.users.length === 0}
+		{#if data.q}
+			<EmptyState variant="no-results" title="No users match ‘{data.q}’.">
+				{#snippet action()}
+					<a
+						href="/settings/roles"
+						class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+					>
+						Clear filter
+					</a>
+				{/snippet}
+			</EmptyState>
+		{:else}
+			<EmptyState title="No users found" />
+		{/if}
+	{:else}
 		<div class="overflow-x-auto">
 			<table class="w-full min-w-max text-sm">
 				<thead class="border-b bg-muted/50">
@@ -269,35 +286,16 @@
 								{/if}
 							</td>
 						</tr>
-					{:else}
-						<tr>
-							<td colspan="5" class="p-0">
-								{#if data.q}
-									<EmptyState variant="no-results" title="No users match ‘{data.q}’.">
-										{#snippet action()}
-											<a
-												href="/settings/roles"
-												class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
-											>
-												Clear filter
-											</a>
-										{/snippet}
-									</EmptyState>
-								{:else}
-									<EmptyState title="No users found" />
-								{/if}
-							</td>
-						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	{/if}
 
-		<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
-			<Pagination meta={data.pagination} />
-		</div>
-	</div>
-</div>
+	{#snippet footer()}
+		<Pagination meta={data.pagination} />
+	{/snippet}
+</PanelPage>
 
 {#if editing}
 	{@const eu = editing}
