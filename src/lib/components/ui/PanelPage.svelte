@@ -13,6 +13,7 @@
 		children,
 		footer,
 		empty = false,
+		emptyState,
 		tone = 'muted',
 		flush = false
 	}: {
@@ -26,6 +27,7 @@
 		children: Snippet
 		footer?: Snippet
 		empty?: boolean
+		emptyState?: Snippet
 		tone?: 'muted' | 'card'
 		flush?: boolean
 	} = $props()
@@ -64,10 +66,17 @@
 
 		<div
 			class="min-h-0 flex-1 overflow-y-auto {flush ? '' : 'p-4'} {empty
-				? 'flex items-center justify-center'
+				? emptyState
+					? 'flex flex-col'
+					: 'flex items-center justify-center'
 				: ''}"
 		>
 			{@render children()}
+			{#if empty && emptyState}
+				<div class="flex flex-1 items-center justify-center">
+					{@render emptyState()}
+				</div>
+			{/if}
 		</div>
 
 		{#if footer}
