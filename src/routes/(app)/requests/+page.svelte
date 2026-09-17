@@ -55,7 +55,7 @@
 	<RequestCreateDialog
 		bind:open={showForm}
 		leaveTypes={data.leaveTypes}
-		balances={data.balances}
+		balancesByYear={data.balancesByYear}
 		{form}
 	/>
 {/snippet}

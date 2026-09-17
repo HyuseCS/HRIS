@@ -13,6 +13,7 @@ import { uploadsFromForm, saveRequestDocuments } from '$lib/server/services/requ
 import { getLeaveBalances } from '$lib/server/services/leave'
 import { meetsLeaveTenure } from '$lib/server/services/requests/leave'
 import { requestSchema } from '$lib/server/schemas/requests'
+import { manilaDayKey } from '$lib/utils/dates'
 import type { Actions, PageServerLoad } from './$types'
 
 /**
@@ -54,18 +55,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		})
 	])
 
-	const balances = myEmployee
-		? (await getLeaveBalances(myEmployee.id, new Date().getFullYear())).map((b) => ({
-				...b,
-				allocated: Number(b.allocated),
-				used: Number(b.used),
-				remaining: Number(b.remaining)
-			}))
-		: []
+	const year = Number(manilaDayKey(new Date()).slice(0, 4))
+	const balancesFor = async (y: number) =>
+		myEmployee
+			? (await getLeaveBalances(myEmployee.id, y)).map((b) => ({
+					...b,
+					allocated: Number(b.allocated),
+					used: Number(b.used),
+					remaining: Number(b.remaining)
+				}))
+			: []
+	const [thisYear, nextYear] = await Promise.all([balancesFor(year), balancesFor(year + 1)])
 
 	return {
 		requests,
-		balances,
+		balancesByYear: { [year]: thisYear, [year + 1]: nextYear },
 		// Tenure-gated types are greyed out in the file form; createRequest is the real
 		// enforcement point (#137). Without an employee record nothing is filable anyway.
 		leaveTypes: leaveTypes.map((lt) => ({

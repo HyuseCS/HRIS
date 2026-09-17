@@ -16,7 +16,7 @@
 	import BalanceSummary from '$lib/components/leave/BalanceSummary.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import FileInput from '$lib/components/ui/FileInput.svelte'
-	import { formatDateISO, tenureRequirement } from '$lib/utils/dates'
+	import { formatDateISO, manilaDayKey, tenureRequirement } from '$lib/utils/dates'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 
 	type LeaveTypeOption = {
@@ -40,12 +40,12 @@
 	let {
 		open = $bindable(),
 		leaveTypes,
-		balances,
+		balancesByYear,
 		form
 	}: {
 		open: boolean
 		leaveTypes: LeaveTypeOption[]
-		balances: LeaveBalance[]
+		balancesByYear: Record<number, LeaveBalance[]>
 		form: CreateResult
 	} = $props()
 
@@ -70,6 +70,9 @@
 	// Date guards: start can't be before today; end can't be before start.
 	const today = formatDateISO(new Date())
 	let startDate = $state(submitted?.startDate ?? '')
+	const balances = $derived(
+		balancesByYear[Number((startDate || manilaDayKey(new Date())).slice(0, 4))] ?? []
+	)
 	let endPicker: ReturnType<typeof DatePicker> | undefined = $state()
 
 	const isDayHours = (t: string) =>
