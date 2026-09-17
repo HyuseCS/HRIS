@@ -628,7 +628,8 @@
 		untrack(() => {
 			const firstOpt = yearList?.querySelector<HTMLElement>('[role="option"]')
 			if (firstOpt) yearRowHeight = firstOpt.getBoundingClientRect().height
-			const maxHeight = (yearRowHeight || 28) * YEAR_ROWS_VISIBLE
+			const rowH = yearRowHeight || 28
+			const maxHeight = rowH * YEAR_ROWS_VISIBLE + LIST_PADDING
 			const r = yearTrigger.getBoundingClientRect()
 			const { top, left } = flipPosition(yearTrigger, r.width, maxHeight)
 			yearPos = { top, left, width: r.width, maxHeight }
@@ -636,7 +637,7 @@
 			// mid-decade. max-height is set imperatively because `yearPos` only lands next render.
 			if (yearList) yearList.style.maxHeight = `${maxHeight}px`
 			const groupIndex = DECADES.findIndex((d) => d[0] === decadeStartOf(view.y))
-			if (yearList && groupIndex >= 0) yearList.scrollTop = groupIndex * maxHeight
+			if (yearList && groupIndex >= 0) yearList.scrollTop = groupIndex * YEAR_ROWS_VISIBLE * rowH
 			focusYear(nearestEnabled(enabledYears, view.y) ?? view.y)
 		})
 	})
