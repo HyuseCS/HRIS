@@ -14,10 +14,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const actorSearch = (url.searchParams.get('actor') ?? '').trim().slice(0, 100)
 	const entityType = url.searchParams.get('entity') ?? undefined
 	const action = url.searchParams.get('action') ?? undefined
-	const startDate = url.searchParams.get('start')
-		? new Date(url.searchParams.get('start')!)
-		: undefined
-	const endDate = url.searchParams.get('end') ? new Date(url.searchParams.get('end')!) : undefined
+	const dayParam = (key: string) => {
+		const v = url.searchParams.get(key) ?? ''
+		const d = new Date(v)
+		return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(d.getTime()) && d.toISOString().startsWith(v)
+			? v
+			: ''
+	}
+	const start = dayParam('start')
+	const end = dayParam('end')
+	const startDate = start ? new Date(start) : undefined
+	const endDate = end ? new Date(end) : undefined
 
 	const where = {
 		organizationId: user.organizationId,
@@ -92,6 +99,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// reveal from being shown a button that will 403.
 		canReveal: isSuperAdmin,
 		pagination,
+		filters: { actor: actorSearch, entity: entityType ?? '', action: action ?? '', start, end },
 		// Hand-maintained — extend it whenever a new entityType starts being audited, or that
 		// entity's rows cannot be filtered for at all. `PayrollPeriod` was missing until #298.
 		entityTypes: [

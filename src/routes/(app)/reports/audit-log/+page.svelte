@@ -58,6 +58,7 @@
 				name="actor"
 				type="search"
 				maxlength="100"
+				value={data.filters.actor}
 				placeholder="Search actor name or email…"
 				class="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
@@ -73,7 +74,7 @@
 			>
 				<option value="">All Types</option>
 				{#each data.entityTypes as et (et)}
-					<option value={et}>{et}</option>
+					<option value={et} selected={data.filters.entity === et}>{et}</option>
 				{/each}
 			</select>
 		</div>
@@ -88,7 +89,7 @@
 			>
 				<option value="">All Actions</option>
 				{#each ACTIONS as a (a)}
-					<option value={a}>{a}</option>
+					<option value={a} selected={data.filters.action === a}>{a}</option>
 				{/each}
 			</select>
 		</div>
@@ -99,7 +100,7 @@
 			<DatePicker
 				id="start"
 				name="start"
-				value=""
+				value={data.filters.start}
 				onchange={(v) => {
 					if (v) endPicker?.focusAndOpen()
 				}}
@@ -112,7 +113,7 @@
 				bind:this={endPicker}
 				id="end"
 				name="end"
-				value=""
+				value={data.filters.end}
 				class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			/>
 		</div>
