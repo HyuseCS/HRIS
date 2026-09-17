@@ -12,9 +12,14 @@
 	const saveConfig = createSubmitGuard()
 	// Re-seed the was→now baseline once the save lands, so a second save with no further edits
 	// correctly reports "nothing changed" instead of replaying the first edit.
-	const saveRates = createSubmitGuard(() => async ({ update, result }) => {
-		await update({ reset: false })
-		if (result.type === 'success') baselineRates = { ...rateValues }
+	const saveRates = createSubmitGuard((input) => {
+		const submitted = Object.fromEntries(
+			rateFields.map((f) => [f.name, Number(input.formData.get(f.name))])
+		) as Record<RateName, number>
+		return async ({ update, result }) => {
+			await update({ reset: false })
+			if (result.type === 'success') baselineRates = submitted
+		}
 	})
 
 	// Editable form fields seeded once from the loaded config — an intentional
