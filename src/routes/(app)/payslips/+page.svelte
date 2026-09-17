@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
 	import PanelPage from '$lib/components/ui/PanelPage.svelte'
 	import Table from '$lib/components/ui/Table.svelte'
@@ -26,12 +27,20 @@
 	<title>My Payslips — Veent HRIS</title>
 </svelte:head>
 
+{#snippet emptyState()}
+	<EmptyState
+		title="No payslips yet"
+		description="Approved payroll runs appear here. Once a run covering you is released, its payslip becomes available to view and download."
+	/>
+{/snippet}
+
 <PanelPage
 	title="My Payslips"
 	description="View and download your approved payslips."
 	tone="card"
 	flush
 	empty={data.payslips.length === 0}
+	{emptyState}
 >
 	<Table
 		bare
@@ -39,8 +48,6 @@
 		rows={data.payslips}
 		getKey={(p: Payslip) => p.id}
 		caption="Approved payslips"
-		emptyTitle="No payslips yet"
-		emptyDescription="Approved payroll runs appear here. Once a run covering you is released, its payslip becomes available to view and download."
 	>
 		{#snippet cell(payslip: Payslip, column: Column)}
 			{#if column.key === 'period'}

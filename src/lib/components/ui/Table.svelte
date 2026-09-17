@@ -46,8 +46,8 @@
 	const mobileColumns = $derived(columns.filter((c) => !c.hideOnMobile))
 </script>
 
-{#if rows.length === 0}
-	<div class={bare ? undefined : 'rounded-lg border bg-card'}>
+{#if rows.length === 0 && !bare}
+	<div class="rounded-lg border bg-card">
 		<EmptyState
 			variant={emptyVariant}
 			title={emptyTitle}
@@ -107,7 +107,13 @@
 
 	<!-- Mobile: one card per row, label beside value. Sideways scrolling a six-column table on a
 	     390px screen is technically readable and practically useless. -->
-	<ul class={bare ? 'space-y-2 p-3 sm:hidden' : 'space-y-2 sm:hidden'}>
+	<ul
+		class={bare
+			? rows.length === 0
+				? 'hidden'
+				: 'space-y-2 p-3 sm:hidden'
+			: 'space-y-2 sm:hidden'}
+	>
 		{#each rows as row, i (getKey(row, i))}
 			<!-- Deliberately not clickable, unlike the desktop row: a card-shaped button whose
 			     label is its whole contents is poor for screen readers, and every table that uses

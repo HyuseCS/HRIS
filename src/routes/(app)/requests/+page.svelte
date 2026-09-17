@@ -59,6 +59,10 @@
 	/>
 {/snippet}
 
+{#snippet emptyState()}
+	<EmptyState title="No requests yet" />
+{/snippet}
+
 {#snippet notice()}
 	<Banner
 		kind="warning"
@@ -72,94 +76,91 @@
 	tone="card"
 	flush
 	empty={data.requests.length === 0}
+	{emptyState}
 	actions={data.hasEmployee ? actions : undefined}
 	notice={data.hasEmployee ? undefined : notice}
 >
-	{#if data.requests.length === 0}
-		<EmptyState title="No requests yet" />
-	{:else}
-		<div class="overflow-x-auto">
-			<table class="w-full text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Dates</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Stage</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-						<th class="px-4 py-3 text-right font-medium text-muted-foreground">Filed</th>
-						<th class="px-4 py-3"></th>
-					</tr>
-				</thead>
-				<tbody class="divide-y">
-					{#each data.requests as req (req.id)}
-						<tr
-							class="cursor-pointer hover:bg-muted/30"
-							role="link"
-							tabindex="0"
-							onclick={(e) => {
-								// Let the row's action buttons (Resubmit/Cancel) fire without also navigating.
-								if ((e.target as HTMLElement).closest('button, a, form')) return
+	<div class="overflow-x-auto">
+		<table class="w-full min-w-[64rem] table-fixed text-sm">
+			<thead class="border-b bg-muted/50">
+				<tr>
+					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
+					<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Dates</th>
+					<th class="w-24 px-4 py-3 text-left font-medium text-muted-foreground">Stage</th>
+					<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+					<th class="w-32 px-4 py-3 text-right font-medium text-muted-foreground">Filed</th>
+					<th class="w-60 px-4 py-3"></th>
+				</tr>
+			</thead>
+			<tbody class="divide-y">
+				{#each data.requests as req (req.id)}
+					<tr
+						class="cursor-pointer hover:bg-muted/30"
+						role="link"
+						tabindex="0"
+						onclick={(e) => {
+							// Let the row's action buttons (Resubmit/Cancel) fire without also navigating.
+							if ((e.target as HTMLElement).closest('button, a, form')) return
+							goto(`/requests/${req.id}`)
+						}}
+						onkeydown={(e) => {
+							if ((e.target as HTMLElement).closest('button, a, form')) return
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault()
 								goto(`/requests/${req.id}`)
-							}}
-							onkeydown={(e) => {
-								if ((e.target as HTMLElement).closest('button, a, form')) return
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault()
-									goto(`/requests/${req.id}`)
-								}
-							}}
+							}
+						}}
+					>
+						<td class="px-4 py-3 font-medium">{typeLabel(req.type)}</td>
+						<td class="px-4 py-3 text-muted-foreground">
+							{#if req.dateFrom}
+								{formatDateRange(req.dateFrom, req.dateTo)}
+							{:else}
+								—
+							{/if}
+						</td>
+						<td class="px-4 py-3 text-muted-foreground">
+							{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
+						</td>
+						<td class="px-4 py-3">
+							<Badge status={req.status} domain="request" />
+						</td>
+						<td class="px-4 py-3 text-right text-muted-foreground"
+							>{formatShortDate(req.createdAt)}</td
 						>
-							<td class="px-4 py-3 font-medium">{typeLabel(req.type)}</td>
-							<td class="px-4 py-3 text-muted-foreground">
-								{#if req.dateFrom}
-									{formatDateRange(req.dateFrom, req.dateTo)}
-								{:else}
-									—
+						<td class="px-4 py-3 text-right">
+							<div class="flex items-center justify-end gap-2">
+								{#if req.status === 'RETURNED'}
+									{@const resubmit = resubmitGuard(req.id)}
+									<form method="POST" action="?/resubmit" use:enhance={resubmit.enhance}>
+										<input type="hidden" name="id" value={req.id} />
+										<button
+											type="submit"
+											disabled={resubmit.busy}
+											class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
+											>{resubmit.busy ? 'Resubmitting…' : 'Resubmit'}</button
+										>
+									</form>
 								{/if}
-							</td>
-							<td class="px-4 py-3 text-muted-foreground">
-								{req.status === 'PENDING' ? `${req.currentStage + 1} of ${req.steps.length}` : '—'}
-							</td>
-							<td class="px-4 py-3">
-								<Badge status={req.status} domain="request" />
-							</td>
-							<td class="px-4 py-3 text-right text-muted-foreground"
-								>{formatShortDate(req.createdAt)}</td
-							>
-							<td class="px-4 py-3 text-right">
-								<div class="flex items-center justify-end gap-2">
-									{#if req.status === 'RETURNED'}
-										{@const resubmit = resubmitGuard(req.id)}
-										<form method="POST" action="?/resubmit" use:enhance={resubmit.enhance}>
-											<input type="hidden" name="id" value={req.id} />
-											<button
-												type="submit"
-												disabled={resubmit.busy}
-												class="rounded-md border border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
-												>{resubmit.busy ? 'Resubmitting…' : 'Resubmit'}</button
-											>
-										</form>
-									{/if}
-									{#if req.status === 'PENDING' || req.status === 'RETURNED'}
-										{@const cancel = cancelGuard(req.id)}
-										<form method="POST" action="?/cancel" use:enhance={cancel.enhance}>
-											<input type="hidden" name="id" value={req.id} />
-											<button
-												type="submit"
-												disabled={cancel.busy}
-												class="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-												>{cancel.busy ? 'Cancelling…' : 'Cancel'}</button
-											>
-										</form>
-									{/if}
-								</div>
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
+								{#if req.status === 'PENDING' || req.status === 'RETURNED'}
+									{@const cancel = cancelGuard(req.id)}
+									<form method="POST" action="?/cancel" use:enhance={cancel.enhance}>
+										<input type="hidden" name="id" value={req.id} />
+										<button
+											type="submit"
+											disabled={cancel.busy}
+											class="rounded-md border border-red-500/20 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+											>{cancel.busy ? 'Cancelling…' : 'Cancel'}</button
+										>
+									</form>
+								{/if}
+							</div>
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 
 	{#snippet footer()}
 		<Pagination meta={data.pagination} />
