@@ -276,7 +276,7 @@ taken.
   `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`. Covers the owner live pass,
   remediation A/B, the surfaces/fields/open-period pass, the datepicker rollout, the Container
   rollout and attendance/team restructure, and the CodeRabbit CLI review remediation (19 confirmed
-  findings fixed). Final gates (17-09-26, at efe96ce): format:check clean; lint 0 errors; svelte-check 0 errors; unit 227 files / 2681 tests passed; e2e 148/148 passed.. See
+  findings fixed). Final gates (17-09-26, at efe96ce): format:check clean; lint 0 errors; svelte-check 0 errors; unit 227 files / 2681 tests passed; e2e 148/148 passed. See
   `completed/ui-ux-overhaul_03-09-26/phase-05-close_REPORT_17-09-26.md`.
 
 ### Phase 1 — `p0-fixes`
