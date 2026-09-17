@@ -20,7 +20,8 @@
 		emptyDescription,
 		emptyVariant = 'empty',
 		emptyAction,
-		caption
+		caption,
+		bare = false
 	}: {
 		columns: Column[]
 		rows: Row[]
@@ -34,6 +35,7 @@
 		emptyVariant?: 'empty' | 'no-results'
 		emptyAction?: Snippet
 		caption?: string
+		bare?: boolean
 	} = $props()
 
 	const alignClass = (c: Column) =>
@@ -45,7 +47,7 @@
 </script>
 
 {#if rows.length === 0}
-	<div class="rounded-lg border bg-card">
+	<div class={bare ? undefined : 'rounded-lg border bg-card'}>
 		<EmptyState
 			variant={emptyVariant}
 			title={emptyTitle}
@@ -56,7 +58,11 @@
 {:else}
 	<!-- Desktop: a real table. Hidden rather than reflowed below sm so the two layouts can each
 	     be laid out properly instead of compromising on one. -->
-	<div class="hidden overflow-x-auto rounded-lg border bg-card sm:block">
+	<div
+		class={bare
+			? 'hidden overflow-x-auto sm:block'
+			: 'hidden overflow-x-auto rounded-lg border bg-card sm:block'}
+	>
 		<table class="w-full text-sm">
 			{#if caption}
 				<caption class="sr-only">{caption}</caption>
@@ -101,7 +107,7 @@
 
 	<!-- Mobile: one card per row, label beside value. Sideways scrolling a six-column table on a
 	     390px screen is technically readable and practically useless. -->
-	<ul class="space-y-2 sm:hidden">
+	<ul class={bare ? 'space-y-2 p-3 sm:hidden' : 'space-y-2 sm:hidden'}>
 		{#each rows as row, i (getKey(row, i))}
 			<!-- Deliberately not clickable, unlike the desktop row: a card-shaped button whose
 			     label is its whole contents is poor for screen readers, and every table that uses

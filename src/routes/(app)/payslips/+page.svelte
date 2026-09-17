@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Pagination from '$lib/components/Pagination.svelte'
-	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import PanelPage from '$lib/components/ui/PanelPage.svelte'
 	import Table from '$lib/components/ui/Table.svelte'
 	import type { Column } from '$lib/components/ui/table'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
@@ -26,10 +26,15 @@
 	<title>My Payslips — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<PageHeader title="My Payslips" description="View and download your approved payslips." />
-
+<PanelPage
+	title="My Payslips"
+	description="View and download your approved payslips."
+	tone="card"
+	flush
+	empty={data.payslips.length === 0}
+>
 	<Table
+		bare
 		{columns}
 		rows={data.payslips}
 		getKey={(p: Payslip) => p.id}
@@ -60,5 +65,7 @@
 		{/snippet}
 	</Table>
 
-	<Pagination meta={data.pagination} />
-</div>
+	{#snippet footer()}
+		<Pagination meta={data.pagination} />
+	{/snippet}
+</PanelPage>
