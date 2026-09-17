@@ -9,7 +9,6 @@
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Badge from '$lib/components/ui/Badge.svelte'
-	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
