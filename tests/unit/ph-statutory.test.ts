@@ -21,6 +21,12 @@ describe('SSS', () => {
 		expect(n(er)).toBe(390)
 	})
 
+	it('keeps a salary inside the ₱0.01 gap in the lower bracket', () => {
+		const { ee, er } = computeSSS('4249.995')
+		expect(n(ee)).toBe(180)
+		expect(n(er)).toBe(390)
+	})
+
 	it('applies maximum bracket for salary above ceiling', () => {
 		const { ee } = computeSSS(25000)
 		expect(n(ee)).toBe(900)
@@ -76,6 +82,18 @@ describe('BIR Withholding Tax', () => {
 	it('computes tax for 2nd bracket', () => {
 		const tax = computeWithholdingTax(25000)
 		expect(n(tax)).toBeCloseTo((15 * (25000 - 20833)) / 100, 0)
+	})
+
+	it.each([
+		[20833, '0'],
+		[33332, '1874.85'],
+		['33332.50', '1874.925'],
+		[33333, '1875'],
+		['66666.40', '8541.68'],
+		['166666.5', '33541.675'],
+		['666666.5', '183541.65']
+	])('taxes %s at bracket boundaries and inside the ₱1 gaps as %s', (income, tax) => {
+		expect(computeWithholdingTax(income).toString()).toBe(tax)
 	})
 })
 

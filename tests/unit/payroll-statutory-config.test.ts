@@ -359,6 +359,18 @@ describe('editing tax ranges/rates re-derives baseTax and the tax follows (#220)
 		expect(edited.map((b) => b.baseTax)).toEqual([0, 0, 4000])
 		expect(s(computeWithholdingTax(60000, edited))).toBe('7000')
 	})
+
+	it('taxes an income inside a gap between stored ceilings by the bracket whose floor it passed', () => {
+		const table = withInfinity(
+			deriveTaxBrackets([
+				{ floor: 0, ceiling: 19999, rate: 0 },
+				{ floor: 20000, ceiling: 49999, rate: 0.2 },
+				{ floor: 50000, ceiling: null, rate: 0.3 }
+			])
+		)
+		expect(s(computeWithholdingTax('19999.5', table))).toBe('0')
+		expect(s(computeWithholdingTax('49999.5', table))).toBe('5999.9')
+	})
 })
 
 describe('rate percentage round-trip — load ×100 / save ÷100 drifts nothing (#220)', () => {

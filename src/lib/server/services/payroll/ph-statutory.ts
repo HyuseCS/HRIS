@@ -236,9 +236,7 @@ export function computeSSS(
 ): { ee: Money; er: Money } {
 	const table = brackets.length ? brackets : SSS_TABLE_2024
 	const salary = D(monthlySalary)
-	const bracket =
-		table.find((b) => salary.gte(b.salaryFloor) && salary.lte(b.salaryCeiling)) ??
-		table[table.length - 1]
+	const bracket = table.findLast((b) => salary.gte(b.salaryFloor)) ?? table[0]
 
 	// Fixed peso amounts straight off the table — exact by nature, no arithmetic involved.
 	return { ee: D(bracket.eeShare), er: D(bracket.erShare) }
@@ -301,8 +299,7 @@ export function computeWithholdingTax(
 ): Money {
 	const table = brackets.length ? brackets : BIR_MONTHLY_TAX_TABLE
 	const income = D(taxableMonthlyIncome)
-	const bracket =
-		table.find((b) => income.gte(b.floor) && income.lte(b.ceiling)) ?? table[table.length - 1]
+	const bracket = table.findLast((b) => income.gte(b.floor)) ?? table[0]
 
 	// Bracket rates (0.15/0.20/0.25/0.30/0.35) are exact as decimals; as binary floats they are not.
 	return D(bracket.baseTax).plus(income.minus(bracket.excessOver).times(D(bracket.rate)))
