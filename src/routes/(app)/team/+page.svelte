@@ -1,169 +1,107 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
-	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
-	import { formatShortDate } from '$lib/utils/format'
+	import EmployeeCard from '$lib/components/people/EmployeeCard.svelte'
+	import EmployeeTable from '$lib/components/people/EmployeeTable.svelte'
+	import type { PeopleView, Person } from '$lib/components/people/people'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
 
-	// svelte-ignore state_referenced_locally
-	let startValue = $state(data.startDate)
-	// svelte-ignore state_referenced_locally
-	let endValue = $state(data.endDate)
+	const title = $derived(data.isFoodService ? 'Branches' : 'Team')
+	const views: { value: PeopleView; label: string }[] = [
+		{ value: 'grid', label: 'Grid' },
+		{ value: 'list', label: 'List' }
+	]
 
-	let rangeForm: HTMLFormElement | undefined = $state()
-
-	// AttendanceDay.status → calendar cell (short code, colour, legend label). Order drives the
-	// legend. These stay one-or-two-letter cells rather than <Badge>: the grid sizes on the code,
-	// and a full label would not fit. Only the colours are theme-paired here — the `-400` step
-	// alone is below AA on the light card, which is the same defect the badge tokens had.
-	const STATUS: Record<string, { code: string; label: string; class: string }> = {
-		PRESENT: {
-			code: 'P',
-			label: 'Present',
-			class: 'bg-green-500/15 text-green-800 dark:text-green-400'
-		},
-		LATE: {
-			code: 'LT',
-			label: 'Late',
-			class: 'bg-amber-500/15 text-amber-800 dark:text-amber-400'
-		},
-		INCOMPLETE: {
-			code: 'IN',
-			label: 'Incomplete',
-			class: 'bg-orange-500/15 text-orange-800 dark:text-orange-400'
-		},
-		ABSENT: { code: 'A', label: 'Absent', class: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-		ON_LEAVE: {
-			code: 'LV',
-			label: 'On Leave',
-			class: 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
-		},
-		HOLIDAY: {
-			code: 'H',
-			label: 'Holiday',
-			class: 'bg-purple-500/15 text-purple-800 dark:text-purple-400'
-		},
-		REST_DAY: { code: 'R', label: 'Rest Day', class: 'bg-muted text-muted-foreground' }
+	function teamHref(view: PeopleView, search: string) {
+		const params = new URLSearchParams()
+		if (search) params.set('search', search)
+		if (view === 'list') params.set('view', view)
+		const qs = params.toString()
+		return qs ? `/team?${qs}` : '/team'
 	}
-	// The dash cell = no AttendanceDay record for that day (no punch / not yet derived).
-	const NO_DATA = { code: '–', label: 'No data', class: 'bg-muted text-muted-foreground' }
-	const legend = [...Object.values(STATUS), NO_DATA]
+
+	// ?from so the shared employee page's Back returns here, not the role-based
+	// /employees fallback, even on reload/direct entry (#113).
+	const employeeHref = (person: Person) => `/employees/${person.id}?from=/team`
 </script>
 
 <svelte:head>
-	<title>{data.isFoodService ? 'Branches' : 'Team'} — Veent HRIS</title>
+	<title>{title} — Veent HRIS</title>
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader
-		title={data.isFoodService ? 'Branch Attendance' : 'Team Attendance'}
-		description="Multi-day overview — present, late, absent, incomplete, on leave, holiday, or rest day across a date range."
-	/>
+	<PageHeader {title} />
 
 	<div class="overflow-hidden rounded-lg border bg-card">
-		<!-- Date range filter -->
-		<form bind:this={rangeForm} method="GET" class="flex flex-wrap items-end gap-3 border-b p-4">
-			<div>
-				<label for="start" class="block text-sm font-medium mb-1">Start Date</label>
-				<DatePicker
-					id="start"
-					name="start"
-					bind:value={startValue}
-					max={endValue || undefined}
-					onchange={() => rangeForm?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		<div class="flex flex-wrap items-center gap-3 border-b p-4">
+			<form method="GET" role="search" class="w-full sm:w-auto sm:min-w-0 sm:flex-1">
+				<label for="team-search" class="sr-only">Search people</label>
+				<input
+					id="team-search"
+					type="search"
+					name="search"
+					value={data.search}
+					maxlength="100"
+					placeholder="Search by name, employee number or job title…"
+					class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-sm"
 				/>
+				{#if data.view === 'list'}
+					<input type="hidden" name="view" value="list" />
+				{/if}
+			</form>
+			<div class="ml-auto flex items-center gap-3">
+				<p class="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+					{data.pagination.total}
+					{data.pagination.total === 1 ? 'person' : 'people'}
+				</p>
+				<div role="group" aria-label="View" class="inline-flex rounded-md border p-0.5">
+					{#each views as v (v.value)}
+						<a
+							href={teamHref(v.value, data.search)}
+							aria-current={data.view === v.value ? 'page' : undefined}
+							class="rounded px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {data.view ===
+							v.value
+								? 'bg-muted text-foreground'
+								: 'text-muted-foreground hover:text-foreground'}">{v.label}</a
+						>
+					{/each}
+				</div>
 			</div>
-			<div>
-				<label for="end" class="block text-sm font-medium mb-1">End Date</label>
-				<DatePicker
-					id="end"
-					name="end"
-					bind:value={endValue}
-					min={startValue || undefined}
-					onchange={() => rangeForm?.requestSubmit()}
-					class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				/>
-			</div>
-			<a
-				href="/attendance?view=team"
-				class="ml-auto whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-				>Daily roster &amp; corrections →</a
-			>
-		</form>
-
-		<!-- Legend -->
-		<div class="flex flex-wrap gap-4 border-b px-4 py-3 text-xs text-muted-foreground">
-			{#each legend as item (item.code)}
-				<span class="flex items-center gap-1.5">
-					<span
-						class="inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold {item.class}"
-						>{item.code}</span
-					>
-					{item.label}
-				</span>
-			{/each}
 		</div>
 
-		<!-- Attendance table -->
-		{#if data.members.length === 0}
-			<div class="bg-muted/50">
-				<EmptyState title="No team members found" />
-			</div>
+		{#if data.people.length === 0}
+			{#if data.search}
+				<EmptyState variant="no-results" title="No one matches “{data.search}”">
+					{#snippet action()}
+						<a
+							href={teamHref(data.view, '')}
+							class="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+							>Clear search</a
+						>
+					{/snippet}
+				</EmptyState>
+			{:else}
+				<EmptyState title={data.isAdmin ? 'No active employees' : 'No one reports to you yet'} />
+			{/if}
+		{:else if data.view === 'list'}
+			<EmployeeTable
+				people={data.people}
+				unitLabel={data.isFoodService ? 'Branch' : 'Department'}
+				hrefFor={employeeHref}
+			/>
 		{:else}
-			<div class="overflow-x-auto">
-				<table class="w-full text-sm">
-					<thead class="border-b bg-muted/50">
-						<tr>
-							<th
-								class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/50 z-10"
-							>
-								Employee
-							</th>
-							{#each data.dates as date (date)}
-								<th
-									class="px-2 py-3 text-center font-medium text-muted-foreground whitespace-nowrap min-w-[64px]"
-								>
-									{formatShortDate(date)}
-								</th>
-							{/each}
-						</tr>
-					</thead>
-					<tbody class="divide-y">
-						{#each data.members as member (member.id)}
-							<tr class="hover:bg-muted/30">
-								<td
-									class="px-4 py-3 font-medium whitespace-nowrap sticky left-0 bg-background z-10"
-								>
-									<!-- ?from so the shared employee page's Back returns here, not the role-based
-								     /employees fallback, even on reload/direct entry (#113). -->
-									<a href="/employees/{member.id}?from=/team" class="text-primary hover:underline">
-										{member.lastName}, {member.firstName}
-									</a>
-								</td>
-								{#each data.dates as date (date)}
-									{@const badge = STATUS[data.attendanceMap[member.id]?.[date]] ?? NO_DATA}
-									<td class="px-2 py-3 text-center">
-										<span
-											class="inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-xs font-bold {badge.class}"
-											title={badge.label}
-											aria-label={badge.label}
-										>
-											{badge.code}
-										</span>
-									</td>
-								{/each}
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-			<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
-				<Pagination meta={data.pagination} />
-			</div>
+			<ul class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+				{#each data.people as person (person.id)}
+					<li class="min-w-0"><EmployeeCard {person} href={employeeHref(person)} /></li>
+				{/each}
+			</ul>
 		{/if}
+
+		<div class="has-[nav]:border-t has-[nav]:px-4 has-[nav]:py-3">
+			<Pagination meta={data.pagination} />
+		</div>
 	</div>
 </div>
