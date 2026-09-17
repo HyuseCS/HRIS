@@ -7,7 +7,7 @@ feature: ui-ux-overhaul
 
 # Form fields vanish into the background in light mode
 
-**Status**: BACKLOG. The owner wants it done right after P2 of the phase 05 owner pass, with
+**Status**: SHIPPED in `9aebc46` (`src/app.css:33`). The owner wants it done right after P2 of the phase 05 owner pass, with
 `settings-roles-no-container_NOTE_15-09-26.md`.
 **Raised by**: the owner, 15-09-26, during P2 test 2 (offboard):
 

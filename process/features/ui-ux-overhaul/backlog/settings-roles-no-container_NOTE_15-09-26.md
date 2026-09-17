@@ -7,7 +7,7 @@ feature: ui-ux-overhaul
 
 # `/settings/roles` needs a container and more contrast
 
-**Status**: BACKLOG. The owner wants it done right after P2 of the phase 05 owner pass.
+**Status**: SHIPPED in `40239f4`, then `701e120` and `848ac4c`. Uses Container, not PanelPage. The owner wants it done right after P2 of the phase 05 owner pass.
 **Raised by**: the owner, 15-09-26, during P2 test 1 (deactivate login):
 
 > *"The filter and the table needs to be inside a container so that the page background and the

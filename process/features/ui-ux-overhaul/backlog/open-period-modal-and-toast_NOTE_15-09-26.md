@@ -7,7 +7,7 @@ feature: ui-ux-overhaul
 
 # Open Period becomes a modal component with a result toast
 
-**Status**: BACKLOG. Batched with `settings-roles-no-container_NOTE_15-09-26.md` and
+**Status**: SHIPPED in `b271e42` and `ba28e7c`. Batched with `settings-roles-no-container_NOTE_15-09-26.md` and
 `light-mode-fields-low-contrast_NOTE_15-09-26.md`, run through the RIPER-5 harness after P2.
 **Raised by**: the owner, 15-09-26, right after P2 test 3 (period void):
 
