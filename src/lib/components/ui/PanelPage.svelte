@@ -7,6 +7,7 @@
 		description,
 		badge,
 		back,
+		actions,
 		notice,
 		toolbar,
 		children,
@@ -19,6 +20,7 @@
 		description?: string
 		badge?: Snippet
 		back?: Snippet
+		actions?: Snippet
 		notice?: Snippet
 		toolbar?: Snippet
 		children: Snippet
@@ -30,7 +32,18 @@
 </script>
 
 <div class="flex flex-col gap-6 lg:h-[calc(100dvh-4rem)]">
-	<PageHeader {title} {description} {badge} {back} />
+	{#if actions}
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<PageHeader {title} {description} {badge} {back} />
+			</div>
+			<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
+				{@render actions()}
+			</div>
+		</div>
+	{:else}
+		<PageHeader {title} {description} {badge} {back} />
+	{/if}
 
 	{#if notice}
 		<div class="flex shrink-0 flex-col gap-3">

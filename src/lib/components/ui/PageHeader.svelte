@@ -22,10 +22,11 @@
 	} = $props()
 </script>
 
-<!-- Title-row rule: the title, its description and the Back link, nothing else. Page actions
-     move DOWN to the heading row of the first section they act on (right-aligned, level with
-     that heading), so Back is the only thing a thumb can hit on the title line and each action
-     sits beside the thing it changes. This component therefore takes no actions prop at all.
+<!-- Title-row rule: the title, its description and the Back link. A page whose only page-level
+     action is a single button may put it on the title row through PanelPage's `actions` slot.
+     Pages with several actions keep each one on the heading row of the section it acts on
+     (right-aligned, level with that heading), so each action sits beside the thing it changes.
+     This component itself takes no actions prop.
      `ml-auto` keeps the Back cluster flush right on whatever line it lands on, and below `sm`
      it takes a full-width row of its own so a long title is never squeezed against it. -->
 <div class="flex flex-wrap items-start justify-between gap-3">

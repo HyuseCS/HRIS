@@ -43,43 +43,38 @@
 	<title>My Requests — Veent HRIS</title>
 </svelte:head>
 
+{#snippet actions()}
+	<!-- The file action sits on the title row. -->
+	<button
+		onclick={() => (showForm = true)}
+		class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+	>
+		New Request
+	</button>
+	<RequestCreateDialog
+		bind:open={showForm}
+		leaveTypes={data.leaveTypes}
+		balances={data.balances}
+		{form}
+	/>
+{/snippet}
+
+{#snippet notice()}
+	<Banner
+		kind="warning"
+		message="Your account has no employee profile, so you can't file requests."
+	/>
+{/snippet}
+
 <PanelPage
 	title="My Requests"
 	description="File and track your requests."
 	tone="card"
 	flush
 	empty={data.requests.length === 0}
+	actions={data.hasEmployee ? actions : undefined}
+	notice={data.hasEmployee ? undefined : notice}
 >
-	{#snippet notice()}
-		<!-- The file action sits directly above the form it opens, not on the title row. -->
-		{#if data.hasEmployee}
-			<div class="flex justify-end">
-				<button
-					onclick={() => (showForm = true)}
-					class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-				>
-					New Request
-				</button>
-			</div>
-		{/if}
-
-		{#if !data.hasEmployee}
-			<Banner
-				kind="warning"
-				message="Your account has no employee profile, so you can't file requests."
-			/>
-		{/if}
-
-		{#if data.hasEmployee}
-			<RequestCreateDialog
-				bind:open={showForm}
-				leaveTypes={data.leaveTypes}
-				balances={data.balances}
-				{form}
-			/>
-		{/if}
-	{/snippet}
-
 	{#if data.requests.length === 0}
 		<EmptyState title="No requests yet" />
 	{:else}
