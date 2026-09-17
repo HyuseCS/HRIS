@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import PanelPage from '$lib/components/ui/PanelPage.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { tick } from 'svelte'
@@ -178,123 +179,125 @@
 	</div>
 {/snippet}
 
-<PanelPage
-	title="Timesheet Approvals"
-	description="Review and approve submitted timesheets."
-	toolbar={data.pendingTimesheets.length > 0 ? bulkToolbar : undefined}
-	empty={data.pendingTimesheets.length === 0}
->
-	{#snippet back()}
-		{#if data.pagination.total > 0}
-			<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-				{data.pagination.total} awaiting you
-			</span>
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	<PageHeader title="Timesheet Approvals" description="Review and approve submitted timesheets.">
+		{#snippet back()}
+			{#if data.pagination.total > 0}
+				<span class="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+					{data.pagination.total} awaiting you
+				</span>
+			{/if}
+		{/snippet}
+	</PageHeader>
+
+	<Container
+		toolbar={data.pendingTimesheets.length > 0 ? bulkToolbar : undefined}
+		empty={data.pendingTimesheets.length === 0}
+	>
+		{#if data.pendingTimesheets.length === 0}
+			<EmptyState title="No pending timesheets to review" />
+		{:else}
+			<ul class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
+				{#each data.pendingTimesheets as ts (ts.id)}
+					{@const picked = selected.includes(ts.id)}
+					{@const g = reviewGuard(ts.id)}
+					<li
+						class="flex flex-col rounded-lg border bg-card transition-colors {picked
+							? 'border-primary ring-1 ring-primary'
+							: 'hover:border-muted-foreground/30'}"
+					>
+						<div
+							role="button"
+							tabindex="0"
+							onclick={() => (openTs = ts)}
+							onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (openTs = ts)}
+							class="flex min-h-0 flex-1 cursor-pointer flex-col gap-3 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							<div class="flex items-start gap-3">
+								<div
+									class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground/70"
+									aria-hidden="true"
+								>
+									{initials(ts.employee.firstName, ts.employee.lastName)}
+								</div>
+								<div class="min-w-0 flex-1">
+									<h2 class="font-medium leading-tight break-words">
+										{ts.employee.lastName}, {ts.employee.firstName}
+									</h2>
+									{#if ts.submittedAt}
+										<p class="mt-0.5 text-xs text-muted-foreground">
+											Waiting {waitingFor(ts.submittedAt)}
+											{#if isStale(ts.submittedAt)}
+												<span class="ml-1 font-medium text-amber-500">· overdue</span>
+											{/if}
+										</p>
+									{/if}
+								</div>
+								<input
+									type="checkbox"
+									checked={picked}
+									onchange={() => toggle(ts.id)}
+									onclick={(e) => e.stopPropagation()}
+									aria-label="Select timesheet"
+									class="mt-1 align-middle"
+								/>
+							</div>
+
+							<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+								<span>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</span>
+								<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
+									>{Number(ts.totalHours).toFixed(1)} hrs</span
+								>
+								<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
+									>{ts.entries.length} entries</span
+								>
+							</div>
+						</div>
+
+						<div class="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-1">
+							{#if ts.currentStageKind}
+								<span class="rounded-full bg-foreground/15 px-2 py-0.5 text-xs text-foreground/70"
+									>Stage: {stageLabel(ts.currentStageKind, ts.currentStageRole)}</span
+								>
+							{/if}
+							<button type="button" class="btn-row ml-auto" onclick={() => (openTs = ts)}
+								>View detail</button
+							>
+						</div>
+
+						<form
+							method="POST"
+							action="?/review"
+							use:enhance={g.enhance}
+							class="flex shrink-0 gap-2 border-t bg-muted/20 p-3"
+						>
+							<input type="hidden" name="id" value={ts.id} />
+							<button
+								type="submit"
+								name="approved"
+								value="true"
+								disabled={g.busy}
+								class="flex-1 rounded-md bg-green-700 px-2 py-1 text-xs font-medium text-white hover:bg-green-800 disabled:pointer-events-none disabled:opacity-50"
+								>{g.busy ? 'Approving…' : 'Approve'}</button
+							>
+							<button
+								type="button"
+								disabled={singleReject.busy && singleId === ts.id}
+								onclick={() => askReason({ kind: 'single', id: ts.id })}
+								class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
+								>Reject</button
+							>
+						</form>
+					</li>
+				{/each}
+			</ul>
 		{/if}
-	{/snippet}
 
-	{#if data.pendingTimesheets.length === 0}
-		<EmptyState title="No pending timesheets to review" />
-	{:else}
-		<ul class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-			{#each data.pendingTimesheets as ts (ts.id)}
-				{@const picked = selected.includes(ts.id)}
-				{@const g = reviewGuard(ts.id)}
-				<li
-					class="flex flex-col rounded-lg border bg-card transition-colors {picked
-						? 'border-primary ring-1 ring-primary'
-						: 'hover:border-muted-foreground/30'}"
-				>
-					<div
-						role="button"
-						tabindex="0"
-						onclick={() => (openTs = ts)}
-						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (openTs = ts)}
-						class="flex min-h-0 flex-1 cursor-pointer flex-col gap-3 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						<div class="flex items-start gap-3">
-							<div
-								class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground/70"
-								aria-hidden="true"
-							>
-								{initials(ts.employee.firstName, ts.employee.lastName)}
-							</div>
-							<div class="min-w-0 flex-1">
-								<h2 class="font-medium leading-tight break-words">
-									{ts.employee.lastName}, {ts.employee.firstName}
-								</h2>
-								{#if ts.submittedAt}
-									<p class="mt-0.5 text-xs text-muted-foreground">
-										Waiting {waitingFor(ts.submittedAt)}
-										{#if isStale(ts.submittedAt)}
-											<span class="ml-1 font-medium text-amber-500">· overdue</span>
-										{/if}
-									</p>
-								{/if}
-							</div>
-							<input
-								type="checkbox"
-								checked={picked}
-								onchange={() => toggle(ts.id)}
-								onclick={(e) => e.stopPropagation()}
-								aria-label="Select timesheet"
-								class="mt-1 align-middle"
-							/>
-						</div>
-
-						<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-							<span>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</span>
-							<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
-								>{Number(ts.totalHours).toFixed(1)} hrs</span
-							>
-							<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
-								>{ts.entries.length} entries</span
-							>
-						</div>
-					</div>
-
-					<div class="mt-auto flex items-center justify-between gap-2 px-4 pb-3 pt-1">
-						{#if ts.currentStageKind}
-							<span class="rounded-full bg-foreground/15 px-2 py-0.5 text-xs text-foreground/70"
-								>Stage: {stageLabel(ts.currentStageKind, ts.currentStageRole)}</span
-							>
-						{/if}
-						<button type="button" class="btn-row ml-auto" onclick={() => (openTs = ts)}
-							>View detail</button
-						>
-					</div>
-
-					<form
-						method="POST"
-						action="?/review"
-						use:enhance={g.enhance}
-						class="flex shrink-0 gap-2 border-t bg-muted/20 p-3"
-					>
-						<input type="hidden" name="id" value={ts.id} />
-						<button
-							type="submit"
-							name="approved"
-							value="true"
-							disabled={g.busy}
-							class="flex-1 rounded-md bg-green-700 px-2 py-1 text-xs font-medium text-white hover:bg-green-800 disabled:pointer-events-none disabled:opacity-50"
-							>{g.busy ? 'Approving…' : 'Approve'}</button
-						>
-						<button
-							type="button"
-							disabled={singleReject.busy && singleId === ts.id}
-							onclick={() => askReason({ kind: 'single', id: ts.id })}
-							class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-							>Reject</button
-						>
-					</form>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-
-	{#snippet footer()}
-		<Pagination meta={data.pagination} />
-	{/snippet}
-</PanelPage>
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
+</div>
 
 <TimesheetModal bind:ts={openTs} mode="review" isManager={true} />
 
