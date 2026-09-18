@@ -105,15 +105,15 @@
 							}}
 						>
 							<td
-								class="sticky left-0 z-10 border-r bg-card px-4 py-3 group-hover:bg-[image:linear-gradient(hsl(var(--muted)/0.3),hsl(var(--muted)/0.3))]"
+								class="sticky left-0 z-10 border-r bg-card px-4 py-2 group-hover:bg-[image:linear-gradient(hsl(var(--muted)/0.3),hsl(var(--muted)/0.3))]"
 							>
 								<div class="font-medium">{row.name}</div>
 								<div class="text-xs text-muted-foreground">{row.employeeNumber}</div>
 							</td>
-							<td class="px-4 py-3 text-muted-foreground">{row.department}</td>
+							<td class="px-4 py-2 text-muted-foreground">{row.department}</td>
 							{#each row.cells as cell, i (data.leaveTypes[i].id)}
 								{@const gated = locked(row.startDate, data.leaveTypes[i].minMonthsOfService)}
-								<td class="px-4 py-3 text-right tabular-nums">
+								<td class="px-4 py-2 text-right tabular-nums">
 									{#if !cell}
 										<span class="text-muted-foreground" title="No balance allocated for {data.year}"
 											>—</span
@@ -126,7 +126,7 @@
 									{/if}
 								</td>
 							{/each}
-							<td class="px-4 py-3 text-right font-medium tabular-nums">
+							<td class="px-4 py-2 text-right font-medium tabular-nums">
 								{row.cells
 									.reduce(
 										(sum, cell, i) =>
