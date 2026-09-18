@@ -1,16 +1,16 @@
-import { test, expect, type Locator } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import { login, USERS } from './helpers'
 
 /**
- * Dashboard layout (17-09-26 plan): the two alert cards are bounded and scroll their rows,
- * the page renders four priority zones, and no zone row ends with an orphan card at lg.
+ * Dashboard layout (18-09-26 plan): the decision cards are title-row icon buttons that open
+ * an anchored dropdown panel, the page renders three zones, and no zone row ends with an orphan.
  *
  * These are the suite's first computed-style assertions. They measure `getComputedStyle`
- * rather than the rendered box, because a card can be 320px tall by accident — one row
+ * rather than the rendered box, because a panel can be 400px tall by accident — one row
  * short of the cap proves nothing about the cap.
  *
- * The bounds group asserts its card is on screen BEFORE measuring it. A missing
+ * The bounds group asserts its button is on screen BEFORE opening it. A missing
  * precondition has to fail loudly; a skipped measurement would read as a pass.
  */
 
@@ -26,20 +26,46 @@ function probationStartDate() {
 	return d.toISOString().slice(0, 10)
 }
 
-async function boundsOf(card: Locator) {
-	return card.evaluate((el) => {
+const AWAITING_BUTTON = /awaiting your decision$/
+const DECISION_BUTTONS = [
+	/upcoming regularizations$/,
+	/postings awaiting your approval$/,
+	AWAITING_BUTTON
+]
+
+function decisionButton(page: Page, name: RegExp) {
+	return page.getByRole('main').getByRole('button', { name })
+}
+
+async function openPanel(page: Page, button: Locator, name: string) {
+	const panel = page.getByRole('region', { name })
+	await expect(async () => {
+		await button.click()
+		await expect(panel).toBeVisible({ timeout: 1000 })
+	}).toPass({ timeout: 15000 })
+	return panel
+}
+
+async function boundsOf(panel: Locator) {
+	return panel.evaluate((el) => {
 		const list = el.querySelector('ul')
-		if (!list) throw new Error('card has no row list')
+		if (!list) throw new Error('panel has no row list')
 		return {
-			maxHeight: getComputedStyle(el).maxHeight,
-			minHeight: getComputedStyle(el).minHeight,
 			overflowY: getComputedStyle(list).overflowY,
-			height: el.getBoundingClientRect().height
+			height: el.getBoundingClientRect().height,
+			cap: window.innerHeight * 0.7
 		}
 	})
 }
 
-test.describe('(a) the alert cards are bounded and scroll their rows', () => {
+async function badgeCount(button: Locator) {
+	const label = (await button.getAttribute('aria-label')) ?? ''
+	const match = /^(\d+) /.exec(label)
+	if (!match) throw new Error(`accessible name does not start with a count: "${label}"`)
+	return Number(match[1])
+}
+
+test.describe('(a) the decision panels are bounded and scroll their rows', () => {
 	test.describe.configure({ mode: 'serial' })
 
 	test.afterAll(async () => {
@@ -56,7 +82,7 @@ test.describe('(a) the alert cards are bounded and scroll their rows', () => {
 		}
 	})
 
-	test('the regularizations card stops at 320px and scrolls its list', async ({ page }) => {
+	test('the regularizations panel stops at 70vh and scrolls its list', async ({ page }) => {
 		await login(page, USERS.admin)
 
 		await page.goto('/employees/new', { waitUntil: 'domcontentloaded' })
@@ -72,31 +98,36 @@ test.describe('(a) the alert cards are bounded and scroll their rows', () => {
 		await page.waitForURL(/\/employees\/c[a-z0-9]{10,}$/)
 
 		await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
-		const card = page.locator('div.card', { hasText: 'Upcoming Regularizations' })
-		await expect(card).toBeVisible()
-		await expect(card.getByText(PROBIE)).toBeVisible()
+		const button = decisionButton(page, /upcoming regularizations$/)
+		await expect(button).toBeVisible()
+		expect(await badgeCount(button)).toBeGreaterThanOrEqual(1)
 
-		const bounds = await boundsOf(card)
-		expect(bounds.maxHeight).toBe('320px')
-		expect(bounds.minHeight).toBe('112px')
+		const panel = await openPanel(page, button, 'Upcoming Regularizations')
+		await expect(panel.getByText(PROBIE)).toBeVisible()
+		await expect(
+			panel.getByRole('button', { name: 'About upcoming regularizations' })
+		).toBeVisible()
+
+		const bounds = await boundsOf(panel)
 		expect(bounds.overflowY).toBe('auto')
-		expect(bounds.height).toBeLessThanOrEqual(320.5)
+		expect(bounds.height).toBeLessThanOrEqual(bounds.cap + 0.5)
 	})
 
-	test('the postings card stops at 320px and scrolls its list', async ({ page }) => {
+	test('the postings panel stops at 70vh and scrolls its list', async ({ page }) => {
 		// No fixture: this card is driven by whatever listPostingsAwaitingApprover already
 		// returns for the account under test. Building one would rewrite the department
 		// mapping posting-approver-sod.spec.ts owns and restores, and that spec races this
 		// one whenever workers > 1.
 		await login(page, USERS.hr)
-		const card = page.locator('div.card', { hasText: 'Postings awaiting your approval' })
-		await expect(card).toBeVisible()
+		const button = decisionButton(page, /postings awaiting your approval$/)
+		await expect(button).toBeVisible()
+		expect(await badgeCount(button)).toBeGreaterThanOrEqual(1)
 
-		const bounds = await boundsOf(card)
-		expect(bounds.maxHeight).toBe('320px')
-		expect(bounds.minHeight).toBe('112px')
+		const panel = await openPanel(page, button, 'Postings awaiting your approval')
+
+		const bounds = await boundsOf(panel)
 		expect(bounds.overflowY).toBe('auto')
-		expect(bounds.height).toBeLessThanOrEqual(320.5)
+		expect(bounds.height).toBeLessThanOrEqual(bounds.cap + 0.5)
 	})
 })
 
@@ -105,12 +136,15 @@ test.describe('(b) each role sees the same cards, in zones', () => {
 
 	// employee@veent.ph is wiped by global-setup on every invocation, so its Recent Activity
 	// card may or may not render. Assert the headings and the D1/D3 invariants, never a count.
-	test('an employee has no decision zone and no payroll tile', async ({ page }) => {
+	test('an employee has no decision buttons and no payroll tile', async ({ page }) => {
 		await login(page, USERS.employee)
 		for (const zone of ZONES) {
 			await expect(page.getByRole('heading', { name: zone })).toBeVisible()
 		}
 		await expect(page.getByRole('heading', { name: 'NEEDS A DECISION' })).toHaveCount(0)
+		for (const name of DECISION_BUTTONS) {
+			await expect(decisionButton(page, name)).toHaveCount(0)
+		}
 		await expect(page.getByRole('link', { name: /Last Payroll/i })).toHaveCount(0)
 	})
 
@@ -119,12 +153,31 @@ test.describe('(b) each role sees the same cards, in zones', () => {
 		['admin', USERS.admin],
 		['ceo', USERS.ceo]
 	] as const) {
-		test(`${role} sees all four zones and the payroll tile`, async ({ page }) => {
+		test(`${role} sees the three zones, the payroll tile and a decision button`, async ({
+			page
+		}) => {
 			await login(page, user)
-			for (const zone of ['NEEDS A DECISION', ...ZONES]) {
+			for (const zone of ZONES) {
 				await expect(page.getByRole('heading', { name: zone })).toBeVisible()
 			}
+			await expect(page.getByRole('heading', { name: 'NEEDS A DECISION' })).toHaveCount(0)
 			await expect(page.getByRole('link', { name: /Last Payroll/i })).toBeVisible()
+
+			let shown = 0
+			for (const name of DECISION_BUTTONS) {
+				const button = decisionButton(page, name)
+				if ((await button.count()) === 0) continue
+				await expect(button).toBeVisible()
+				const badge = button.locator('span')
+				await expect(badge).toHaveText(/^\d+$/)
+				expect(Number(await badge.innerText())).toBeGreaterThan(0)
+				if (name === AWAITING_BUTTON) {
+					const panel = await openPanel(page, button, 'Awaiting you')
+					await expect(panel.locator('li a').first()).toBeVisible()
+				}
+				shown++
+			}
+			expect(shown, 'no decision button rendered for a role that has decisions').toBeGreaterThan(0)
 		})
 	}
 })

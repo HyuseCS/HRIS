@@ -57,6 +57,18 @@ async function createAndSubmit(page: Page, title: string) {
 	await expect(page.locator('tr', { hasText: title })).toContainText(/PENDING|Pending/i)
 }
 
+async function openPostings(page: Page) {
+	const button = page
+		.getByRole('main')
+		.getByRole('button', { name: /postings awaiting your approval$/ })
+	if ((await button.count()) === 0) return
+	const panel = page.getByRole('region', { name: 'Postings awaiting your approval' })
+	await expect(async () => {
+		await button.click()
+		await expect(panel).toBeVisible({ timeout: 1000 })
+	}).toPass({ timeout: 15000 })
+}
+
 /** The posting-approval card on the dashboard, scoped to one posting. */
 function approvalCard(page: Page, title: string) {
 	return page
@@ -82,6 +94,7 @@ test('(a) a mapped department is decidable only by its designated approver', asy
 
 	// HR can no longer approve it — this is the behaviour that changed.
 	await hr.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(hr)
 	await expect(approvalCard(hr, TITLE_A)).toHaveCount(0)
 
 	// NEGATIVE CONTROL: the designated approver CAN. Without this, the assertion above would
@@ -90,6 +103,7 @@ test('(a) a mapped department is decidable only by its designated approver', asy
 	const ap = await apCtx.newPage()
 	await login(ap, USERS.approver)
 	await ap.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(ap)
 	await expect(approvalCard(ap, TITLE_A)).toHaveCount(1)
 	await approvalCard(ap, TITLE_A).getByRole('button', { name: 'Approve' }).click()
 	await expect(approvalCard(ap, TITLE_A)).toHaveCount(0)
@@ -152,6 +166,7 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 
 	// She cannot decide it, despite being the designated approver.
 	await ap.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(ap)
 	await expect(approvalCard(ap, TITLE_B)).toHaveCount(0)
 
 	// And nobody rescues it — D9 is deliberate: no HR-steps-in fallback. The posting is stuck
@@ -160,9 +175,11 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 	const hr = await hrCtx.newPage()
 	await login(hr, USERS.hr)
 	await hr.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(hr)
 	await expect(approvalCard(hr, TITLE_B)).toHaveCount(0)
 
 	await ceo.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(ceo)
 	await expect(approvalCard(ceo, TITLE_B)).toHaveCount(0)
 
 	// The escape hatch the 403 names: remap the department, and it becomes decidable again.
@@ -171,6 +188,7 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 	const th = await thCtx.newPage()
 	await login(th, USERS.twoHat)
 	await th.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(th)
 	await expect(approvalCard(th, TITLE_B)).toHaveCount(1)
 
 	await ceoCtx.close()

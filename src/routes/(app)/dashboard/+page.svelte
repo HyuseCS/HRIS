@@ -8,7 +8,8 @@
 	import AnnouncementItem from '$lib/components/dashboard/AnnouncementItem.svelte'
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
-	import Badge from '$lib/components/ui/Badge.svelte'
+	import Monogram from '$lib/components/people/Monogram.svelte'
+	import HelpTip from '$lib/components/ui/HelpTip.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -46,31 +47,6 @@
 	}
 	const metrics = $derived(data.metrics)
 
-	// "Awaiting you" rows. SCOPING GUARANTEE: every count here comes from the single
-	// `countPendingApprovals` call already made by this page's load — the same service the sidebar
-	// badge and the four inbox pages read, whose per-domain queries ARE those pages' own queries
-	// (listPendingRequestsForApprover / countActionableTimesheets / countActionablePayrollRuns /
-	// listActionableProposals), and which short-circuits to all-zeros for anyone without
-	// APPROVE_REQUESTS (approvals.ts). This block issues NO query of its own and computes no count,
-	// so it cannot widen scope and cannot disagree with the pages it links to.
-	const awaiting = $derived(
-		[
-			{ n: metrics.pendingRequests, href: '/requests/approvals', one: 'request', many: 'requests' },
-			{
-				n: metrics.pendingTimesheets,
-				href: '/requests/timesheets',
-				one: 'timesheet',
-				many: 'timesheets'
-			},
-			{
-				n: metrics.pendingProposals,
-				href: '/requests/proposals',
-				one: 'pay change',
-				many: 'pay changes'
-			},
-			{ n: metrics.pendingPayrollRuns, href: '/payroll', one: 'payroll run', many: 'payroll runs' }
-		].filter((row) => row.n > 0)
-	)
 	const cols = (n: number) =>
 		n >= 4
 			? 'lg:grid-cols-4'
@@ -138,13 +114,8 @@
 			showAward = false
 		}
 	})
-	const decisionCount = $derived(
-		[
-			data.canPost && data.regularizations.length,
-			data.postingsToApprove.length,
-			metrics.pendingApprovals > 0
-		].filter(Boolean).length
-	)
+	let openPanel = $state<'regularizations' | 'postings' | 'awaiting' | null>(null)
+	let cluster = $state<HTMLElement>()
 	const glanceCount = $derived(data.canViewPayroll ? 3 : 2)
 	const feedCount = $derived(
 		[data.recentActivity.length, true, !!status, true].filter(Boolean).length
@@ -152,12 +123,251 @@
 	const doorCount = $derived(data.canCreateTimesheet ? 3 : 2)
 </script>
 
+<svelte:window
+	onkeydown={(e) => e.key === 'Escape' && (openPanel = null)}
+	onclick={(e) => cluster && !cluster.contains(e.target as Node) && (openPanel = null)}
+/>
+
 <svelte:head>
 	<title>Dashboard — Veent HRIS</title>
 </svelte:head>
 
 <div class="flex flex-1 flex-col gap-6">
-	<PageHeader title="Dashboard" />
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader title="Dashboard" />
+		</div>
+		<div bind:this={cluster} class="relative flex shrink-0 items-center gap-2 sm:pt-1">
+			{#if data.canPost && data.regularizations.length}
+				<button
+					type="button"
+					onclick={() => (openPanel = openPanel === 'regularizations' ? null : 'regularizations')}
+					aria-expanded={openPanel === 'regularizations'}
+					aria-label="{data.regularizations.length} upcoming regularizations"
+					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
+				>
+					<svg
+						class="h-5 w-5 text-amber-500"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.7"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path
+							d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+						/>
+					</svg>
+					<span
+						aria-hidden="true"
+						class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
+						>{data.regularizations.length}</span
+					>
+				</button>
+			{/if}
+
+			{#if data.postingsToApprove.length}
+				<button
+					type="button"
+					onclick={() => (openPanel = openPanel === 'postings' ? null : 'postings')}
+					aria-expanded={openPanel === 'postings'}
+					aria-label="{data.postingsToApprove.length} postings awaiting your approval"
+					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
+				>
+					<svg
+						class="h-5 w-5 text-muted-foreground"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path
+							d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 6.006a2.18 2.18 0 0 1-.75.402m0 0a48.108 48.108 0 0 1-15 0m15 0a2.18 2.18 0 0 0 .75-.402M3.75 14.15a2.18 2.18 0 0 1-.75-1.661V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z"
+						/>
+					</svg>
+					<span
+						aria-hidden="true"
+						class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
+						>{data.postingsToApprove.length}</span
+					>
+				</button>
+			{/if}
+
+			{#if metrics.pendingApprovals > 0}
+				<button
+					type="button"
+					onclick={() => (openPanel = openPanel === 'awaiting' ? null : 'awaiting')}
+					aria-expanded={openPanel === 'awaiting'}
+					aria-label="{metrics.pendingApprovals} awaiting your decision"
+					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
+				>
+					<svg
+						class="h-5 w-5 text-muted-foreground"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path
+							d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z"
+						/>
+					</svg>
+					<span
+						aria-hidden="true"
+						class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
+						>{metrics.pendingApprovals}</span
+					>
+				</button>
+			{/if}
+
+			<!-- Upcoming regularizations — HR's advance warning (#168) -->
+			{#if openPanel === 'regularizations'}
+				<div
+					role="region"
+					aria-label="Upcoming Regularizations"
+					class="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col gap-3 overflow-visible rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
+				>
+					<div class="relative flex items-center gap-2">
+						<h2 class="text-sm font-semibold">Upcoming Regularizations</h2>
+						<HelpTip label="About upcoming regularizations"
+							>Probationary staff becoming regular within the next three weeks — decide before the
+							date lands.</HelpTip
+						>
+					</div>
+					<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
+						{#each data.regularizations as r (r.id)}
+							<li class="flex items-center justify-between gap-3 py-2">
+								<div class="min-w-0">
+									<a href="/employees/{r.id}" class="font-medium hover:underline">{r.name}</a>
+									<p class="truncate text-xs text-muted-foreground">
+										{r.jobTitle} · {r.department}
+									</p>
+								</div>
+								<div class="shrink-0 text-right">
+									<p class="text-sm">{formatShortDate(r.regularizationDate)}</p>
+									<p class="text-xs font-medium {r.overdue ? 'text-red-400' : 'text-amber-500'}">
+										{r.overdue
+											? `Overdue by ${-r.daysUntil} day${r.daysUntil === -1 ? '' : 's'}`
+											: r.daysUntil === 0
+												? 'Regularizes today'
+												: `in ${r.daysUntil} day${r.daysUntil === 1 ? '' : 's'}`}
+									</p>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				</div>
+				<!-- Job postings awaiting your approval (#195) -->
+			{:else if openPanel === 'postings'}
+				<div
+					role="region"
+					aria-label="Postings awaiting your approval"
+					class="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
+				>
+					<h2 class="text-sm font-semibold">Postings awaiting your approval</h2>
+					<!-- Scoped: with the award panel open, a posting failure used to render under
+					     "Give award", where nothing had gone wrong. -->
+					{#if form?.action === 'decidePosting' && form?.error}
+						<Banner kind="error" message={form.error} />
+					{/if}
+					<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
+						{#each data.postingsToApprove as p (p.id)}
+							{@const g = decideGuard(p.id)}
+							<li class="space-y-2 py-2">
+								<div class="flex items-center justify-between gap-3">
+									<div class="min-w-0">
+										<a href="/recruitment/{p.id}" class="font-medium hover:underline">{p.title}</a>
+										<p class="truncate text-xs text-muted-foreground">{p.department}</p>
+									</div>
+									<div class="flex shrink-0 items-center gap-2">
+										<form method="POST" action="?/decidePosting" use:enhance={g.enhance}>
+											<input type="hidden" name="id" value={p.id} />
+											<input type="hidden" name="action" value="approve" />
+											<button
+												type="submit"
+												disabled={g.busy}
+												class="rounded-md border border-green-500/30 px-3 py-1 text-xs font-medium text-green-400 hover:bg-green-500/10 disabled:pointer-events-none disabled:opacity-50"
+												>{g.busy ? '…' : 'Approve'}</button
+											>
+										</form>
+										<button
+											type="button"
+											onclick={() => (rejectingId = rejectingId === p.id ? null : p.id)}
+											class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent"
+											>Send back</button
+										>
+									</div>
+								</div>
+								{#if rejectingId === p.id}
+									<form
+										method="POST"
+										action="?/decidePosting"
+										use:enhance={g.enhance}
+										class="flex items-center gap-2"
+									>
+										<input type="hidden" name="id" value={p.id} />
+										<input type="hidden" name="action" value="reject" />
+										<input
+											name="note"
+											required
+											placeholder="Reason to send back to draft…"
+											class="h-8 flex-1 rounded border border-input bg-background px-2 text-xs"
+										/>
+										<button
+											type="submit"
+											disabled={g.busy}
+											class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+											>Confirm</button
+										>
+									</form>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</div>
+				<!-- Awaiting you — one door to the four approval inboxes. Hidden entirely at zero, matching the
+			     status card's rule that "0 pending" is noise on a surface whose job is to say what needs
+			     doing. -->
+			{:else if openPanel === 'awaiting'}
+				<div
+					role="region"
+					aria-label="Awaiting you"
+					class="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
+				>
+					<h2 class="text-sm font-semibold">Awaiting you</h2>
+					<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
+						{#each data.pendingItems as item (item.href + item.id)}
+							<li>
+								<a href={item.href} class="flex items-center gap-3 py-2 hover:text-primary">
+									{#if item.person}
+										<Monogram
+											firstName={item.person.firstName}
+											lastName={item.person.lastName}
+											size="sm"
+										/>
+									{:else}
+										<span aria-hidden="true" class="h-7 w-7 shrink-0"></span>
+									{/if}
+									<span class="min-w-0">
+										<span class="block truncate font-medium">{item.label}</span>
+										<span class="block truncate text-xs text-muted-foreground">{item.sub}</span>
+									</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+		</div>
+	</div>
 
 	<!-- Zones in priority order: what needs a decision, then the numbers, then the feed, then the
 	     doors. Each zone's lg column count is derived from the cards that role actually sees, so no
@@ -167,161 +377,6 @@
 	     column is sized `auto`, so a `truncate`d line (whitespace-nowrap) sets a min-content
 	     floor and the whole card pushes past a 390px viewport. Tailwind's numbered variants
 	     emit `minmax(0, 1fr)`, which lets the column shrink and the text ellipsize as intended. -->
-
-	{#if decisionCount}
-		<section class="space-y-3">
-			<h2 class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-				NEEDS A DECISION
-			</h2>
-			<div class="grid grid-cols-1 gap-4 {cols(decisionCount)}" data-zone="decision">
-				<!-- Upcoming regularizations — HR's advance warning (#168) -->
-				{#if data.canPost && data.regularizations.length}
-					<div
-						class="card flex max-h-80 min-h-[7rem] flex-col gap-3 overflow-hidden border-amber-500/30 bg-amber-500/5"
-					>
-						<div class="flex items-center gap-2">
-							<svg
-								class="h-4 w-4 text-amber-500"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="1.7"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								aria-hidden="true"
-							>
-								<path
-									d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-								/>
-							</svg>
-							<p class="text-xs font-semibold uppercase tracking-widest text-amber-500">
-								Upcoming Regularizations
-							</p>
-						</div>
-						<p class="text-xs text-muted-foreground">
-							Probationary staff becoming regular within the next three weeks — decide before the
-							date lands.
-						</p>
-						<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
-							{#each data.regularizations as r (r.id)}
-								<li class="flex items-center justify-between gap-3 py-2">
-									<div class="min-w-0">
-										<a href="/employees/{r.id}" class="font-medium hover:underline">{r.name}</a>
-										<p class="truncate text-xs text-muted-foreground">
-											{r.jobTitle} · {r.department}
-										</p>
-									</div>
-									<div class="shrink-0 text-right">
-										<p class="text-sm">{formatShortDate(r.regularizationDate)}</p>
-										<p class="text-xs font-medium {r.overdue ? 'text-red-400' : 'text-amber-500'}">
-											{r.overdue
-												? `Overdue by ${-r.daysUntil} day${r.daysUntil === -1 ? '' : 's'}`
-												: r.daysUntil === 0
-													? 'Regularizes today'
-													: `in ${r.daysUntil} day${r.daysUntil === 1 ? '' : 's'}`}
-										</p>
-									</div>
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/if}
-
-				<!-- Job postings awaiting your approval (#195) -->
-				{#if data.postingsToApprove.length}
-					<div
-						class="card flex max-h-80 min-h-[7rem] flex-col gap-3 overflow-hidden border-blue-500/30 bg-blue-500/5"
-					>
-						<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
-							Postings awaiting your approval
-						</p>
-						<!-- Scoped: with the award panel open, a posting failure used to render under
-						     "Give award", where nothing had gone wrong. -->
-						{#if form?.action === 'decidePosting' && form?.error}
-							<Banner kind="error" message={form.error} />
-						{/if}
-						<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
-							{#each data.postingsToApprove as p (p.id)}
-								{@const g = decideGuard(p.id)}
-								<li class="space-y-2 py-2">
-									<div class="flex items-center justify-between gap-3">
-										<div class="min-w-0">
-											<p class="font-medium">{p.title}</p>
-											<p class="truncate text-xs text-muted-foreground">{p.department}</p>
-										</div>
-										<div class="flex shrink-0 items-center gap-2">
-											<form method="POST" action="?/decidePosting" use:enhance={g.enhance}>
-												<input type="hidden" name="id" value={p.id} />
-												<input type="hidden" name="action" value="approve" />
-												<button
-													type="submit"
-													disabled={g.busy}
-													class="rounded-md border border-green-500/30 px-3 py-1 text-xs font-medium text-green-400 hover:bg-green-500/10 disabled:pointer-events-none disabled:opacity-50"
-													>{g.busy ? '…' : 'Approve'}</button
-												>
-											</form>
-											<button
-												type="button"
-												onclick={() => (rejectingId = rejectingId === p.id ? null : p.id)}
-												class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent"
-												>Send back</button
-											>
-										</div>
-									</div>
-									{#if rejectingId === p.id}
-										<form
-											method="POST"
-											action="?/decidePosting"
-											use:enhance={g.enhance}
-											class="flex items-center gap-2"
-										>
-											<input type="hidden" name="id" value={p.id} />
-											<input type="hidden" name="action" value="reject" />
-											<input
-												name="note"
-												required
-												placeholder="Reason to send back to draft…"
-												class="h-8 flex-1 rounded border border-input bg-background px-2 text-xs"
-											/>
-											<button
-												type="submit"
-												disabled={g.busy}
-												class="rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-												>Confirm</button
-											>
-										</form>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/if}
-
-				<!-- Awaiting you — one door to the four approval inboxes. Hidden entirely at zero, matching the
-				     status card's rule that "0 pending" is noise on a surface whose job is to say what needs
-				     doing. -->
-				{#if metrics.pendingApprovals > 0}
-					<div class="card space-y-3">
-						<h3 class="text-sm font-semibold text-foreground">Awaiting you</h3>
-						<div class="space-y-1">
-							{#each awaiting as row (row.href)}
-								<a
-									href={row.href}
-									class="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-sm transition-colors hover:text-primary"
-								>
-									<span class="flex items-center gap-2">
-										<Badge status="pending" tone="blue" label={String(row.n)} />
-										<span>{row.n === 1 ? row.one : row.many}</span>
-									</span>
-									<span aria-hidden="true" class="text-muted-foreground">→</span>
-								</a>
-							{/each}
-						</div>
-					</div>
-				{/if}
-			</div>
-		</section>
-	{/if}
 
 	<section class="space-y-3">
 		<h2 class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
