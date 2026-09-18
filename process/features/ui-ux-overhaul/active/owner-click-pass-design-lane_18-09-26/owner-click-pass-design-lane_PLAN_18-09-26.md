@@ -9,7 +9,7 @@ feature: ui-ux-overhaul
 
 **Date**: 18-09-26
 **Status**: PLANNED — awaiting VALIDATE
-**Complexity**: COMPLEX (3 items, 6 source files, 20 acceptance criteria, 3 route surfaces, 2 mandatory negative controls)
+**Complexity**: COMPLEX (3 items, 6 source files, 20 SPEC criteria + 1 plan-added, 3 route surfaces, 2 mandatory negative controls, 1 e2e fixture)
 **Feature**: ui-ux-overhaul
 **Branch**: `feat/uiux-phase-7`
 **Upstream SPEC**: `owner-click-pass-design-lane_SPEC_18-09-26.md` (same folder)
@@ -17,8 +17,15 @@ feature: ui-ux-overhaul
 
 ## TL;DR
 
-Three pages, three files of real source each, 34 numbered steps, 4 commits. All 20 SPEC criteria have
-a step and a test. Nothing touches `rbac.ts`, `schema.prisma` or `services/**`. No new component.
+Three pages, three files of real source each, 35 numbered steps, 4 commits. All 20 SPEC criteria
+have a step and a test, plus 1 plan-added criterion (N5-AC9). Nothing touches `rbac.ts`,
+`schema.prisma` or `services/**`. No new component.
+
+**One finding is bigger than this lane: `/inventory` loses data today.** Every row save writes
+`notes: null` over whatever the item had, because the row form posts ten fields and `notes` is not
+one of them while `inputOf` sets it unconditionally. D15's single-modal merge fixes it for free;
+N5-AC9 makes the fix an asserted behaviour instead of a side effect. Full chain in §The `notes`
+defect.
 
 Five things this plan corrects against the design reports, because the reports were written before
 the owner's D17 ruling or were measured wrong:
@@ -113,7 +120,12 @@ The two lanes can run **at the same time**: zero file overlap. Two sequencing no
 
 ## Measured facts this plan depends on
 
-Verified against the tree at `feat/uiux-phase-7`. Do not re-derive; do re-verify any line you edit.
+Verified against the tree at `feat/uiux-phase-7` by reading each line. **Several cites carried over
+from the design reports were off by a few lines and have been corrected here** — the reports are
+right on substance and unreliable on line numbers, which is the same failure that blocked the
+sibling lane. Do not re-derive the measurements; **do** re-verify any line number before editing at
+it. Every cite below is one `sed -n` from being checked, and a stale one sends the next reader to
+the wrong place with full confidence.
 
 | Fact | Where | Value |
 |---|---|---|
@@ -127,17 +139,19 @@ Verified against the tree at `feat/uiux-phase-7`. Do not re-derive; do re-verify
 | Float legend | `:101-102` | `float-left … w-full` + `[&>legend+*]:clear-left` on the fieldset |
 | Fieldset grid lines | `:103 :151 :177 :246 :423 :486 :523` | `sm:grid-cols-3/2/2/2/2/3/2` |
 | Settings destinations | `settings-destinations.ts` | **17** total; `SETTINGS_GROUP_ORDER` = 5 |
-| Capability-gated destinations | `:68 :106 :114 :171 :182` | 5 gated, 12 ungated |
+| Capability-gated destinations | `settings-destinations.ts:77, 109, 118, 177, 185` (the `capabilities:` lines) | 5 gated, 12 ungated |
 | `System` group membership | Review Schedule + Document Backup | **both gated** |
 | Destinations by role | via `visibleSettings` | SUPER_ADMIN 17, HR_ADMIN 14, MANAGER 12 |
 | **Groups by role** | derived from the two rows above | **SUPER_ADMIN 5, HR_ADMIN 5, MANAGER 4** |
 | Settings bar focus style today | `settings/+layout.svelte:47-49` | **none** — colour only |
-| Inventory table min width | `inventory/+page.svelte:193-194` `min-w-max` | ~1438px; 942 available at 1280 |
-| `Dialog` max-height source | `Dialog.svelte:125` | only `scroll` adds `flex max-h-[90vh] flex-col overflow-hidden` |
-| `Dialog` focus restore | `Dialog.svelte` `trigger?.focus()` on close | detached node after a delete → `<body>` |
-| `ConfirmDialog` z-index | hard-wired | **60** — a parent dialog must be below it |
+| Inventory table min width | `inventory/+page.svelte:194` `min-w-max` | ~1438px; 942 available at 1280 |
+| `Dialog` max-height source | `Dialog.svelte:149` | only `scroll` adds `flex max-h-[90vh] flex-col overflow-hidden` |
+| `Dialog` focus restore | `Dialog.svelte:85-87` — captures `activeElement`, restores with `trigger?.focus()` | detached node after a delete → `<body>` |
+| `ConfirmDialog` z-index | `ConfirmDialog.svelte:34` | **60** — a parent dialog must be below it |
 | `submitFeedback` update seam | `submit-feedback.svelte.ts:70,82,90` | returning a callback from `inner` suppresses the built-in `o.update()` |
 | `paginate()` return | `src/lib/server/pagination.ts:53-63` | carries `total`, `totalPages`, `skip`, `take`, `label` |
+| Seed inventory items | `prisma/seed-core.ts:938-978` | 3 items; first is `MacBook Pro 14"` **with a trailing quote**; **all three unassigned**; none has `notes` |
+| **Row save erases `notes` today** | `inventory/+page.svelte:213-321` posts 10 fields, none is `notes`; `+page.server.ts:113` → `inputOf` at `:63-76` sets `notes: d.notes ?? null` | **live data loss** — see §The `notes` defect |
 | `scrollbar-none` utility | `tailwind.config.ts:68` | defined, **zero consumers today** — N2 is the first |
 
 ### The hazard-2 count check, done before any assertion is written
@@ -151,6 +165,65 @@ SPEC hazard 2 says: count the real value before asserting "exactly N". Done:
 - Settings group links: **not symmetric across roles.** 5 / 5 / **4**. Any `toHaveCount(5)` is red
   on a correct MANAGER page. Every group-count assertion therefore derives its expectation from the
   role's own visible destination set (§Test plan N2-T1), never from a literal.
+
+---
+
+## The `notes` defect — pre-existing live data loss, fixed as a side effect
+
+**Found while planning N5. It is not a design concern and it is bigger than this lane.** Stating it
+here so it is not carried as a footnote, and adding a criterion so the fix is proven rather than
+assumed.
+
+### What is wrong today
+
+Every row save on `/inventory` silently erases that item's `notes`. The chain, all three links read
+from source:
+
+1. The row edit form posts **ten** fields (`inventory/+page.svelte:213-321`) — `name`, `category`,
+   `quantity`, `unit`, `location`, `status`, `assignedToId`, `serialNumber`, `value`, and the hidden
+   `id`. **`notes` is not among them.** It has no table column and no row editor.
+2. `update` parses the body and calls `inputOf(parsed.data)` (`+page.server.ts:113`).
+3. `inputOf` (`:63-76`) builds a **complete** `InventoryInput` and sets `notes: d.notes ?? null`.
+
+`notes` is `z.string().max(2000).optional()` (`:60`), so an absent field parses to `undefined`,
+`?? null` turns it into `null`, and the update writes `null` over whatever was there. It is a full
+overwrite, not a patch.
+
+So: an item's notes can only be set through the "Add an item" form, and are destroyed by the next
+edit of any other field on that item. Nobody would connect the two.
+
+### Status and ownership
+
+- **Severity:** silent, unrecoverable loss of user-entered data in shipped code. It is not a layout
+  bug.
+- **Cause of the drift:** the page has carried **two independent forms over the same ten fields**.
+  `notes` exists in one and not the other. That divergence is exactly what D15 cites as the reason
+  to merge them.
+- **Is it in scope?** The *fix* is, incidentally and for free: D15's single shared modal renders all
+  ten fields in both modes, so a save always posts a real `notes` value and there is nothing left to
+  null. No server change is involved — `inputOf` is correct, it was being starved of a field.
+- **What is NOT in scope:** recovering notes already destroyed. They are gone; there is no audit of
+  the prior value to restore from. If the owner wants to know how much was lost, that is a separate
+  query against the audit trail and a separate decision.
+- **Do not let it ride as a side effect.** N5-AC9 below makes the preservation an asserted
+  behaviour, so a future change that reintroduces a partial-field save on this page turns a test
+  red instead of quietly resuming the data loss.
+
+### N5-AC9 (plan-added) — a modal save preserves a non-empty `notes`
+
+> Opening an item that has a non-empty `notes` shows that text in the modal. Changing a **different**
+> field and saving leaves `notes` byte-identical when the item is reopened. Proven against a fixture
+> item that actually has notes, because **no seed item does**.
+
+*proven by:* e2e `inventory.spec.ts` › "a modal save preserves a non-empty notes value";
+`strategy:` Fully-Automated
+
+This criterion is **added by this plan**, not by the SPEC. It is recorded separately from the SPEC's
+20 throughout this document so the SPEC's coverage count stays honest: **20 SPEC criteria + 1
+plan-added = 21**. It should be folded into the SPEC on the next revision, and the defect itself
+deserves a backlog note regardless of this lane
+(`inventory-row-save-erases-notes_NOTE_18-09-26.md`) so it is recorded even if N5 is rolled back —
+**rolling back Commit 3 reinstates the data loss.**
 
 ---
 
@@ -174,9 +247,10 @@ Context Rail chips, `groupSlug` — is taken from the reports as written.
 
 # Implementation Checklist
 
-34 steps. Each names the file, quotes the current code, and gives the replacement.
+35 steps — Step 5 is the new import pre-flight and Step 5a writes the spec it protects. Each step
+names the file, quotes the current code, and gives the replacement.
 
-## N2 — `/settings` Context Rail + destinations search (steps 1-9)
+## N2 — `/settings` Context Rail + destinations search (steps 1-9, incl. 5a)
 
 ### Step 1 — append `groupSlug` to the destinations module
 
@@ -441,7 +515,50 @@ Replacement:
 The assertions at 57-58 and every locator are **untouched**. They are the regression guard on the
 duplication being removed (N2-AC2, SPEC R3). **Satisfies:** N2-AC2 (the "survive unchanged" half).
 
-### Step 5 — write `tests/e2e/settings-context-rail.spec.ts`
+### Step 5 — pre-flight: prove the `settings-destinations` import resolves under Playwright
+
+**Do this before writing the spec, not after it fails.** N2-T1 and N2-T2 derive their expected
+counts by importing `visibleSettings` and `SETTINGS_GROUP_ORDER` from the app's own module. If that
+import does not resolve under Playwright's transform, **the spec does not run at all** — the file
+errors at collection and Playwright reports zero tests for it. A zero is not a failure: the run goes
+green and two criteria are proved by nothing. That silent-zero is the exact shape of the
+vacuous-green problem this lane is being held to.
+
+Note the import in the spec is a **relative** path (`../../src/lib/settings-destinations`), not the
+`$lib` alias — `$lib` is a SvelteKit alias resolved by the Vite plugin, and the Playwright runner
+does not necessarily carry it.
+
+Write this throwaway file, run it, delete it:
+
+```ts
+// tests/e2e/_preflight.spec.ts — DELETE after this step
+import { test, expect } from '@playwright/test'
+import { SETTINGS_GROUP_ORDER, visibleSettings } from '../../src/lib/settings-destinations'
+
+test('settings-destinations resolves under the Playwright runner', () => {
+	expect(SETTINGS_GROUP_ORDER).toHaveLength(5)
+	expect(visibleSettings(['SUPER_ADMIN'] as never)).toHaveLength(17)
+	expect(visibleSettings(['MANAGER'] as never)).toHaveLength(12)
+})
+```
+
+```bash
+CI=1 bun run exec dotenv -e .env.dev -- playwright test tests/e2e/_preflight.spec.ts --reporter=list
+```
+
+**Read the output for the test count, not just for green.** `1 passed` is the pass. `0 passed`, `no
+tests found`, or any resolution error is a fail, and the fix is one of:
+
+- the module pulls in `$lib/rbac` (it does, at its first line) — if **that** alias is what fails,
+  add the mapping the runner needs, or
+- fall back to **not importing app code at all**: hardcode the three per-role expectations as
+  literals in the spec, with a comment naming `settings-destinations.ts` as the source and the risk
+  that they drift.
+
+The fallback is acceptable and the silent zero is not. Record which path was taken in the phase
+report. Delete `_preflight.spec.ts` before Commit 1 — `git status --short` must not show it.
+
+### Step 5a — write `tests/e2e/settings-context-rail.spec.ts`
 
 New file. Full contents in §Test plan N2. **Satisfies:** all six N2 criteria.
 
@@ -502,7 +619,7 @@ Append after it:
 		'employmentType',
 		'startDate',
 		'rateType',
-		'basicSalary',
+		'basicMonthlySalary',
 		'reportsToId',
 		'positionId',
 		'workScheduleId',
@@ -521,9 +638,17 @@ N3-AC6 freezes), with the 11 optional fields appended in their existing array or
 `firstErrorField` is the first invalid field **on the page**, not the first key the server happened
 to write. `OPTIONAL_FIELDS` is reused, not restated, so the two cannot drift.
 
-> Step-10 verification before writing: confirm each of the 18 required-block names above matches a
-> real `name=` on the page (`grep -n 'name="' src/routes/\(app\)/employees/new/+page.svelte`). A name
-> that does not exist is silently never invalid and would make the jump skip a field.
+> **This list was verified against source, name by name, and one was wrong.** The field is
+> `basicMonthlySalary` (`employees/new/+page.svelte:345`, confirmed at `+page.server.ts:82` and
+> `tests/e2e/admin.spec.ts:48`) — **not** `basicSalary`. A name that does not exist on the page is
+> permanently never invalid, so `invalid('basicSalary')` would be false forever and the
+> jump-to-first-error would silently **skip the salary field** — one of the ten required ones.
+>
+> The full check, and its result: `grep -n 'name="' "src/routes/(app)/employees/new/+page.svelte"`
+> yields 29 names in DOM order. All 18 required-block names above and all 11 `OPTIONAL_FIELDS`
+> entries now match source exactly, in source order. The 29th name is `basicMonthlySalary` at :345;
+> every other one was already correct. Re-run that grep and diff it against `FIELD_ORDER` before
+> editing this list again — this defect class is invisible to the compiler and to a green suite.
 
 **Satisfies:** N3-AC3, N3-AC6.
 
@@ -569,6 +694,19 @@ Replacement:
 so the form loses 288 only at ≥1536. 1536 → 1232 − 288 = **944**. 1920 → 1616 − 288 = **1328**.
 Below 1536 the grid is one column and the form column is the full content width: 1280 → **976**,
 1440 → **1136**. Every one is ≥ today's 768 and 1024 is unchanged at 720.
+
+**What `xl:` would actually cost, at both widths — not just 1280.** If this token is written as
+`xl:` the rail appears from 1280 up, so the form column is wrong at **two** of the six measured
+viewports, not one:
+
+| Viewport | Correct (`2xl:`) | With `xl:` | Verdict |
+|---|---|---|---|
+| 1280 | 976 | **688** | narrower than today's 768 cap |
+| 1440 | 1136 | **848** | 288px short — wider than 768, so a naive "is it wider than today" check passes |
+
+The 1440 case is the dangerous one: 848 still beats 768, so a guard that only asked "wider than
+today" would go green on it. N3-T1 asserts the **exact** width at all six viewports, which is what
+catches 1440, and additionally asserts `> 768` at 1280 and 1440. Both halves are needed.
 
 The `<div class="space-y-8">` opened here **closes in step 14**, immediately after the `</details>`.
 It carries the `space-y-8` the `<form>` used to own, so the vertical rhythm between fieldsets is
@@ -765,7 +903,7 @@ CI=1 bun run exec dotenv -e .env.dev -- playwright test tests/e2e/employees-new-
 File: `src/routes/(app)/inventory/+page.server.ts`. **Two lines. Actions and `itemSchema` are not
 touched.**
 
-Current, verbatim (`:20-24` and `:42`):
+Current, verbatim (`:21-25` and `:43`):
 
 ```ts
 	const filter = {
@@ -861,8 +999,8 @@ call site):
 	import type { SubmitFunction } from '@sveltejs/kit'
 ```
 
-`enhance` (already imported) stays. `cellInputClass` at `:23-24` is **deleted** — its only consumers
-were the row editors. `inputClass` at `:21-22` stays and is reused by the modal verbatim.
+`enhance` (already imported) stays. `cellInputClass` at `:24-25` is **deleted** — its only consumers
+were the row editors. `inputClass` at `:22-23` stays and is reused by the modal verbatim.
 
 Why this shape, precisely:
 
@@ -910,7 +1048,7 @@ Replacement (this opens the shell; steps 24-26 supply the snippets it renders):
 	<section
 		bind:this={listEl}
 		tabindex="-1"
-		class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card focus:outline-none"
+		class="overflow-hidden rounded-lg border bg-card focus:outline-none"
 	>
 		<div class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
 			<h2 class="font-semibold">Items</h2>
@@ -939,7 +1077,7 @@ Replacement (this opens the shell; steps 24-26 supply the snippets it renders):
 			</div>
 		</div>
 
-		<div class="min-h-0 flex-1 overflow-y-auto">
+		<div>
 			{#if data.items.length === 0}
 				<EmptyState
 					variant={data.filter.search || data.filter.category || data.filter.status
@@ -979,6 +1117,38 @@ the URL and survives a reload (N5-AC3).
 
 `bind:this={listEl}` + `tabindex="-1"` is the post-delete focus target (N5-AC7).
 
+### Why this shell is NOT `/team`'s flex column, and why the thead does not stick
+
+The N5 design report's toolbar sketch (§2.2) is lifted from `/team`, including
+`flex min-h-0 flex-1 flex-col overflow-hidden` on the panel, `min-h-0 flex-1 overflow-y-auto` on the
+body, and a `sticky top-0` thead. **On `/inventory` all four of those are dead code**, and shipping
+them would be worse than useless — they would read as a working scrollport to the next person.
+
+The reason is one line of context the report did not carry across. `/team` wraps its whole page in a
+height-constrained flex column:
+
+```svelte
+<!-- team/+page.svelte:35 -->
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+```
+
+`/inventory`'s page wrapper is `<div class="space-y-6">` (`inventory/+page.svelte:32`), and **no step
+of this plan changes it.** Without an ancestor that has a bounded height, `flex-1` has nothing to
+fill, `min-h-0` has nothing to shrink against, and the inner `overflow-y-auto` never becomes a
+scrollport — so `sticky top-0` has no scrolling container to stick within and the thead simply
+scrolls away with the page.
+
+**Decision: drop them.** The section is a plain bordered panel and the whole page scrolls, which is
+what `/inventory` does today. `tabindex="-1"` stays — it is the focus target, not a layout device.
+
+The alternative — adding a `lg:h-[calc(100dvh-4rem)]` wrapper to match `/team` — is rejected here:
+it is a second, unrequested layout change to a page already being rewritten, it has its own
+overflow risk against the owner's "modals must not overflow / 314px innerHeight" rule, and **no SPEC
+criterion asks for a viewport-fit inventory panel or a sticky header.** N5-AC1's no-overflow
+assertions hold either way. If the owner later wants the registry to fit the viewport, that is a
+separate item — there is already a backlog note in this feature for the same idea
+(`queue-pages-not-viewport-fit_NOTE_18-09-26.md`).
+
 **Satisfies:** N5-AC3, N5-AC7.
 
 ### Step 24 — the table snippet
@@ -990,7 +1160,7 @@ in the script (lifted from `EmployeeTable.svelte:12`):
 {#snippet itemTable()}
 	<table class="hidden w-full table-fixed text-sm sm:table">
 		<caption class="sr-only">Inventory items. Select an item to edit it.</caption>
-		<thead class="sticky top-0 z-10 border-b bg-muted/50 backdrop-blur">
+		<thead class="border-b bg-muted/50">
 			<tr>
 				<th scope="col" class="{th} w-[38%] md:w-[26%]">Item</th>
 				<th scope="col" class="{th} hidden md:table-cell">Category</th>
@@ -1125,7 +1295,7 @@ the e2e helper must match the **visible** one (step 31, SPEC R8).
 
 ### Step 26 — delete the footer hint
 
-Current, verbatim (`:340-343`):
+Current, verbatim (`:339-343`):
 
 ```svelte
 			<p class="text-xs text-muted-foreground">
@@ -1341,18 +1511,18 @@ create path, `editing` the edit path, and there is **one** set of ten fields.
 {/if}
 ```
 
-The existing inactive-assignee comment from `:276-279` is carried across **verbatim** — same words,
+The existing inactive-assignee comment from `:280-281` is carried across **verbatim** — same words,
 same two lines. Only its surroundings changed.
 
 **The ten field names are exactly `itemSchema`'s** (`+page.server.ts:46-61`): `name, category,
 quantity, unit, location, status, assignedToId, serialNumber, value, notes` — plus `id` on update
-only, which the `update` action reads at `:114`. **Zero server change** (N5-AC4).
+only, which the `update` action reads at `+page.server.ts:113`. **Zero server change** (N5-AC4).
 
 **`notes` is present in both modes.** Today it exists in the Add form and has no table column. That
 is the drift D15 removes — one form, one set of fields, they cannot disagree.
 
 **Delete is a header-row sibling of the edit form, not a Save-row neighbour.** `ConfirmButton`
-renders its own `<form class="contents">` (`ConfirmButton.svelte:52`); putting it on the Save row
+renders its own `<form class="contents">` (`ConfirmButton.svelte:91`); putting it on the Save row
 would nest a form inside a form — invalid HTML. The header sits outside the scrolling body, so
 Delete is permanently visible (N5-AC5).
 
@@ -1360,15 +1530,15 @@ Delete is permanently visible (N5-AC5).
 
 | Prop | Value | Why, with the number |
 |---|---|---|
-| `scroll` | **set** | `Dialog.svelte:125` — `scroll` is the *only* thing that adds `flex max-h-[90vh] flex-col overflow-hidden`. Without it the panel has **no max-height at all**, and the backdrop's `items-center` centres an over-tall panel so both ends clip off-screen and Save becomes unreachable. Measured body heights: **~1008px at 390** (10 field rows, 1 column), **~696px at 1280** (6 rows, 2 columns). Both exceed a 720px viewport minus chrome. The owner's measured `innerHeight` has been as low as **314px**. `scroll` is mandatory, not stylistic. |
+| `scroll` | **set** | `Dialog.svelte:149` — `scroll` is the *only* thing that adds `flex max-h-[90vh] flex-col overflow-hidden`. Without it the panel has **no max-height at all**, and the backdrop's `items-center` centres an over-tall panel so both ends clip off-screen and Save becomes unreachable. Measured body heights: **~1008px at 390** (10 field rows, 1 column), **~696px at 1280** (6 rows, 2 columns). Both exceed a 720px viewport minus chrome. The owner's measured `innerHeight` has been as low as **314px**. `scroll` is mandatory, not stylistic. |
 | `size` | `"wide"` | `max-w-lg` / `sm:max-w-2xl` / `lg:max-w-4xl`. At `lg` (512) the `sm:grid-cols-2` field grid gives 236px columns, which truncates employee names in the assignee select. `wide` gives 2xl/4xl above `sm`; below `sm` the backdrop's `p-4` caps it at 358px at 390 anyway. |
-| `zIndex` | `50` | `ConfirmDialog` is hard-wired to **60**. A dialog that contains one must sit below it or the confirm paints underneath. `TimesheetModal.svelte:305` passes 50 for exactly this reason. |
-| `initialFocus` | left at the default `'panel'` | `Dialog.svelte:28` documents that panel-focus and a self-focusing control race each other. Do **not** autofocus the Name field. |
+| `zIndex` | `50` | `ConfirmDialog` is hard-wired to **60** (`ConfirmDialog.svelte:34`). A dialog that contains one must sit below it or the confirm paints underneath. `timesheets/TimesheetModal.svelte:305` passes 50 for exactly this reason. |
+| `initialFocus` | left at the default `'panel'` | `Dialog.svelte:28` documents `initialFocus` — panel-focus and a self-focusing control race each other. Do **not** autofocus the Name field. |
 
 With `scroll`, the panel is `flex max-h-[90vh] flex-col overflow-hidden`, the form is
 `flex min-h-0 flex-1 flex-col`, the field grid is `min-h-0 flex-1 overflow-y-auto`. Header, Delete
 and the Save/Cancel row are always on screen; **only the fields scroll** (N5-AC1b). This is
-`RequestCreateDialog.svelte:98,104,108` copied exactly.
+the shape `RequestCreateDialog.svelte` already uses for a scrolling dialog body.
 
 No `{@const}` anywhere in the dialog — it is outside any `{#each}` that would need one, which also
 removes the `{@const}`-placement hazard the current row has.
@@ -1443,6 +1613,17 @@ CI=1 bun run exec dotenv -e .env.dev -- playwright test <specs>
 counts rows declares `test.describe.configure({ mode: 'serial' })` and reads its totals from the
 page, never from a fixture constant.** `inventory.spec.ts` already does this at line 7; the two new
 specs adopt it.
+
+**Fixtures.** `inventory.spec.ts` gains a `beforeAll`/`afterAll` pair (full source in §N5). It
+creates one item named `E2E Fixture Asset`, held by an employee it offboards for the duration, with
+a non-empty `notes`. Two rules it follows, both learned in this repo already:
+
+- **Teardown restores the employee's `employmentStatus`.** Leaving a seeded employee OFFBOARDED
+  would change what `/team`, `/employees` and every headcount spec see. `afterAll` puts it back.
+- **It creates its own item rather than mutating a seed row**, so a failure mid-run cannot corrupt
+  the three demo assets other assertions read. `deleteMany` by name runs first *and* last, so a run
+  is independent of how the previous one ended — the idiom `onboarding-checklist.spec.ts:18-28`
+  already uses.
 
 ---
 
@@ -1655,11 +1836,26 @@ test('keyboard order, current-state and focus rings', async ({ page }) => {
 
 	// A visible focus ring on EVERY bar link. Assert the COMPUTED style, not a bounding box —
 	// a box cannot tell a ring from no ring, and this bar has no focus style at all today.
+	//
+	// Reached by Tab, never by a programmatic .focus(). Chromium only sets :focus-visible on a
+	// programmatic focus when it judges the last interaction to have been a keyboard one, so
+	// after any click earlier in the test a .focus() can leave the ring unpainted and red a
+	// correct page. Tab is the interaction the criterion is actually about.
 	const links = bar(page).getByRole('link')
-	for (let i = 0; i < (await links.count()); i++) {
-		await links.nth(i).focus()
+	const count = await links.count()
+	await page.locator('body').click()
+	await page.keyboard.press('Tab')
+	for (let i = 0; i < count; i++) {
+		// Walk forward until Tab lands on bar link i, then measure that element.
+		await expect(async () => {
+			const onLink = await links.nth(i).evaluate((el) => el === document.activeElement)
+			if (!onLink) {
+				await page.keyboard.press('Tab')
+				throw new Error('not yet on bar link ' + i)
+			}
+		}).toPass({ timeout: 5000 })
 		const shadow = await links.nth(i).evaluate((el) => getComputedStyle(el).boxShadow)
-		expect(shadow, `bar link ${i}`).not.toBe('none')
+		expect(shadow, `bar link ${i} focus ring`).not.toBe('none')
 	}
 
 	// Tab order: All settings -> group links -> search -> first card.
@@ -1909,10 +2105,35 @@ test('opening the disclosure does not move the rail', async ({ page }) => {
 **N3-T10 — "tab order unchanged above and below 2xl"** (proves **N3-AC6**)
 
 ```ts
-const TAB_ORDER = [
-	'firstName','lastName','middleName','contactPhone','contactAddress','email','password',
-	'role','discordId','departmentId','jobTitle','employmentType','startDate','rateType',
-	'basicSalary','reportsToId','positionId','workScheduleId'
+// The EXACT sequence, pinned. Start Date is a DatePicker, which contributes TWO stops: the text
+// input (DatePicker.svelte:661, which carries the `name`) and the calendar trigger beside it
+// (DatePicker.svelte:691-693, aria-label="Open calendar"). It is the only composite control in
+// the required block — the other 17 fields are plain inputs and selects.
+//
+// Each entry is matched by element id, except the calendar trigger, which has no id and is
+// matched by its accessible name. There is NO tolerance and NO skip: an unexpected stop at any
+// position is a failure, because the criterion is an order, not a set.
+type Stop = { id: string } | { label: string }
+const TAB_SEQUENCE: Stop[] = [
+	{ id: 'firstName' },
+	{ id: 'lastName' },
+	{ id: 'middleName' },
+	{ id: 'contactPhone' },
+	{ id: 'contactAddress' },
+	{ id: 'email' },
+	{ id: 'password' },
+	{ id: 'role' },
+	{ id: 'discordId' },
+	{ id: 'departmentId' },
+	{ id: 'jobTitle' },
+	{ id: 'employmentType' },
+	{ id: 'startDate' },
+	{ label: 'Open calendar' },
+	{ id: 'rateType' },
+	{ id: 'basicMonthlySalary' },
+	{ id: 'reportsToId' },
+	{ id: 'positionId' },
+	{ id: 'workScheduleId' }
 ]
 
 test('tab order unchanged above and below 2xl', async ({ page }) => {
@@ -1920,17 +2141,18 @@ test('tab order unchanged above and below 2xl', async ({ page }) => {
 	for (const viewport of [1280, 1920]) {
 		await at(page, viewport)
 		await page.locator('#firstName').focus()
-		for (let i = 1; i < TAB_ORDER.length; i++) {
+		for (let i = 1; i < TAB_SEQUENCE.length; i++) {
 			await page.keyboard.press('Tab')
-			const id = await page.evaluate(() => document.activeElement?.id ?? '')
-			// DatePicker and TimePicker wrap their inputs; skip a stop that is not a named field.
-			if (id !== TAB_ORDER[i]) {
-				await page.keyboard.press('Tab')
+			const actual = await page.evaluate(() => {
+				const el = document.activeElement as HTMLElement | null
+				return { id: el?.id ?? '', label: el?.getAttribute('aria-label') ?? '' }
+			})
+			const want = TAB_SEQUENCE[i]
+			if ('id' in want) {
+				expect(actual.id, `${viewport}px stop ${i} (want #${want.id})`).toBe(want.id)
+			} else {
+				expect(actual.label, `${viewport}px stop ${i} (want "${want.label}")`).toBe(want.label)
 			}
-			expect(
-				await page.evaluate(() => document.activeElement?.id ?? ''),
-				`${viewport}px stop ${i}`
-			).toBe(TAB_ORDER[i])
 		}
 		// Then the disclosure summary, then the rail — same elements, both sides of the breakpoint.
 		await page.keyboard.press('Tab')
@@ -1939,10 +2161,16 @@ test('tab order unchanged above and below 2xl', async ({ page }) => {
 })
 ```
 
-> **Execution note for this test.** `DatePicker` (Start Date) and any composite control may insert
-> an extra tab stop. Run it once against the built page and, if a stop is inserted, replace the
-> single-skip fallback above with the measured exact sequence and delete the fallback. Do **not**
-> loosen the assertion to "contains" — the criterion is an order, not a set.
+> **This sequence is derived from source, not from a guess.** The 18 named fields are the 18 `name=`
+> attributes in the required block, in DOM order (`employees/new/+page.svelte:110-390`). The one
+> composite is Start Date, a `DatePicker` at `:309`; its wrapper renders the named text input first
+> and the `aria-label="Open calendar"` toggle second, so it is worth exactly two stops. There is no
+> `TimePicker` on this page.
+>
+> **If the first run disagrees with this sequence, the fix is to correct the sequence from what the
+> page actually does — never to add tolerance.** A `if (unexpected) press Tab again` fallback
+> accepts one stray stop at *every* position, which is the loosening N3-AC6 exists to forbid: it
+> would pass a page that had grown a new control anywhere in the form.
 
 **N3-T11 — "one h1"** (proves **N3-AC6**)
 
@@ -1971,12 +2199,37 @@ element-name selector double-counts (SPEC R8).
 
 ```ts
 // was: page.locator(`tr[data-name="${name}"]`)
+//
+// Two changes, not one. The `tr` goes because the card carries data-name too and CSS hides one of
+// them, so an element-name selector double-counts (SPEC R8).
+//
+// And the value is escaped: one seed item is literally `MacBook Pro 14"` (prisma/seed-core.ts:943)
+// — the name ends in a double quote. Interpolated raw into `[data-name="..."]` that quote closes
+// the attribute selector early and the locator is a syntax error, not a miss. CSS.escape is the
+// built-in for exactly this and needs no import in the page context; here in Node we escape the
+// one character the attribute-value syntax cares about.
+const dataName = (name: string) => name.replace(/["\\]/g, '\\$&')
 const row = (page: import('@playwright/test').Page, name: string) =>
-	page.locator(`[data-name="${name}"]:visible`)
+	page.locator(`[data-name="${dataName(name)}"]:visible`)
 ```
 
 Lines 18, 19, 25, 26, 29 keep working unchanged against it — Playwright's default 1280 renders the
 table branch.
+
+**The seed names, byte-exact** (`prisma/seed-core.ts:938-978`), because two of the three are easy to
+mistype and one of them is why the helper escapes:
+
+| Seed id | `name`, exactly | `assignedToId` |
+|---|---|---|
+| `inv_seed_1` | `MacBook Pro 14"` — **note the trailing `"`** | none |
+| `inv_seed_2` | `Office Chair` | none |
+| `inv_seed_3` | `Projector (old)` | none |
+
+Any spec literal for the first item must be `'MacBook Pro 14"'` and any dialog-name regex must
+escape it: `new RegExp('^Edit MacBook Pro 14"$')` — written as a `RegExp` from a string rather than
+a `/…/` literal so the quote does not have to fight the delimiter. **All three are unassigned**,
+which is why N5-AC5's inactive-holder clause and N5-AC9 both need the fixture above rather than a
+seed row.
 
 **Lines 38-39 become** (proves **N5-AC4**):
 
@@ -2164,20 +2417,115 @@ test('add item uses the shared modal', async ({ page }) => {                    
 	])
 })
 
+// ---------------------------------------------------------------------------------------------
+// FIXTURE. Two criteria have no seed data to stand on, so they get their own item.
+//
+// N5-AC5's inactive-holder clause needs an item held by an employee who is NOT in the active
+// list. All three seed items are unassigned (seed-core.ts:938-978), so without this the
+// "preserved" assertion compares '' to '' and is vacuously green.
+//
+// N5-AC9 needs an item with a non-empty `notes`. No seed item has one.
+//
+// The item is created and torn down here rather than reusing a seed row, so the spec does not
+// mutate shared fixtures other specs read.
+// ---------------------------------------------------------------------------------------------
+const FIXTURE_NAME = 'E2E Fixture Asset'
+const FIXTURE_NOTES = 'E2E notes sentinel — must survive a modal save'
+let fixtureHolderId = ''
+
+test.beforeAll(async () => {
+	const { PrismaClient } = await import('@prisma/client')
+	const db = new PrismaClient()
+	try {
+		const org = await db.organization.findFirstOrThrow({ where: { name: 'Veent' } })
+		// An employee who is NOT ACTIVE, so the modal's assignee select cannot list them and must
+		// append the preserved option instead. Offboard a spare rather than creating a user.
+		const holder = await db.employee.findFirstOrThrow({
+			where: { organizationId: org.id, employmentStatus: 'ACTIVE' },
+			orderBy: { lastName: 'desc' }
+		})
+		fixtureHolderId = holder.id
+		await db.employee.update({
+			where: { id: holder.id },
+			data: { employmentStatus: 'OFFBOARDED' }
+		})
+		await db.inventoryItem.deleteMany({ where: { name: FIXTURE_NAME } })
+		await db.inventoryItem.create({
+			data: {
+				organizationId: org.id,
+				name: FIXTURE_NAME,
+				category: 'Laptop',
+				quantity: 1,
+				unit: 'pc',
+				status: 'ASSIGNED',
+				assignedToId: holder.id,
+				notes: FIXTURE_NOTES
+			}
+		})
+	} finally {
+		await db.$disconnect()
+	}
+})
+
+test.afterAll(async () => {
+	const { PrismaClient } = await import('@prisma/client')
+	const db = new PrismaClient()
+	try {
+		await db.inventoryItem.deleteMany({ where: { name: FIXTURE_NAME } })
+		if (fixtureHolderId) {
+			await db.employee.update({
+				where: { id: fixtureHolderId },
+				data: { employmentStatus: 'ACTIVE' }
+			})
+		}
+	} finally {
+		await db.$disconnect()
+	}
+})
+
 test('inactive holder is preserved on save', async ({ page }) => {                // N5-AC5
 	await login(page, USERS.admin)
 	await page.goto('/inventory', { waitUntil: 'domcontentloaded' })
-	await row(page, 'MacBook Pro 14').click()
-	const dlg = page.getByRole('dialog', { name: /^Edit MacBook Pro 14$/ })
+	await row(page, FIXTURE_NAME).click()
+	const dlg = page.getByRole('dialog', { name: new RegExp(`^Edit ${FIXTURE_NAME}$`) })
 	const assigned = dlg.locator('select[name="assignedToId"]')
+
+	// The guard only means something if there IS a holder and they are NOT in the active list.
 	const selectedBefore = await assigned.inputValue()
+	expect(selectedBefore, 'fixture must have an assignee').toBe(fixtureHolderId)
+	await expect(assigned.locator('option:checked')).toHaveText(/— no longer active$/)
+
 	// Save without touching the assignment.
 	await dlg.getByRole('button', { name: 'Save' }).click()
 	await expect(dlg).toHaveCount(0)
-	await row(page, 'MacBook Pro 14').click()
+
+	await row(page, FIXTURE_NAME).click()
 	await expect(
-		page.getByRole('dialog', { name: /^Edit MacBook Pro 14$/ }).locator('select[name="assignedToId"]')
+		page
+			.getByRole('dialog', { name: new RegExp(`^Edit ${FIXTURE_NAME}$`) })
+			.locator('select[name="assignedToId"]')
 	).toHaveValue(selectedBefore)
+	await page.keyboard.press('Escape')
+})
+
+test('a modal save preserves a non-empty notes value', async ({ page }) => {      // N5-AC9
+	await login(page, USERS.admin)
+	await page.goto('/inventory', { waitUntil: 'domcontentloaded' })
+	await row(page, FIXTURE_NAME).click()
+	const dlg = page.getByRole('dialog', { name: new RegExp(`^Edit ${FIXTURE_NAME}$`) })
+
+	// The modal renders the stored notes — the row-edit form never had this field at all.
+	await expect(dlg.locator('textarea[name="notes"]')).toHaveValue(FIXTURE_NOTES)
+
+	// Change something ELSE and save. Notes must come back untouched.
+	await dlg.locator('#i-location').fill('Storage')
+	await dlg.getByRole('button', { name: 'Save' }).click()
+	await expect(dlg).toHaveCount(0)
+
+	await row(page, FIXTURE_NAME).click()
+	const reopened = page.getByRole('dialog', { name: new RegExp(`^Edit ${FIXTURE_NAME}$`) })
+	await expect(reopened.locator('#i-location')).toHaveValue('Storage')
+	await expect(reopened.locator('textarea[name="notes"]')).toHaveValue(FIXTURE_NOTES)
 	await page.keyboard.press('Escape')
 })
 
@@ -2475,7 +2823,7 @@ Each item is one commit, so each rolls back on its own.
 |---|---|---|
 | **N2** | `git revert <commit 1>` | `/settings` and all 17 sub-pages return to the wrapping 17-link bar and the unfiltered card grid. `groupSlug` disappears with it — it has no other consumer. `?g=` becomes an ignored query param. The unscoped assertions at `settings-visibility.spec.ts:57-58` pass before and after, so the revert is provable with an existing test. |
 | **N3** | `git revert <commit 2>` | `/employees/new` returns to the 768px centred column with two Cancels and the bottom submit row. `admin.spec.ts` passes on both sides of the revert — its strict-mode `Create Employee` locator resolves to exactly one element either way. No data path is involved. |
-| **N5** | `git revert <commit 3>` | `/inventory` returns to the nine-editor row and the separate Add form, and to its sideways scroll at 1280. **No data migration, no server change to undo** — `?/create`, `?/update`, `?/remove` and `itemSchema` were never touched, so items created or edited through the modal are indistinguishable from ones created through the old form. `?view=grid` becomes an ignored query param. |
+| **N5** | `git revert <commit 3>` | `/inventory` returns to the nine-editor row and the separate Add form, to its sideways scroll at 1280, **and to silently erasing `notes` on every row save** — see §The `notes` defect. That is the one rollback in this lane with a data cost, and it is why the defect gets its own backlog note rather than living only in this commit. **No data migration, no server change to undo** — `?/create`, `?/update`, `?/remove` and `itemSchema` were never touched, so items created or edited through the modal are indistinguishable from ones created through the old form. `?view=grid` becomes an ignored query param. |
 
 No step in this plan writes to the database, changes a permission, changes a schema, or changes a
 server action. There is nothing to un-migrate in any of the three.
@@ -2506,9 +2854,13 @@ server action. There is nothing to un-migrate in any of the three.
 | `inventory.spec.ts` › "failed save preserves the edit" + **NC-1** | Fully-Automated | N5-AC6 |
 | `inventory.spec.ts` › "focus after delete lands on the list" + **NC-2** | Fully-Automated | N5-AC7 |
 | `inventory.spec.ts` › "row is a button with a name" + "Enter and Space both open, Space does not scroll" + "focus on open, on close, and after delete" + owner theme check (step 33) | Hybrid | N5-AC8 |
+| `inventory.spec.ts` › "a modal save preserves a non-empty notes value" (fixtured — no seed item has notes) | Fully-Automated | **N5-AC9** (plan-added) |
 
-**Vacuous-green statement.** No criterion in this lane is proved by Known-Gap. All 20 have at least
-one Fully-Automated or Hybrid gate. The three Hybrid criteria (N2-AC6, N3-AC6, N5-AC8) are Hybrid
+**Vacuous-green statement.** No criterion in this lane is proved by Known-Gap. All 20 SPEC criteria
+and the 1 plan-added criterion have at least one Fully-Automated or Hybrid gate. **Two of them —
+N5-AC5's inactive-holder clause and N5-AC9 — would have been *vacuously* green against the seed**,
+because all three seed items are unassigned and none has notes; both now run against an explicit
+`beforeAll` fixture that gives the guard something to guard. The three Hybrid criteria (N2-AC6, N3-AC6, N5-AC8) are Hybrid
 for one reason only — the repo has no automated contrast or focus-visibility gate, so the "is the
 ring *visible*" half needs an owner's eye. Every other half of each is automated.
 
@@ -2539,8 +2891,8 @@ a test.**
 
 | Criterion | Steps | Test |
 |---|---|---|
-| N2-AC1 | 1, 2 | N2-T1 |
-| N2-AC2 | 2, 3, 4 | N2-T2 + unchanged `settings-visibility.spec.ts` |
+| N2-AC1 | 1, 2, 5 | N2-T1 |
+| N2-AC2 | 2, 3, 4, 5 | N2-T2 + unchanged `settings-visibility.spec.ts` |
 | N2-AC3 | 1, 2 | N2-T3 |
 | N2-AC4 | 3 | N2-T4 |
 | N2-AC5 | 2 | N2-T5, N2-T6 |
@@ -2555,12 +2907,13 @@ a test.**
 | N5-AC2 | 24, 25, 28 | "rows carry no controls" |
 | N5-AC3 | 20, 21, 23, 25 | "view toggle defaults to list…", "both views open the same modal" |
 | N5-AC4 | 22, 27, 29 | "add item uses the shared modal" + step-29 diff check |
-| N5-AC5 | 26, 27 | rewritten lines 53-54, "inactive holder is preserved on save", "assign invariant" |
+| N5-AC5 | 26, 27 | rewritten lines 53-54, "assign invariant", "inactive holder is preserved on save" **+ the `beforeAll` fixture** |
 | N5-AC6 | 21, 27 | rewritten lines 48-49 + **NC-1** |
 | N5-AC7 | 21, 23 | post-delete focus block + **NC-2** |
 | N5-AC8 | 24, 25, 26, 27 | "row is a button with a name", "Enter and Space…", "focus on open, on close…" + owner theme check |
+| **N5-AC9** (plan-added) | 27 | "a modal save preserves a non-empty notes value" + the `beforeAll` fixture |
 
-**Holes: none.** Every one of the 20 has a step and a gate.
+**Holes: none.** All 20 SPEC criteria have a step and a gate, as does the 1 plan-added criterion.
 
 ---
 
@@ -2631,9 +2984,10 @@ that is the single source.
 | N5-AC6 | A rejected save keeps the modal open AND keeps the edits | Fully-Automated | rewritten lines 48-49 + **NC-1** |
 | N5-AC7 | Focus after a delete never falls to `<body>` | Fully-Automated | post-delete focus block + **NC-2** |
 | N5-AC8 | The row is a real button, named, keyboard-complete, defined focus path | Hybrid | "row is a button…", "Enter and Space…", "focus on open, on close…" + owner theme check (step 33) |
+| **N5-AC9** *(plan-added, not in the SPEC)* | A modal save preserves a non-empty `notes` — see §The `notes` defect | Fully-Automated | "a modal save preserves a non-empty notes value" |
 
-**Coverage: 20 of 20.** No criterion is carried by Known-Gap, and none lacks a step (see
-§Traceability).
+**Coverage: 20 of 20 SPEC criteria, plus 1 plan-added = 21.** No criterion is carried by Known-Gap,
+and none lacks a step (see §Traceability).
 
 ---
 
@@ -2655,6 +3009,15 @@ be marked:
      phase failure.
   4. `tests/e2e/settings-visibility.spec.ts` lines 57-58 are byte-identical to their pre-change
      state and pass.
+  5. The `inventory.spec.ts` fixture's `afterAll` is confirmed to have run: after a full e2e pass,
+     `E2E Fixture Asset` does not exist and the offboarded employee is `ACTIVE` again. A leftover
+     OFFBOARDED employee silently changes what every headcount spec sees on the next run.
+  6. N5-AC9 is green **and** its fixture is confirmed to carry a non-empty `notes` — a green
+     "preserves notes" assertion against an item with no notes proves nothing, which is the same
+     vacuous shape as an unassigned item proving the inactive-holder guard.
+  7. The backlog note `inventory-row-save-erases-notes_NOTE_18-09-26.md` exists, recording the
+     pre-existing data loss independently of this lane. Rolling back Commit 3 reinstates the bug,
+     so the record must not live only inside the commit that happens to fix it.
 - It may **not** be marked VERIFIED on a green suite with a negative control unrun. A criterion
   that stays green through its own mutation has not been proven, and this repo has lost time to
   exactly that on `update({ reset: false })` twice.
@@ -2687,4 +3050,333 @@ The specs most likely to catch a cross-lane regression, and which must be seen g
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: BLOCKED
+Date: 18-09-26
+date: 2026-09-18
+generated-by: outer-pvl
+
+Parallel strategy: sequential
+Rationale: 3/7 signals (S3 three items, S6 none, S7 6+ files). No Agent tool was available in this
+session, so the Layer 1 / Layer 2 fan-out ran sequentially in one context against source. Every
+finding below carries a file:line derived from a read of the tree at `feat/uiux-phase-7`.
+
+### Net gate derivation
+
+| Layer 1 dimension | Status |
+|---|---|
+| Infra fit | PASS |
+| Test coverage | **FAIL** |
+| Breaking changes | PASS |
+| Security surface | PASS |
+
+| Layer 2 section | Status |
+|---|---|
+| N2 — `/settings` Context Rail + search (steps 1-9) | CONCERN |
+| N3 — `/employees/new` Companion Rail (steps 10-19) | **FAIL** |
+| N5 — `/inventory` list + grid + shared modal (steps 20-34) | **FAIL** |
+| Lane split / cross-lane safety | PASS |
+| Negative controls + commit plan | PASS |
+
+**Totals: 3 FAILs / 6 CONCERNs / 5 PASSes → Net Gate: BLOCKED**
+
+### FAILs — each is red against correct code, or silently wrong
+
+**F1 — `basicSalary` is not a field on this page. It is `basicMonthlySalary`.**
+Step 10's `FIELD_ORDER` and N3-T10's `TAB_ORDER` both list `'basicSalary'`. Source:
+`employees/new/+page.svelte:345` `name="basicMonthlySalary"`, `:344` `id="basicMonthlySalary"`,
+`+page.server.ts:82` `basicMonthlySalary: z.coerce.number().positive()`,
+`admin.spec.ts:48,126,157` `getByLabel('Basic Monthly Salary')`.
+Two consequences:
+- `firstErrorField` can never select the salary field — `invalid('basicSalary')` is permanently
+  false — so the N3-AC6 jump silently skips it. Step 10's own guard note ("a name that does not
+  exist is silently never invalid and would make the jump skip a field") describes this exact
+  defect and the plan then ships it.
+- N3-T10 goes **red against correct code**: the walk reaches `id="basicMonthlySalary"`, the
+  single-skip fallback fires, focus advances to `reportsToId`, and the assertion expects
+  `basicSalary`. This is failure mode 2 from the sibling plan that was BLOCKED last round.
+**Fix:** replace both occurrences with `basicMonthlySalary`.
+
+**F2 — `MacBook Pro 14` is not the seed item's name. It is `MacBook Pro 14"` (trailing double quote).**
+Source: `prisma/seed-core.ts:943` `name: 'MacBook Pro 14"'`.
+The new N5 test "inactive holder is preserved on save" uses `row(page, 'MacBook Pro 14')` →
+`[data-name="MacBook Pro 14"]`, which matches nothing, and
+`getByRole('dialog', { name: /^Edit MacBook Pro 14$/ })`, an anchored regex that can never match
+the real accessible name `Edit MacBook Pro 14"`. Red against correct code. The embedded `"` also
+cannot be expressed in the step-30 `[data-name="…"]` helper without escaping.
+**Fix:** use `Office Chair` (`seed-core.ts:959`) or escape the quote and fix both anchors.
+
+**F3 — N5-AC5's inactive-holder clause has no fixture and cannot be proven.**
+All three seed items are unassigned: `inv_seed_1/2/3` carry no `assignedToId`
+(`seed-core.ts:938-978`). The test saves without touching the assignee, so `selectedBefore` is
+`''` and the assertion is vacuously green — it proves nothing about "an item held by an employee
+who is no longer active still offers that holder as the selected option ... and saving without
+touching the field does not drop the assignment" (SPEC N5-AC5). One of the 20 criteria is
+therefore carried by a vacuous gate, not a real one.
+**Fix:** have the test build its own fixture (create an item, assign it, then assert the option is
+present and survives a save), or split the clause out as a named residual with a backlog stub.
+
+### CONCERNs
+
+**C1 — N3-T10's single-skip fallback is a weaker assertion than the plan forbids.**
+`if (id !== TAB_ORDER[i]) { await page.keyboard.press('Tab') }` tolerates one unexpected stop at
+**every** position, so a genuine tab-order regression that inserts one stop passes green. The
+plan's own execution note says "Do not loosen the assertion to 'contains' — the criterion is an
+order", and then ships a loosening of a different shape. The flagged unknown itself resolves:
+`DatePicker.svelte:661` is the input and `:691` is the calendar trigger `<button>`, so Start Date
+adds **exactly one** extra stop. Pin the sequence now rather than measuring at EXECUTE.
+
+**C2 — Three wrong line citations in an evidence table two gates rest on.**
+`Dialog.svelte:125` is cited twice (measured-facts table and step 27) as the source of
+`max-h-[90vh]`; the real line is **`Dialog.svelte:149`** (`:125` is a focus-trap comment). The
+substance is correct — `scroll` is the only thing that adds
+`flex max-h-[90vh] flex-col overflow-hidden` — but "named the wrong lines" is the third reason the
+sibling plan was BLOCKED. Also wrong: `ConfirmButton.svelte:52` for the `<form class="contents">`
+(real line **91**), `inventory/+page.svelte:21-22`/`:23-24` for `inputClass`/`cellInputClass`
+(real **22-23**/**24-25**), `inventory/+page.server.ts:20-24`/`:42` for the filter/return (real
+**21-25**/**43**), and `settings-destinations.ts:68 :106 :114 :171 :182` for the gated entries
+(those are the `label:` lines; the `capabilities:` lines are **77, 109, 118, 177, 185**). Every
+one of these is a cite offset, not a substance error — but they must be corrected.
+
+**C3 — Step 23's flex shell is inert, and its sticky `thead` cannot stick.**
+Step 23 gives the `<section>` `flex min-h-0 flex-1 flex-col overflow-hidden` and step 24 gives the
+`<thead>` `sticky top-0`. That works on `/team` because `team/+page.svelte:36` wraps the page in
+`flex min-h-[calc(100dvh-6rem)] flex-col lg:h-[calc(100dvh-4rem)] lg:min-h-0`. `/inventory`'s
+wrapper is `inventory/+page.svelte:32` `<div class="space-y-6">` — a block box — and **no step
+changes it**. So `flex-1`/`min-h-0` do nothing, the inner `overflow-y-auto` never becomes a
+scrollport, and the sticky `thead` sticks to a container that never scrolls (the repo already
+recorded "sticky thead needs a scrollport"). No assertion goes red; the classes are simply dead.
+**Fix:** either adopt `/team`'s outer wrapper or drop the inert classes and the `sticky` thead.
+
+**C4 — N2-T7's focus-ring probe uses programmatic `.focus()` to trigger `:focus-visible`.**
+`getComputedStyle(el).boxShadow !== 'none'` **does** distinguish focused from unfocused here — the
+bar links carry no other box-shadow, so unfocused is `none` and a Tailwind `ring-2` is a
+box-shadow (verified: `settings/+layout.svelte:47-49` is colour-only today, so the gate is
+genuinely red-on-arrival). The risk is `locator.focus()` in Chromium not matching `:focus-visible`
+after any prior mouse interaction in the same page. Prefer `page.keyboard.press('Tab')` to reach
+each link, or assert immediately after a `goto` with no click.
+
+**C5 — N3-T6 contains one vacuous line.**
+`expect(focused).not.toBe('body')` can never fire: `document.activeElement?.id` for `<body>` is
+`''`, already covered by the preceding `not.toBe('')`. Harmless, but it reads as a guard and is
+not one. (Its `aria-invalid` check is sound — `employees/new/+page.svelte:111,127,…` sets it, and
+`lastName` at `:127` is the field the test will land on.)
+
+**C6 — the spec-side import of `src/lib/settings-destinations.ts` is unproven under Playwright.**
+`settings-context-rail.spec.ts` imports `visibleSettings` from `../../src/lib/settings-destinations`,
+which imports `$lib/rbac` at `settings-destinations.ts:2`. The two existing specs that import from
+`src/` (`timelog-replay.spec.ts:5`, `timesheet-punch.spec.ts:4`) import a module with no `$lib`
+alias in it. Playwright resolves `tsconfig` paths, so this very likely works — but if it does not,
+N2-T1 and N2-T2 do not run at all. Add a 30-second pre-flight before writing the spec.
+
+### Verified claims (A–F), each against source
+
+**A1 CONFIRMED (with the plan understating its own coverage).** `(app)/+layout.svelte:650`
+`lg:pl-60` (240) and `:651` `lg:p-8` (32/side) give content `= viewport − 304` from `lg`, and
+`p-4` gives `viewport − 32` below. `tailwind.config.ts` declares **no** `screens` key (only
+`.scrollbar-none` at `:68`), so `2xl` is stock 1536. Six widths recompute exactly to the plan's
+table (358 / 720 / 976 / 1136 / 944 / 1328). Left at `xl:`, 1280 → 976 − 288 = **688**, below
+today's 768 cap at `employees/new/+page.svelte:78`. The plan's sub-claim that "every other width
+assertion still passes" under `xl:` is **REFUTED**: 1440 would render 848 against an expected
+1136 ±8, so N3-T1 catches the mistake at two widths, not one. The guard is stronger than claimed.
+
+**A2 CONFIRMED.** `hidden` is `display:none`, which removes a link from the tab order; SPEC N3-AC3
+requires the section links "reachable by keyboard" at 390. The plan's `flex flex-wrap … 2xl:block`
+never uses `hidden`, and N3-T5 proves it by focusing `Employment Details` at four widths.
+
+**A3 CONFIRMED in reasoning, REFUTED in the shipped list.** `Object.keys(fieldErrors)[0]` is
+server insertion order, so the report's approach is genuinely wrong. `OPTIONAL_FIELDS` at
+`employees/new/+page.svelte:43-55` **does** match DOM order — its 11 names map to `:428, :442,
+:456, :470, :491, :502, :512, :528, :538, :547, :563`, strictly ascending — and spreading it into
+`FIELD_ORDER` means the two cannot drift. The 18-name required block matches `:110 → :390` in
+order **except** `basicSalary` (see **F1**). Note also that `OPTIONAL_FIELDS.length` is 11 while
+the frozen summary says 12; the plan correctly declares that out of scope.
+
+**A4 CONFIRMED.** A bare `href="#id"` scrolls and only focuses by browser grace; SPEC N3-AC6
+requires focus to land. The plan's `preventDefault()` + `scrollIntoView` + `.focus()` with the
+`href` kept as the no-JS fallback is right, and the disclosure auto-open (`:412`
+`open={optionalHasError}`) fires on the same render, so a target inside it is focusable when the
+click lands.
+
+**A5 CONFIRMED.** `settings-destinations.ts` holds 17 entries; 5 are capability-gated
+(`:77, :109, :118, :177, :185`). `System` holds only Review Schedule (`ADMINISTER_HR_ORGWIDE`) and
+Document Backup (`ADMINISTER_SYSTEM`); `rbac.ts:36` grants the first to HR_ADMIN/SUPER_ADMIN/CEO
+and `:58` the second to SUPER_ADMIN/CEO, so **MANAGER holds neither and the System chip does not
+render**. Destinations resolve to SUPER_ADMIN 17 / HR_ADMIN 14 / MANAGER 12 and groups to
+**5 / 5 / 4**. MANAGER can reach `/settings` (`+page.server.ts:8` requires `MANAGE_HR`, granted to
+MANAGER at `rbac.ts:26`), so the MANAGER case really runs. Every count in the test plan derives
+from `expected(roles)`; no literal group count appears anywhere.
+
+**B CONFIRMED, one item qualified.**
+- **No source-scanning unit test in this lane.** Verified: the test plan writes three e2e files and
+  zero unit files, so hazard 1 cannot occur here by construction. (The build lane does ship one —
+  `tests/unit/page-header-helptip.test.ts` — which is out of this lane's scope.)
+- **Counts.** `Create Employee` = **1** today (`:580-586`) and 1 after — green on both sides, red
+  only on a real duplicate. `Cancel` = **2** today (`:79` header via `PageHeader` `back()` at
+  `:80-82`, plus `:579` in the submit row) and 1 after, so the `=== 1` assertion is red on the
+  untouched tree; the plan ships it in the same commit as the step-15 deletion (Commit 2). Correct.
+- **`toBeVisible()` never used for a reveal.** Verified across all three specs. The focus-ring
+  probe uses `getComputedStyle` and does distinguish — see **C4** for the one execution caveat.
+- **Negative controls.** NC-1's mutation (`update({ reset: false })` → `update()`) and NC-2's
+  (drop `listEl?.focus()`) each name an exact red. NC-1's mechanism is confirmed at
+  `submit-feedback.svelte.ts:56,70,82,90` — returning a callback from `inner` sets `after`, and
+  `if (!after) await o.update()` is what the plan relies on, so the modal's own `update()` options
+  really do govern. NC-2's mechanism is confirmed at `Dialog.svelte:87` `return () =>
+  trigger?.focus()` on a node the delete detached. Both run `-g "enforces the assign invariant"`,
+  which matches the real test title. Both reverts are explicitly gated on Commit 3 landing first,
+  with a `git status --short` check named — correct and correctly justified.
+- **Duplicate controls.** N3-T7 counts with `document.querySelectorAll` at six widths, which does
+  not skip hidden nodes. The aside uses `2xl:sticky`, `2xl:top-8`, `2xl:block`, `2xl:space-y-0.5`
+  and **no `hidden`/`block` pair anywhere** — verified line by line through step 15. There is
+  genuinely no place for a hidden duplicate to live, so `admin.spec.ts:49`'s strict-mode locator
+  keeps resolving to one node.
+- **Serial mode.** All three specs declare `test.describe.configure({ mode: 'serial' })` and read
+  totals from the page; `inventory.spec.ts:7` already has it. `pagination.spec.ts` seeding
+  `Zzpagetest` rows under `fullyParallel: true` (`playwright.config.ts:20`) is the reason, and the
+  plan states it.
+
+**C CONFIRMED except F2/F3.**
+- **Server surface.** `itemSchema` at `+page.server.ts:46-61` is exactly the ten names the modal
+  posts — `name, category, quantity, unit, location, status, assignedToId, serialNumber, value,
+  notes` — and `update` reads `id` at `:114`. The plan changes two lines in `load` only, and
+  step 29 gates that with a `git diff` check. **`notes` verified as drift**: it exists in the Add
+  form (`inventory/+page.svelte:168`) and **not** in the row editor (`:217-294` has nine names, no
+  `notes`). Worth recording: today a row `Save` posts no `notes`, so `inputOf` at `:74` writes
+  `notes: null` and **every row save silently wipes the item's notes**. Folding the two forms
+  fixes a live data-loss bug, it does not introduce one.
+- **Row is a real button.** `EmployeeTable.svelte:29` is the `relative … has-[a:focus-visible]`
+  `<tr>` and `:35` the stretched `after:absolute after:inset-0` — cited correctly, and the plan
+  adapts the selector to `has-[button:focus-visible]`. `Table.svelte`'s `onRowClick` is correctly
+  rejected: `:95` puts `role="button"` on the `<tr>` and `:92-93` handles
+  `e.key === 'Enter' || e.key === ' '` with **no `preventDefault`**, so Space scrolls. A native
+  `<button type="button">` gives Enter and Space with no scroll for free. Every element inside the
+  button in steps 24/25 is a `<span>` (phrasing content) — `Table.svelte:119-121` documents why
+  this matters.
+- **Dialog props.** `scroll` is the only source of `max-h-[90vh]` — `Dialog.svelte:149` (the
+  plan's `:125` is wrong, see **C2**). `SIZES.wide` is `max-w-lg sm:max-w-2xl lg:max-w-4xl`
+  (`:63-69`) as claimed. `ConfirmDialog.svelte:34` is hard-wired `zIndex={60}`, so the parent must
+  pass 50 — correct. The no-overflow argument holds: with `scroll` the panel is
+  `flex max-h-[90vh] flex-col overflow-hidden`, the form is `flex min-h-0 flex-1 flex-col`, the
+  field grid is `min-h-0 flex-1 overflow-y-auto`, and the backdrop's `p-4` caps the panel at 358px
+  at a 390 viewport. At 1280×360 the 90vh cap is 324 against the test's ≤325 bound.
+- **Inactive-assignee guard preserved.** `inventory/+page.svelte:276-280` is carried into the
+  modal with its two-line comment byte-for-byte, plus the `— no longer active` label SPEC N5-AC5
+  asks for. Preserved. Its **test** is not — see **F2** and **F3**.
+- **`inventory.spec.ts` line replacements.** Line 10's helper correctly becomes
+  `[data-name="…"]:visible`, which is required because list view renders the table **and** an
+  `sm:hidden` card grid, so both carry `data-name` and exactly one is visible at any width.
+  Lines 38-39, 43-44, 48-49 and 53-54 all map correctly onto the new modal, and line 54's
+  `getByRole('alertdialog')` still disambiguates because `ConfirmDialog.svelte:34` sets
+  `role="alertdialog"`. Only the new inactive-holder scenario is wrong.
+
+**D CONFIRMED.** `settings-visibility.spec.ts:57-58` are unscoped
+`getByRole('link', { name: /Payroll Config/ | /Roles & Access/ }).toHaveCount(0)` for HR Admin and
+Manager. Neither destination is visible to either role, and the Context Rail renders only group
+names (`Payroll`, `Organization`) which do not contain either string — so the assertions still
+pass and are **not** weakened. The plan changes no locator and no assertion in that file. The
+comment at `:32-34` ("matches three links") does go stale — after N2 the hub card and the sidebar
+row are the only two — and the plan's replacement text is accurate, ships in the same commit, and
+preserves the historical note.
+
+**E CONFIRMED — the two lanes are safe to run concurrently.** The build lane's own Touchpoints
+(build-lane PLAN `:42-65`) name five source files and seven test files; not one appears in this
+lane's ten. The design lane never edits `PageHeader.svelte` and never touches the `relative` div
+at `PageHeader.svelte:35` that `HelpTip` anchors to — N2's search control is laid out by the page
+**beside** `PageHeader`, never inside it. The one named cross-lane risk is real:
+`settings-org-assignments.spec.ts` is a **new** build-lane spec on `/settings/org`, a page that
+gains a sibling row under N2; the mitigation ("whichever lane lands second runs the other's specs
+before committing") is adequate, and that spec should simply be written with scoped locators.
+One interaction the plan does not name but which is benign: N7 removes the visible description
+`<p>` (`PageHeader.svelte:39-41`), shortening the header block from ~56px to ~32px. N2-T4 asserts
+the search box's vertical mid-point is within 24px of the `<h1>`'s — the search is a flex sibling
+with `items-start`, so it aligns to the top either way and the assertion holds before and after N7.
+
+**F CONFIRMED as the right call, with one exception.** Refusing to loosen an order assertion to a
+set assertion is correct — N3-AC6 is a sequence. The unknown resolves cleanly:
+`DatePicker.svelte:661` renders the input and `:691` the calendar trigger button, so Start Date
+inserts exactly one stop. The plan does **not** smuggle a weaker assertion anywhere else (N3-T7
+uses DOM-level counts, N2-T4 asserts alignment *and* separation, N5's focus checks assert by
+identity) — **except** in N3-T10 itself, where the single-skip fallback is the weakening. See **C1**.
+
+### Standing constraints — all clear
+
+| Constraint | Verdict |
+|---|---|
+| Never touch `rbac.ts`, `schema.prisma`, `services/**` | **PASS** — no step reads or writes them; `visibleSettings` is imported, `rbac.ts` is read-only, and Phase Completion Rules make a staged path in any of the three a phase failure |
+| No explanatory comments added to source | **PASS** — every comment in the replacement markup is an existing one carried verbatim (`settings/+layout.svelte:11-12`, `settings/+page.svelte:13-14` and `:31`, `inventory/+page.svelte:277-278`, `inventory.spec.ts:4-6`). No new narration found |
+| `Complete later — 12 optional fields` byte-for-byte | **PASS** — `employees/new/+page.svelte:413` is untouched by steps 13/14; N3-T8 asserts the exact string; `admin.spec.ts:128,159` keep clicking it |
+| `admin.spec.ts:49` strict-mode locator | **PASS** — exactly one `Create Employee` node in the DOM at all six widths, no `hidden`/`block` pair |
+| bun 1.4, `bun run <script>`, CI order | **PASS** — the §Gates block reproduces the required order exactly and records the `test:e2e -- <spec>` filter bug and the never-bare-`bun test` rule |
+| No `./start.sh`, vite or docker | **PASS** — every live check is an e2e spec or an owner step (8, 33) |
+| No sideways scroll, 390px, modals never overflow | **PASS** — asserted at 390/1280/1920 for N2 and N5, six widths for N3, and a deliberate 1280×360 for the modal |
+| Never `git add -A`; no AI attribution | **PASS** — all four commits stage explicit paths; the drafted messages carry no trailer or footer |
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| N2-AC1 | Bar lists groups, not destinations | Fully-Automated | `settings-context-rail.spec.ts` › "bar lists groups only" (derived per role) | A |
+| N2-AC2 | Each destination listed exactly once on the hub | Fully-Automated | same spec › "no destination is listed twice" + unchanged `settings-visibility.spec.ts:57-58` | A |
+| N2-AC3 | Sibling row only on sub-pages, siblings only | Fully-Automated | same spec › "siblings only, sub-page only" | A |
+| N2-AC4 | Search top-right, filters destinations only | Fully-Automated | same spec › "search filters the cards only" (alignment + separation) | A |
+| N2-AC5 | One line, no sideways scroll, 3 roles × 3 widths | Fully-Automated | same spec › "one line…" + "no sideways scroll" | A |
+| N2-AC6 | Landmark, current-state, focus ring, announcement | Hybrid | same spec › "keyboard order, current-state and focus rings" + owner theme check (step 8) | B (C4 execution fix) |
+| N3-AC1 | Full bleed, never narrower than today | Fully-Automated | `employees-new-layout.spec.ts` › "form column widths at six viewports" + "no sideways scroll" | A |
+| N3-AC2 | Sticky 256px aside at `2xl` and up | Fully-Automated | same spec › "rail is a sticky aside at 1536 and 1920" + "no rail at 1440" | A |
+| N3-AC3 | Same four things stack below `2xl`; jump survives at 390 | Fully-Automated | same spec › "rail contents stack…" + "jump to first error works at 390" | B (F1 fix) |
+| N3-AC4 | Exactly one `Create Employee` and one `Cancel` | Fully-Automated | same spec › "exactly one … at six widths" (DOM counts) + unchanged `admin.spec.ts` | A |
+| N3-AC5 | Disclosure text and behaviour frozen; rail does not move | Fully-Automated | same spec › "disclosure text frozen" + "opening the disclosure does not move the rail" | A |
+| N3-AC6 | Tab order, jump moves focus, one `h1` | Hybrid | same spec › "tab order unchanged above and below 2xl" + "jump…" + "one h1" + owner theme check | **B (F1 + C1 fix — red as written)** |
+| N5-AC1 | Nothing overflows: page or modal | Fully-Automated | `inventory.spec.ts` › "no sideways scroll at three widths in both views" + "modal fits three viewports…" | A |
+| N5-AC2 | Row is purely clickable; nothing on it edits | Fully-Automated | same spec › "rows carry no controls" | A |
+| N5-AC3 | Two views, `/team`-style toggle, List by default | Fully-Automated | same spec › "view toggle defaults to list…" + "both views open the same modal" | A |
+| N5-AC4 | One modal for create and edit; old add form gone | Fully-Automated | same spec › "add item uses the shared modal" (field-name equality) + step-29 server diff | A |
+| N5-AC5 | Delete in modal; assign invariant; inactive holder preserved | Fully-Automated | same spec rewritten `:53-54` + "assign invariant" + "inactive holder is preserved on save" | **B (F2) / D (F3 — inactive-holder clause has no fixture)** |
+| N5-AC6 | Rejected save keeps the modal open AND the edits | Fully-Automated | same spec rewritten `:48-49` + **NC-1** | A |
+| N5-AC7 | Focus after delete never falls to `<body>` | Fully-Automated | same spec post-delete identity block + **NC-2** | A |
+| N5-AC8 | Row is a real named button, keyboard-complete | Hybrid | same spec › "row is a button…" + "Enter and Space…" + "focus on open, on close…" + owner theme check (step 33) | A |
+
+gap-resolution legend: A — proven now. B — fixed in this plan (a supplement adds the gate/fix).
+C — deferred to a named later phase. D — backlog test-building stub (named residual).
+
+Legacy line form:
+- N2 `/settings` + `/settings/*`: Fully-automated: `CI=1 bun run exec dotenv -e .env.dev -- playwright test tests/e2e/settings-context-rail.spec.ts tests/e2e/settings-visibility.spec.ts` | hybrid: owner confirms the bar focus ring in light and dark (step 8)
+- N3 `/employees/new`: Fully-automated: `CI=1 bun run exec dotenv -e .env.dev -- playwright test tests/e2e/employees-new-layout.spec.ts tests/e2e/admin.spec.ts` | hybrid: owner confirms the rail focus ring in light and dark (step 8)
+- N5 `/inventory`: Fully-automated: `CI=1 bun run exec dotenv -e .env.dev -- playwright test tests/e2e/inventory.spec.ts` + NC-1 and NC-2 recorded red | hybrid: owner confirms the row focus indicator in both views and themes (step 33)
+- Whole lane: Fully-automated: `bun run format:check && bun run lint && bun run check && bun run test`, then `bun run test:e2e` unfiltered
+- Inactive-holder clause of N5-AC5: known-gap: no seed item is assigned to anyone (`seed-core.ts:938-978`) — needs a self-built fixture
+
+Dimension findings:
+- Infra fit: PASS — six source files, three e2e files, one comment. No container, no port, no runtime surface. Every cited helper (`Dialog`, `ConfirmButton`, `SearchInput`, `EmptyState`, `Pagination`, `Badge`) exists with the props the plan passes; `Pagination.svelte:28-29` renders its `<nav>` only above one page, which is exactly what step 23's `has-[nav]:` classes handle.
+- Test coverage: **FAIL** — two specs are red against correct code (**F1**, **F2**) and one criterion clause is proved by a vacuous assertion (**F3**). The rest of the coverage is strong: both negative controls are real, no reveal is asserted with `toBeVisible()`, and every count is derived rather than hardcoded.
+- Breaking changes: PASS — `itemSchema` and all three inventory actions are unchanged and diff-gated (step 29); `groupSlug` is a new export with two in-repo consumers; `?g=` and `?view=` are additive read-only params that degrade to "show everything" / "list"; `settings-visibility.spec.ts:57-58` survives byte-identical.
+- Security surface: PASS — no auth, billing, schema, secret or trust-boundary change. `visibleSettings` is read, never redefined; the server guards (`settings/+page.server.ts:8`, `inventory/+page.server.ts:18,99,112,129`) are untouched, so the group row can only ever hide links the server already refuses.
+- N2 section feasibility: CONCERN — every edit target is present and uniquely matchable; both `{@const}` are immediate children of an `{#each}`; the one open item is **C6** (the spec's `src/` import under Playwright) and **C4** (programmatic `:focus-visible`). Highest-risk edit: the full rewrite of `settings/+layout.svelte` — mitigate by keeping `settings-visibility.spec.ts` green as the first gate after Commit 1.
+- N3 section feasibility: **FAIL** — targets at `:78`, `:101/:149/:175/:244`, `:246/:423/:523`, `:412-413`, `:578-587` are all present and verbatim-correct, but **F1** makes both the jump index and the tab-order walk wrong. Highest-risk edit: the step-12/14 `<div class="space-y-8">` open/close pair — an unbalanced tag fails `bun run check` loudly, which is the cheap guard.
+- N5 section feasibility: **FAIL** — the page rewrite is mechanically sound and every Dialog/ConfirmButton prop is real, but **F2** and **F3** make the inactive-holder scenario unrunnable and unproven, and **C3** leaves a dead flex/sticky shell. Highest-risk edit: `update({ reset: false })`, correctly identified by the plan and correctly guarded by NC-1.
+
+Open gaps:
+- N5-AC5 inactive-holder clause: known-gap until the test builds its own assigned-then-inactive fixture — no seed item carries an `assignedToId` (`prisma/seed-core.ts:938-978`).
+- No automated focus-visibility or contrast gate exists in this repo, which is the sole reason N2-AC6, N3-AC6 and N5-AC8 are Hybrid rather than Fully-Automated. Named in the plan's own Test Infra Improvement Notes; backlog candidate, not a blocker.
+- `bun run test:e2e -- <spec>` silently ignores its filter. Already a backlog note; every gate in this plan works around it.
+
+What this coverage does NOT prove:
+- The e2e suite does not prove any focus ring or focus indicator is **visible** or has contrast in either theme — only that a `box-shadow` other than `none` is computed. That half is the owner's eye (steps 8 and 33) and has no machine substitute here.
+- `documentElement.scrollWidth − clientWidth === 0` proves no page-level sideways scroll; it does not prove nothing is clipped. Step 23's `overflow-hidden` on the items section can hide an overflow rather than prevent it, and no assertion distinguishes the two.
+- The width table proves the form column's rendered width; it does not prove any field inside it is usable at that width — 4-up at 224px per cell at 1536 is asserted nowhere.
+- `expect(after!.y).toBe(before!.y)` in N3-T9 proves the aside did not move when the disclosure opened at 1920; it proves nothing at 1536, where the sticky column is narrowest.
+- The `Create Employee` / `Cancel` DOM counts prove node count, not that the surviving control submits the right form. Only `admin.spec.ts`'s end-to-end onboarding run proves that, and it is unchanged.
+- NC-1 and NC-2 prove their two assertions are non-vacuous. No negative control exists for N2 or N3, so N2-T1/T2's derived counts and N3-T7's DOM counts are unproven against a deliberately broken tree.
+- `tests/unit/settings-cards.test.ts` and `tests/unit/settings-destinations.test.ts` assert off the load, not the markup — seeing them green proves N2 did not change data, not that N2 rendered anything.
+- Nothing in this lane proves behaviour under the build lane's N7 change; only the full unfiltered `bun run test:e2e` after both lanes land does.
+
+Gate: BLOCKED (3 unresolved FAILs — F1, F2, F3)
+Accepted by: — (no CONDITIONAL acceptance; BLOCKED)
+
+SUPPLEMENT REQUEST:
+- Gap 1: Section implementation-checklist | Concern: Step 10's `FIELD_ORDER` and N3-T10's `TAB_ORDER` both name `basicSalary`; the real field is `basicMonthlySalary` (`employees/new/+page.svelte:345`, `+page.server.ts:82`) — the jump silently skips the field and N3-T10 is red against correct code | Severity: FAIL | Suggested addition: replace `'basicSalary'` with `'basicMonthlySalary'` in both lists and re-state the step-10 verification as a mandatory `grep` diff of the 18 names against `name="` in DOM order.
+- Gap 2: Section test-plan | Concern: the N5 "inactive holder is preserved on save" test targets `MacBook Pro 14`, but the seed item is `MacBook Pro 14"` (`prisma/seed-core.ts:943`), so both the `[data-name]` helper and the `/^Edit MacBook Pro 14$/` anchor match nothing | Severity: FAIL | Suggested addition: retarget the scenario at `Office Chair` (or escape the quote) and fix both anchors.
+- Gap 3: Section test-plan | Concern: no seed item carries an `assignedToId` (`seed-core.ts:938-978`), so N5-AC5's inactive-holder clause is proved by a vacuous assertion (`selectedBefore` is `''`) | Severity: FAIL | Suggested addition: have the scenario build its own fixture — create an item, assign it, assert the option renders with the `— no longer active` label and survives an untouched save — or declare the clause a named residual with a backlog stub.
+- Gap 4: Section test-plan | Concern: N3-T10's `if (id !== TAB_ORDER[i]) press Tab` fallback tolerates one unexpected stop at every position, contradicting the plan's own "do not loosen" note | Severity: CONCERN | Suggested addition: pin the exact sequence now — `DatePicker.svelte:661` input then `:691` trigger button means Start Date adds exactly one stop — and delete the fallback.
+- Gap 5: Section measured-facts | Concern: `Dialog.svelte:125` (twice), `ConfirmButton.svelte:52`, `inventory/+page.svelte:21-24`, `inventory/+page.server.ts:20-24`/`:42` and the five `settings-destinations.ts` capability lines are all wrong by one or more lines | Severity: CONCERN | Suggested addition: correct to `Dialog.svelte:149`, `ConfirmButton.svelte:91`, `inventory/+page.svelte:22-25`, `+page.server.ts:21-25`/`:43`, `settings-destinations.ts:77,109,118,177,185`.
+- Gap 6: Section implementation-checklist | Concern: step 23's `flex min-h-0 flex-1 overflow-hidden` and step 24's `sticky top-0` thead are inert because `inventory/+page.svelte:32` is a `space-y-6` block, unlike `team/+page.svelte:36` | Severity: CONCERN | Suggested addition: either adopt `/team`'s outer wrapper in a new step, or drop the inert flex classes and the sticky thead.
+- Gap 7: Section test-plan | Concern: N2-T7 relies on programmatic `.focus()` matching `:focus-visible`, and `settings-context-rail.spec.ts` imports `$lib`-aliased `src/lib/settings-destinations.ts` under Playwright — both unproven | Severity: CONCERN | Suggested addition: reach each link with `keyboard.press('Tab')` instead of `.focus()`, and add a one-command pre-flight that the `src/` import resolves before the spec is written.
