@@ -1162,7 +1162,9 @@ separate item — there is already a backlog note in this feature for the same i
 ### Step 24 — the table snippet
 
 Add above the `<section>`, with `const th = 'px-4 py-2 text-left text-xs font-medium text-muted-foreground'`
-in the script (lifted from `EmployeeTable.svelte:12`):
+in the script. **Adapted from `EmployeeTable.svelte:12`, not copied** — that constant is
+`'px-4 py-2 text-left font-medium text-muted-foreground'` with **no `text-xs`**; the `text-xs` above
+is added here for the denser inventory header. Do not cite `:12` as the source of the `text-xs`:
 
 ```svelte
 {#snippet itemTable()}
@@ -1227,8 +1229,34 @@ fixed-width input and no `overflow-x-auto` wrapper — the three things that mad
 1438px. The scroll wrapper is deliberately **not** kept: keeping it would hide a regression instead
 of preventing one (N5-AC1a).
 
+### Why the `min-w-max` restore was rejected as N5-AC1's mutation
+
+The obvious negative control — "put `min-w-max` back" — **is not reliable on this table, and a
+control that may stay green is worse than none.** Under `table-layout: fixed` the intrinsic
+(max-content) width is resolved from the *specified* column widths (`w-[38%]`, `w-20`, `w-28`, and
+the `hidden` ones), not from cell content, and every text cell additionally carries `truncate`. So
+`min-width: max-content` most likely resolves at or under the container width, no overflow appears,
+and the test passes while proving nothing. That is the exact vacuous shape this lane is being held
+to.
+
+**Named mutation instead: add `min-w-[1600px]` to the `<table>` in step 24.** 1600 > the 942px
+available at 1280, so `scrollWidth − clientWidth > 0` is forced — deterministically, with no
+dependence on content, seed data or font metrics. It reproduces exactly the defect the criterion
+guards: the pre-rewrite table needed ~1438px at 942 available (`inventory/+page.svelte:194`).
+
+**EXECUTE may prefer the realistic restore if — and only if — it actually reds.** Remove
+`table-fixed`, remove every `truncate`, and add `min-w-max`; if that turns the test red against the
+real page, record it and use it, because it is closer to the regression being guarded. If it stays
+green, **do not record it as a control and do not weaken the assertion** — fall back to
+`min-w-[1600px]`. Record in the phase report which of the two was used.
+
 **The row is a real `<button type="button">`,** stretched with `after:absolute after:inset-0`,
-copying `EmployeeTable.svelte:29,35`. `Table.svelte`'s `onRowClick` — `role="button"` on a `<tr>`,
+adapting `EmployeeTable.svelte:32-36`. **The precedent is the stretch technique, not the element:**
+that row's stretched control is an `<a href>` (opens at `:32`, `after:absolute after:inset-0` on its
+class at `:35`), and the row's focus-within hook at `:29` is `has-[a:focus-visible]`. This plan keeps
+the stretch verbatim and deliberately changes the element to `<button type="button">` — the target
+is a dialog, not a navigation, so there is no href to give an anchor — and changes the row hook to
+`has-[button:focus-visible]` to match. `Table.svelte`'s `onRowClick` — `role="button"` on a `<tr>`,
 and a Space handler with no `preventDefault` — is rejected by the SPEC and not used. Native
 `<button>` gives Enter **and** Space for free, and Space does not scroll (N5-AC8).
 
@@ -1709,13 +1737,13 @@ under Playwright before this spec is written.
 |---|---|---|---|
 | **N2-T1** bar lists groups, not destinations | N2-AC1 | In `settings/+layout.svelte`, render the visible **destinations** in the first row instead of the groups | The bar's link count exceeds `groups + 1`, and a destination label resolves inside the bar |
 | **N2-T2** no destination is listed twice on the hub | N2-AC2 | Duplicate the hub's card `{#each}` block | The hub resolves 2 links for a destination where it must resolve 1 |
-| **N2-T3** siblings only, and only on a sub-page | N2-AC3 | Drop the "is there a current destination" guard, so the sibling row also renders on the hub | The hub renders two rows where it must render one |
+| **N2-T3** siblings only, and only on a sub-page | N2-AC3 | **Substitute a group** so the sibling row renders non-empty on the hub: `const siblings = $derived(visible.filter((d) => d.group === (current?.group ?? groups[0])))` | The hub renders two rows where it must render one |
 | **N2-T4** search filters the cards and nothing else | N2-AC4 | Make the search input a no-op (drop the filter predicate) | The filtered card count equals the unfiltered count |
-| **N2-T5** one line, three widths, three roles | N2-AC5 | Remove the no-wrap on the group row | The row's height for one role exceeds one chip line |
+| **N2-T5** one line, three widths, three roles | N2-AC5 | **Add `flex-wrap` and remove `overflow-x-auto`** from the group row's inner div | The row's height for one role exceeds one chip line |
 | **N2-T6** no sideways scroll | N2-AC5 | Give the group row a fixed width wider than the narrow viewport | `scrollWidth − clientWidth` is greater than 0 at 390 |
 | **N2-T7a** current state | N2-AC6 | Delete the `aria-current` write on the bar links | The hub link and the selected group link carry no current-state token |
 | **N2-T7b** focus ring on every bar link | N2-AC6 | Delete the focus-ring class from the bar link | The computed `box-shadow` on a Tab-focused bar link is `none` |
-| **N2-T7c** tab order | N2-AC6 | Move the search control before the bar in the DOM | The walk reaches the search box before the last group link |
+| **N2-T7c** tab order | N2-AC6 | **Move the `<nav>` below `{@render children()}`** in `settings/+layout.svelte` | The walk reaches the search box before the last group link |
 | **N2-T7d** the match count is announced | N2-AC6 | Delete the polite live region from the hub | The hub contains no polite live region |
 
 **N2-T7 authoring notes — three page realities the assertions must respect:**
@@ -1754,7 +1782,7 @@ Serial mode. Six viewports throughout: **390, 1024, 1280, 1440, 1536, 1920**.
 | **N3-T2** no sideways scroll | N3-AC1 | Give the form column a fixed min-width above the narrow viewport | `scrollWidth − clientWidth` > 0 at 390 |
 | **N3-T3** sticky aside at 1536 and 1920 | N3-AC2 | Drop `2xl:sticky` | The aside's top moves with the wheel |
 | **N3-T4** no 256px column at 1440 | N3-AC2 | Change the gate to `xl:` | At 1440 the aside is a 256px column beside the form, not a block under it |
-| **N3-T5** rail contents stack and stay reachable below `2xl` | N3-AC3 | Add `hidden` to the section-link nav below `2xl` (what the design report said) | The nav's links are absent from the DOM and the focus step fails |
+| **N3-T5** rail contents stack and stay reachable below `2xl` | N3-AC3 | Add `hidden` to the section-link nav below `2xl` (what the design report said) | **The focus step fails** — a Tab walk at 390 never reaches a section link. Note `hidden` is `display:none`, so the links stay **in** the DOM: a DOM-presence count would still pass, and the test must not assert one |
 | **N3-T6** jump to the first error moves focus, at 390 | N3-AC3, N3-AC6 | Remove the explicit `.focus()` from the jump handler, leaving the bare anchor | The active element after the jump is not the invalid field (it is `<body>` or unchanged) |
 | **N3-T7** exactly one `Create Employee`, one `Cancel`, six widths | N3-AC4 | Keep the bottom submit row instead of deleting it | The DOM-level `Cancel` count is 2 |
 | **N3-T8** the disclosure summary string is frozen | N3-AC5 | Change one character of the summary string | Exact-text mismatch |
@@ -1770,6 +1798,30 @@ guesses, so they stay in the plan: **390→358, 1024→720, 1280→976, 1440→1
 must be **wider than 768**, today's cap. That is the assertion that catches an `xl:` written where
 `2xl:` belongs — one character, 288px of form width.
 
+**The six numbers are nominal, and the assertion must not use them raw.** `/employees/new` renders a
+vertical scrollbar at all six viewports, and Chromium's classic scrollbar (~15px) is taken out of the
+containing block before any of this arithmetic applies. Measured widths therefore land ~15px under
+every number above — outside the ±8px tolerance, so a literal comparison **reds correct code**.
+
+**Chosen fix: derive the baseline from `document.documentElement.clientWidth`, not from the nominal
+viewport.** The test computes its own expectation per viewport:
+
+```
+base     = document.documentElement.clientWidth      // excludes the scrollbar, whatever its width
+content  = base >= 1024 ? base - 304 : base - 32     // (app)/+layout.svelte:650-651
+expected = base >= 1536 ? content - 288 : content    // 16rem rail + gap-8, only at 2xl
+```
+
+**Why this and not ±20px.** Widening the tolerance to ±20 buys the scrollbar at the cost of the
+gate: a real 16px layout error would then pass. Deriving from `clientWidth` removes the scrollbar
+from both sides of the comparison, so the ±8px tolerance — which exists for sub-pixel rounding, not
+for chrome — keeps its original tightness, and the test stops depending on the host's scrollbar
+width at all. The six nominal numbers stay in the plan as the derivation's sanity check: at a 15px
+scrollbar the formula must reproduce them minus ~15.
+
+The `> 768` half at 1280 and 1440 is **unchanged and stays literal** — it compares against today's
+cap, and a scrollbar only makes that comparison harder to pass, never easier.
+
 ### N3-T6 — the submit is blocked by native validation, and the scenario must be rebuilt for it
 
 **The round-3 scenario was wrong and is deleted.** It filled only First Name and expected a server
@@ -1784,13 +1836,39 @@ reds on correct code.
 return `{ error, values }` with none, so a duplicate-email submit also leaves the error block
 unrendered. So the submit must satisfy every HTML constraint **and** still fail zod. It does this:
 
-- Fill all **seven** required fields with natively-valid values.
-- Set **`basicMonthlySalary` to `0`**. The input is `type="number" min="0"` (`:344-349`), so `0` is
-  natively valid; the schema is `z.coerce.number().positive()` (`+page.server.ts:82`), which rejects
-  it. The result is a `fail(400)` carrying `fieldErrors.basicMonthlySalary` — a real error on a
-  real, focusable, `aria-invalid` field.
+- Fill all **seven** required fields with natively-valid values — including a **valid**
+  `basicMonthlySalary` (e.g. `28000`).
+- Open the `Complete later` disclosure and set **`sssNumber` to `'1234'`**.
 - Assert the aside's error block has rendered **before** clicking the jump link. If it has not, the
   test must fail there, loudly, rather than time out on the link.
+- Assert focus lands on **`#sssNumber`**.
+
+**Why `sssNumber` and not `basicMonthlySalary` — the round-3 target was wrong too.** The plan
+previously set `basicMonthlySalary` to `0` and called the target "a real, focusable, `aria-invalid`
+field". Re-read at the line, that input (`employees/new/+page.svelte:343-352`) carries `id`, `name`,
+`type`, `min`, `step`, `required`, `value` and `class` — and **no `aria-invalid`**. The 13 inputs
+that do carry it are at `:111, 127, 185, 228, 254, 274, 312, 429, 443, 457, 471, 548, 564`. A test
+written to the old words reds on correct code.
+
+`sssNumber` clears every requirement, each checked at the line:
+
+| Requirement | Evidence |
+|---|---|
+| Has a stable `id` to focus and assert | `id="sssNumber"` at `:427` |
+| Carries `aria-invalid` | `aria-invalid={invalid('sssNumber')}` at `:429` |
+| Natively valid, so the submit is not blocked | no `required`, no `pattern`, no `type` on that input |
+| Rejected by zod, so `fail(400)` + `fieldErrors` fires | `sssNumber: govIdSchema('sssNumber')` at `+page.server.ts:88`; `fail(400)` at `:140-141` |
+| Focusable when the jump lands | it sits inside the disclosure, and `optionalHasError` (`:56`) sets `open` on the same render |
+
+**This exact route is already exercised, live and green:** `tests/e2e/admin.spec.ts:126-130` fills
+salary `28000`, clicks `Complete later — 12 optional fields`, fills SSS with `'1234'`, submits, and
+`:132` asserts the rendered error. It is a proven path, not a new one.
+
+The facts that made the salary route *look* right are still true and still recorded, because they are
+what rules the other routes out: the salary input really is `type="number" min="0"` (`:346-347`) and
+the schema really is `z.coerce.number().positive()` (`+page.server.ts:82`), so `0` really does
+produce a `fail(400)`. The single thing it does **not** do is set `aria-invalid`. If a future reader
+wants the salary route back, the `aria-invalid` clause must be dropped with it.
 
 Rejected alternatives, recorded so they are not re-proposed: the `rateType` / `employmentType`
 refine (`+page.server.ts:126-129`) is **unreachable from the UI** — `:70` re-writes `rateType` to
@@ -1808,7 +1886,7 @@ search against the real page** and use such a pair if one exists. If none does:
 
 - N3-T6 still proves the whole of the rest of N3-AC6's jump clause — that the error block renders,
   that the jump link exists, that clicking it **moves focus**, and that focus lands on a field that
-  is genuinely `aria-invalid`.
+  is genuinely `aria-invalid` (`#sssNumber`, `:429`).
 - The ordering half alone is recorded as a **known residual** with a test-building backlog stub:
   `n3-first-error-dom-order-unprovable_NOTE_18-09-26.md`. It is a residual, not a proving strategy,
   and N3-AC6 stays Hybrid either way (its focus-ring half already is).
@@ -1857,7 +1935,7 @@ mode: 'serial' })` at line 7 stays — it is already there and it is required (f
 
 | Test | Proves | Mutation that must turn it red | Expected failure mode |
 |---|---|---|---|
-| **no sideways scroll, 3 widths × 2 views** | N5-AC1 | Restore `min-w-max` on the table | `scrollWidth − clientWidth` > 0 at 1280 |
+| **no sideways scroll, 3 widths × 2 views** | N5-AC1 | **Add `min-w-[1600px]` to the `<table>`** (see §Why the `min-w-max` restore was rejected) | `scrollWidth − clientWidth` > 0 at 1280 |
 | **the modal fits, incl. a short viewport** | N5-AC1 | Drop `scroll` from the shared `Dialog`'s props | The panel is taller than 90% of a 360px-high viewport |
 | **rows carry no controls** | N5-AC2 | Leave one `<select>` in the row | The row's editor count is 1 |
 | **view toggle defaults to list, survives reload** | N5-AC3 | Default the server's `view` to `grid` | `/inventory` with no query renders the grid |
@@ -1930,7 +2008,7 @@ Four rules it follows, none of which may be loosened:
   `employmentStatus: 'OFFBOARDED'`, so a leftover row from a killed run is corrected, not inherited.
 
 The fixture must end up **OFFBOARDED**, not merely created: the load lists assignees with
-`where: { organizationId, employmentStatus: 'ACTIVE' }` (`inventory/+page.server.ts:29-33`), so an
+`where: { organizationId, employmentStatus: 'ACTIVE' }` (`inventory/+page.server.ts:31`), so an
 ACTIVE holder appears in the normal `{#each}`, the preserved-option `{#if}` at
 `inventory/+page.svelte:276` never fires, and N5-AC5 proves nothing. `beforeAll` asserts all three
 facts — item assigned, notes non-empty, holder OFFBOARDED — **before** any test runs.
@@ -1981,7 +2059,7 @@ test.beforeAll(async () => {
 			where: { userId: user.id },
 			// OFFBOARDED on both paths, so a leftover row from a killed run is corrected, never
 			// inherited. OFFBOARDED is what keeps them out of the load's
-			// `where: { employmentStatus: 'ACTIVE' }` (inventory/+page.server.ts:29-33), which is
+			// `where: { employmentStatus: 'ACTIVE' }` (inventory/+page.server.ts:31), which is
 			// what makes the page's {#if} at :276 fire and `selectedBefore` non-empty.
 			update: { employmentStatus: 'OFFBOARDED' },
 			create: {
@@ -2039,7 +2117,7 @@ test.afterAll(async () => {
 		//   4. the user
 		// try/catch so a failed assertion earlier in the run can never leave the org dirty AND
 		// take teardown down with it. NOTHING ELSE SWEEPS THIS FIXTURE: scripts/clean-e2e-employees
-		// matches email prefixes only, and its list is ['e2e_', 'probe_', 'zzpagetest'] (:20) —
+		// matches email prefixes only, and its list is ['e2e_', 'probe_', 'zzpagetest'] (:19) —
 		// zzinvfixture@example.test matches none of them. This teardown is the only cleanup, which
 		// is why the assertions below run and why Phase Completion Rule 5 is mandatory.
 		await db.inventoryItem.deleteMany({ where: { name: FIXTURE_NAME } })
@@ -2062,7 +2140,7 @@ test.afterAll(async () => {
 
 > **The sweep-script claim is gone and this is the choice made.** `scripts/clean-e2e-employees.ts`
 > was never going to sweep `zzinvfixture@example.test` — its `PREFIXES` are `['e2e_', 'probe_',
-> 'zzpagetest']` (`:20`). Rather than add a prefix to a script that is not in this lane's blast
+> 'zzpagetest']` (`:19`). Rather than add a prefix to a script that is not in this lane's blast
 > radius, the false sentence is deleted and **this teardown is the only cleanup**, with its own
 > assertions proving it ran. A leftover OFFBOARDED employee silently changes what every headcount
 > spec sees on the next run, so the proof lives in the spec, not in a manual step.
@@ -2090,6 +2168,28 @@ observed.
 **If the unmutated run is red**, the fix is named in advance: bind the select to local `$state`
 seeded from the item being edited, so the user's choice is not re-derived from `load` data on
 re-render. Do not weaken the assertion.
+
+**The seed must key on `editingId`, never on `editing`.** `editing` is
+`$derived(data.items.find((i) => i.id === editingId) ?? null)`, so `invalidateAll` hands back a
+**new object identity** for the same row. An `$effect` that reads `editing` therefore re-fires on
+every rejected save and overwrites the user's selection with the server's value — reproducing the
+identical failure the control exists to catch, while the guard *looks* wired. `editingId` is a plain
+`$state` string that changes only when a different item is opened, so keying the seed on it makes the
+effect open-time only:
+
+```ts
+let statusDraft = $state('')
+$effect(() => {
+	editingId // the ONLY dependency — do not read `editing` in this effect
+	untrack(() => {
+		statusDraft = editing?.status ?? 'AVAILABLE'
+	})
+})
+```
+
+Reading `editing` inside the effect body without `untrack` re-subscribes to it and undoes the whole
+point. If this fallback is taken, NC-1 must be re-run from a clean state: unmutated green first,
+then the mutation, then the revert.
 
 **Mutation.** `src/routes/(app)/inventory/+page.svelte`, in `save`:
 
@@ -2548,258 +2648,275 @@ The specs most likely to catch a cross-lane regression, and which must be seen g
 
 ## Validate Contract
 
-Status: BLOCKED
+Status: CONDITIONAL
 Date: 18-09-26
 date: 2026-09-18
 generated-by: outer-pvl
-supersedes: 2026-09-18 (outer-pvl) — third outer-PVL pass; both round-2 FAILs re-verified as fixed against source, two new FAILs and four new cite/claim defects found in the amended text
+supersedes: 2026-09-18 (outer-pvl) — fourth and final outer-PVL pass, judged against D19's new test policy; all round-3 fixes re-verified against source, one new high-severity defect and six new concerns found
 
 Parallel strategy: sequential
-Rationale: 3/7 signals (S3 three items, S7 6+ source files). No Agent tool available in this
-session, so the Layer 1 / Layer 2 fan-out ran sequentially in one context. Every claim below was
-re-derived from source at the line; nothing was carried forward from round 2 on trust.
+Rationale: 3/7 signals (S3 three items, S7 6+ source files). No Agent tool in this session, so the
+Layer 1 / Layer 2 fan-out ran sequentially in one context. Every claim below was re-derived from
+source at the line — nothing was carried forward from round 3 on trust, including the cites round 3
+declared correct.
+
+**Judged against the NEW (D19) bar.** No finding below is "a locator is missing", "a count literal
+is absent" or "an assertion is under-specified" — under D19 that is the intended design. What was
+checked is whether the D19 structure holds: every criterion has a named gate AND a named mutation,
+the mutations are mechanically applicable and would produce their stated failure, the EXECUTE
+procedure is binding, and every remaining literal is true against source.
 
 ### Net gate derivation
 
 | Layer 1 dimension | Status |
 |---|---|
 | Infra fit | PASS |
-| Test coverage | FAIL |
+| Test coverage | CONCERN |
 | Breaking changes | PASS |
 | Security surface | PASS |
 
 | Layer 2 section | Status |
 |---|---|
-| N2 — `/settings` Context Rail + search | FAIL |
-| N3 — `/employees/new` Companion Rail | FAIL |
-| N5 — `/inventory` list + grid + shared modal | CONCERN |
-| Test plan | FAIL |
-| Gates / commit plan | PASS |
-| Lane split | PASS |
+| N2 `/settings` Context Rail + search (steps 1-9) | CONCERN |
+| N3 `/employees/new` Companion Rail (steps 10-19) | CONCERN |
+| N5 `/inventory` list + grid + shared modal (steps 20-34) | CONCERN |
+| Test plan + EXECUTE procedure (D19) | CONCERN |
+| Fixture + negative controls | PASS |
+| Phase Completion Rules + Gates | PASS |
+| Lane split / no-overlap | PASS |
 
-**Totals: 2 FAILs / 5 CONCERNs / 8 PASSes → Net gate: BLOCKED**
+**Totals: 0 FAILs / 7 CONCERNs / 6 PASSes → Net gate: CONDITIONAL**
 
-### Round-2 items — verdicts
+No criterion is proved by Known-Gap. 21/21 (20 SPEC + N5-AC9) carry a Fully-Automated or Hybrid
+gate, so the vacuous-green ban is not triggered. The single named residual (the DOM-order half of
+N3-AC6) is a residual on a criterion that keeps three other proving gates, not the sole basis of a
+pass.
 
-| Item | Verdict | Evidence |
+### Items 1-10 — verdicts
+
+| # | Item | Verdict |
 |---|---|---|
-| **F-NEW-1** fixture creates its own rows | **CONFIRMED FIXED** | `User` required set is `organizationId, email, passwordHash` (`prisma/schema.prisma:402-404`); `roles`/`isActive` have defaults (`:408-409`). `Employee` required set is `userId, organizationId, employeeNumber, firstName, lastName, departmentId, jobTitle, employmentType, startDate, basicMonthlySalary` (`:435-465`); `employmentStatus` and `rateType` have defaults (`:448, :466`) and the plan supplies both explicitly. `REGULAR` and `OFFBOARDED` are valid enum members. `@@unique([organizationId, employeeNumber])` at `:525` — `ZZINV-001` is unused elsewhere. No missed required field, no invalid enum value. |
-| **F-NEW-1** `departmentId` | **CONFIRMED FIXED** | The `beforeAll` resolves a real row with `db.department.findFirstOrThrow({ where: { organizationId } })` — same idiom as `pagination.spec.ts:22-25`. It never assumes an id. |
-| **F-NEW-1** teardown FK order | **CONFIRMED CORRECT** | `InventoryItem.assignedTo` is `onDelete: SetNull` (`:1489`); `PayrollEntry.employee` (`:1279`) and `Employee.user` (`:488`) carry no `onDelete`, so both are RESTRICT. item → payrollEntry → employee → user is the right order. The `try/catch` swallows only teardown, after every assertion has run — it cannot mask a test failure. |
-| **F-NEW-1** OFFBOARDED keeps the holder out of the active list | **CONFIRMED** | `inventory/+page.server.ts:29-33` filters `employmentStatus: 'ACTIVE'`, so the holder is absent from `data.employees`, the `{#if}` at `inventory/+page.svelte:276` fires, and `selectedBefore` is the holder id. The save path does **not** re-check employment status — `services/inventory.ts:99-104` looks the assignee up by `{ id, organizationId }` only — so saving an OFFBOARDED holder is accepted. |
-| **F-NEW-1** pre-guard reality assertions | **CONFIRMED** | `beforeAll` asserts `assignedToId`, `notes`, and `employmentStatus` before any test body runs. A silently-unassigned or notes-less fixture now reds in `beforeAll` instead of going vacuously green. |
-| **F-NEW-1** nothing else can select or delete the fixture | **CONFIRMED, with one gap** | Every `employee`/`user`/`inventoryItem` write in `tests/e2e/` was read. The only broad deletes are `pagination.spec.ts:73-75` (`lastName: 'Zzpagetest'`, `email startsWith 'zzpagetest'`) — neither matches `Zzinvfixture` / `zzinvfixture@example.test`. `global-setup.ts`, `branches.spec.ts:54`, `leave-balances.spec.ts:55` all target specific seeded rows. **Gap:** see CONCERN-6 — the plan's claim that leftovers are swept by `scripts/clean-e2e-employees.ts` is false. |
-| **F-NEW-1** idempotency across reruns | **CONFIRMED** | `user.upsert` by unique `email`; `employee.upsert` by unique `userId` (`schema.prisma:435`) with `update: { employmentStatus: 'OFFBOARDED' }`, so a leftover ACTIVE row from a killed run is corrected rather than inherited. `inventoryItem.deleteMany` by name runs before the `create`, so a leftover item cannot be reused with stale `notes`. |
-| **F-NEW-2** commands | **CONFIRMED FIXED — run, not read** | `grep -c 'bun run exec'` = 0. `bunx dotenv` appears 17× (13 commands, 4 in prose/history). `node_modules/.bin/dotenv` exists; `package.json:15` is `"test:e2e": "dotenv -e .env.dev -- playwright test"`, so the plan's form matches the script's flags and argument order exactly. Executed live: `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/inventory.spec.ts --list` → `Total: 2 tests in 1 file`. The `-g "enforces the assign invariant"` filter in NC-1/NC-2 matches the real title `adds an item, enforces the assign invariant, then deletes it` (`inventory.spec.ts:32`). |
-| **Cite** `inventory/+page.svelte:277-278` | **CONFIRMED CORRECT** | `:276` `{#if}`, `:277-278` the comment, `:279` the option, `:280` `{/if}`. |
-| **Cite** `inventory/+page.svelte:340-343` | **CONFIRMED CORRECT** | `<p>` opens at `:340`, `</p>` at `:343`. |
-| **Cite** `team/+page.svelte:36` | **CONFIRMED CORRECT** | `:36` is the `flex min-h-[calc(100dvh-6rem)] … lg:min-h-0` wrapper. `:60-71` toggle also correct. |
-| **Cite** `+page.server.ts:114` / `:122` | **CONFIRMED CORRECT** | `:114` `const id = data.id as string`; `:122` `inputOf(parsed.data)` inside `update`. |
-| **Cite** `employees/new/+page.svelte:585` | **CONFIRMED CORRECT** | `:585` is `{create.busy ? 'Creating…' : 'Create Employee'}`. |
-| **Invented string** `— no longer active` | **CONFIRMED REMOVED** | `grep -n "no longer active" "src/routes/(app)/inventory/+page.svelte"` → no match. `:279` renders `{empName(item.assignedTo)}` unsuffixed; `empName` at `:20` is `` `${lastName}, ${firstName}` ``, so the test's `Zzinvfixture, Holder` is byte-correct. No other invented source claim found. |
-| **Trimmed comment** | **CONFIRMED** | Exactly one `// ponytail:` marker in the whole plan (3 lines, in `tests/e2e/inventory.spec.ts`). **Zero new comments are introduced into any `src/` file:** the four comment blocks in the replacement markup are all carried verbatim and each was diffed against source — `settings/+layout.svelte:11-12`, `settings/+page.svelte:13-14` and `:31`, `inventory/+page.svelte:277-278`. The new spec files do carry new comments; that is normal for this repo's specs and outside the standing rule, which is scoped to `src/`. |
+| 1 | All 21 criteria have a named gate **and** a named mutation | **CONFIRMED** |
+| 2 | The 30+ mutations are real | **PARTLY REFUTED** — 20 spot-checked, 15 sound, 5 defective (CONCERN-2, -3, -4) |
+| 3 | The EXECUTE test procedure is binding, not advisory | **CONFIRMED** |
+| 4 | The four named fixes work | **3 of 4 CONFIRMED**; N3-T6 carries CONCERN-A |
+| 5 | The cite fixes hold | **PARTLY REFUTED** — the 3 named cites exact; 5 of 30 further cites wrong (CONCERN-5) |
+| 6 | The sweep-script claim is gone | **CONFIRMED** |
+| 7 | Phase Completion Rule 5 no longer calls `docker exec` | **CONFIRMED** |
+| 8 | The N5 fixture was not loosened | **CONFIRMED** |
+| 9 | No reachable scenario inverts server-key order vs DOM order | **CONFIRMED** — independently re-derived |
+| 10 | Every remaining hard-coded value is true against source | **CONFIRMED** — all of them; CONCERN-1 is a measurement caveat, not a wrong number |
 
-### New defects found in round 3
+**Item 1 — CONFIRMED.** N2 6/6, N3 6/6, N5 9/9 (incl. N5-AC9). Every criterion names at least one
+test and at least one mutation. One sub-test — N5's "the assign invariant is enforced" — carries `—`
+in the mutation column, correctly justified as unchanged server behaviour; N5-AC5 keeps two other
+mutated gates ("delete behind a confirm", "inactive holder preserved"), so it is not a hole. No
+criterion is gated by description alone.
 
-**FAIL-1 (class 2 — a gate that goes red against correct code). N3-T6 cannot run its own scenario: native constraint validation blocks the submit.**
-The test fills only First Name and clicks Create Employee, expecting a server rejection. But
-`<form method="POST" action="?/create" use:enhance…>` at `employees/new/+page.svelte:97` carries **no
-`novalidate`**, and seven fields are `required` — `lastName:128`, `email:187`, `departmentId:255`,
-`jobTitle:275`, `startDate:313`, `basicMonthlySalary:349` (plus `firstName:112`). Chromium blocks the
-submit, the `submit` event `use:enhance` listens for never fires, no POST happens, `form` stays
-`null`, `errorCount` is `0`, the aside error block never renders, and
-`await expect(jump).toBeVisible()` times out. The test fails on correct code.
-Compounding it: the only code path that produces `fieldErrors` is the zod `fail(400, …)` at
-`+page.server.ts:140-141`. Every 409 path (`:176, :189, :196`) returns `{ error, values }` with **no
-`fieldErrors`**, so a duplicate-email submit would also leave `errorCount === 0`. The replacement
-scenario must satisfy every HTML constraint and still fail zod.
-*Effect:* N3-AC6's jump-focus half and N3-AC3's 390-reachability half lose their only automated gate.
+**Item 3 — CONFIRMED.** §The EXECUTE test procedure states the four steps and "A test that has not
+been seen failing is not accepted", and **Phase Completion Rule 8** enforces it: every e2e test in
+the lane must have been seen RED under its own named mutation, with the exact red output recorded in
+the phase report, one entry per test; NC-1/NC-2 additionally require the unmutated green run
+recorded first. Enforced, not merely described.
 
-**FAIL-2 (class 2 — a gate that goes red against correct code). N2-T7's `aria-live` count is 2, not 1.**
-`src/routes/(app)/+layout.svelte:214` mounts `<Toaster />` on every app page, and
-`Toaster.svelte:49-52` renders `<div role="status" aria-live="polite" aria-atomic="false">`. The
-final assertion `await expect(page.locator('[aria-live="polite"]')).toHaveCount(1)` therefore sees
-**two** elements on `/settings` — the Toaster region and the new sr-only count line — and reds the
-whole test on correct code.
-*Fix:* scope it to the landmark and assert its content, which also removes a bare-count assertion:
-`await expect(hub(page).locator('[aria-live="polite"]')).toHaveText(/\d+ of \d+ settings shown/)`.
-*Effect:* N2-AC6 loses its only automated gate.
+**Item 4 — three of four confirmed.**
 
-**CONCERN-4 (class 1 — a gate that cannot fail). "Space does not scroll" has no scrollable page.**
-`expect(await page.evaluate(() => window.scrollY)).toBe(yBefore)` runs at Playwright's default
-1280×720 against 3 seed items plus 1-2 e2e rows. The document is very likely shorter than the
-viewport, so `scrollY` is `0` before and after **whether or not Space scrolls** — the assertion
-cannot fail, which is precisely the failure the SPEC's hazard 1 forbids. Add a precondition that
-reds when the page is not scrollable, e.g.
-`expect(await page.evaluate(() => document.documentElement.scrollHeight > document.documentElement.clientHeight), 'page must be scrollable for this to mean anything').toBe(true)`
-before the Space press, or run this case at a short viewport.
+- **N3-T6 — mechanics all verified, one clause false (CONCERN-A).** Seven `required` fields at
+  `employees/new/+page.svelte:112, 128, 187, 255, 275, 313, 349` ✓. The salary input is
+  `type="number"` (`:346`), `min="0"` (`:347`), `required` (`:349`) ✓. The schema rule is
+  `z.coerce.number().positive()` at `+page.server.ts:82` ✓. `fail(400)` + `fieldErrors` at
+  `:140-141` ✓, and the three 409 paths at `:176, :189, :196` carry no `fieldErrors` ✓. The
+  `rateType` refine at `:126-129` is unreachable: `+page.svelte:70` rewrites `rateType` to
+  `MONTHLY` whenever the pairing is illegal, and `rateOptions` never offers HOURLY for a REGULAR
+  type ✓. `email` is `type="email" required` at `:186-187` ✓. **But** the plan says the jump lands
+  on "a real, focusable, `aria-invalid` field" — see CONCERN-A.
+- **N2-T7 — CONFIRMED.** `<Toaster />` is mounted at `(app)/+layout.svelte:214` ✓ and renders
+  `role="status" aria-live="polite"` at `Toaster.svelte:52` ✓, so the page-wide polite count on
+  `/settings` really is 2 and the round-3 assertion was genuinely red on correct code. Scoping to
+  the destinations landmark is sound: the hub's `<p aria-live="polite" class="sr-only">` sits inside
+  `role="region" aria-label="Settings destinations"` (step 3), while the Toaster is a layout-root
+  sibling and cannot be inside it.
+- **Space-scroll — CONFIRMED.** The plan requires asserting `scrollHeight > clientHeight` **before**
+  the Space press and failing on it. On an unscrollable page that precondition is false, so the test
+  reds instead of passing vacuously. Sound.
+- **NC-1 / NC-2 — CONFIRMED.** Recording the unmutated run GREEN first is exactly what separates
+  "guard removed" (green → red) from "guard never worked" (red → red); a red-only record cannot.
+  The named fallback (bind the select to local `$state`) is the right mechanism — see CONCERN-6 for
+  its one gap.
 
-**CONCERN-5 (class 3 — wrong cite, and the dangerous one). Step 15 quotes the submit row as `:578-589`; it is `:578-587`.**
-`:588` is `</form>` and `:589` is `{/key}`. The quoted markup in Step 15 is correct and stops at
-`</div>`, so an agent matching the quote is safe — but an agent deleting the stated **range** breaks
-the component with no compile error at the deletion site. Round 2 listed `578-589` in its
-"confirmed correct" set, so this cite has now survived two correction passes.
+**Item 9 — CONFIRMED, independently re-derived.** Schema/key order (`+page.server.ts:59-122`) and
+DOM order (29 `name=` attributes, `+page.svelte:109-390`) disagree in exactly four places, and every
+one is unreachable: `email` vs `firstName`/`lastName`/`middleName` (the DOM-early three are
+`z.string().min(1)` behind `required`, or `.optional()` and never error); `contactPhone` /
+`contactAddress` are absent from `createSchema` entirely; `rateType` vs `basicMonthlySalary` (the
+refine is unreachable, above); `positionId` vs `workScheduleId` (both `.optional()`, never error).
+For every field that CAN be natively valid **and** zod-invalid — `email`(schema 0 / DOM 5),
+`startDate`(9/12), `basicMonthlySalary`(10/14), the four gov IDs(12-15/18-21),
+`emergencyContactPhone`(18/24), `bankAccountNumber`(21/25), `gcashNumber`(22/26) — the two orders
+are strictly monotonic together. **No reachable inverting pair exists.** The plan is not
+understating what it can prove; the residual is honest. The same grep also confirms `FIELD_ORDER`'s
+18 names + `...OPTIONAL_FIELDS` reproduce the DOM order byte-for-byte.
 
-**CONCERN-6 (a false claim in the new fixture). `scripts/clean-e2e-employees.ts` does not sweep this fixture.**
-The `afterAll` comment says "Leftovers are swept by `scripts/clean-e2e-employees.ts`". That script
-matches on email prefix only, and its list is `const PREFIXES = ['e2e_', 'probe_', 'zzpagetest']`
-(`scripts/clean-e2e-employees.ts:20`). `zzinvfixture@example.test` matches none of them, so a
-best-effort teardown that loses a race leaves an OFFBOARDED employee and a user in the dev DB with
-no sweeper — the exact leftover that Phase Completion Rule 5 exists to catch. Either add
-`'zzinvfixture'` to `PREFIXES` (a one-line change to a file not currently in the blast radius, so it
-must be added to Touchpoints) or delete the false sentence and make Rule 5's psql check mandatory.
+**Item 10 — every literal CONFIRMED.**
 
-**CONCERN-7 (class 3 — two more wrong cites, both carried over).**
-- `submit-feedback.svelte.ts:70,82,90` is cited in Step 21 for `if (!after) await o.update()`. That
-  line appears at **`:82` and `:90` only**; `:70` is `if (after) await after(o)`. The seam is real
-  and the reasoning holds; the line list is wrong. Round 2 listed `70,82,90` as confirmed correct.
-- `DatePicker.svelte:691-693` is cited in the N3-T10 note for the `aria-label="Open calendar"`
-  trigger. The `<button>` opens at `:691`, but the `aria-label` is at **`:695`**. Round 2 found this
-  and it was **not** included in the supplement request, so it was never fixed.
+| Literal | Verdict | Evidence |
+|---|---|---|
+| The 18 field names and their DOM order | ✅ exact | `grep -n 'name="' employees/new/+page.svelte` → 29 names; the first 18 are `FIELD_ORDER`'s, the last 11 are `OPTIONAL_FIELDS` in order (`:43-55`) |
+| N3-T10 tab sequence incl. `[Open calendar]` | ✅ | `DatePicker.svelte:662` renders the `{id}`/`{name}` input (`:666`, `:668`), toggle second with `aria-label="Open calendar"` at `:695` |
+| `Complete later — 12 optional fields` | ✅ byte-exact | `:413`; clicked at `admin.spec.ts:128` and `:159` |
+| `itemSchema`'s ten names | ✅ | `inventory/+page.server.ts:46-61` — name, category, quantity, unit, location, status, assignedToId, serialNumber, value, notes |
+| The six N3 widths (358/720/976/1136/944/1328) | ✅ arithmetic | `(app)/+layout.svelte:650` `lg:pl-60` (240) + `:651` `lg:p-8` (64) = 304; `p-4` = 32 below `lg`. See CONCERN-1 on the scrollbar |
+| The three seed item names | ✅ | `prisma/seed-core.ts:943` `MacBook Pro 14"` (trailing quote real), `:959` `Office Chair`, `:974` `Projector (old)`; none has `assignedToId` or `notes` |
+| Settings 17 / 5 groups / 5 gated | ✅ | 17 `href:` entries; `SETTINGS_GROUP_ORDER` 5 at `:33-39`; gated at `:77, :109, :118, :177, :185`; both `System` entries (`:173`, `:184`) gated |
+| Groups per role 5 / 5 / 4 | ✅ derived | `rbac.ts:36` `ADMINISTER_HR_ORGWIDE:['HR_ADMIN','SUPER_ADMIN','CEO']`, `:58` `ADMINISTER_SYSTEM:['SUPER_ADMIN','CEO']`, `:75` `MANAGE_USER_ROLES:['CEO']`, `:101` `MANAGE_STATUTORY_RATES:['CEO','SUPER_ADMIN']`, `:103` `PROPOSE_STATUTORY_RATES:['HR_ADMIN']` → SUPER_ADMIN 17/5, HR_ADMIN 14/5 (System survives on Review Schedule), MANAGER 12/**4** |
 
-**CONCERN-8 (a claim the amendment made false). "No step runs `./start.sh`, vite or docker" is no longer true.**
-Phase Completion Rule 5 (plan line 3091) prescribes
-`docker exec -i veent-db-5434 psql …` as the leftover check, while the standing-constraints section
-still asserts no step runs docker. The psql query is read-only and does not start a container, so
-this is a wording defect, not a rule breach — but the two statements must be reconciled.
+### Findings — round 4
 
-**Nit (not a finding).** Step 24 says its `th` constant is "lifted from `EmployeeTable.svelte:12`";
-source at `:12` is `'px-4 py-2 text-left font-medium text-muted-foreground'` — the plan's string adds
-`text-xs`. The plan's own value is the intended one; only the word "lifted" overstates it.
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| **CONCERN-A** | **N3-T6's target field carries no `aria-invalid`.** §N3-T6 calls the `basicMonthlySalary=0` target "a real, focusable, `aria-invalid` field", and Traceability repeats that focus must land on a field that is "genuinely `aria-invalid`". Source `employees/new/+page.svelte:343-352`: the input has `id`, `name`, `type`, `min`, `step`, `required`, `value`, `class` and **no `aria-invalid`**. The 13 fields that do carry it are at `:111, 127, 185, 228, 254, 274, 312, 429, 443, 457, 471, 548, 564`. A test written to the plan's own words reds on correct code — the round-2/3 defect class. | **CONCERN (high)** | **Verified replacement:** keep all seven `required` fields natively valid and set `sssNumber = '1234'`. That input is `id="sssNumber"` (`:427`) with `aria-invalid={invalid('sssNumber')}` (`:429`), no `required`, no `pattern` → natively valid; `govIdSchema` rejects it → `fail(400)` at `:140-141`; `optionalHasError` (`:56`) opens the disclosure on the same render so the target is focusable. **`admin.spec.ts:126-130` already exercises this exact path.** Alternative: keep `basicMonthlySalary=0` and delete the `aria-invalid` clause from what N3-T6 proves. |
+| **CONCERN-1** | **N3-T1's six literal widths ignore the scrollbar.** The arithmetic is right in CSS-pixel terms, but `/employees/new` renders a vertical scrollbar at all six viewports and Chromium's classic scrollbar (~15px) is subtracted from the containing block. Measured widths will sit ~15px below all six numbers — outside the stated ±8px tolerance. The `> 768` half at 1280/1440 survives. | CONCERN | Widen the tolerance to ±20px, **or** derive the baseline from `document.documentElement.clientWidth` at EXECUTE instead of the nominal viewport. |
+| **CONCERN-2** | **Three mutations are not mechanically applicable as written.** (a) **N2-T3** "drop the is-there-a-current-destination guard" — `siblings` is `$derived(current ? … : [])`; dropping the ternary makes `current.group` throw a TypeError on the hub, a render error rather than an assertion failure. (b) **N2-T5** "remove the no-wrap on the group row" — the row is `flex … overflow-x-auto`; flex does not wrap by default and there is no `flex-nowrap` class to remove. (c) **N2-T7c** "move the search control before the bar in the DOM" — the bar is in `settings/+layout.svelte`, the search in `settings/+page.svelte`, and the layout renders `<nav>` then `{@render children()}`; the search can never precede it without editing both files. | CONCERN | Restate each as an applicable edit: (a) substitute a group so the sibling row renders non-empty on the hub; (b) **add** `flex-wrap` and **remove** `overflow-x-auto`; (c) move the `<nav>` below `{@render children()}` in the layout. |
+| **CONCERN-3** | **The `min-w-max` restore may not red N5-AC1.** Step 24's table is `hidden w-full table-fixed`. Under `table-layout: fixed`, intrinsic (max-content) sizing derives from the specified column widths (`w-[38%]`, `w-20`, `w-28`, …) rather than cell content, and every text cell carries `truncate`. `min-width: max-content` therefore likely resolves near the container width and produces no overflow — a control that stays green. | CONCERN | Stronger mutation: remove `table-fixed` **and** the `truncate` classes, or restore the old `overflow-x-auto` wrapper together with `min-w-max`. |
+| **CONCERN-4** | **N3-T5's stated failure mode is half wrong.** Adding `hidden` (i.e. `display:none`) leaves the section links **in the DOM**; a `querySelectorAll` count still finds them. The stated "The nav's links are absent from the DOM" is false. The second half — "and the focus step fails" — is correct and is what actually reds. | CONCERN | Delete the DOM-absence clause; keep the focus-step clause. |
+| **CONCERN-5** | **Five cites are wrong.** (a) `scripts/clean-e2e-employees.ts:20` → `PREFIXES` is at **`:19`** (cited twice: the fixture `afterAll` comment and the §sweep-script note). (b) `DatePicker.svelte:661` "the wrapper renders the named text input first" → `:661` is the wrapper `<span>`; the input opens at **`:662`**. (c) `EmployeeTable.svelte:12` cited as the source of `const th = '… text-xs …'` → source is `'px-4 py-2 text-left font-medium text-muted-foreground'`, **no `text-xs`**. (d) `EmployeeTable.svelte:29,35` cited for the `<button>` stretch pattern → `:35` is an `<a>` and `:29` uses `has-[a:focus-visible]`; the `after:absolute after:inset-0` stretch is real, the element is not a button. (e) `inventory/+page.server.ts:29-33` for the ACTIVE-employees filter → the `where` is at `:31` (`:29` is `listCategories`). All are cosmetic or navigational; none changes a behaviour the plan depends on. | CONCERN | Correct in place. |
+| **CONCERN-6** | **NC-1's named fallback is under-specified.** "Bind the select to local `$state` seeded from the item being edited" is the right mechanism, but seeding via a bare `$effect` off the `$derived` `editing` re-fires after `invalidateAll` and clobbers the user's choice again — the identical failure. | CONCERN | State that the seed keys on `editingId` (open-time only), not on `editing`'s identity. |
 
-### Still-unproven, but not defects
+### Round-3 items — re-verified
 
-- **N5-AC6's positive direction is unproven.** `update({ reset: false })` stops SvelteKit resetting
-  the `<form>`, but `update()` still invalidates and re-runs `load`, which re-renders the modal's
-  `<option selected={editing?.status === val}>` set. Whether the user's `ASSIGNED` selection survives
-  that re-render is a live behaviour nobody has observed. NC-1 does not settle it: its expected red
-  output (`Expected "ASSIGNED", Received "IN_STOCK"`) is **identical** to the output you get if the
-  assertion simply cannot pass, so NC-1 cannot tell "guard removed" from "guard never worked". Run
-  the unmutated test first and record it green **before** running NC-1; if it is red, bind the select
-  to local `$state` seeded from `editing`.
-- **N2-T4's title-row separation passes by the 12px `gap-3` only.** `PageHeader.svelte:35-36` puts the
-  `<h1>` inside a `flex` row, so the h1 box is text-width and `search.x > heading.x + heading.width`
-  clears comfortably. Verified, not a risk — recorded because the build lane rewrites that component.
+| Round-3 item | Verdict |
+|---|---|
+| Step 15's submit-row range `:578-587` | **CONFIRMED exact** — `:578` opens the row, `:587` closes it, `:588` is `</form>`, `:589` is `{/key}`; `Create Employee` at `:585`, the row's `Cancel` at `:579` |
+| `submit-feedback.svelte.ts:82` and `:90` only | **CONFIRMED exact** — both are `if (!after) await o.update()`; `:70` is `if (after) await after(o)`; no third site |
+| `DatePicker.svelte:695` `aria-label="Open calendar"` | **CONFIRMED exact** |
+| Sweep-script claim removed | **CONFIRMED** — the `afterAll` now says "NOTHING ELSE SWEEPS THIS FIXTURE" and asserts three counts are 0; the §note states the choice explicitly |
+| Rule 5 free of `docker exec` | **CONFIRMED** — a plan-wide grep for `docker`/`start.sh`/`psql`/`vite` returns only "vitest" in the Context Envelope and the *replacement* wording in Rule 5; the remaining hits are inside the superseded round-3 contract |
+| N5 fixture not loosened | **CONFIRMED** — dedicated `User` + `Employee` (`Employee.userId` is `@unique`, so the `upsert` is legal); `OFFBOARDED` on **both** upsert branches; teardown item → payrollEntry → employee → user; `try/catch` + `finally $disconnect`; `beforeAll` asserts assigned + notes + OFFBOARDED before any test; idempotent upserts; `deleteMany` by name first and last; no `orderBy` pick. `InventoryItem.category` is non-optional in the schema and the fixture supplies it. The only delta vs round 3 is the deleted sentence and the three new `afterAll` assertions — strictly tighter |
 
 ### Standing constraints — re-checked, all clear
 
-- `src/lib/rbac.ts`, `prisma/schema.prisma`, `src/lib/server/services/**`: no step touches any of
-  them. The e2e fixture uses `PrismaClient` directly from `tests/`, the repo's existing idiom.
-- `/inventory` actions and `itemSchema` unchanged; the modal's ten field names are exactly
-  `itemSchema`'s (`+page.server.ts:46-61`), `notes` included, `id` on update only (read at `:114`).
-- `Complete later — 12 optional fields` byte-identical: the string is at
-  `employees/new/+page.svelte:413`, inside the `<details>` at `:411`, and Steps 13/14 do not touch it.
-  `admin.spec.ts:128,159` click that exact string.
-- Exactly one `Create Employee` at every width: Step 15 repositions one set of elements by CSS with
-  no `hidden`/`block` pair; N3-T7 counts at DOM level via `querySelectorAll`, which does not skip
-  hidden nodes, at all six widths. `admin.spec.ts:49` strict mode is safe.
-- `/settings` search filter: `'holiday'` matches exactly one destination (`Holiday Calendar`,
-  `settings-destinations.ts:90-91`) — no other label, desc or group contains the string, so
-  `toHaveCount(1)` is correct and discriminating. No destination label equals a group name, so
-  N2-T1's `exact: true` group assertions cannot collide.
-- 17 destinations, 5 groups, 5 capability-gated (`:77, :109, :118, :177, :185`), both `System`
-  entries gated — independently re-derived. Groups per role 5 / 5 / 4 stands.
-- No `git add -A`; no `Co-Authored-By`, no AI attribution in any drafted commit message.
-- App never deployed — no production reasoning anywhere in the plan.
-- **Coverage count is honest.** The SPEC contains exactly 20 `N*-AC*` criteria; the plan declares
-  "20 SPEC + 1 plan-added = 21" and the traceability table matches.
+- No step touches `src/lib/rbac.ts`, `prisma/schema.prisma` or `src/lib/server/services/**`; all
+  three are listed as banned and as read-only.
+- `/inventory` server actions and `itemSchema` unchanged — step 20 is +2 lines in `load`, step 29
+  gates the diff at exactly two lines, Phase Completion Rule 3 makes any other touch a phase failure.
+  The modal posts the identical ten names including `notes`.
+- Exactly one `Create Employee` node at every width — step 15 repositions one set of elements by CSS
+  with no `hidden`/`block` pair, and N3-T7 counts at DOM level at six widths. `admin.spec.ts:49` is
+  strict-mode and resolves to 1 today and 1 after.
+- One new comment only: the `// ponytail:` marker in the N5 fixture. Every carried comment is quoted
+  verbatim (`settings/+layout.svelte:11-12`, `settings/+page.svelte:13-14` and `:31`,
+  `inventory/+page.svelte:277-278`, `inventory.spec.ts:4-6`).
+- bun 1.4 — all ten e2e invocations are `CI=1 bunx dotenv -e .env.dev -- playwright test …`; zero
+  `bun run exec`; package scripts via `bun run`; `bun test` bare is explicitly forbidden.
+- CI gate order matches `package.json` and is stated in full in §Gates.
+- Never `git add -A` (explicit paths in all four commits; a staged `-A` is a phase failure); no
+  AI attribution in any drafted commit message.
+- App never deployed — no production reasoning anywhere.
+- Coverage count honest: 20 SPEC `N*-AC*` criteria + 1 plan-added (N5-AC9) = 21, and the
+  traceability table matches.
 
 ### Lane split — the no-overlap claim still holds
 
-Re-read the build lane's Touchpoints (`owner-click-pass-build-lane_PLAN_18-09-26.md:40-70`): 5 source
-files (`PageHeader.svelte`, `AttendanceHrGrid.svelte`, `separations/+page.svelte`,
-`settings/org/+page.server.ts`, `settings/org/+page.svelte`) and 7 test files
+Re-read the build lane's Touchpoints (`owner-click-pass-build-lane_PLAN_18-09-26.md`): **5 source
+files** (`PageHeader.svelte`, `AttendanceHrGrid.svelte`, `separations/+page.svelte`,
+`settings/org/+page.server.ts`, `settings/org/+page.svelte`) and **7 test files**
 (`page-header-helptip` unit + e2e, `settings-org-load`, `settings-org-assignments`,
 `attendance-view-switch`, `employee-view-only`, `separations`). The design lane's 6 source + 4 test
-files share **none** of them. The two runtime couplings the plan names are real and correctly
-handled. **Safe to run concurrently — unchanged from round 2.**
+files share **none** of them. `src/lib/components/Pagination.svelte`, `src/lib/server/pagination.ts`
+and `settings/roles/*` are READ-only in the build lane, so N5's `<Pagination>` usage and the
+`has-[nav]:` selector (`Pagination.svelte:29` renders `<nav>` when `total > pageSize`) are not at
+risk. The two runtime couplings the plan names — N7's `PageHeader` change under both headers, and
+`settings-org-assignments.spec.ts` running on a page that gains a sibling row under N2 — are real
+and correctly handled. **Safe to run concurrently — unchanged from rounds 2 and 3.**
 
 Test gates:
 
 | criterion id | behavior | strategy | proving test | gap-resolution |
 |---|---|---|---|---|
-| N2-AC1 | bar lists groups, not destinations | Fully-Automated | `settings-context-rail.spec.ts` › "bar lists groups only" (counts derived per role) | A |
-| N2-AC2 | each destination rendered exactly once | Fully-Automated | same spec › "no destination is listed twice on the hub" + unchanged `settings-visibility.spec.ts:57-58` | A |
-| N2-AC3 | sibling row only on sub-pages | Fully-Automated | same spec › "siblings only, sub-page only" | A |
-| N2-AC4 | search on the title row, filters cards only | Fully-Automated | same spec › "search filters the cards only" | A |
-| N2-AC5 | one line, no sideways scroll, all roles/widths | Fully-Automated | same spec › "one line at three widths and three roles", "no sideways scroll" | A |
-| N2-AC6 | landmark, current-state, focus ring, announcement | Hybrid | same spec › "keyboard order, current-state and focus rings" + owner light/dark pass (Step 8) | **B** — the only gate reds on correct code; see FAIL-2 |
-| N3-AC1 | full bleed, measured, never narrower than today | Fully-Automated | `employees-new-layout.spec.ts` › "form column widths at six viewports", "no sideways scroll" | A |
-| N3-AC2 | rail is a sticky aside at 2xl | Fully-Automated | same spec › "rail is a sticky aside at 1536 and 1920", "no rail at 1440" | A |
-| N3-AC3 | below 2xl the four things stack and stay reachable | Fully-Automated | same spec › "rail contents stack under the form below 2xl" (green); "jump to first error works at 390" | **B** — the 390 half reds on correct code; see FAIL-1 |
-| N3-AC4 | exactly one Create Employee and one Cancel | Fully-Automated | same spec › "exactly one Create Employee and one Cancel at six widths" (DOM counts) + unchanged `admin.spec.ts` | A |
-| N3-AC5 | disclosure text and behaviour unchanged | Fully-Automated | same spec › "disclosure text frozen", "opening the disclosure does not move the rail" + `admin.spec.ts:128,159` | A |
-| N3-AC6 | tab order, jump focus, one h1 | Hybrid | same spec › "tab order unchanged above and below 2xl", "one h1" (both green); "jump to first error works at 390" + owner pass | **B** — the jump-focus half reds on correct code; see FAIL-1 |
-| N5-AC1 | nothing overflows: page or modal | Fully-Automated | `inventory.spec.ts` › "no sideways scroll at three widths in both views", "modal fits three viewports including a short one" | A |
-| N5-AC2 | the row is purely clickable | Fully-Automated | same spec › "rows carry no controls" | A |
-| N5-AC3 | two views, List default, survives reload | Fully-Automated | same spec › "view toggle defaults to list and survives reload", "both views open the same modal" | A |
-| N5-AC4 | one modal for create and edit; old add form gone | Fully-Automated | same spec › "add item uses the shared modal" (field-name equality against a literal ten-name list) + Step 29 server diff check | A |
-| N5-AC5 | delete in the modal, confirm, assign invariant, holder preserved | Fully-Automated | same spec › rewritten `:53-54`, "assign invariant", "inactive holder is preserved on save" — fixture now verified sound | A |
-| N5-AC6 | rejected save keeps modal open AND keeps edits | Fully-Automated | same spec › rewritten `:48-49` + **NC-1** | A — but record the unmutated green BEFORE NC-1; see §Still-unproven |
-| N5-AC7 | focus after delete never falls to `<body>` | Fully-Automated | same spec › post-delete focus block (asserted by identity) + **NC-2** | A |
-| N5-AC8 | row is a real button, named, keyboard-complete | Hybrid | same spec › "row is a button with a name", "focus on open, on close, and after delete" + owner pass (Step 33); "Enter and Space both open, Space does not scroll" | **B** — the Space-scroll half cannot fail; see CONCERN-4 |
-| **N5-AC9** (plan-added) | a modal save preserves a non-empty `notes` | Fully-Automated | same spec › "a modal save preserves a non-empty notes value" — fixture now verified sound | A |
+| N2-AC1 | The settings bar lists groups, not destinations | Fully-Automated | `settings-context-rail.spec.ts` › N2-T1 (mutation: render destinations in the first row) | A |
+| N2-AC2 | Each destination renders exactly once on `/settings` | Fully-Automated | N2-T2 + unchanged `settings-visibility.spec.ts:57-58` | A |
+| N2-AC3 | Sibling row only on sub-pages, siblings only | Fully-Automated | N2-T3 | B — mutation must be restated (CONCERN-2a) |
+| N2-AC4 | Search filters destinations and nothing else | Fully-Automated | N2-T4 (mutation: drop the filter predicate) | A |
+| N2-AC5 | One line, no sideways scroll, three roles × three widths | Fully-Automated | N2-T5, N2-T6 | B — N2-T5's mutation must be restated (CONCERN-2b) |
+| N2-AC6 | Landmark, current-state, focus ring, announcement | Hybrid | N2-T7a-d + owner light/dark check (step 8) | B — N2-T7c's mutation must be restated (CONCERN-2c) |
+| N3-AC1 | Full bleed, measured, never narrower than today | Fully-Automated | N3-T1 (mutation: `2xl:`→`xl:`), N3-T2 | B — tolerance/baseline fix (CONCERN-1) |
+| N3-AC2 | Sticky 256px aside at `2xl` and up, not at 1440 | Fully-Automated | N3-T3 (drop `2xl:sticky`), N3-T4 (`2xl:`→`xl:`) | A |
+| N3-AC3 | Rail contents stack and stay keyboard-reachable below `2xl` | Fully-Automated | N3-T5, N3-T6 | B — N3-T5's failure mode must be corrected (CONCERN-4) |
+| N3-AC4 | Exactly one `Create Employee`, one `Cancel`, six widths | Fully-Automated | N3-T7 (keep the bottom submit row) + unchanged `admin.spec.ts` | A |
+| N3-AC5 | Disclosure text frozen; opening it does not move the rail | Fully-Automated | N3-T8, N3-T9 + `admin.spec.ts:128,159` | A |
+| N3-AC6 | Tab order, jump-to-first-error moves focus, one `h1` | Hybrid | N3-T10, N3-T6, N3-T11 + owner light/dark check | B — N3-T6's scenario must be corrected (CONCERN-A); ordering half is D |
+| N5-AC1 | Nothing overflows: not the page, not the modal | Fully-Automated | "no sideways scroll, 3 widths × 2 views", "the modal fits, incl. a short viewport" (drop `scroll`) | B — the `min-w-max` mutation must be strengthened (CONCERN-3) |
+| N5-AC2 | Rows carry no controls; one focusable element per row | Fully-Automated | "rows carry no controls" (leave one `<select>`) | A |
+| N5-AC3 | View toggle defaults to list, survives reload, both views open one modal | Fully-Automated | "view toggle…" (default the server to grid), "both views open the same modal" | A |
+| N5-AC4 | Add uses the shared modal; the ten posted names equal `itemSchema`'s | Fully-Automated | "add item uses the shared modal" (remove `notes`) + step-29 server diff check | A |
+| N5-AC5 | Delete behind a confirm; assign invariant; inactive holder preserved | Fully-Automated | "delete… behind a confirm" (remove the confirm), "inactive holder is preserved" (delete the `{#if}` at `:276`) + the `beforeAll` fixture | A |
+| N5-AC6 | A rejected save keeps the modal open with the edits | Fully-Automated | "a rejected save keeps the modal open" + **NC-1** (unmutated green recorded first) | B — fallback must key on `editingId` (CONCERN-6) |
+| N5-AC7 | Focus after a delete lands on the list, not `<body>` | Fully-Automated | "focus after a delete lands on the list" + **NC-2** (unmutated green recorded first) | A |
+| N5-AC8 | Row is a real button; Enter and Space open; Space does not scroll | Hybrid | "row is a button with a name", "Enter and Space both open" (div + Enter-only keydown), "focus on open and on close" + owner light/dark check (step 33) | A |
+| N5-AC9 | A modal save preserves a non-empty `notes` | Fully-Automated | "a modal save preserves a non-empty notes value" (remove the `notes` textarea) + the `beforeAll` fixture | A |
+| N3-AC6 (ordering half) | The first invalid field is picked in DOM order, not server-key order | — (named residual) | no reachable inverting pair exists — re-verified this round | D — backlog stub `n3-first-error-dom-order-unprovable_NOTE_18-09-26.md` |
 
-gap-resolution legend: A — proven now; B — fixed in this plan; C — deferred to a named phase; D — backlog test-building stub.
+gap-resolution legend: A — proven now. B — fixed in this plan (the named correction is applied
+before EXECUTE writes the test). C — deferred to a named later phase. D — backlog test-building
+stub; named residual, keep-active, continue.
 
-Legacy line form:
-- N2 (`/settings`): Fully-automated: `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/settings-context-rail.spec.ts tests/e2e/settings-visibility.spec.ts`
-- N3 (`/employees/new`): Fully-automated: `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/employees-new-layout.spec.ts tests/e2e/admin.spec.ts`
-- N5 (`/inventory`): Fully-automated: `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/inventory.spec.ts`
-- Unit + static: Fully-automated: `bun run format:check && bun run lint && bun run check && bun run test`
-- Focus-ring visibility in light and dark (N2-AC6, N3-AC6, N5-AC8): hybrid: owner pass at Steps 8 and 33 — precondition: the three commits are in and a dev server is running (the owner starts it)
-- Full regression: Fully-automated: `bun run test:e2e` after Commit 3
+`strategy:` carries only the three proving strategies. Known-Gap is never a `strategy:` value — the
+one residual is carried as gap-resolution D.
+
+Legacy line form (retained so existing validate-contract consumers still parse):
+- N2 `/settings`: Fully-automated — `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/settings-context-rail.spec.ts tests/e2e/settings-visibility.spec.ts` | hybrid: owner light/dark focus-ring check at 390 and 1280 (step 8)
+- N3 `/employees/new`: Fully-automated — `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/employees-new-layout.spec.ts tests/e2e/admin.spec.ts` | hybrid: owner light/dark rail focus-ring check (step 8) | known-gap: the DOM-order half of N3-AC6, documented as a named residual with a backlog stub
+- N5 `/inventory`: Fully-automated — `CI=1 bunx dotenv -e .env.dev -- playwright test tests/e2e/inventory.spec.ts` plus NC-1 and NC-2 with the unmutated green recorded first | hybrid: owner light/dark row focus-indicator check in both views (step 33)
+- Whole lane: Fully-automated — `bun install --frozen-lockfile`; `bunx prisma generate`; `bun run format:check`; `bun run lint`; `bun run check`; `bun run test`; then `bun run test:e2e` unfiltered
 
 Dimension findings:
-- Infra fit: PASS — `bunx dotenv -e .env.dev -- playwright test …` verified by running it; matches `package.json:15`'s flags and argument order. No step starts a server, vite or docker (see CONCERN-8 for one read-only `docker exec` wording clash).
-- Test coverage: FAIL — two of the 21 criteria are carried by a gate that reds on correct code (FAIL-1, FAIL-2) and one by a gate that cannot fail (CONCERN-4).
-- Breaking changes: PASS — `settings-visibility.spec.ts:57-58` and `admin.spec.ts:49,128,159` pass on both sides; the `/inventory` server surface is provably two lines inside `load`.
-- Security surface: PASS — no auth, schema, permission, money or trust-boundary surface. `visibleSettings()` is read, never changed. The e2e fixture writes a disabled, OFFBOARDED user with a non-hash password that nobody can log in as.
-- N2 section feasibility: FAIL — markup and derivations all verified (`SearchInput` spreads `id`/`autocomplete`/`class` onto its `<input>`, so `getByLabel` resolves; `{@const}` placement legal in both `{#each}` blocks; `scrollbar-none` defined at `tailwind.config.ts:68`). The single blocker is FAIL-2's `aria-live` count.
-- N3 section feasibility: FAIL — all 29 `name=`/`id=` pairs verified in DOM order (`:109-390`, `:427-563`); `FIELD_ORDER` matches source exactly; `2xl` arithmetic correct. Blockers: FAIL-1, plus CONCERN-5's `:578-589` range.
-- N5 section feasibility: CONCERN — page work is sound and every component API checked (`Dialog` `size:'wide'` = `max-w-lg sm:max-w-2xl lg:max-w-4xl` at `:67`; `scroll` is the only source of `max-h-[90vh]` at `:149`; `ConfirmDialog` z-60 at `:34`; `ConfirmButton` accepts `submit` at `:30`; `Pagination` renders its `<nav>` only when `total > pageSize`, which the `has-[nav]:` classes handle). Remaining: CONCERN-4, CONCERN-6.
-- Test plan: FAIL — FAIL-1, FAIL-2, CONCERN-4.
-- Gates / commit plan: PASS — command form verified live; CI order matches; explicit staged paths; no AI attribution.
-- Lane split: PASS — zero file overlap with the build lane, re-verified against its Touchpoints table.
+- Infra fit: PASS — all ten e2e invocations use the `CI=1 bunx dotenv -e .env.dev -- playwright test …` form, matching `package.json:15`'s flags and argument order. No step starts a server, vite or docker; the last `docker exec` was removed and Rule 5 now proves teardown inside the spec.
+- Test coverage: CONCERN — 21/21 criteria carry a Fully-Automated or Hybrid gate and a named mutation, and the D19 four-step procedure is enforced by Phase Completion Rule 8. Five of twenty spot-checked mutations are defective (CONCERN-2, -3, -4) and one test scenario names a page property that is false (CONCERN-A).
+- Breaking changes: PASS — `itemSchema` and the three `/inventory` actions are unchanged and diff-gated; the `Create Employee` strict-mode locator at `admin.spec.ts:49` resolves to exactly one node before and after; the frozen summary string at `:413` is byte-untouched; `settings-visibility.spec.ts:57-58` passes on both sides of N2.
+- Security surface: PASS — no auth, billing, schema, permission or trust-boundary change. `visibleSettings()` is read, never altered, and the rbac table is untouched. The one data-integrity finding (`notes` erased on every row save) is pre-existing, fixed as a side effect, asserted by N5-AC9, and separately backlogged.
+- N2 Context Rail + search: CONCERN — mechanically feasible (`data.user.roles` present in both files; `.input` exists at `app.css:186`; `SearchInput` spreads `id`/`autocomplete`/`placeholder`); three mutations need restating.
+- N3 Companion Rail: CONCERN — all edit targets exact and uniquely matchable; N3-T6's scenario clause and N3-T1's tolerance need correcting.
+- N5 inventory: CONCERN — feasible and the fixture is sound; the `min-w-max` control needs strengthening.
+- Fixture + negative controls: PASS — not loosened, and both NC procedures are logically sound.
+- Lane split: PASS — zero file intersection with the build lane; both runtime couplings named and handled.
 
-Open gaps: none deferred to backlog. One backlog note is still required by the plan itself and does
-not yet exist — `inventory-row-save-erases-notes_NOTE_18-09-26.md` (§Phase Completion Rules item 7).
+Open gaps:
+- N3-AC6 ordering half: known-gap: documented as a named residual — `n3-first-error-dom-order-unprovable_NOTE_18-09-26.md`. Re-verified this round: no reachable two-field scenario inverts server-key order against DOM order.
+- `inventory-row-save-erases-notes_NOTE_18-09-26.md`: required by Phase Completion Rule 7, records the pre-existing data loss independently of this lane.
+- No automated focus-visibility or contrast gate in the repo — the reason N2-AC6, N3-AC6 and N5-AC8 are Hybrid rather than Fully-Automated.
 
 What this coverage does NOT prove:
-- The e2e gates prove behaviour at 390/1024/1280/1440/1536/1920 × Chromium only. Nothing here proves
-  any other engine, any other width, or the owner's real 125%-scaled viewport with docked DevTools
-  (`innerHeight` has measured as low as 314 in this repo).
-- `getComputedStyle(el).boxShadow !== 'none'` proves a ring **exists**. It proves nothing about the
-  ring's contrast against its background in either theme — that is why N2-AC6, N3-AC6 and N5-AC8 are
-  Hybrid, and a green suite does not carry them.
-- NC-1 and NC-2 prove those two assertions respond to a mutation. NC-1 in particular does **not**
-  prove the assertion is green-capable on correct code — its red output is indistinguishable from an
-  assertion that can never pass. The other ~60 assertions in the three new specs have no negative
-  control at all.
-- The six-viewport width assertions use a ±8px tolerance. They cannot distinguish 1136 from 1132,
-  only 1136 from 848 — which is the failure they exist for.
-- Nothing here proves the three commits are free of the repo's known e2e flake (#287), nor that the
-  dev DB's existing e2e residue rows do not change what a count-based assertion sees. Only a recorded
-  pre-change baseline makes a post-change count meaningful.
-- Step 29's `git diff --stat` proves the server file changed two lines. It proves nothing about
-  whether those two lines are correct — only the view-toggle e2e does.
-- Nothing proves the fixture's OFFBOARDED employee is invisible to every other spec's headcount
-  assertions while the suite runs `fullyParallel` across files. No spec read in this pass asserts a
-  total employee count, but that is an absence of evidence, not a gate.
+- The e2e gates prove the rendered DOM, geometry and keyboard behaviour in headless Chromium at the named viewports. They do **not** prove the focus ring or the row focus indicator have adequate **contrast** against either theme's background — that is the Hybrid half, owner-judged at steps 8 and 33, and there is no machine substitute in this repo.
+- They do not prove any behaviour in Firefox, WebKit, or at a real device pixel ratio; the six N3 width numbers are Chromium measurements and are sensitive to scrollbar width (CONCERN-1).
+- `bun run test:e2e` (full suite) proves no cross-spec regression **for the specs that exist**. It does not prove `/settings/org`'s own behaviour — that page is the build lane's and gets its first spec there.
+- The step-29 diff check proves `+page.server.ts` changed exactly two lines. It does **not** prove the three inventory actions still behave correctly under concurrent writes, nor that `inputOf`'s full-overwrite semantics are safe for any field other than `notes`.
+- N5-AC9 proves `notes` survives a modal save of a different field. It does **not** prove how many notes were already destroyed by the pre-existing defect, and there is no audit trail to recover them from.
+- NC-1 proves `update({ reset: false })` is load-bearing for the asserted field. It does not prove every field in the modal survives a rejected save.
+- Nothing here proves production behaviour — this app has never been deployed.
 
-Gate: BLOCKED (2 unresolved FAILs)
-Accepted by: — (not applicable; gate is BLOCKED)
+Gate: CONDITIONAL — 0 FAILs, 7 CONCERNs. Six are plan-text corrections with a named, source-verified
+fix (CONCERN-A, -1, -2, -3, -4, -6); one is a cite sweep (CONCERN-5). None removes a criterion's
+gate. Apply all seven before EXECUTE authors the affected tests.
 
-SUPPLEMENT REQUEST:
-- Gap 1: Section test-plan | Concern: N3-T6 "jump to first error works at 390" fills only First Name and clicks Create Employee, but the form at `employees/new/+page.svelte:97` has no `novalidate` and seven fields are `required` (`:112, :128, :187, :255, :275, :313, :349`), so Chromium blocks the submit, no POST fires, `form` stays null, `errorCount` is 0 and the "Go to the first one" link never renders — the test reds on correct code. The 409 paths at `+page.server.ts:176, :189, :196` return no `fieldErrors`, so only the zod `fail(400, …)` at `:140-141` can produce the error block | Severity: FAIL | Suggested addition: rewrite the scenario to satisfy every HTML constraint and still fail zod (fill all seven required fields with natively-valid values and supply one server-invalid value, e.g. an over-length or malformed field that zod rejects), and assert the aside error block renders before clicking the jump link.
-- Gap 2: Section test-plan | Concern: N2-T7's closing assertion `expect(page.locator('[aria-live="polite"]')).toHaveCount(1)` sees two elements — `src/routes/(app)/+layout.svelte:214` mounts `<Toaster />`, which renders `aria-live="polite"` at `Toaster.svelte:52` — so the whole test reds on correct code and N2-AC6 loses its only automated gate | Severity: FAIL | Suggested addition: scope and strengthen it to `await expect(hub(page).locator('[aria-live="polite"]')).toHaveText(/\d+ of \d+ settings shown/)`.
-- Gap 3: Section test-plan | Concern: "Enter and Space both open, Space does not scroll" compares `window.scrollY` before and after at 1280×720 on a page with 3-5 rows, where the document is not scrollable, so `0 === 0` passes whether or not Space scrolls — a gate that cannot fail | Severity: CONCERN | Suggested addition: assert the page is scrollable as a precondition (`document.documentElement.scrollHeight > clientHeight`) or run the case at a short viewport.
-- Gap 4: Section step-15 | Concern: the submit row is quoted as `:578-589`; it is `:578-587` — `:588` is `</form>` and `:589` is `{/key}`, so deleting the stated range breaks the component | Severity: CONCERN | Suggested addition: correct the range to `:578-587`.
-- Gap 5: Section test-plan N5 fixture | Concern: the `afterAll` comment claims leftovers are swept by `scripts/clean-e2e-employees.ts`, but that script matches email prefixes only and its list is `['e2e_', 'probe_', 'zzpagetest']` (`scripts/clean-e2e-employees.ts:20`) — `zzinvfixture@example.test` matches none | Severity: CONCERN | Suggested addition: either add `'zzinvfixture'` to that script's `PREFIXES` and list the script in Touchpoints, or delete the false sentence and make Phase Completion Rule 5's psql check mandatory.
-- Gap 6: Section step-21 and step-N3-T10-note | Concern: two cites are wrong — `if (!after) await o.update()` is at `submit-feedback.svelte.ts:82` and `:90` only (`:70` is `if (after) await after(o)`), and `DatePicker.svelte`'s `aria-label="Open calendar"` is at `:695`, not within the cited `:691-693` | Severity: CONCERN | Suggested addition: correct both in place.
-- Gap 7: Section standing-constraints | Concern: "No step runs `./start.sh`, vite or docker" contradicts Phase Completion Rule 5's `docker exec -i veent-db-5434 psql …` leftover check | Severity: CONCERN | Suggested addition: qualify it as "no step starts a server or a container; Rule 5's read-only psql query runs against the container the owner already has up".
-- Gap 8: Section test-plan N5 | Concern: NC-1's expected red output is identical to the output of an assertion that can never pass, so it cannot distinguish "guard removed" from "guard never worked"; `update()` still invalidates and re-renders the modal's `<option selected>` set, so it is unproven that the user's ASSIGNED selection survives a rejected save | Severity: CONCERN | Suggested addition: require the unmutated N5-AC6 assertion to be recorded green BEFORE NC-1 is run, and name the fallback (bind the select to local `$state` seeded from `editing`) if it is red.
+Accepted by: user / session — round 4 declared final by the user in this session ("Round 4, and the
+last one"), with three prior recorded PVL fix cycles (rounds 1-3, see the supersedes chain and
+§Supplement 18-09-26). Accepted concerns, by name: CONCERN-A (N3-T6 target field carries no
+`aria-invalid`), CONCERN-1 (N3-T1 scrollbar tolerance), CONCERN-2 (three inapplicable mutations:
+N2-T3, N2-T5, N2-T7c), CONCERN-3 (`min-w-max` control may stay green), CONCERN-4 (N3-T5 failure
+mode half wrong), CONCERN-5 (five wrong cites), CONCERN-6 (NC-1 fallback must key on `editingId`).
 
+Execute-agent instructions (binding):
+
+| # | Instruction | Trigger |
+|---|---|---|
+| E1 | Before writing N3-T6, replace the scenario: all seven `required` fields natively valid **plus** `sssNumber = '1234'`. Assert focus lands on `#sssNumber`, which carries `aria-invalid` (`:429`). Do **not** assert `aria-invalid` on `basicMonthlySalary` — the attribute is not on that input. | Step 17 |
+| E2 | For N3-T1, measure the baseline from `document.documentElement.clientWidth`, or widen the tolerance to ±20px. Keep the explicit `> 768` assertion at 1280 and 1440 unchanged. | Step 17 |
+| E3 | Restate three mutations before running them: N2-T3 → substitute a group so the sibling row renders non-empty on the hub; N2-T5 → add `flex-wrap` and remove `overflow-x-auto`; N2-T7c → move the `<nav>` below `{@render children()}` in `settings/+layout.svelte`. Record the restated mutation in the phase report. | Step 5a / step 31 |
+| E4 | For N5-AC1's sideways-scroll control, do not rely on restoring `min-w-max` alone — remove `table-fixed` and the `truncate` classes as well, or restore the `overflow-x-auto` wrapper with it. If the control stays green, the test proves nothing: fix the mutation, not the record. | Step 30 |
+| E5 | For N3-T5, assert the focus step, not DOM absence — `hidden` leaves the links in the DOM. | Step 17 |
+| E6 | Correct five cites in place before Commit 1: `clean-e2e-employees.ts:19` (×2), `DatePicker.svelte:662`, the `EmployeeTable.svelte:12` `th` string claim, the `EmployeeTable.svelte:29,35` anchor-vs-button wording, `inventory/+page.server.ts:31`. | Step 1 |
+| E7 | If NC-1's unmutated run is red, seed the local `$state` on **open** (keyed on `editingId`), never from `editing`'s identity — an `$effect` off `editing` re-fires after `invalidateAll` and reproduces the failure. Do not weaken the assertion. | Step 31 |
+| E8 | Re-verify any line number before editing at it. Five cites were wrong this round after three prior correction passes; assume more remain. | Every step |
 ---
 
 ## Supplement 18-09-26 — round-2 PVL gap closure
@@ -2823,3 +2940,42 @@ pre-flight.
 
 **Re-validate required.** A plan amendment introduces defects; this one rewrote a test fixture.
 VALIDATE round 3 should re-run against the new `beforeAll`/`afterAll` before EXECUTE starts.
+
+---
+
+## Supplement 18-09-26 — round-4 PVL gap closure (final)
+
+PVL-supplement mode. Scope: the seven round-4 concerns only (CONCERN-A, -1, -2, -3, -4, -5, -6). No
+design decision reopened, no scope change, no source file touched, no e2e locator specified — D19
+stands. The round-4 validate-contract above is left as written: it is the record of what was found,
+not a place to overwrite.
+
+| Gap | Section changed | What changed |
+|---|---|---|
+| **CONCERN-A** (high) | §N3-T6 | The scenario's target field is replaced. Salary stays **valid** (`28000`); the rejection now comes from **`sssNumber = '1234'`**, and focus is asserted on `#sssNumber`. Verified at the line: `id` `:427`, `aria-invalid` `:429`, no `required`/`pattern`/`type` so it is natively valid, `govIdSchema('sssNumber')` at `+page.server.ts:88` rejects it, `fail(400)` at `:140-141`, `optionalHasError` (`:56`) opens the disclosure so the target is focusable. Recorded that `admin.spec.ts:126-130` already walks this exact path and `:132` asserts the rendered error — a proven route, not a new one. The old target's facts (`min="0"` at `:347`, `.positive()` at `:82`) are kept as the reason the other routes are ruled out, with the `aria-invalid` clause explicitly attached to the correct field. |
+| **CONCERN-1** | §N3-T1 | **Choice: derive the baseline from `document.documentElement.clientWidth`**, not widen the tolerance. The formula is written out (`base − 304` / `base − 32`, minus 288 at ≥1536). Why this over ±20px: ±20 would buy ~15px of scrollbar at the price of letting a real 16px layout error pass; `clientWidth` takes the scrollbar out of both sides, so the ±8px tolerance keeps the tightness it was chosen for and the gate stops depending on the host's scrollbar width. The six nominal numbers stay as the derivation's sanity check. The `> 768` half at 1280/1440 is untouched and stays literal. |
+| **CONCERN-2a** | §Test plan N2, N2-T3 | Mutation restated as an applicable edit: substitute a group so the sibling row renders non-empty on the hub — `visible.filter((d) => d.group === (current?.group ?? groups[0]))`. The old "drop the ternary" reds with a TypeError on `current.group`, which kills the test rather than failing its assertion. |
+| **CONCERN-2b** | §Test plan N2, N2-T5 | Mutation restated: **add `flex-wrap`, remove `overflow-x-auto`**. There is no `flex-nowrap` class on that row to remove — flex does not wrap by default. |
+| **CONCERN-2c** | §Test plan N2, N2-T7c | Mutation restated: move the `<nav>` below `{@render children()}` in `settings/+layout.svelte`. The bar and the search live in two different files, so "move the search before the bar" is not a single applicable edit. |
+| **CONCERN-3** | §Step 24 (new sub-section §Why the `min-w-max` restore was rejected), §Test plan N5 | Mutation strengthened to **`min-w-[1600px]` on the `<table>`** — deterministic against the 942px available at 1280, with no dependence on content or font metrics. The reason `min-w-max` was rejected is written out: under `table-layout: fixed` the max-content width resolves from the specified column widths, not cell content, and every cell truncates, so the restore likely produces no overflow and a green control. EXECUTE may prefer the realistic restore (drop `table-fixed` + `truncate`, add `min-w-max`) **only if it actually reds**; if it stays green it must not be recorded as a control. Which one was used goes in the phase report. |
+| **CONCERN-4** | §Test plan N3, N3-T5 | The DOM-absence clause is deleted. `hidden` is `display:none` and leaves the links in the DOM, so a presence count still passes; the stated failure is now the focus step alone, with an explicit warning not to assert DOM presence. |
+| **CONCERN-5** | §Test plan N5 fixture + sweep note, §Step 24, §Step 24 stretch note, §N5 fixture prose | Four of five cites corrected: `clean-e2e-employees.ts:19` (both occurrences), `inventory/+page.server.ts:31` (both occurrences), the `EmployeeTable.svelte:12` `th` claim (source has **no `text-xs`** — now stated as *adapted*, not lifted), and the `EmployeeTable.svelte:29,35` precedent (the stretched control there is an `<a href>` opening at `:32` with the stretch class at `:35`, and the row hook at `:29` is `has-[a:focus-visible]`). |
+| **CONCERN-5, fifth cite** | — **REFUTED, no change made** | The contract says `DatePicker.svelte:661` is the wrapper `<span>` and the input opens at `:662`. Re-read at the line: **`:660` is the wrapper `<span bind:this={wrapper}>`, `:661` is `<input`, `:662` is `bind:this={input}`.** The plan's existing `:661` is correct and was left alone. `:695` `aria-label="Open calendar"` re-confirmed. This is the fifth cite in four rounds to be *wrongly* corrected — E8 stands. |
+| **CONCERN-6** | §NC-1 | The named fallback now keys on **`editingId`**, with the mechanism spelled out: `editing` is `$derived` off `data.items`, so `invalidateAll` hands back a new object identity and an `$effect` reading it re-fires and re-clobbers the user's choice — the identical failure, with the guard looking wired. The effect's only dependency is `editingId`; the body reads `editing` under `untrack`. If the fallback is taken, NC-1 re-runs from clean: unmutated green, mutation, revert. |
+
+**Execute-agent instructions E1–E8 in the round-4 contract still stand** and are not superseded by
+this supplement. E1–E5 and E7 are now also written into the plan body at the point of use, so an
+executor who reads only the step will get them; E6's fifth cite is refuted above; **E8 is permanent
+— re-verify every line number before editing at it.**
+
+**Unchanged, per scope:** the D19 test policy and the EXECUTE test procedure; the N5 fixture
+(dedicated User + Employee, OFFBOARDED, teardown item → payrollEntry → employee → user, try/catch,
+pre-guard reality assertions, idempotent upserts); the `2xl` gating; the dropped sticky thead;
+N5-AC9 and the "20 SPEC + 1 plan-added" count; the pinned tab order with no tolerance; the
+`keyboard.press('Tab')` walk; Step 5's pre-flight; `FIELD_ORDER`'s 18 names; and the N3-AC6 ordering
+residual, which stays a backlog stub — the validator re-derived all four order disagreements as
+unreachable, so the plan is not understating itself.
+
+**Coverage after this supplement: 21/21 (20 SPEC + N5-AC9).** Every criterion keeps a
+Fully-Automated or Hybrid gate, and every gate now carries a mutation that is mechanically
+applicable and reds the assertion it guards. Nothing became a Known-Gap; nothing lost a gate.
