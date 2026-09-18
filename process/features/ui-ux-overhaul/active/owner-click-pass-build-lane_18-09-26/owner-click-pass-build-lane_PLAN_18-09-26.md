@@ -14,7 +14,7 @@ feature: ui-ux-overhaul
 **Branch**: `feat/uiux-phase-7`
 **Upstream SPEC**: `owner-click-pass-build-lane_SPEC_18-09-26.md`
 
-**TL;DR** — 22 steps, 4 commits, order **N7 → N1 → N4 → N6**. 5 source files change, 5 test files change (2 new unit, 3 new e2e, 2 extended e2e). 33 of 34 acceptance criteria are covered with a named step and a named test. **N6-AC10 is CONDITIONAL** — its "focus is not lost to `<body>` after a page change" clause cannot be met without editing shared `Pagination.svelte`; see [Hole: N6-AC10](#hole-n6-ac10). Two mandatory negative controls are specified with exact mutations. Nothing touches `rbac.ts`, `schema.prisma` or `services/**`.
+**TL;DR** — 22 steps, 4 commits, order **N7 → N1 → N4 → N6**. 5 source files change, 5 test files change (2 new unit, 3 new e2e, 2 extended e2e). 33 of 34 acceptance criteria are covered with a named step and a named test. **N6-AC10's page-change focus clause is OUT of this lane by owner decision** and is filed as its own backlog note; the rest of AC10 is covered. See [N6-AC10 — deferred by owner decision](#n6-ac10--deferred-by-owner-decision). Two mandatory negative controls are specified with exact mutations. Nothing touches `rbac.ts`, `schema.prisma` or `services/**`.
 
 Upstream SPEC: `owner-click-pass-build-lane_SPEC_18-09-26.md` (same folder). Decisions D1, D3, D6, D6b are inputs, not choices — INNOVATE was skipped deliberately.
 
@@ -96,21 +96,29 @@ These are the implementation-level calls the SPEC left to PLAN. The owner's D1/D
 
 ### P-D1 — the N7 label is `About {title}`, with no guard against a badge
 
-`HelpTip`'s `label` prop is `label: string`, **required, no default** (`HelpTip.svelte:4`). `PageHeader` synthesises it as the template literal `` `About ${title}` ``. That mirrors the four hand-written call sites exactly — `leave/balances/+page.svelte` already writes `label="About leave balances"`.
+`HelpTip`'s `label` prop is `label: string`, **required, no default** (`HelpTip.svelte:4`). `PageHeader` synthesises it as the template literal `` `About ${title}` ``. That mirrors the two hand-written `PageHeader` badge call sites exactly — `leave/balances/+page.svelte:33` already writes `label="About leave balances"` and `settings/roles/+page.svelte:168` writes `label="About roles and permissions"`.
 
-**N7-AC7 / R1 — what stops a double `?`.** I checked every call site that passes both a `description` and a `badge` snippet. There are four, and the split is decisive:
+**N7-AC7 / R1 — what stops a double `?`.**
 
-| File | passes `description`? | `badge` content |
+> **Corrected at VALIDATE.** The SPEC's background section names **four** pages as passing a `HelpTip` through a `PageHeader` `badge` snippet. Two of those four are wrong, and I repeated the error in the first draft of this plan. Re-derived from source:
+> `grep -rl PageHeader src/ | xargs grep -l HelpTip` returns **three** files — `dashboard/+page.svelte`, `leave/balances/+page.svelte`, `settings/roles/+page.svelte` — and only two of those put the `HelpTip` in the `badge` snippet.
+> - `attendance/TeamMatrix.svelte:75` — its `HelpTip` is inside `{#snippet toolbar()}` beside an `<h2>`, passed to `<Container>` at `:111`. **`grep -c PageHeader TeamMatrix.svelte` returns 0.** It is not a `PageHeader` badge at all.
+> - `dashboard/+page.svelte:253` — its `HelpTip` is inside the "Upcoming Regularizations" popover, gated by `{#if openPanel === 'regularizations'}` at `:245`. The page's own header is a bare `<PageHeader title="Dashboard" />` at `:138` — no description, no badge.
+> The conclusion is unchanged; only the evidence is.
+
+There are exactly **two** `PageHeader` badge-`HelpTip` call sites, and **three** call sites passing a `description` alongside a badge. The split is decisive:
+
+| File | passes `description` on `<PageHeader>`? | `badge` snippet content |
 |---|---|---|
-| `leave/balances/+page.svelte:32-36` | **no** | a `HelpTip` |
-| `settings/roles/+page.svelte:166-177` | no | a `HelpTip` |
-| `attendance/TeamMatrix.svelte:75-78` | no | a `HelpTip` |
-| `dashboard/+page.svelte:253-255` | no | a `HelpTip` |
+| `leave/balances/+page.svelte:31-36` | **no** | a `HelpTip` |
+| `settings/roles/+page.svelte:166-172` | **no** | a `HelpTip` |
 | `performance/reviews/[id]/+page.svelte` | **yes** | a **`Badge`** status pill |
 | `separations/[id]/+page.svelte` | **yes** | a **`Badge`** status pill |
 | `complaints/[id]/+page.svelte` | **yes** | a **`Badge`** status pill |
 
-So **no page today passes both a `description` and a badge-`HelpTip`**. The four AC7 pages pass no description at all, so they render exactly one `?` with no conditional needed.
+Not `PageHeader` badges, and therefore not in this table: `attendance/TeamMatrix.svelte:75` (a `Container` toolbar `HelpTip`) and `dashboard/+page.svelte:253` (a popover `HelpTip`).
+
+So **no page today passes both a `description` and a badge-`HelpTip`**. The two badge-`HelpTip` pages pass no description at all, so they render exactly one `?` with no conditional needed.
 
 **Rejected:** `{#if description && !badge}`. It looks like the safe guard and it is wrong — it would silently delete the description from the three `Badge`-pill detail pages, and it would break N7-AC10 outright (`/complaints/[id]` must keep its identity line in the tooltip).
 
@@ -131,6 +139,11 @@ The prompt asks me to derive `rowPx`/`chromePx` by measuring a comparable route.
 ### P-D3 — N6 param names: `empSearch`, `empUnassigned`, `empPage`
 
 `empPage` follows the `myPage` / `teamPage` two-tables-one-page precedent at `timesheets/+page.server.ts:62,79`. It is deliberately **not** `page`, so a future Positions table can take `page` or `posPage` without colliding — that is N6-AC6, asserted as a literal string in the load unit test.
+
+**Two limits of this design, recorded at VALIDATE so nobody rediscovers them as bugs:**
+
+- **A GET form replaces the whole query string.** So if a Positions table is paged later, changing an assignments filter would also reset the Positions page. Harmless today — `/settings/org` consumes no other param — and it does not weaken N6-AC6, which is about *name collision* (two params overwriting one another's value), not about co-survival. If Positions is ever paged, the fix is a hidden `<input>` carrying the Positions param through this form. Noted, not built (YAGNI).
+- **The native `×` on `<input type="search">` fires no submit.** After N6, clearing the box with the browser's built-in clear button will not restore the unfiltered rows until the user presses Enter or clicks `Filter`. This is not an N6-AC5 violation — no filter change has been committed to the address — but it is a real trap created by the round-trip model the owner accepted in D3/R7. **Flag it to the owner at sign-off**; do not silently add an `onsearch` handler to paper over it, because that reintroduces per-keystroke navigation.
 
 ### P-D4 — N6-AC5 (filter change returns to page 1) is enforced structurally, not by code
 
@@ -273,8 +286,10 @@ describe('PageHeader renders its description as a HelpTip', () => {
 	it('no call site passes both a description and a badge HelpTip', () => {
 		const offenders = sourceFiles('src').filter((path) => {
 			const src = readFileSync(path, 'utf8')
-			if (!src.includes('<PageHeader')) return false
-			if (!/description=/.test(src)) return false
+			// Scope to the <PageHeader ...> OPENING TAG. A file-wide /description=/ is wrong:
+			// EmptyState, Badge and others take a `description` prop too.
+			const openingTags = [...src.matchAll(/<PageHeader\b[^>]*>/g)].map((m) => m[0])
+			if (!openingTags.some((tag) => /\bdescription=/.test(tag))) return false
 			const badge = src.match(/\{#snippet badge\(\)\}([\s\S]*?)\{\/snippet\}/)
 			return !!badge && badge[1].includes('HelpTip')
 		})
@@ -283,7 +298,19 @@ describe('PageHeader renders its description as a HelpTip', () => {
 })
 ```
 
-Satisfies: **N7-AC1, N7-AC2, N7-AC3, N7-AC7, N7-AC4** (the props half), **N4-AC4** (the `actions` half).
+**Why the predicate is scoped to the opening tag (corrected at VALIDATE).** A file-wide `/description=/` test makes this gate **red against the untouched repo**: `leave/balances/+page.svelte` has a badge-`HelpTip` at `:33` **and** an unrelated `description={filtered ? … : undefined}` on an `<EmptyState>` at `:148`, so it would be reported as an offender on day one. `EmptyState`, `Badge` and others all take a `description` prop. Matching `/<PageHeader\b[^>]*>/g` and testing only those tags is the fix. The regex-over-source shape mirrors `tests/unit/badge-class-literals.test.ts:34-40` (the recursive `sourceFiles` walker, lifted verbatim) and `tests/unit/time-picker-migration.test.ts:9-13`.
+
+**The mutation that reds this gate (state it in the phase report).** Add a description to the `PageHeader` at `src/routes/(app)/leave/balances/+page.svelte:31`:
+
+```svelte
+<PageHeader title="Leave Balances" description="Remaining days per employee.">
+```
+
+That file already carries a badge-`HelpTip` at `:33`, so the page would render two `?` — one from the badge, one from the description path. Expected failure:
+`expect(received).toEqual(expected) — Received: ["src/routes/(app)/leave/balances/+page.svelte"], Expected: []`.
+Revert after recording. This confirms the invariant scan is a guard and not a tautology.
+
+Satisfies: **N7-AC1, N7-AC2, N7-AC3, N7-AC7** (the invariant half), **N7-AC4** (the props half), **N4-AC4** (the `actions` half).
 
 #### Step 4 — the N7 e2e spec
 
@@ -676,7 +703,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 }
 ```
 
-The four-line comment is **carried verbatim from `separations/+page.server.ts:26-28` / `inventory/+page.server.ts:37-39`**, where this exact fetch-then-slice constraint already needed stating. It is a load-bearing constraint note, not narration, and it is the repo's own established wording for this pattern (SPEC R3 requires the in-memory limitation be stated openly).
+**Comment sanction (recorded at VALIDATE).** This is the **only** new code comment anywhere in this plan, and the standing rule is no explanatory comments. It is sanctioned explicitly: it states a load-bearing constraint (why the slice is in the load and not in the query) rather than narrating the diff, and it is the repo's own established wording for this exact pattern. EXECUTE may add this one comment and no other.
+
+The four-line comment is **adapted from `separations/+page.server.ts:26-28` / `inventory/+page.server.ts:37-39`**, where this exact fetch-then-slice constraint already needed stating. It is a load-bearing constraint note, not narration, and it is the repo's own established wording for this pattern (SPEC R3 requires the in-memory limitation be stated openly).
 
 The filter predicate is lifted **verbatim** from the client `$derived.by` at `+page.svelte:38-45` — same fields, same `includes`, same `!e.positionId` test — so filtering behaviour is byte-identical, only relocated. `data.positions` is returned whole and unpaged, so the per-row `<select>` still offers every position — **N6-AC7**, and Positions stays out of scope per D3.
 
@@ -833,7 +862,9 @@ File: `tests/e2e/settings-org-assignments.spec.ts` (NEW). Assertions in [Test pl
 
 Read-only check before writing Step 20's assertions: `prisma/seed-e2e.ts` and `prisma/seed-core.ts`. N6-AC1 and N6-AC2 need **more than 20** assignable employees in the `Veent` org, or "table is bounded" and "page 2 and back" are vacuous by construction.
 
-If the seed carries 20 or fewer, the spec **must** create the extra employees itself in a `test.beforeAll` (with a `data-*`-free, name-prefixed marker so the rows are findable and removable) and delete them in `afterAll` — the same pattern the repo already uses to avoid the "fixture residue turns into failures" trap. **Do not edit the shared seed files**; other specs count on their contents.
+**Confirmed at VALIDATE: the shared seed carries well under 21 assignable employees**, so this is not a maybe — the spec **must** seed its own fixtures. Create them in `test.beforeAll` under a distinct surname prefix (do **not** reuse `Zzpagetest`; pick a non-colliding marker such as `Zzorgtest` so the two specs cannot sweep each other's rows) and delete them in `afterAll`, payroll entries first. This is the pattern that avoids the "fixture residue turns into failures" trap.
+
+**Do not edit `prisma/seed-e2e.ts` or `prisma/seed-core.ts`** — other specs assert against their exact contents.
 
 #### Step 22 — the full gate run
 
@@ -859,9 +890,33 @@ Logged in as `USERS.hr` (or `USERS.admin` for `/settings/roles`). Reference page
 | `focus reveals` | same page; `await page.getByRole('button', { name: 'About Separations' }).focus()`; `await expect(tip).toHaveCSS('opacity', '1')`. Asserted **separately** from hover — hover-only is the exact failure mode the 04-09-26 note warned about. |
 | `no standalone description paragraph` | `await expect(page.getByText('Record resignations and terminations', { exact: false })).toHaveCount(1)` — the only occurrence is the tooltip body. |
 | `anchoring and overflow at three widths` | for `w` of `1280`, `768`, `375`: `setViewportSize`, focus the `?`, read `tip.boundingBox()` and the `h1`'s box; assert `tip.y >= h1.y + h1.height - 2` (below), `tip.x < h1.x + h1.width && tip.x + tip.width > h1.x` (horizontal overlap), `tip.x >= 0` and `tip.x + tip.width <= w` (no spill). |
-| `no double question mark on the four badge pages` | for each of `/settings/roles`, `/leave/balances`, `/attendance`, `/dashboard`: `await expect(page.getByRole('button', { name: /^About / })).toHaveCount(1)`. |
+| `exactly one description-path help control per page` | **Rewritten at VALIDATE — see the note under this table.** For each row of the expected-count table below: assert `getByRole('button', { name: 'About ' + <that page's h1 text>, exact: true })` has count **1 when the page passes a description, 0 when it does not**; and separately assert the page's **total** `getByRole('button', { name: /^About / })` count equals the recorded figure. |
 | `keyboard reach + aria-describedby resolves` | `/separations`; Tab from the `h1` until the `?` has focus; `const id = await tipButton.getAttribute('aria-describedby')`; assert `id` is non-empty; `await expect(page.locator(`#${id}`)).toContainText('Record resignations and terminations')`; assert `toHaveCSS('opacity', '1')` while focused. |
 | `complaints detail keeps an identifying title` | seed/read one complaint id; `/complaints/{id}`; assert the `h1` text equals the complaint subject; assert the tooltip body contains `For ` and the employee number. |
+
+#### The N7-AC7 rewrite — what "exactly one `?`" actually means
+
+> **Corrected at VALIDATE.** The first draft asserted `getByRole('button', { name: /^About / })).toHaveCount(1)` on four pages. That assertion **goes red against correct code** on two of them, and it was measuring the wrong thing.
+
+The invariant that matters is not "one `?` on the page". It is **exactly one `?` originating from the description path** — i.e. at most one `PageHeader`-synthesised `About {title}` button. A page may legitimately carry other `HelpTip`s in section toolbars or popovers; those are page-owned and none of N7's business.
+
+Measured expected counts, per page:
+
+| Page | `About {h1}` from the description path | Other `About …` controls on the page | **Total** `/^About /` |
+|---|---|---|---|
+| `/settings/roles` | **0** — `PageHeader title="Roles & Permissions"` at `:166` passes no description | 1 — the badge `HelpTip` `About roles and permissions` at `:168` | **1** |
+| `/leave/balances` | **0** — `PageHeader title="Leave Balances"` at `:31` passes no description | 1 — the badge `HelpTip` `About leave balances` at `:33` | **1** |
+| `/attendance` | **1** — `About Attendance`, from the description at `AttendanceHrGrid.svelte:209` | 1 — `About team attendance` at `TeamMatrix.svelte:75`, rendered via the `toolbar` snippet passed to `<Container>` at `:111` on the matrix view | **2** |
+| `/dashboard` | **0** — `PageHeader title="Dashboard"` at `:138` passes neither description nor badge | 0 — the popover `HelpTip` at `:253` is behind `{#if openPanel === 'regularizations'}` at `:245` and is **not in the DOM** while the panel is closed | **0** |
+
+Two `?` on `/attendance` — one on the title row, one on the section toolbar — is **correct behaviour**, not a defect. They describe different things and sit in different places.
+
+The test asserts both columns: the description-path count (the invariant N7 owns) and the total (a canary that catches an unexpected new `HelpTip` appearing). `/dashboard` is kept in the table precisely because its expected description-path count is 0 — it proves the assertion is capable of distinguishing 0 from 1.
+
+**This rewritten test can still fail.** Two mutations red it, either of which may be used as the recorded check:
+- Drop the `{#if description}` guard in Step 2 so the `HelpTip` always renders → `/settings/roles`, `/leave/balances` and `/dashboard` each gain an `About {title}` button and their description-path assertions go from 0 to 1.
+  Expected: `expect(locator).toHaveCount(0) — Expected: 0, Received: 1`.
+- Add a `description` to `<PageHeader title="Dashboard" />` at `dashboard/+page.svelte:138` → `/dashboard`'s total goes 0 → 1.
 
 #### N7-AC8 — contrast probe (Agent-Probe)
 
@@ -903,8 +958,11 @@ Appended `test.describe('Separations title row (N4)')`, logged in as `USERS.hr`:
 | `action sits on the title row` | `const h = page.getByRole('heading', { name: 'Separations', level: 1 })`, `const b = page.getByRole('button', { name: 'New Separation' })`; boxes: mid-points within 24 px **and** `b.x > h.x + h.width`. |
 | `no standalone action row` | `await expect(page.locator('div.flex.justify-end').filter({ has: page.getByRole('button', { name: 'New Separation' }) })).toHaveCount(0)`. |
 | `title row a11y` | `getByRole('button', { name: 'New Separation' })` count 1 and enabled; `page.locator('h1')` count 1; `await b.focus()` then assert a non-`none` focus outline/ring. |
+| `the button still opens the create dialog` | `await page.getByRole('button', { name: 'New Separation' }).click()`; assert the create dialog is open — `await expect(page.getByRole('dialog')).toBeVisible()` and its Employee field resolves (`getByLabel('Employee')`). Close without submitting. |
 
-The whole existing spec must pass unchanged — **N4-AC3**. Run `bun run test:e2e -- separations` and record the before/after counts.
+**N4-AC3, corrected at VALIDATE.** The first draft leaned on "every existing assertion in `separations.spec.ts` passes". That proves nothing about this change: **`grep -c "New Separation" tests/e2e/separations.spec.ts` returns 0.** The existing spec asserts the `h1`, the 403 gate, and drives finalize/undo from DB fixtures — it never touches the button or the dialog. Moving the button could break the create flow outright and the whole file would still be green.
+
+So N4-AC3 is proved by the **new** `the button still opens the create dialog` test, with the existing spec's continued pass as a regression check rather than as the proof. Run `bun run test:e2e -- separations` and record before/after counts for both roles.
 
 ### `tests/unit/settings-org-load.test.ts` (NEW)
 
@@ -932,7 +990,14 @@ const load = (query: string) =>
 
 ### `tests/e2e/settings-org-assignments.spec.ts` (NEW)
 
-Logged in as `USERS.admin` (`MANAGE_HR` + settings access). Precondition from Step 21: **> 20 assignable employees** in the org, created by the spec if the seed is short.
+Logged in as `USERS.admin` (`MANAGE_HR` + settings access). Precondition from Step 21: **> 20 assignable employees** in the org, created by the spec itself.
+
+**Two anti-flake requirements, added at VALIDATE. Both are mandatory.**
+
+1. **Serial mode.** The spec's first statement must be `test.describe.configure({ mode: 'serial' })`. `playwright.config.ts` sets `fullyParallel: true`, and `tests/e2e/pagination.spec.ts:13-14` seeds **25 `Zzpagetest` employees into the same Veent org**, with deliberately *best-effort* cleanup at `:67-79` ("Leftovers are swept by `scripts/clean-e2e-employees.ts` rather than failing teardown"). Under a parallel run, the assignable-employee population of the org changes underneath this spec mid-test.
+2. **Read M from the page, never from a fixture constant.** `counter tells the truth` must parse `Showing N of M` and assert the *relationship* — unfiltered `N === M`; filtered `N` equals the number of rows summed across pages; `M` unchanged across a filter change — rather than comparing `M` to a hard-coded seed count. Any assertion of the form `expect(M).toBe(25)` is flaky by construction here and must not be written.
+
+`pagination.spec.ts` is the working precedent for **both** halves: it already declares `test.describe.configure({ mode: 'serial' })` at `:10` and seeds its own `SURNAME = 'Zzpagetest'` / `COUNT = 25` fixtures in `beforeAll` rather than depending on the shared seed. Follow its shape, including the `afterAll` ordering note — **delete `payrollEntry` rows before `employee` rows**, because that FK is `RESTRICT` and a concurrent payroll compute will have attached entries to any ACTIVE fixture employee.
 
 | Test name | Assertions |
 |---|---|
@@ -954,7 +1019,7 @@ Two are mandatory. A guard that cannot go red is not a guard.
 
 ### Negative control 1 — A1 / N1-AC9
 
-**Mutation.** `src/routes/(app)/attendance/+page.svelte:20`:
+**Mutation.** `src/routes/(app)/attendance/+page.svelte:19`:
 
 ```svelte
 {#if data.canManage}
@@ -968,9 +1033,13 @@ This renders `AttendanceHrGrid` — and therefore the `Whole team` link and the 
 
 **Command.** `bun run test:e2e -- employee-view-only`
 
-**Expected failure, exactly.** The test `employee sees only their own attendance, with no correction controls` fails on the **first** of the two corrected assertions:
-`expect(locator).toHaveCount(0) — Expected: 0, Received: 1` for `getByRole('link', { name: 'Whole team', exact: true })`.
-Both new assertions are red-capable; the first to run reports.
+**Expected failure.** The test `employee sees only their own attendance, with no correction controls` must go **red**. Any of these is an acceptable red — record which one occurred:
+
+- the likely one: `expect(locator).toHaveCount(0) — Expected: 0, Received: 1` on `getByRole('link', { name: 'Whole team', exact: true })`, which is the first of the two corrected assertions to run;
+- the same failure on `getByRole('link', { name: 'Show one day', exact: true })`;
+- an earlier failure in the same test — including a **render or load error**. `AttendanceHrGrid` is built for the `canManage` persona and reads fields the employee-scoped load may not populate, so forcing it to render for an employee can throw before any assertion is reached.
+
+What is **not** acceptable is a green run. A green run means the corrected assertions are still vacuous and Step 11 has to be redone. Do not over-specify the message when recording — record the actual failure text.
 
 **Revert.** `git checkout -- "src/routes/(app)/attendance/+page.svelte"` — **only** after confirming the file has no other uncommitted change (the repo has been burned by `git checkout <file>` reverting live work). Safest: make the mutation **after** Commit 2 is in, so the revert target is a committed state.
 
@@ -1070,11 +1139,15 @@ because that div is its only positioned ancestor — HelpTip's own wrapper is
 not relative, so rendering the control anywhere else mis-anchors the tooltip
 with no compile error.
 
-No page today passes both a description and a badge HelpTip: the four pages
+No page today passes both a description and a badge HelpTip: the two pages
 that carry a badge HelpTip pass no description, and the three that pass both
 a description and a badge carry a status pill, not a second ?. A source
-assertion now pins that invariant so a future page that would render two ?
-fails the unit gate instead of shipping.
+assertion scoped to the PageHeader opening tag now pins that invariant, so a
+future page that would render two ? fails the unit gate instead of shipping.
+
+Other HelpTips on a page are untouched and are not this component's business:
+/attendance legitimately shows two, one on the title row and one on the
+matrix section toolbar.
 ```
 
 **Commit 2 — N1**
@@ -1194,6 +1267,10 @@ Recommended execution:
    commits 2,3,4 + full CI gate set
 ```
 
+**One coupling the table does not show (found at VALIDATE).** N7's own spec, `tests/e2e/page-header-helptip.spec.ts`, uses **`/separations`** as its reference page and asserts its title-row geometry at three widths. `/separations` is N4's surface, and Step 13 wraps its `PageHeader` in `min-w-0 flex-1`, which narrows the title cluster the tooltip anchors to. So N4 can move N7's assertions even though the two lanes share no file.
+
+Mitigation, and it is the only one: **the full `bun run test:e2e` after Commit 4 is the gate that catches this**, not any per-lane run. A lane-local green on `page-header-helptip` before N4 lands does not carry. If the anchoring assertions prove brittle under the narrower cluster, re-point that spec at a page with no title-row action — `/inventory` and `/complaints` both pass a description and carry no title-row control.
+
 If the concurrent lanes run as parallel subagents: each owns its table row above and **writes nothing outside it**. Negative control 1 mutates `attendance/+page.svelte`, which is outside every lane's ownership — that mutation must run **after** N1 is committed, by whoever runs the gates, never inside a live lane. The owner's visual sign-off on N4 happens after N7 lands (SPEC sequencing note).
 
 ---
@@ -1222,7 +1299,7 @@ Nothing here writes to the database, changes a schema, or touches a permission, 
 | `bun run test -- page-header-helptip` › no call site passes description + badge-HelpTip | Fully-Automated | N7-AC7 (invariant half) |
 | e2e `page-header-helptip` › `hover reveals` / `focus reveals` | Fully-Automated | N7-AC5 |
 | e2e `page-header-helptip` › `anchoring and overflow at three widths` | Fully-Automated | N7-AC6 |
-| e2e `page-header-helptip` › `no double question mark on the four badge pages` | Fully-Automated | N7-AC7 |
+| e2e `page-header-helptip` › `exactly one description-path help control per page` (4-page expected-count table) | Fully-Automated | N7-AC7 |
 | Composited contrast probe, both themes, numbers in the phase report | Agent-Probe | N7-AC8 |
 | e2e `page-header-helptip` › `keyboard reach + aria-describedby resolves` **+ Negative control 2** | Fully-Automated | N7-AC9 |
 | e2e `page-header-helptip` › `complaints detail keeps an identifying title` | Fully-Automated | N7-AC10 |
@@ -1248,25 +1325,30 @@ Nothing here writes to the database, changes a schema, or touches a permission, 
 | e2e `settings-org-assignments` › `assign from a row still works` + unit `positions are returned whole` | Fully-Automated | N6-AC7 |
 | e2e `settings-org-assignments` › `counter tells the truth` + unit `counter inputs` | Fully-Automated | N6-AC8 |
 | e2e `settings-org-assignments` › `no control when it fits` | Fully-Automated | N6-AC9 |
-| e2e `settings-org-assignments` › `filters and paging a11y` + owner screen-reader listen | Hybrid | N6-AC10 — **CONDITIONAL**, see below |
+| e2e `settings-org-assignments` › `filters and paging a11y` + owner screen-reader listen | Hybrid | N6-AC10 (labels, roles, link names, announcement, focus-after-filter) |
+| — page-change focus clause only | **DEFERRED by owner decision** → backlog note | N6-AC10 (one clause) |
+| e2e `separations` › `the button still opens the create dialog` | Fully-Automated | N4-AC3 |
 
-No criterion is proved by Known-Gap. One criterion (N6-AC10) is partially proved and stays CONDITIONAL with a backlog stub, per the vacuous-green ban.
+No criterion is proved by Known-Gap. Every in-scope criterion has a Fully-Automated, Hybrid or Agent-Probe gate. One clause of one criterion (N6-AC10's page-change focus) is **deferred by owner decision** and handed to a named backlog note — a recorded residual, not a silent pass.
 
-### Hole: N6-AC10
+### N6-AC10 — deferred by owner decision
 
-**The clause I cannot fully satisfy:** *"Focus is not lost to `<body>` after a filter or a page change."*
+> **Owner decision, taken at VALIDATE: the page-change focus clause is OUT of this lane and is filed as its own backlog note.** It is not to be added back. The rest of N6-AC10 — labels, keyboard operability, pagination link names, the announcement, and focus after a *filter* change — stays in scope and is covered.
+
+**The clause that is out:** *"Focus is not lost to `<body>` after a filter or a page change."*
 
 - The **filter** half is satisfied — Step 17 adds `data-sveltekit-keepfocus` to the GET form, so SvelteKit keeps focus on the control the user was using across that navigation. The e2e asserts `document.activeElement !== BODY` after a filter submit.
-- The **page change** half is not. Paging goes through `Pagination.svelte`'s `<a>` elements. On navigation SvelteKit resets focus to `<body>` by default, and the anchor the user clicked may not exist on the new page (the `← Previous` link becomes a disabled `<span>` on page 1). Fixing it means adding `data-sveltekit-keepfocus` to the links **inside `Pagination.svelte`** — a shared component rendered by roughly ten routes, none of which is in this plan's blast radius. That is a scope expansion, and it changes focus behaviour on nine unrelated pages.
+- The **page change** half is not, and **the owner has taken it out of this lane.** Paging goes through `Pagination.svelte`'s `<a>` elements; on navigation SvelteKit resets focus to `<body>` by default. Fixing it means editing **`Pagination.svelte`, which is imported by 19 files across 16 routes** (15 route pages plus `/attendance` via `AttendanceHrGrid.svelte`, `AttendanceSelfView.svelte` and `TeamMatrix.svelte`; `TimesheetListTab.svelte` is the fourth shared importer). None of those is in this plan's blast radius.
+- **And `data-sveltekit-keepfocus` on those links would not finish the job anyway.** On page 1 the `← Previous` control is a `<span>`, not an anchor (`Pagination.svelte:40`), and on the last page `Next →` is likewise a `<span>` (`:55`). There is no element to keep focus on at either end of the range, so the boundary cases need a different fix — a roving focus target or an `aria-live` region — which is a design question, not a one-attribute change. Recording this matters: a future reader must not assume the backlog note describes a one-line fix.
 
-**Status:** N6-AC10 is **CONDITIONAL**, not PASS. It cannot be archived green.
+**Status:** N6-AC10 is **covered except the page-change focus clause**, which is **DEFERRED by owner decision** with a backlog note. It is not a silent gap and it is not a Known-Gap standing in for a proving strategy — the in-scope clauses all have a Fully-Automated or Hybrid gate. The deferred clause is a recorded residual owned by a separate artifact.
 
-**Backlog stub required at EXECUTE time** (write it, do not skip it):
-`process/features/ui-ux-overhaul/backlog/pagination-focus-after-page-change_NOTE_18-09-26.md` — records that `Pagination.svelte` drops focus to `<body>` on every page change across every paginated route, names `data-sveltekit-keepfocus` on its two `<a>` elements as the candidate one-line fix, and notes that the change is app-wide and needs the owner's call because it alters focus behaviour on ten routes at once.
+The `data-sveltekit-keepfocus` attribute on the **filter form** (Step 17) stays in this lane: it is page-local, inside the blast radius, and covers the filter half at the cost of one attribute. Only the shared-`Pagination.svelte` edit is deferred.
 
-**Decision for the owner, 2 options:**
-- **A.** Ship N6 with the filter half only; take the app-wide `Pagination.svelte` focus fix as its own change later. *(My pick — it keeps this lane's diff honest and puts a ten-route behaviour change in front of the owner on its own merits.)*
-- **B.** Add `data-sveltekit-keepfocus` to `Pagination.svelte`'s two links inside Commit 4, accepting that nine other routes change focus behaviour in the same commit.
+**Backlog note required at EXECUTE time** (write it, do not skip it — it is the artifact the owner's decision hands the clause off to):
+`process/features/ui-ux-overhaul/backlog/pagination-focus-after-page-change_NOTE_18-09-26.md` — records that `Pagination.svelte` drops focus to `<body>` on every page change across every paginated route, names `data-sveltekit-keepfocus` on its two `<a>` elements as a **partial** candidate fix, records that the fix is **incomplete on its own** because `← Previous` on page 1 (`:40`) and `Next →` on the last page (`:55`) are `<span>`s with no anchor to keep focus on, and notes that the change is app-wide — `Pagination.svelte` is imported by **19 files across 16 routes** — so it alters focus behaviour everywhere at once and needs its own review.
+
+**Decision status: TAKEN.** The owner chose to ship N6 with the filter half only and file the app-wide `Pagination.svelte` focus behaviour as its own backlog note. No option remains open here; do not re-ask (standing rule: a parked decision is filed once, not re-raised).
 
 ---
 
@@ -1290,8 +1372,9 @@ The 34 acceptance criteria are owned by the SPEC and are not restated here. They
 This lane is a single phase with four committable units. It may be marked:
 
 - **CODE DONE** when Commits 1–4 exist and every gate in [Gates](#gates) is green in CI order, including a full `bun run test:e2e` measured against the recorded pre-change baseline.
-- **VERIFIED** only when, in addition: both negative controls in [Negative controls](#negative-controls) have been run and recorded as going **red** on mutation and green on revert; the N7-AC8 contrast probe numbers are recorded in the phase report for both themes; the owner has confirmed the three Hybrid focus-ring/screen-reader clauses (N1-AC8, N4-AC5, N6-AC10) on a live page in light and dark; and the N6-AC10 backlog stub exists at `process/features/ui-ux-overhaul/backlog/pagination-focus-after-page-change_NOTE_18-09-26.md`.
-- It may **not** be marked VERIFIED while N6-AC10 is CONDITIONAL and its backlog stub is unwritten. A green suite with that stub missing is the vacuous-green case this repo has been burned by; the residual must be recorded, not dropped.
+- **VERIFIED** only when, in addition: both negative controls in [Negative controls](#negative-controls) have been run and recorded as going **red** on mutation and green on revert; the N7-AC8 contrast probe numbers are recorded in the phase report for both themes; the owner has confirmed the three Hybrid focus-ring/screen-reader clauses (N1-AC8, N4-AC5, N6-AC10) on a live page in light and dark; and the N6-AC10 backlog note exists at `process/features/ui-ux-overhaul/backlog/pagination-focus-after-page-change_NOTE_18-09-26.md`.
+- It may **not** be marked VERIFIED while that backlog note is unwritten. A green suite with the note missing is the vacuous-green case this repo has been burned by; the deferred clause must be recorded, not dropped.
+- It may **not** be marked VERIFIED on the strength of the existing `separations.spec.ts` alone for N4-AC3 — that file contains no `New Separation` match and cannot prove the create flow survived the move.
 - A commit whose `git diff --cached --name-only` contains `src/lib/rbac.ts`, `prisma/schema.prisma`, or any `src/lib/server/services/` path is a **phase failure**, not a deviation. Stop and re-plan.
 
 ## Traceability
@@ -1311,7 +1394,7 @@ All 34 acceptance criteria. Every criterion has at least one step and at least o
 | N1-AC9 | 11, 12 | corrected `employee-view-only.spec.ts` + **Negative control 1** | covered |
 | N4-AC1 | 13 | e2e `separations` › `action sits on the title row` | covered |
 | N4-AC2 | 13 | e2e › `no standalone action row` | covered |
-| N4-AC3 | 13 | full existing `separations.spec.ts` | covered |
+| N4-AC3 | 13, 14 | e2e › `the button still opens the create dialog` (**the proof**) + full existing `separations.spec.ts` (regression) | covered |
 | N4-AC4 | 13, 3 | unit `page-header-helptip` › props unchanged, no `actions` | covered |
 | N4-AC5 | 13 | e2e › `title row a11y` + owner theme check | covered (Hybrid) |
 | N6-AC1 | 15, 18 | e2e `settings-org-assignments` › `table is bounded` | covered |
@@ -1323,19 +1406,19 @@ All 34 acceptance criteria. Every criterion has at least one step and at least o
 | N6-AC7 | 15, 18 | e2e › `assign from a row still works`; unit › `positions are returned whole` | covered |
 | N6-AC8 | 15, 17 | e2e › `counter tells the truth`; unit › `counter inputs` | covered |
 | N6-AC9 | 18 | e2e › `no control when it fits` | covered |
-| N6-AC10 | 17 | e2e › `filters and paging a11y` (filter half) | **CONDITIONAL — page-change focus clause not covered; backlog stub required** |
+| N6-AC10 | 17 | e2e › `filters and paging a11y` | covered **except the page-change focus clause — DEFERRED by owner decision**, backlog note required |
 | N7-AC1 | 2 | unit › no standalone `<p>`; e2e › `no standalone description paragraph` | covered |
 | N7-AC2 | 2, 3 | unit › one `HelpTip`, named | covered |
 | N7-AC3 | 2, 3 | unit › guarded by `{#if description}` | covered |
 | N7-AC4 | 2 | unit › props unchanged + diff-scope gate + `bun run check` | covered |
 | N7-AC5 | 2, 4 | e2e › `hover reveals`, `focus reveals` | covered |
 | N7-AC6 | 2, 4 | e2e › `anchoring and overflow at three widths` | covered |
-| N7-AC7 | 2, 3, 4 (P-D1) | e2e › `no double question mark…`; unit › invariant scan | covered |
+| N7-AC7 | 2, 3, 4 (P-D1) | e2e › `exactly one description-path help control per page`; unit › invariant scan (opening-tag-scoped) | covered |
 | N7-AC8 | 6 | composited contrast probe, both themes | covered (Agent-Probe) |
 | N7-AC9 | 2, 5 | e2e › `keyboard reach + aria-describedby resolves` + **Negative control 2** | covered |
 | N7-AC10 | 2, 4 | e2e › `complaints detail keeps an identifying title` | covered |
 
-**33 of 34 fully covered. 1 CONDITIONAL (N6-AC10).** No criterion is unaddressed.
+**33 of 34 fully covered. N6-AC10 covered except one clause deferred by owner decision.** No criterion is unaddressed.
 
 ---
 
@@ -1356,16 +1439,109 @@ All 34 acceptance criteria. Every criterion has at least one step and at least o
 
 ## Validate Contract
 
-(placeholder — vc-validate-agent writes this section before EXECUTE)
+Status: BLOCKED
+Date: 18-09-26
+date: 2026-09-18
+generated-by: outer-pvl
+
+Parallel strategy: sequential (single validate-agent, batched read-only probes)
+Rationale: 4/7 signals (S3 four independent items, S5 user asked for depth, S6 shared-component wide reach, S7 12 files). The HIGH score recommends a fan-out, but no Agent tool is available in this session, so the Layer 1 + Layer 2 roles were executed in-process as batched parallel Bash probes. Every finding below carries file:line evidence; none is inferred.
+
+### Test gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| N7-AC1..AC4 | PageHeader renders description as HelpTip, props unchanged | Fully-Automated | `bun run test -- page-header-helptip` | B — gate must be rewritten first (FAIL-3) |
+| N7-AC5 | hover AND focus both reveal | Fully-Automated | e2e `page-header-helptip` › `hover reveals`, `focus reveals` (`toHaveCSS('opacity','1')`) | A |
+| N7-AC6 | tooltip anchors under the title row, no spill at 1280/768/375 | Fully-Automated | e2e › `anchoring and overflow at three widths` | A |
+| N7-AC7 | exactly one `?` on the badge-HelpTip pages | Fully-Automated | e2e › `no double question mark…` | **B — test is wrong as written (FAIL-1, FAIL-2)** |
+| N7-AC8 | `?` and tooltip text clear the contrast floor, both themes | Agent-Probe | composited-alpha measurement, numbers in the phase report | A |
+| N7-AC9 | keyboard reach + `aria-describedby` resolves | Fully-Automated | e2e › `keyboard reach…` + Negative control 2 (`HelpTip.svelte:21`) | A |
+| N7-AC10 | `/complaints/[id]` keeps an identifying `h1` | Fully-Automated | e2e › `complaints detail keeps an identifying title` | A |
+| N1-AC1..AC7 | two-state switch, flip link, one-row per-day controls, url contract | Fully-Automated | e2e `attendance-view-switch` (8 tests) | A |
+| N1-AC8 | keyboard order, names, focus ring | Hybrid | e2e › `keyboard order and names` + owner theme-pair check | A |
+| N1-AC9 | `employee-view-only:170` is no longer vacuous | Fully-Automated | corrected spec + Negative control 1 (`attendance/+page.svelte:19`) | A |
+| N4-AC1, AC2 | button on the title row, old `justify-end` row gone | Fully-Automated | e2e `separations` › `action sits on the title row`, `no standalone action row` | A |
+| N4-AC3 | create dialog still opens and the create flow completes | Fully-Automated | full existing `separations.spec.ts` | **B — the existing spec never touches the button (CONCERN-2)** |
+| N4-AC4 | `PageHeader` still has no `actions` prop | Fully-Automated | unit `page-header-helptip` › props assertion | B (same gate as FAIL-3) |
+| N4-AC5 | name, role, single `h1`, focus ring | Hybrid | e2e › `title row a11y` + owner theme-pair check | A |
+| N6-AC1..AC4, AC7..AC9 | bounded table, paging, filters in the address, positions unpaged | Fully-Automated | e2e `settings-org-assignments` + unit `settings-org-load` | A (see CONCERN-3 for flake control) |
+| N6-AC5 | filter change returns to page 1 | Fully-Automated | unit › `a filter with no page param starts at page 1` + e2e › `filter resets page…` | A |
+| N6-AC6 | `empPage` is not the generic `page` param | Fully-Automated | unit › `the assignments param is not the generic page param` | A |
+| N6-AC10 | filters/paging a11y; focus not lost to `<body>` | Hybrid | e2e › `filters and paging a11y` (filter half only) | **D — page-change half is a named residual; backlog stub required** |
+
+gap-resolution legend: A proven now · B fixed by this plan · C deferred to a named later phase · D backlog test-building stub (named residual).
+
+Legacy line form:
+- N7 PageHeader: [Fully-automated: `bun run test -- page-header-helptip`] + [Fully-automated: `bun run test:e2e -- page-header-helptip`] + [agent-probe: composited contrast, both themes]
+- N1 attendance: [Fully-automated: `bun run test:e2e -- attendance-view-switch`] + [Fully-automated: `bun run test:e2e -- employee-view-only`] + [hybrid: owner confirms the focus ring in both themes]
+- N4 separations: [Fully-automated: `bun run test:e2e -- separations`] + [hybrid: owner confirms the focus ring in both themes]
+- N6 settings/org: [Fully-automated: `bun run test -- settings-org-load`] + [Fully-automated: `bun run test:e2e -- settings-org-assignments`] + [known-gap: focus after a page change, documented as a backlog NOTE]
+
+### Dimension findings
+
+- Infra fit: **PASS** — `lucide-svelte ^0.460.0` at `package.json:75` (resolved 0.460.1); `calendar-days.svelte`, `table-2.svelte`, `grid-3x3.svelte` all present in `node_modules/lucide-svelte/dist/icons/`; import style matches `DatePicker.svelte:3-4`. `vitest.config.ts` is `environment: 'node'`, `include: tests/unit/**` — the source-assertion pattern is correct and jsdom is genuinely absent. `playwright.config.ts` builds and serves its own preview (`reuseExistingServer: false`, port 4173) so `bun run test:e2e` does not need the owner's dev server, only the DB. `bun run test -- <name>` and `bun run test:e2e -- <name>` both resolve correctly through the `dotenv -e .env.dev --` wrapper. No step runs `./start.sh`, `vite dev` or `docker`. Every quoted anchor in Steps 2, 8, 9a, 13, 15b matches live source verbatim.
+- Test coverage: **FAIL** — two specified gates cannot pass on a correct implementation (FAIL-2, FAIL-3), and N4-AC3 rests on a spec that never exercises the behaviour it claims to prove (CONCERN-2).
+- Breaking changes: **PASS** — `PageHeader` props unchanged (`PageHeader.svelte:8-22`); `listAssignableEmployees` signature untouched (`services/settings/org.ts:394`); `/attendance?view=` values untouched; `/settings/org` gains only additive query params. No test anywhere asserts a description string (verified: zero matches across `tests/`).
+- Security surface: **PASS** — no auth, billing, schema, migration, secret or trust-boundary surface. `requireAnyCapability(user.roles, 'MANAGE_HR')` stays at the head of the `/settings/org` load, unmoved. `rbac.ts`, `prisma/schema.prisma` and `src/lib/server/services/**` are untouched by every one of the 22 steps; the staged-path grep gate in §Gates is a real guard. Employee names appearing in the query string via `empSearch` match the existing GET-filter pattern on `/settings/roles`, `/employees` and `/leave/balances` — no new exposure class.
+- Section N7 feasibility: **FAIL** — mechanically sound (Step 2's anchor is verbatim, the `relative` ancestor argument at `PageHeader.svelte:35` is correct), but the P-D1 evidence table is wrong on two rows and both N7-AC7 gates inherit the error.
+- Section N1 feasibility: **PASS** — anchors verbatim at `AttendanceHrGrid.svelte:207-237` and `240-258`; `data.view !== 'employee'` correctly covers both `matrix` and `team`; the flip link's DOM position gives the Tab order N1-AC8 requires.
+- Section N4 feasibility: **CONCERN** — the edit is correct and the `AttendanceHrGrid.svelte:207-210` precedent is real, but N4-AC3 is not actually proved (CONCERN-2).
+- Section N6 feasibility: **CONCERN** — the load rewrite is complete (all four `data.employees`/`filteredEmployees` consumers at `+page.svelte:38-46, 289, 304, 340` are accounted for; `data.positions` at `:145` and `:324` is never narrowed), but the e2e is exposed to cross-spec employee fixtures (CONCERN-3) and the AC10 residual understates its own blast radius (CONCERN-1).
+
+### FAILs — must be resolved before EXECUTE
+
+**FAIL-1 — P-D1's evidence table is wrong on two of four rows.** Only **two** call sites pass a `HelpTip` through a `PageHeader` `badge` snippet: `leave/balances/+page.svelte:33` and `settings/roles/+page.svelte:168`. The other two named are not PageHeader badges at all:
+- `attendance/TeamMatrix.svelte:75-78` — the HelpTip sits in a `{#snippet toolbar()}` beside an `<h2>`. `TeamMatrix.svelte` contains **zero** references to `PageHeader`.
+- `dashboard/+page.svelte:253-255` — the HelpTip sits inside the "Upcoming Regularizations" popover (`{#if openPanel === 'regularizations'}`). That page's header is `<PageHeader title="Dashboard" />` at `:138` — no description, no badge.
+The *conclusion* P-D1 draws survives (no page passes both a description and a badge-HelpTip; `{#if description}` alone is still the right choice; `{#if description && !badge}` is still correctly rejected because it would delete the descriptions at `complaints/[id]:43`, `separations/[id]:98` and `performance/reviews/[id]:97`). Only the evidence is wrong — and the two gates built on it are not.
+
+**FAIL-2 — the N7-AC7 e2e test goes red on a correct implementation.** `expect(page.getByRole('button', { name: /^About / })).toHaveCount(1)` is asserted for four pages. Two of them will not return 1:
+- `/attendance` → **2**. `AttendanceHrGrid.svelte:209` passes `description="Team overview, daily records & corrections."`, so N7 adds an `About Attendance` button on the title row, while `TeamMatrix` (rendered at `AttendanceHrGrid.svelte:580` under `{#if data.view === 'matrix' && data.matrix}`, the landing view) already renders `About team attendance`.
+- `/dashboard` → **0**. No description on its PageHeader, and the only HelpTip on the page is inside a closed popover.
+Fix: assert `toHaveCount(1)` only for `/settings/roles` and `/leave/balances`; for `/attendance` assert exactly one `About Attendance` on the title row and separately that the TeamMatrix `?` is unaffected; drop `/dashboard` or restate it as "no `?` on the title row". SPEC N7-AC7's wording needs the same correction.
+
+**FAIL-3 — the Step 3 source-scan gate is red on arrival.** Its offender predicate uses a file-wide `/description=/.test(src)`. `leave/balances/+page.svelte:148` carries `description={filtered ? … }` on an `<EmptyState>`, and the same file has a badge-HelpTip at `:33`. So `offenders` evaluates to `['src/routes/(app)/leave/balances/+page.svelte']` and `expect(offenders).toEqual([])` fails against the unmodified repo. Fix: extract the `<PageHeader …>` opening tag first and test `\bdescription=` against **that tag only**, not the whole file. (Checked for the same trap elsewhere: `settings/org/+page.svelte` also carries an `EmptyState description=`, but has no badge snippet, so it is not a second offender today — it would become one under any future badge.)
+Answering the "name the mutation that turns it red" question: with the scope fixed, the mutation is to add `description="Remaining / allocated days per active employee."` to the `<PageHeader title="Leave Balances">` tag at `leave/balances/+page.svelte:31` — `offenders` then contains that file and the assertion fails. The pattern matches the cited precedents exactly (`badge-class-literals.test.ts:34-40` and `time-picker-migration.test.ts:9-13` both recurse `src/` and assert an offender list is empty), so the shape is right; only the predicate is wrong.
+
+### Open gaps
+
+- **N6-AC10 (page-change focus)** — `known-gap: documented as NEW PLAN REQUIRED`. Blast radius is **larger than the plan states**: `Pagination.svelte` is imported by **19 files covering 16 distinct routes**, not "roughly ten". Direct routes: `complaints`, `employees`, `inventory`, `leave`, `leave/balances`, `payslips`, `recruitment`, `reports/audit-log`, `requests`, `requests/approvals`, `requests/proposals`, `requests/timesheets`, `separations`, `settings/roles`, `team`. Via shared components: `/attendance` (`AttendanceHrGrid.svelte`, `AttendanceSelfView.svelte`, `TeamMatrix.svelte`) and `/timesheets` (`TimesheetListTab.svelte`). What changes for each: adding `data-sveltekit-keepfocus` to the two `<a>` at `Pagination.svelte:33` and `:48` suppresses SvelteKit's focus reset on every one of those routes, which also changes what a screen reader announces on a page change. It is also an **incomplete** fix — on page 1 and on the last page the clicked link is rendered as a `<span>` (`Pagination.svelte:40`, `:55`), so there is no anchor left to keep focus on. Verdict: **genuinely out of this lane's bounds.** Option A (ship the filter half, defer the shared fix) is the right call, and the backlog stub must name 16 routes and the first/last-page hole.
+- **CONCERN-2 — N4-AC3 is not proved.** `tests/e2e/separations.spec.ts` contains no `New Separation` match at all; it asserts the `h1` (`:23`, `:33`) and drives the finalize/undo flow from DB fixtures. Running "the full existing spec" therefore proves nothing about the create dialog. (The SPEC contradicts itself here: R6 says "N4 moves a button the separations spec locates", the Background section says "No spec locates the separations `New Separation` button" — the latter is correct.) Fix, one line in the new N4 block: click `New Separation` and assert the dialog is visible.
+- **CONCERN-3 — N6 e2e is exposed to cross-spec employee fixtures.** `playwright.config.ts` sets `fullyParallel: true`. `tests/e2e/pagination.spec.ts:13-14` seeds **25** `Zzpagetest` employees into the Veent org with best-effort cleanup (`:67-79`, which explicitly tolerates leftovers), and `separations.spec.ts` and `payslip-tenancy.spec.ts` also create employees. The new spec's "M equals the full assignable count" assertion will drift. Fix: `test.describe.configure({ mode: 'serial' })`, derive M from the page rather than a constant, and scope every row assertion to the spec's own name prefix. `pagination.spec.ts` is the exact working precedent for Step 21's seeding fallback — name it in the step.
+- **CONCERN-1** — the "ten routes / nine unrelated pages" figure in §Hole: N6-AC10 and in the Decision-for-the-owner is wrong; it is 16 routes.
+- **CONCERN-4** — cleared-search path: the native `×` on `<input type="search">` fires no submit, so after N6 the rows will not match an emptied box until Enter or `Filter`. Not an AC5 violation (no filter change is committed) but a real UX trap created by the round-trip model (SPEC R7). Worth one line to the owner.
+- **CONCERN-5** — a GET form replaces the whole query string, so any assignments filter change would also reset a future Positions `page` param. This partly undercuts P-D3's stated rationale; harmless today (no other param is consumed).
+- **CONCERN-6** — `data-sveltekit-keepfocus` on a `<form method="GET">` is an untested runtime behaviour, not a source fact. It is gated by the e2e `document.activeElement !== BODY` assertion, so it is acceptable; it must not be reported as proven until that assertion is green.
+- **CONCERN-7** — Step 15b adds a four-line code comment. It is adapted, not verbatim, from `separations/+page.server.ts:26-28`. It is the only new comment in the plan; under the standing no-comments rule EXECUTE needs explicit sanction to add it. Sanctioned here: it states a load-bearing constraint and matches the repo's own wording for this pattern.
+- **CONCERN-8** — Negative control 1's "expected failure, exactly" is over-specified. With `{#if true}` an employee-role user may not have the data `AttendanceHrGrid` needs, so the spec may go red on a render error rather than on `Expected: 0, Received: 1`. The control is still valid (red is red); the wording should say "red on the corrected assertion, or on a render error".
+- **CONCERN-9** — the lane table misses one coupling: N7's own e2e spec targets `/separations` (owned by N4) and asserts its title-row geometry at three widths. N4 wraps `PageHeader` in `min-w-0 flex-1`, which narrows it. Mitigated only by the final full-suite run — say so explicitly.
+- **CONCERN-10** — minor drift: the `canManage` guard is at `attendance/+page.svelte:19`, not `:20`; `{:else if data.view === 'employee'}` is at `AttendanceHrGrid.svelte:258`, not `:259`; lucide resolves to 0.460.1 (`^0.460.0` at `package.json:75`). Step 21's precondition is real — org_seed carries well under 21 assignable employees, so the spec **will** need its own fixtures.
+  - **Re-derived at PLAN: the `:258`/`:259` half of this does not reproduce.** `sed -n '256,261p' src/lib/components/attendance/AttendanceHrGrid.svelte` shows `</form>` at **258** and `{:else if data.view === 'employee'}` at **259** — which is exactly what Step 9a says. The plan was already correct; no edit made. The `attendance/+page.svelte:19` half **did** reproduce and is fixed in Negative control 1. (Standing rule: a machine finding is a hypothesis — verify the defect and the cause separately before acting.)
+
+### What this coverage does NOT prove
+
+- `bun run test -- page-header-helptip` is a **source-text** assertion. It does not prove the component renders, that the tooltip is positioned correctly, or that any of the 33 call sites still compile — only `bun run check` and the e2e cover those.
+- `bun run test:e2e -- page-header-helptip` runs a single Chromium project. It proves nothing about Firefox, WebKit, touch devices (where `:hover` does not exist — the `?` is a `<button>` so tap-focus reveals it, but that path is untested), reduced-motion, or forced-colors mode.
+- `toHaveCSS('opacity','1')` proves the reveal rule fires. It does not prove the tooltip is readable, is not clipped by an ancestor `overflow:hidden`, or is announced by a real screen reader — N7-AC8 (Agent-Probe) and the owner's Hybrid checks carry those.
+- The bounding-box assertions prove alignment and horizontal separation at three fixed widths on one device scale factor. They do not prove the layout at the owner's actual 125% browser zoom, nor at any width between the three sampled points.
+- `bun run test:e2e -- separations` proves the page opens for HR, is refused for an employee, and that the finalize/undo flow works from DB fixtures. It does **not** today prove the create dialog opens or that a separation can be created through the UI (CONCERN-2).
+- `bun run test -- settings-org-load` runs against a mocked service. It proves the filter/slice/param arithmetic; it proves nothing about the real Prisma query, the real row shape, or the payload size — and N6 explicitly does not reduce the query cost (SPEC R3).
+- `bun run test:e2e -- settings-org-assignments` proves paging and filtering on whatever roster exists at run time. It does not prove behaviour at real tenant scale, nor that the unbounded `listAssignableEmployees` query stays acceptable.
+- Nothing in this contract proves the four commits are free of the repo's known e2e flake (#287). Only a recorded pre-change baseline makes a post-change count meaningful.
+- The two negative controls prove those two specific assertions are red-capable. They prove nothing about the other ~40 assertions in the new specs, which have no negative control.
+
+Gate: BLOCKED (3 unresolved FAILs — FAIL-1, FAIL-2, FAIL-3)
+Accepted by: not accepted — BLOCKED gates cannot be accepted. Return to PLAN; each FAIL has a named one-line fix above.
 
 ---
 
 ## Resume and Execution Handoff
 
 1. **Selected plan file:** `process/features/ui-ux-overhaul/active/owner-click-pass-build-lane_18-09-26/owner-click-pass-build-lane_PLAN_18-09-26.md`
-2. **Last completed phase or step:** PLAN complete. No step executed. Branch `feat/uiux-phase-7`, tree clean apart from this task folder.
-3. **Validate-contract status:** pending — VALIDATE has not run.
+2. **Last completed phase or step:** PLAN complete, then **revised after a BLOCKED VALIDATE gate**. FAIL-1, FAIL-2 and FAIL-3 are resolved in-plan; CONCERN-1 through CONCERN-10 are each addressed, deferred by owner decision, or recorded as not-reproducing. No step executed. No file under `src/` or `tests/` touched. Branch `feat/uiux-phase-7`, tree clean apart from this task folder.
+3. **Validate-contract status:** pending — the first VALIDATE pass returned **BLOCKED**; this revision must go back through **VALIDATE from V1**.
 4. **Supporting context files loaded:** `owner-click-pass-build-lane_SPEC_18-09-26.md`; `CLAUDE.md`; `process/context/all-context.md` → `process/context/uxui/all-uxui.md`, `process/context/tests/all-tests.md`; `process/development-protocols/all-development-protocols.md`, `implementation-standards.md`, `plan-lifecycle.md`; umbrella `phase-07-page-splits_PLAN_03-09-26.md` (lines 85-86, 617).
-5. **Next step for a fresh agent:** run VALIDATE against this plan. On approval, EXECUTE **Step 1** and stop at Commit 1's gate — N7 must be committed and green before the N1/N4/N6 lanes start (see [Execute lane split](#execute-lane-split)). Before any source edit, re-read the anchors in Steps 2, 8, 9, 13, 15 against live source; this plan was written against a clean tree and any drift invalidates a quoted anchor.
+5. **Next step for a fresh agent:** re-run **VALIDATE from V1** against this revised plan. The three FAILs are fixed; re-check specifically that the N7-AC7 expected-count table and the opening-tag-scoped unit predicate are both red-capable, which was the defect class that blocked the first pass. On approval, EXECUTE **Step 1** and stop at Commit 1's gate — N7 must be committed and green before the N1/N4/N6 lanes start (see [Execute lane split](#execute-lane-split)). Before any source edit, re-read the anchors in Steps 2, 8, 9, 13, 15 against live source; this plan was written against a clean tree and any drift invalidates a quoted anchor.
 
 **Do not** run `./start.sh`, `vite` or `docker` — the owner starts servers and the database. **Do not** `git add -A`. **Do not** push.
