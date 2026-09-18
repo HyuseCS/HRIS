@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		departmentId: departmentId || undefined,
 		search: search || undefined
 	}
-	const pagination = paginate(url, await countOrgLeaveBalances(filters), { pageSize: 8 })
+	const pagination = paginate(url, await countOrgLeaveBalances(filters), { pageSize: 9 })
 
 	const [employees, departments, leaveTypes] = await Promise.all([
 		listOrgLeaveBalances(filters, { skip: pagination.skip, take: pagination.take }),
