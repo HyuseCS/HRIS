@@ -140,7 +140,7 @@
 	const settingsChildren = $derived(
 		isAdmin
 			? [
-			// The group header is a toggle, not a link, so without this the settings index
+					// The group header is a toggle, not a link, so without this the settings index
 					// (which lists every destination, including pages absent from this list) is unreachable.
 					{ href: '/settings', label: 'All settings' },
 					...visibleSettings(roles)

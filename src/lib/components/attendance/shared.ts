@@ -14,7 +14,15 @@ export type AttendanceForm = ActionData
 export type DayRow = PageData['days'][number]
 export type TeamRow = PageData['team'][number]
 
-export const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'INCOMPLETE', 'ON_LEAVE', 'HOLIDAY', 'REST_DAY']
+export const STATUSES = [
+	'PRESENT',
+	'LATE',
+	'ABSENT',
+	'INCOMPLETE',
+	'ON_LEAVE',
+	'HOLIDAY',
+	'REST_DAY'
+]
 
 export function fmtTime(d: string | Date | null) {
 	if (!d) return '—'

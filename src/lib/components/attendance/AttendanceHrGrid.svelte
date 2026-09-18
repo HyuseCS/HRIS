@@ -24,8 +24,11 @@
 	 * submit guard, the exceptions filter and the row-guard cache: this component is only ever
 	 * mounted for a manager, so its state cannot collide with `AttendanceSelfView`'s.
 	 */
-	let { data, form, exportHref }: { data: AttendanceData; form: AttendanceForm; exportHref: string } =
-		$props()
+	let {
+		data,
+		form,
+		exportHref
+	}: { data: AttendanceData; form: AttendanceForm; exportHref: string } = $props()
 
 	// Don't reset the form on success: enhance's default form.reset() clears the cross-cell
 	// (form=…) inputs, and Svelte only re-syncs inputs whose value changed — so untouched
@@ -454,8 +457,8 @@
 			<div class="space-y-3 border-t p-4">
 				<div>
 					<p class="text-xs text-muted-foreground">
-						Columns: employeeNumber, date (YYYY-MM-DD), amIn, amOut, pmIn, pmOut (HH:MM, Manila time).
-						Locked and hand-corrected days are refused.
+						Columns: employeeNumber, date (YYYY-MM-DD), amIn, amOut, pmIn, pmOut (HH:MM, Manila
+						time). Locked and hand-corrected days are refused.
 					</p>
 					<!-- m-4: state the caps here — the operator otherwise meets them as a 413/400 that renders
 					     in the page-top banner, off-screen. `load` passes the real MAX_IMPORT_BYTES and

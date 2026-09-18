@@ -157,9 +157,7 @@
 						<td class="px-3 py-2 text-muted-foreground">{fmtTime(d.timeOut)}</td>
 						<td class="px-3 py-2 text-right font-mono">{n(d.regularHours).toFixed(2)}</td>
 						<td class="px-3 py-2 text-right font-mono"
-							>{n(d.overtimeHours).toFixed(
-								2
-							)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
+							>{n(d.overtimeHours).toFixed(2)}{#if n(d.rawOvertimeHours) > n(d.overtimeHours)}<span
 									class="ml-1 text-xs text-amber-600 dark:text-amber-400"
 									title="unapproved OT"
 									>(+{(n(d.rawOvertimeHours) - n(d.overtimeHours)).toFixed(1)})</span

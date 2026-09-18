@@ -417,161 +417,161 @@
 						You can save these now or add them to the 201 file after the employee is created.
 					</p>
 
-			<!-- Government IDs -->
-			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
-				<legend class="float-left mb-4 w-full font-semibold">Government IDs</legend>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div>
-						<label for="sssNumber" class="text-sm font-medium">SSS Number</label>
-						<input
-							id="sssNumber"
-							name="sssNumber"
-							aria-invalid={invalid('sssNumber')}
-							value={form?.values?.sssNumber ?? ''}
-							placeholder={GOV_ID_FORMATS.sssNumber.example}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-						{#if form?.fieldErrors?.sssNumber}
-							<p class="mt-1 text-xs text-red-400">{form.fieldErrors.sssNumber[0]}</p>
-						{/if}
-					</div>
-					<div>
-						<label for="philhealthNumber" class="text-sm font-medium">PhilHealth Number</label>
-						<input
-							id="philhealthNumber"
-							name="philhealthNumber"
-							aria-invalid={invalid('philhealthNumber')}
-							value={form?.values?.philhealthNumber ?? ''}
-							placeholder={GOV_ID_FORMATS.philhealthNumber.example}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-						{#if form?.fieldErrors?.philhealthNumber}
-							<p class="mt-1 text-xs text-red-400">{form.fieldErrors.philhealthNumber[0]}</p>
-						{/if}
-					</div>
-					<div>
-						<label for="pagibigNumber" class="text-sm font-medium">Pag-IBIG Number</label>
-						<input
-							id="pagibigNumber"
-							name="pagibigNumber"
-							aria-invalid={invalid('pagibigNumber')}
-							value={form?.values?.pagibigNumber ?? ''}
-							placeholder={GOV_ID_FORMATS.pagibigNumber.example}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-						{#if form?.fieldErrors?.pagibigNumber}
-							<p class="mt-1 text-xs text-red-400">{form.fieldErrors.pagibigNumber[0]}</p>
-						{/if}
-					</div>
-					<div>
-						<label for="tinNumber" class="text-sm font-medium">TIN Number</label>
-						<input
-							id="tinNumber"
-							name="tinNumber"
-							aria-invalid={invalid('tinNumber')}
-							value={form?.values?.tinNumber ?? ''}
-							placeholder={GOV_ID_FORMATS.tinNumber.example}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-						{#if form?.fieldErrors?.tinNumber}
-							<p class="mt-1 text-xs text-red-400">{form.fieldErrors.tinNumber[0]}</p>
-						{/if}
-					</div>
-				</div>
-			</fieldset>
+					<!-- Government IDs -->
+					<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+						<legend class="float-left mb-4 w-full font-semibold">Government IDs</legend>
+						<div class="grid gap-4 sm:grid-cols-2">
+							<div>
+								<label for="sssNumber" class="text-sm font-medium">SSS Number</label>
+								<input
+									id="sssNumber"
+									name="sssNumber"
+									aria-invalid={invalid('sssNumber')}
+									value={form?.values?.sssNumber ?? ''}
+									placeholder={GOV_ID_FORMATS.sssNumber.example}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								{#if form?.fieldErrors?.sssNumber}
+									<p class="mt-1 text-xs text-red-400">{form.fieldErrors.sssNumber[0]}</p>
+								{/if}
+							</div>
+							<div>
+								<label for="philhealthNumber" class="text-sm font-medium">PhilHealth Number</label>
+								<input
+									id="philhealthNumber"
+									name="philhealthNumber"
+									aria-invalid={invalid('philhealthNumber')}
+									value={form?.values?.philhealthNumber ?? ''}
+									placeholder={GOV_ID_FORMATS.philhealthNumber.example}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								{#if form?.fieldErrors?.philhealthNumber}
+									<p class="mt-1 text-xs text-red-400">{form.fieldErrors.philhealthNumber[0]}</p>
+								{/if}
+							</div>
+							<div>
+								<label for="pagibigNumber" class="text-sm font-medium">Pag-IBIG Number</label>
+								<input
+									id="pagibigNumber"
+									name="pagibigNumber"
+									aria-invalid={invalid('pagibigNumber')}
+									value={form?.values?.pagibigNumber ?? ''}
+									placeholder={GOV_ID_FORMATS.pagibigNumber.example}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								{#if form?.fieldErrors?.pagibigNumber}
+									<p class="mt-1 text-xs text-red-400">{form.fieldErrors.pagibigNumber[0]}</p>
+								{/if}
+							</div>
+							<div>
+								<label for="tinNumber" class="text-sm font-medium">TIN Number</label>
+								<input
+									id="tinNumber"
+									name="tinNumber"
+									aria-invalid={invalid('tinNumber')}
+									value={form?.values?.tinNumber ?? ''}
+									placeholder={GOV_ID_FORMATS.tinNumber.example}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								{#if form?.fieldErrors?.tinNumber}
+									<p class="mt-1 text-xs text-red-400">{form.fieldErrors.tinNumber[0]}</p>
+								{/if}
+							</div>
+						</div>
+					</fieldset>
 
-			<!-- Emergency Contact -->
-			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
-				<legend class="float-left mb-4 w-full font-semibold">Emergency Contact</legend>
-				<div class="grid gap-4 sm:grid-cols-3">
-					<div>
-						<label for="emergencyContactName" class="text-sm font-medium">Contact Name</label>
-						<input
-							id="emergencyContactName"
-							name="emergencyContactName"
-							value={form?.values?.emergencyContactName ?? ''}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-					</div>
-					<div>
+					<!-- Emergency Contact -->
+					<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+						<legend class="float-left mb-4 w-full font-semibold">Emergency Contact</legend>
+						<div class="grid gap-4 sm:grid-cols-3">
+							<div>
+								<label for="emergencyContactName" class="text-sm font-medium">Contact Name</label>
+								<input
+									id="emergencyContactName"
+									name="emergencyContactName"
+									value={form?.values?.emergencyContactName ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</div>
+							<div>
 								<label for="emergencyContactRelation" class="text-sm font-medium"
 									>Relationship</label
 								>
-						<input
-							id="emergencyContactRelation"
-							name="emergencyContactRelation"
-							value={form?.values?.emergencyContactRelation ?? ''}
-							placeholder="e.g. Spouse, Parent"
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-					</div>
-					<div>
-						<label for="emergencyContactPhone" class="text-sm font-medium">Contact Phone</label>
-						<input
-							id="emergencyContactPhone"
-							name="emergencyContactPhone"
-							value={form?.values?.emergencyContactPhone ?? ''}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-					</div>
-				</div>
-			</fieldset>
+								<input
+									id="emergencyContactRelation"
+									name="emergencyContactRelation"
+									value={form?.values?.emergencyContactRelation ?? ''}
+									placeholder="e.g. Spouse, Parent"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</div>
+							<div>
+								<label for="emergencyContactPhone" class="text-sm font-medium">Contact Phone</label>
+								<input
+									id="emergencyContactPhone"
+									name="emergencyContactPhone"
+									value={form?.values?.emergencyContactPhone ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</div>
+						</div>
+					</fieldset>
 
-			<!-- Bank / GCash Details -->
-			<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
-				<legend class="float-left mb-4 w-full font-semibold">Bank / GCash Details</legend>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div>
-						<label for="bankName" class="text-sm font-medium">Bank</label>
-						<input
-							id="bankName"
-							name="bankName"
-							value={form?.values?.bankName ?? ''}
-							placeholder="e.g. BDO, BPI"
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-					</div>
-					<div>
-						<label for="bankAccountName" class="text-sm font-medium">Account Name</label>
-						<input
-							id="bankAccountName"
-							name="bankAccountName"
-							value={form?.values?.bankAccountName ?? ''}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-					</div>
-					<div>
-						<label for="bankAccountNumber" class="text-sm font-medium">Account Number</label>
-						<input
-							id="bankAccountNumber"
-							name="bankAccountNumber"
-							aria-invalid={invalid('bankAccountNumber')}
-							value={form?.values?.bankAccountNumber ?? ''}
-							placeholder={GOV_ID_FORMATS.bankAccountNumber.example}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-						{#if form?.fieldErrors?.bankAccountNumber}
+					<!-- Bank / GCash Details -->
+					<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+						<legend class="float-left mb-4 w-full font-semibold">Bank / GCash Details</legend>
+						<div class="grid gap-4 sm:grid-cols-2">
+							<div>
+								<label for="bankName" class="text-sm font-medium">Bank</label>
+								<input
+									id="bankName"
+									name="bankName"
+									value={form?.values?.bankName ?? ''}
+									placeholder="e.g. BDO, BPI"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</div>
+							<div>
+								<label for="bankAccountName" class="text-sm font-medium">Account Name</label>
+								<input
+									id="bankAccountName"
+									name="bankAccountName"
+									value={form?.values?.bankAccountName ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</div>
+							<div>
+								<label for="bankAccountNumber" class="text-sm font-medium">Account Number</label>
+								<input
+									id="bankAccountNumber"
+									name="bankAccountNumber"
+									aria-invalid={invalid('bankAccountNumber')}
+									value={form?.values?.bankAccountNumber ?? ''}
+									placeholder={GOV_ID_FORMATS.bankAccountNumber.example}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								{#if form?.fieldErrors?.bankAccountNumber}
 									<p class="mt-1 text-xs text-destructive">
 										{form.fieldErrors.bankAccountNumber[0]}
 									</p>
-						{/if}
-					</div>
-					<div>
-						<label for="gcashNumber" class="text-sm font-medium">GCash Number</label>
-						<input
-							id="gcashNumber"
-							name="gcashNumber"
-							aria-invalid={invalid('gcashNumber')}
-							value={form?.values?.gcashNumber ?? ''}
-							placeholder={GOV_ID_FORMATS.gcashNumber.example}
-							class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						/>
-						{#if form?.fieldErrors?.gcashNumber}
-							<p class="mt-1 text-xs text-destructive">{form.fieldErrors.gcashNumber[0]}</p>
-						{/if}
-					</div>
-				</div>
-			</fieldset>
+								{/if}
+							</div>
+							<div>
+								<label for="gcashNumber" class="text-sm font-medium">GCash Number</label>
+								<input
+									id="gcashNumber"
+									name="gcashNumber"
+									aria-invalid={invalid('gcashNumber')}
+									value={form?.values?.gcashNumber ?? ''}
+									placeholder={GOV_ID_FORMATS.gcashNumber.example}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+								{#if form?.fieldErrors?.gcashNumber}
+									<p class="mt-1 text-xs text-destructive">{form.fieldErrors.gcashNumber[0]}</p>
+								{/if}
+							</div>
+						</div>
+					</fieldset>
 				</div>
 			</details>
 
