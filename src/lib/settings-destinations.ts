@@ -193,3 +193,5 @@ export function visibleSettings(roles: Role[]): SettingsDestination[] {
 		(d) => d.capabilities.length === 0 || d.capabilities.some((c) => canAny(roles, c))
 	)
 }
+
+export const groupSlug = (g: SettingsGroup) => g.toLowerCase().replace(/[^a-z]+/g, '-')

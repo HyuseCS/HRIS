@@ -29,9 +29,9 @@ for (const { label, user } of LOCKED_OUT) {
 		await login(page, user)
 		await page.goto('/settings', { waitUntil: 'domcontentloaded' })
 
-		// Scoped: since phase 07 the hub card, the settings sub-nav row and the sidebar row all
-		// carry the SAME canonical label, so an unscoped locator matches three links and
-		// Playwright strict mode throws.
+		// Scoped: the hub card and the sidebar row carry the SAME canonical label, so an unscoped
+		// locator matches two links and Playwright strict mode throws. (Before the settings
+		// Context Rail there was a third — the sub-nav repeated every destination on /settings.)
 		const card = hubCard(page, /Holiday Calendar/)
 		await expect(card).toBeVisible()
 		// The Settings nav group auto-expands on a /settings route, so the child row is on screen.
