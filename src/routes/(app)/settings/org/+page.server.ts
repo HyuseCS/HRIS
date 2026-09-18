@@ -10,20 +10,49 @@ import {
 	assignEmployeePosition
 } from '$lib/server/services/settings/org'
 import { listSalaryGrades } from '$lib/server/services/settings/master'
+import { paginate } from '$lib/server/pagination'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	requireAnyCapability(user.roles, 'MANAGE_HR')
 
-	const [positions, orgChart, salaryGrades, employees] = await Promise.all([
+	const [positions, orgChart, salaryGrades, allEmployees] = await Promise.all([
 		listPositions(user.organizationId),
 		getOrgChart(user.organizationId),
 		listSalaryGrades(user.organizationId),
 		listAssignableEmployees(user.organizationId)
 	])
 
-	return { positions, orgChart, salaryGrades, employees }
+	const empSearch = (url.searchParams.get('empSearch') ?? '').trim()
+	const empUnassigned = url.searchParams.get('empUnassigned') === '1'
+	const needle = empSearch.toLowerCase()
+	const filtered = allEmployees.filter(
+		(e) =>
+			(!empUnassigned || !e.positionId) &&
+			(needle === '' ||
+				e.name.toLowerCase().includes(needle) ||
+				e.jobTitle.toLowerCase().includes(needle))
+	)
+
+	// Sliced here, not in the query: `listAssignableEmployees` is a shared service and giving it
+	// skip/take is out of this phase's bounds. This caps what the page RENDERS, not what the
+	// load fetches — the query cost is tracked as a backlog item.
+	const employeePagination = paginate(url, filtered.length, { param: 'empPage', pageSize: 20 })
+
+	return {
+		positions,
+		orgChart,
+		salaryGrades,
+		employees: filtered.slice(
+			employeePagination.skip,
+			employeePagination.skip + employeePagination.take
+		),
+		employeeTotal: allEmployees.length,
+		employeePagination,
+		empSearch,
+		empUnassigned
+	}
 }
 
 const positionSchema = z.object({

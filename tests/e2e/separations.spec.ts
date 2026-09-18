@@ -350,3 +350,58 @@ test.describe('Separation finalize -> undo (#304)', () => {
 		}
 	})
 })
+
+test.describe('Separations title row (N4)', () => {
+	test.describe.configure({ mode: 'default' })
+
+	test.beforeEach(async ({ page }) => {
+		await login(page, USERS.hr)
+		await page.goto('/separations', { waitUntil: 'domcontentloaded' })
+	})
+
+	test('action sits on the title row', async ({ page }) => {
+		const heading = page.getByRole('heading', { name: 'Separations', level: 1 })
+		const button = page.getByRole('button', { name: 'New Separation' })
+		await expect(heading).toBeVisible()
+		await expect(button).toBeVisible()
+
+		const h = (await heading.boundingBox())!
+		const b = (await button.boundingBox())!
+
+		expect(Math.abs(h.y + h.height / 2 - (b.y + b.height / 2))).toBeLessThanOrEqual(24)
+		expect(b.x).toBeGreaterThan(h.x + h.width)
+	})
+
+	test('no standalone action row', async ({ page }) => {
+		await expect(
+			page
+				.locator('div.flex.justify-end')
+				.filter({ has: page.getByRole('button', { name: 'New Separation' }) })
+		).toHaveCount(0)
+	})
+
+	test('title row a11y', async ({ page }) => {
+		const button = page.getByRole('button', { name: 'New Separation' })
+		await expect(button).toHaveCount(1)
+		await expect(button).toBeEnabled()
+		await expect(page.locator('h1')).toHaveCount(1)
+
+		const shadow = () => button.evaluate((el) => getComputedStyle(el).boxShadow)
+		expect(await shadow()).toBe('none')
+
+		await page.keyboard.press('Tab')
+		await button.focus()
+		expect(await shadow()).not.toBe('none')
+	})
+
+	test('the button still opens the create dialog', async ({ page }) => {
+		await page.getByRole('button', { name: 'New Separation' }).click()
+
+		const dialog = page.getByRole('dialog')
+		await expect(dialog).toBeVisible()
+		await expect(dialog.getByLabel('Employee')).toBeVisible()
+
+		await page.keyboard.press('Escape')
+		await expect(dialog).toHaveCount(0)
+	})
+})

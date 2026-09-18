@@ -278,7 +278,7 @@ describe('?/resetAll recalculates every edited day and reports each row (#F11c, 
 // the button renders or that the number shown is right — that is the owner's L7 step.
 describe('the Recalculate-all trigger states its scope', () => {
 	const page = readFileSync(
-		join(import.meta.dirname, '../../src/routes/(app)/attendance/+page.svelte'),
+		join(import.meta.dirname, '../../src/lib/components/attendance/AttendanceHrGrid.svelte'),
 		'utf8'
 	).replace(/\s+/g, ' ')
 

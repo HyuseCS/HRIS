@@ -1,15 +1,37 @@
 ---
 name: note:e2e-spec-filter-silently-ignored
-description: "pnpm test:e2e -- <specs> ignores the spec names and runs all 143 tests; every scoped-e2e claim in this repo's history is suspect"
+description: "RESOLVED by the bun migration. Under pnpm, test:e2e -- <specs> ignored the filter and ran the whole suite; bun forwards it correctly. Kept for the history it casts doubt on."
 date: 10-09-26
 feature: ui-ux-overhaul
 ---
 
 # `pnpm test:e2e -- <specs>` does not filter. It runs the whole suite.
 
-**Live footgun, not history.** Found in §4 of the B2/B3/B5 feedback plan, 10-09-26.
+**RESOLVED 18-09-26 by the bun migration — this is now history, not a live footgun.**
+Found in §4 of the B2/B3/B5 feedback plan, 10-09-26, when the package manager was pnpm.
 
-## What happens
+## Resolution, measured 18-09-26
+
+`bun` strips the `--` that `pnpm` forwarded, so the spec names reach Playwright. Verified with a
+control rather than a single reading:
+
+```
+$ bun run test:e2e -- separations --list
+Total: 6 tests in 1 file
+
+$ bun run test:e2e -- --list
+Total: 160 tests in 47 files
+```
+
+The filter works. See [[bun-replaced-pnpm]] (commit `8268538`).
+
+**What still stands:** every scoped-e2e claim made in this repo BEFORE the bun migration was run
+under the broken form, so any historical "I ran just these three specs" is still suspect. The
+tool is fixed; the old claims are not retroactively true. Note also that the suite has grown from
+the 143 tests this note was written against to 160 in 47 files.
+
+## What used to happen, under pnpm
+
 
 `package.json:15` defines:
 
