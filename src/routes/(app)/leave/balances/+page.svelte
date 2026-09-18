@@ -77,17 +77,12 @@
 							>Department</th
 						>
 						{#each data.leaveTypes as lt (lt.id)}
-							<th class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground">
-								{lt.name}
-								{#if lt.minMonthsOfService > 0}
-									<span
-										class="block text-xs font-normal opacity-70"
-										title="Requires {tenureRequirement(lt.minMonthsOfService)} of service"
-									>
-										after {tenureRequirement(lt.minMonthsOfService)}
-									</span>
-								{/if}
-							</th>
+							<th
+								class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground"
+								title={lt.minMonthsOfService > 0
+									? `Requires ${tenureRequirement(lt.minMonthsOfService)} of service`
+									: undefined}>{lt.name}</th
+							>
 						{/each}
 						<th class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground"
 							>Total left</th
