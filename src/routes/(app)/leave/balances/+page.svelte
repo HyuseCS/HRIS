@@ -3,6 +3,9 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import HelpTip from '$lib/components/ui/HelpTip.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import { goto } from '$app/navigation'
 	import { monthsOfService, tenureRequirement } from '$lib/utils/dates'
 	import type { PageData } from './$types'
@@ -25,47 +28,56 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader
-		title="Leave Balances"
-		description="Remaining / allocated days per active employee for {data.year}."
-	>
+	<PageHeader title="Leave Balances">
+		{#snippet badge()}
+			<HelpTip label="About leave balances">
+				Remaining / allocated days per active employee for {data.year}.
+			</HelpTip>
+		{/snippet}
 		{#snippet back()}
 			<BackButton fallback="/leave" label="Leave" />
 		{/snippet}
 	</PageHeader>
 
-	<div class="overflow-hidden rounded-lg border bg-card">
-		<form method="GET" class="flex flex-wrap gap-2 border-b p-4">
-			<SearchInput
-				name="search"
-				value={data.search}
-				placeholder="Search by name or employee number…"
-				class="flex h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-			<select
-				name="department"
-				aria-label="Department"
-				class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">All departments</option>
-				{#each data.departments as d (d.id)}
-					<option value={d.id} selected={data.departmentId === d.id}>{d.name}</option>
-				{/each}
-			</select>
-			<input type="hidden" name="year" value={data.year} />
-			<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent"
-				>Filter</button
-			>
-		</form>
+	<Container tone="card" flush>
+		{#snippet toolbar()}
+			<form method="GET" class="flex flex-wrap gap-2">
+				<SearchInput
+					name="search"
+					value={data.search}
+					placeholder="Search by name or employee number…"
+					class="flex h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+				<select
+					name="department"
+					aria-label="Department"
+					class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<option value="">All departments</option>
+					{#each data.departments as d (d.id)}
+						<option value={d.id} selected={data.departmentId === d.id}>{d.name}</option>
+					{/each}
+				</select>
+				<input type="hidden" name="year" value={data.year} />
+				<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent"
+					>Filter</button
+				>
+			</form>
+		{/snippet}
 
 		<div class="overflow-x-auto">
 			<table class="w-full min-w-max text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
+				<thead class="bg-card">
+					<tr class="border-b">
+						<th
+							class="sticky left-0 z-20 border-r bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))] px-4 py-3 text-left font-medium text-muted-foreground"
+							>Employee</th
+						>
+						<th class="bg-muted/50 px-4 py-3 text-left font-medium text-muted-foreground"
+							>Department</th
+						>
 						{#each data.leaveTypes as lt (lt.id)}
-							<th class="px-4 py-3 text-right font-medium text-muted-foreground">
+							<th class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground">
 								{lt.name}
 								{#if lt.minMonthsOfService > 0}
 									<span
@@ -77,13 +89,15 @@
 								{/if}
 							</th>
 						{/each}
-						<th class="px-4 py-3 text-right font-medium text-muted-foreground">Total left</th>
+						<th class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground"
+							>Total left</th
+						>
 					</tr>
 				</thead>
 				<tbody class="divide-y">
 					{#each data.rows as row (row.id)}
 						<tr
-							class="cursor-pointer hover:bg-muted/30"
+							class="group cursor-pointer hover:bg-muted/30"
 							role="link"
 							tabindex="0"
 							data-employee={row.employeeNumber}
@@ -95,7 +109,9 @@
 								}
 							}}
 						>
-							<td class="px-4 py-3">
+							<td
+								class="sticky left-0 z-10 border-r bg-card px-4 py-3 group-hover:bg-[image:linear-gradient(hsl(var(--muted)/0.3),hsl(var(--muted)/0.3))]"
+							>
 								<div class="font-medium">{row.name}</div>
 								<div class="text-xs text-muted-foreground">{row.employeeNumber}</div>
 							</td>
@@ -144,5 +160,9 @@
 				</tbody>
 			</table>
 		</div>
-	</div>
+
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
 </div>
