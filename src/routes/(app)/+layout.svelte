@@ -180,6 +180,23 @@
 		APPROVER: 'Approver'
 	}
 
+	$effect(() => {
+		if (!browser) return
+		const write = () =>
+			(document.cookie = `vp=${innerWidth}x${innerHeight}; path=/; SameSite=Lax; max-age=31536000`)
+		write()
+		let t: ReturnType<typeof setTimeout>
+		const onResize = () => {
+			clearTimeout(t)
+			t = setTimeout(write, 200)
+		}
+		addEventListener('resize', onResize)
+		return () => {
+			removeEventListener('resize', onResize)
+			clearTimeout(t)
+		}
+	})
+
 	// Mobile sidebar drawer. Close it whenever the route changes.
 	let sidebarOpen = $state(false)
 	$effect(() => {

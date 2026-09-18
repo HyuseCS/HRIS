@@ -1,4 +1,5 @@
 import { error, fail } from '@sveltejs/kit'
+import type { Cookies } from '@sveltejs/kit'
 import { z } from 'zod'
 import { db } from '$lib/server/db'
 import { canAny, requireAnyCapability, requireFoodServiceOrg } from '$lib/server/rbac'
@@ -21,7 +22,7 @@ import {
 	MAX_IMPORT_ROWS
 } from '$lib/server/services/attendance/import'
 import { listReportIdsFor } from '$lib/server/services/supervisors'
-import { paginate } from '$lib/server/pagination'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { manilaDayKey, manilaShortDay, manilaWeekEnd, manilaWeekStart } from '$lib/utils/dates'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
@@ -42,7 +43,8 @@ function clampRange(fromKey: string, toKey: string) {
 async function loadMatrix(
 	user: NonNullable<App.Locals['user']>,
 	url: URL,
-	ctx: Parameters<typeof autoDeriveFromPunches>[2]
+	ctx: Parameters<typeof autoDeriveFromPunches>[2],
+	cookies: Cookies
 ) {
 	const myEmployee = await db.employee.findFirst({
 		where: { userId: user.id, organizationId: user.organizationId },
@@ -74,7 +76,9 @@ async function loadMatrix(
 		...memberScope
 	}
 	const total = await db.employee.count({ where: memberWhere })
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 57, chromePx: 332 })
+	})
 	const members = await db.employee.findMany({
 		where: memberWhere,
 		select: { id: true, firstName: true, lastName: true },
@@ -126,7 +130,7 @@ async function loadMatrix(
 	}
 }
 
-export const load: PageServerLoad = async ({ locals, url, getClientAddress }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies, getClientAddress }) => {
 	const user = locals.user!
 	const canManage = canAny(user.roles, 'MANAGE_HR')
 	const canUnlock = canAny(user.roles, 'OVERRIDE_FINALIZED') // reopening locked days is privileged
@@ -187,7 +191,7 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		)
 	}
 
-	const matrix = view === 'matrix' ? await loadMatrix(user, url, ctx) : null
+	const matrix = view === 'matrix' ? await loadMatrix(user, url, ctx, cookies) : null
 
 	// #64: paginate the employee-view day rows (one count + one page query); the
 	// team view is paginated the same way.
@@ -199,7 +203,13 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 			: 0
 	const pagination = paginate(
 		url,
-		view === 'team' ? await countTeamDay(user.organizationId, date, exceptionsOnly) : dayTotal
+		view === 'team' ? await countTeamDay(user.organizationId, date, exceptionsOnly) : dayTotal,
+		{
+			pageSize: fitPageSize(cookies, {
+				rowPx: 45,
+				chromePx: view === 'team' ? 475 : 654
+			})
+		}
 	)
 
 	const days =

@@ -55,6 +55,12 @@ export async function login(page: Page, user: { email: string; password: string 
 	// domcontentloaded here too — waitForURL's default 'load' hangs the same way.
 	await page.waitForURL('**/dashboard', { waitUntil: 'domcontentloaded' })
 	await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+	// Rows-per-page is computed server-side from the `vp` viewport cookie the app layout
+	// writes on hydration. Waiting for it here keeps every later list navigation deterministic
+	// instead of racing the fallback page size.
+	await expect
+		.poll(async () => (await page.context().cookies()).some((c) => c.name === 'vp'))
+		.toBe(true)
 }
 
 /**

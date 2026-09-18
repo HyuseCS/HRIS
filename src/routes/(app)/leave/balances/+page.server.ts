@@ -1,12 +1,12 @@
 import { db } from '$lib/server/db'
 import { requireAnyCapability } from '$lib/server/rbac'
-import { paginate } from '$lib/server/pagination'
+import { paginate, fitPageSize } from '$lib/server/pagination'
 import { countOrgLeaveBalances, listOrgLeaveBalances } from '$lib/server/services/leave'
 import type { PageServerLoad } from './$types'
 
 // HR-facing org-wide leave balances (#137, and the fix for #150 — privileged roles had no
 // way to see anyone's balances but their own, which for HR/CEO meant an empty panel).
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 
 	const organizationId = locals.user!.organizationId
@@ -20,7 +20,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		departmentId: departmentId || undefined,
 		search: search || undefined
 	}
-	const pagination = paginate(url, await countOrgLeaveBalances(filters), { pageSize: 9 })
+	const pagination = paginate(url, await countOrgLeaveBalances(filters), {
+		pageSize: fitPageSize(cookies, { rowPx: 53, chromePx: 281, fallback: 9 })
+	})
 
 	const [employees, departments, leaveTypes] = await Promise.all([
 		listOrgLeaveBalances(filters, { skip: pagination.skip, take: pagination.take }),

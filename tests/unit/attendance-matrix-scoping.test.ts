@@ -59,6 +59,7 @@ let selfRow: { id: string } | null = null
 const event = (roles: Role[]) =>
 	({
 		locals: { user: { id: 'user-1', roles, organizationId: ORG } },
+		cookies: { get: () => undefined },
 		url: new URL('http://localhost/attendance'),
 		getClientAddress: () => '127.0.0.1'
 	}) as never

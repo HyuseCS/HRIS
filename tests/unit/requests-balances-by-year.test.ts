@@ -30,6 +30,7 @@ const { load } = await import('../../src/routes/(app)/requests/+page.server')
 const event = () =>
 	({
 		locals: { user: { id: 'user-1', roles: ['EMPLOYEE'], organizationId: 'org-1' } },
+		cookies: { get: () => undefined },
 		url: new URL('http://localhost/requests')
 	}) as never
 

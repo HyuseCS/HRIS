@@ -1,12 +1,12 @@
 import { requireAnyCapability } from '$lib/server/rbac'
-import { paginate } from '$lib/server/pagination'
+import { paginate, fitPageSize } from '$lib/server/pagination'
 import { countEmployees, listEmployees } from '$lib/server/services/employees'
 import { listAssignableBranches } from '$lib/server/services/branches'
 import { listVisibleEmployeeIds } from '$lib/server/services/employee-access'
 import { isFoodServiceOrg } from '$lib/orgs'
 import type { PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	// #234: MANAGER ranks level with HR_ADMIN (#133), so the `requireMinRole('HR_ADMIN')` that
 	// used to stand here admitted every manager to the WHOLE roster — the same dead-guard shape
 	// #228 fixed on the 201 page. This check only keeps EMPLOYEE and the off-ladder roles out;
@@ -38,7 +38,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		countEmployees(organizationId, { ...baseFilters, offboarded: true })
 	])
 	const total = tab === 'offboarded' ? offboardedCount : activeCount
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 61, chromePx: 287 })
+	})
 	const employees = listEmployees(
 		organizationId,
 		{ ...baseFilters, offboarded: tab === 'offboarded' },

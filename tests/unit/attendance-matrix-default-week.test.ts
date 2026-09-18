@@ -35,6 +35,7 @@ const { load } = await import('../../src/routes/(app)/attendance/+page.server')
 const event = (roles: Role[], query = '') =>
 	({
 		locals: { user: { id: 'user-1', roles, organizationId: 'org-1' } },
+		cookies: { get: () => undefined },
 		url: new URL(`http://localhost/attendance${query}`),
 		getClientAddress: () => '127.0.0.1'
 	}) as never

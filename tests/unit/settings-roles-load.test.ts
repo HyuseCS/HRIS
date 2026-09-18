@@ -33,6 +33,7 @@ const user = (n: number, email: string) => ({
 const load = (query: string) =>
 	roles.load({
 		locals: { user: { id: 'actor', organizationId: 'org1', roles: SUPER } },
+		cookies: { get: () => undefined },
 		url: new URL(`http://localhost/settings/roles${query}`)
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} as any) as Promise<{

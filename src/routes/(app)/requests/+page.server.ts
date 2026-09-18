@@ -1,6 +1,6 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
-import { paginate } from '$lib/server/pagination'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
 	createRequest,
 	countRequests,
@@ -33,7 +33,7 @@ function findSelfEmployee(user: { id: string; organizationId: string }) {
 
 // Self-service: the current user's own requests. Approvals live under
 // /requests/timesheets and /requests/approvals.
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	const myEmployee = await findSelfEmployee(user)
 
@@ -42,7 +42,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		? { organizationId: user.organizationId, employeeId: myEmployee.id }
 		: null
 	const total = listParams ? await countRequests(listParams) : 0
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 51, chromePx: 191 })
+	})
 
 	const [requests, leaveTypes] = await Promise.all([
 		listParams

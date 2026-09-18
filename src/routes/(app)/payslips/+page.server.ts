@@ -1,9 +1,9 @@
 import { db } from '$lib/server/db'
-import { paginate } from '$lib/server/pagination'
+import { paginate, fitPageSize } from '$lib/server/pagination'
 import { payslipVisibleRunFilter } from '$lib/server/services/payroll/runs'
 import type { PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 
 	const myEmployee = await db.employee.findFirst({
@@ -23,7 +23,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		payrollRun: payslipVisibleRunFilter
 	}
 	const total = await db.payrollEntry.count({ where })
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 48, chromePx: 242 })
+	})
 
 	const payslips = await db.payrollEntry.findMany({
 		where,
