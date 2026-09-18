@@ -11,7 +11,7 @@
 	let strip = $state<HTMLElement>()
 
 	function go(id: TabId) {
-		pushState(hrefFor($page.url, id), $page.state)
+		pushState(hrefFor($page.url, id), { ...$page.state, tab: id })
 	}
 
 	function onclick(e: MouseEvent, id: TabId) {

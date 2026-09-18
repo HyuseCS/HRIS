@@ -30,7 +30,7 @@
 	// The five sections of the 201 file are URL-backed (`?tab=`), so a deep link and the browser's
 	// Back button both work. Panels are always rendered and hidden with the attribute AND the
 	// class — never `{#if}`, which would discard anything typed into an inactive tab's form.
-	const activeTab = $derived(resolveTab($page.url.searchParams.get('tab')))
+	const activeTab = $derived(resolveTab($page.state.tab ?? $page.url.searchParams.get('tab')))
 
 	// Label + field pairs for the Government IDs card, so the display and its format warning
 	// stay in step with the validator's field names.
