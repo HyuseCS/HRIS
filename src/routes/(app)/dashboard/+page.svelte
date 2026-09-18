@@ -603,7 +603,9 @@
 
 	<!-- Upcoming regularizations — HR's advance warning (#168) -->
 	{#if data.canPost && data.regularizations.length}
-		<div class="card space-y-3 border-amber-500/30 bg-amber-500/5">
+		<div
+			class="card flex max-h-80 min-h-[7rem] flex-col gap-3 overflow-hidden border-amber-500/30 bg-amber-500/5"
+		>
 			<div class="flex items-center gap-2">
 				<svg
 					class="h-4 w-4 text-amber-500"
@@ -627,7 +629,7 @@
 				Probationary staff becoming regular within the next three weeks — decide before the date
 				lands.
 			</p>
-			<ul class="divide-y divide-border/60">
+			<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
 				{#each data.regularizations as r (r.id)}
 					<li class="flex items-center justify-between gap-3 py-2">
 						<div class="min-w-0">
@@ -652,7 +654,9 @@
 
 	<!-- Job postings awaiting your approval (#195) -->
 	{#if data.postingsToApprove.length}
-		<div class="card space-y-3 border-blue-500/30 bg-blue-500/5">
+		<div
+			class="card flex max-h-80 min-h-[7rem] flex-col gap-3 overflow-hidden border-blue-500/30 bg-blue-500/5"
+		>
 			<p class="text-xs font-semibold uppercase tracking-widest text-blue-400">
 				Postings awaiting your approval
 			</p>
@@ -661,7 +665,7 @@
 			{#if form?.action === 'decidePosting' && form?.error}
 				<Banner kind="error" message={form.error} />
 			{/if}
-			<ul class="divide-y divide-border/60">
+			<ul class="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
 				{#each data.postingsToApprove as p (p.id)}
 					{@const g = decideGuard(p.id)}
 					<li class="space-y-2 py-2">
