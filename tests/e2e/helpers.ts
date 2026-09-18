@@ -6,6 +6,7 @@ export const USERS = {
 	// Settings cards. Seeded by seedProd; see prisma/seed-core.ts.
 	hr: { email: 'hr@veent.ph', password: 'Hr@1234' },
 	manager: { email: 'manager@veent.ph', password: 'Manager@1234' },
+	payroll: { email: 'payroll@veent.ph', password: 'Payroll@1234' },
 	employee: { email: 'employee@veent.ph', password: 'Employee@1234' },
 	// Maker-checker sign-off accounts (#134).
 	verifier: { email: 'verifier@veent.ph', password: 'Verifier@1234' },

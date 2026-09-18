@@ -26,6 +26,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Since #165 employees don't create timesheets, so the quick action would only send them
 	// to a 403. Same capability the /timesheets create action enforces.
 	const canCreateTimesheet = canAny(user.roles, 'MANAGE_HR')
+	const canApprove = canAny(user.roles, 'APPROVE_REQUESTS')
 
 	// Today's PHT day, stored as the UTC-midnight date key used by AttendanceDay.
 	const todayKey = manilaDayKey(new Date())
@@ -120,6 +121,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		roles,
 		user.id
 	)
+	const canDecidePostings =
+		canPost ||
+		(myEmployee != null &&
+			(await db.postingApprover.count({
+				where: { organizationId: orgId, approverId: myEmployee.id }
+			})) > 0)
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the
 	// toast is gone.
@@ -129,6 +136,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		canPost,
+		canApprove,
+		canDecidePostings,
 		canViewPayroll,
 		canCreateTimesheet,
 		announcements,

@@ -166,9 +166,11 @@ test.describe('(b) each role sees the same cards, in zones', () => {
 			let shown = 0
 			for (const name of DECISION_BUTTONS) {
 				const button = decisionButton(page, name)
+				if (role === 'hr') await expect(button).toBeVisible()
 				if ((await button.count()) === 0) continue
 				await expect(button).toBeVisible()
 				const badge = button.locator('span')
+				if ((await badge.count()) === 0) continue
 				await expect(badge).toHaveText(/^\d+$/)
 				expect(Number(await badge.innerText())).toBeGreaterThan(0)
 				if (name === AWAITING_BUTTON) {
@@ -180,6 +182,18 @@ test.describe('(b) each role sees the same cards, in zones', () => {
 			expect(shown, 'no decision button rendered for a role that has decisions').toBeGreaterThan(0)
 		})
 	}
+})
+
+test.describe('(d) an entitled role with nothing pending sees the button, not a badge', () => {
+	test('a payroll officer has an empty awaiting-you panel', async ({ page }) => {
+		await login(page, USERS.payroll)
+		const button = decisionButton(page, AWAITING_BUTTON)
+		await expect(button).toBeVisible()
+		await expect(button.locator('span')).toHaveCount(0)
+
+		const panel = await openPanel(page, button, 'Awaiting you')
+		await expect(panel.getByText('Nothing pending.')).toBeVisible()
+	})
 })
 
 test.describe('(c) no zone row ends with an orphan card at lg', () => {
