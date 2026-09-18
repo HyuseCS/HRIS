@@ -119,3 +119,29 @@ Every question in the table above is now answered. Recorded here so the notes st
 
 - Build lane SPEC and PLAN: `process/features/ui-ux-overhaul/active/owner-click-pass-build-lane_18-09-26/`
 - Design round: `process/features/ui-ux-overhaul/active/owner-click-pass-design-round_18-09-26/`
+
+## DESIGN ROUND OUTCOME 18-09-26
+
+Reports: `process/features/ui-ux-overhaul/active/owner-click-pass-design-round_18-09-26/`
+
+| | Item | Owner pick |
+|---|---|---|
+| D11 | N2 `/settings` | **Direction A, Context Rail.** The bar lists the 5 groups, not 17 destinations; a sub-page adds a second row of its own siblings only. On `/settings` there are no siblings, so that row never renders and the duplicate list resolves by construction. Hub cards stay. No new component. |
+| D12 | N3 `/employees/new` | **Direction C, Companion Rail.** `mx-auto max-w-3xl` goes; a 256px sticky aside holds an error count, jump-to-first-error, section links and the single Create button. The form column ends up wider than today's 768px cap at every size. |
+| D13 | N5 `/inventory` | **Both views**, list and card grid, with the `/team`-style toggle, defaulting to List. One shared edit modal. |
+| D14 | N2 | Owner ACCEPTS that a cross-group jump from a sub-page becomes two clicks. The 17-link view stays on `/settings`, one click away. |
+| D15 | N5 | The separate "Add an item" `<details>` form folds into the same modal. One modal for create and edit. Removes ~96 lines and the drift that already lost `notes` from one of the two forms. |
+
+### Measured facts the design round corrected
+
+- **Real content width is `viewport − 304` from `lg` up**, not the full viewport: the sidebar (`+layout.svelte:650`, `lg:pl-60`) arrives at the same breakpoint. At 1024 that is 720px, so a two-column gives 348px per column, not the ~512 assumed in the brief. A column only clears the 640px `sm` threshold at viewport ≈1608. Content also gets NARROWER going 768 -> 1024.
+- **`/inventory` already overflows on a normal laptop.** The table needs ~1438px; available is 942px at 1280. That is also Playwright's default width, which is part of why no test caught it.
+- **The settings bar has no visible focus style.** `settings/+layout.svelte:47-49` changes colour only.
+- **`employees/new:101-102` uses a `float-left` legend** because `<legend>` and a grid sibling do not compose, and a grid container does not wrap a float.
+
+### Build hazards found, to be guarded not just avoided
+
+- `update()` defaults to `reset: true`. On a rejected save that blanks every field in the edit modal, and the existing e2e would still pass — for the wrong reason. Recorded before in [[sveltekit-update-resets-the-form]].
+- After a delete, `Dialog`'s focus restore targets a removed node and focus falls to `<body>`.
+- `tests/e2e/admin.spec.ts:49` is strict mode. If the Companion Rail adds a Create button and the old one stays, four onboarding tests fail. Exactly one may exist.
+- `tests/e2e/settings-visibility.spec.ts:57-58` is an unscoped count-zero assertion that guards the very duplication being removed. It must survive. The comment at 32-34 goes stale under Context Rail.
