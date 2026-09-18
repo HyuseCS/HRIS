@@ -5,6 +5,8 @@ test.describe.configure({ mode: 'serial' })
 
 const VIEWPORTS = [390, 1024, 1280, 1440, 1536, 1920]
 const TOLERANCE = 8
+const STICKY_TOP = 32
+const SCROLL_SPAN = 500
 const SUMMARY_TEXT = 'Complete later — 12 optional fields'
 const SECTION_LINKS = [
 	'Personal Information',
@@ -61,6 +63,11 @@ function formColumn() {
 
 function rail() {
 	return page.locator('form[action="?/create"] aside')
+}
+
+async function atPageTop() {
+	await page.evaluate(() => window.scrollTo(0, 0))
+	await page.waitForFunction(() => Math.round(window.scrollY) === 0)
 }
 
 async function boxOf(selector: string) {
@@ -147,27 +154,45 @@ test('N3-T3 the rail is a 256px sticky aside at 1536 and 1920', async () => {
 			`rail width at ${width}: ${box?.width}`
 		).toBeLessThanOrEqual(4)
 
-		const maxScroll = await page.evaluate(
-			() => document.documentElement.scrollHeight - window.innerHeight
-		)
-		expect(
-			maxScroll,
-			`page at ${width} is not scrollable enough to test stickiness`
-		).toBeGreaterThanOrEqual(500)
+		await page.getByText(SUMMARY_TEXT).click()
+		await expect(page.locator('details[open]')).toBeAttached()
+		await atPageTop()
 
-		await page.evaluate(() => window.scrollTo(0, 200))
-		await page.waitForFunction(() => window.scrollY === 200)
+		const walk = await page.evaluate((stickyTop) => {
+			const el = document.querySelector('form[action="?/create"] aside')
+			if (!el) throw new Error('no rail')
+			return {
+				stuckAt: Math.max(0, Math.round(el.getBoundingClientRect().top - stickyTop)),
+				maxScroll: document.documentElement.scrollHeight - window.innerHeight
+			}
+		}, STICKY_TOP)
+		const from = walk.stuckAt + 100
+		const to = from + SCROLL_SPAN
+		expect(
+			walk.maxScroll,
+			`page at ${width} scrolls ${walk.maxScroll}px with the disclosure open; the sticky walk needs ${to}px`
+		).toBeGreaterThanOrEqual(to)
+
+		await page.evaluate((y) => window.scrollTo(0, y), from)
+		await page.waitForFunction((y) => Math.round(window.scrollY) === y, from)
 		const first = await boxOf('form[action="?/create"] aside')
-		await page.evaluate(() => window.scrollTo(0, 500))
-		await page.waitForFunction(() => window.scrollY === 500)
+		await page.evaluate((y) => window.scrollTo(0, y), to)
+		await page.waitForFunction((y) => Math.round(window.scrollY) === y, to)
 		const second = await boxOf('form[action="?/create"] aside')
 
 		expect(
 			Math.abs(second.top - first.top),
-			`rail moved with the page at ${width}: ${first.top} → ${second.top}`
+			`rail moved with the page at ${width} over a ${SCROLL_SPAN}px scroll: ${first.top} -> ${second.top}`
 		).toBeLessThanOrEqual(TOLERANCE)
-		expect(second.top, `rail scrolled out of view at ${width}`).toBeGreaterThanOrEqual(0)
-		await page.evaluate(() => window.scrollTo(0, 0))
+		expect(
+			Math.abs(first.top - STICKY_TOP),
+			`rail is not pinned at top-8 at ${width} after scrolling to ${from}: ${first.top}`
+		).toBeLessThanOrEqual(TOLERANCE)
+		expect(
+			Math.abs(second.top - STICKY_TOP),
+			`rail is not pinned at top-8 at ${width} after scrolling to ${to}: ${second.top}`
+		).toBeLessThanOrEqual(TOLERANCE)
+		await atPageTop()
 	}
 })
 
@@ -242,10 +267,11 @@ test('N3-T8 the disclosure summary string is frozen', async () => {
 
 test('N3-T9 opening the disclosure does not move the rail at 1920', async () => {
 	await openAt(1920)
-	await page.evaluate(() => window.scrollTo(0, 0))
+	await atPageTop()
 	const before = await boxOf('form[action="?/create"] aside')
 	await page.getByText(SUMMARY_TEXT).click()
 	await expect(page.locator('details[open]')).toBeAttached()
+	await atPageTop()
 	const after = await boxOf('form[action="?/create"] aside')
 	expect(
 		Math.abs(after.top - before.top),

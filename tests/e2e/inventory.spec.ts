@@ -9,7 +9,21 @@ test.describe.configure({ mode: 'serial' })
 // ponytail: this spec creates its own User + Employee rather than picking an existing one.
 // A pick is silently nulled when another spec deletes its own fixtures (assignedTo is SetNull),
 // which makes the assertion vacuously green. Do not replace this with a query.
-const FIXTURE_NAME = 'E2E Fixture Asset'
+//
+// Every inventory row this spec creates — the DB fixture and every disposable item made
+// through the modal — is named with SPEC_PREFIX, and both hooks delete that prefix inside the
+// admin's org. `CI=1` retries twice, so a test that fails AFTER its create leaves the row
+// behind; without the beforeAll sweep the next run finds several and every row locator is a
+// strict-mode violation. No seed item can be swept: the three are `MacBook Pro 14"`,
+// `Office Chair` and `Projector (old)` (prisma/seed-core.ts), none of which starts with 'E2E '.
+const SPEC_PREFIX = 'E2E '
+// Disposable items also carry a per-run, per-create suffix, so a leftover row from a failed
+// attempt can never collide with the row the retry creates.
+const RUN_ID = `${Date.now().toString(36)}${process.pid.toString(36)}`
+let tempSeq = 0
+const tempName = (label: string) => `${SPEC_PREFIX}Temp ${label} ${RUN_ID}-${++tempSeq}`
+
+const FIXTURE_NAME = `${SPEC_PREFIX}Fixture Asset`
 const FIXTURE_NOTES = 'E2E notes sentinel — must survive a modal save'
 const FIXTURE_EMAIL = 'zzinvfixture@example.test'
 const FIXTURE_LAST = 'Zzinvfixture'
@@ -17,6 +31,7 @@ const FIXTURE_FIRST = 'Holder'
 // `empName` renders `${lastName}, ${firstName}` (inventory/+page.svelte).
 const FIXTURE_HOLDER_NAME = `${FIXTURE_LAST}, ${FIXTURE_FIRST}`
 let fixtureHolderId = ''
+let fixtureOrgId = ''
 
 // itemSchema's ten field names (src/routes/(app)/inventory/+page.server.ts), sorted.
 const FIELD_NAMES = [
@@ -135,8 +150,13 @@ test.beforeAll(async () => {
 			}
 		})
 		fixtureHolderId = holder.id
+		fixtureOrgId = admin.organizationId
 
-		await db.inventoryItem.deleteMany({ where: { name: FIXTURE_NAME } })
+		// Sweep this spec's own history FIRST: the DB fixture and any disposable rows a killed
+		// or retried previous run left behind. Scoped to the admin's org and to SPEC_PREFIX.
+		await db.inventoryItem.deleteMany({
+			where: { organizationId: admin.organizationId, name: { startsWith: SPEC_PREFIX } }
+		})
 		await db.inventoryItem.create({
 			data: {
 				organizationId: admin.organizationId,
@@ -175,13 +195,24 @@ test.afterAll(async () => {
 		// take teardown down with it. NOTHING ELSE SWEEPS THIS FIXTURE: scripts/clean-e2e-employees
 		// matches email prefixes only, and its list is ['e2e_', 'probe_', 'zzpagetest'] —
 		// zzinvfixture@example.test matches none of them. This teardown is the only cleanup.
-		await db.inventoryItem.deleteMany({ where: { name: FIXTURE_NAME } })
+		// Same prefix sweep as beforeAll, so a disposable item whose own test failed before
+		// deleting it does not survive the run either. `beforeAll` may not have reached the
+		// assignment, so the org is re-resolved when it is missing.
+		if (!fixtureOrgId) {
+			const admin = await db.user.findFirst({
+				where: { email: 'admin@veent.ph' },
+				select: { organizationId: true }
+			})
+			fixtureOrgId = admin?.organizationId ?? ''
+		}
+		const mine = { organizationId: fixtureOrgId, name: { startsWith: SPEC_PREFIX } }
+		await db.inventoryItem.deleteMany({ where: mine })
 		await db.payrollEntry.deleteMany({ where: { employee: { lastName: FIXTURE_LAST } } })
 		await db.employee.deleteMany({ where: { lastName: FIXTURE_LAST } })
 		await db.user.deleteMany({ where: { email: FIXTURE_EMAIL } })
 
 		// Prove the teardown actually emptied, in the same process that owns the fixture.
-		expect(await db.inventoryItem.count({ where: { name: FIXTURE_NAME } })).toBe(0)
+		expect(await db.inventoryItem.count({ where: mine })).toBe(0)
 		expect(await db.employee.count({ where: { lastName: FIXTURE_LAST } })).toBe(0)
 		expect(await db.user.count({ where: { email: FIXTURE_EMAIL } })).toBe(0)
 	} catch {
@@ -330,6 +361,7 @@ test.describe('Inventory (#114)', () => {
 	test('add item uses the shared modal', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
+		const name = tempName('shared-modal')
 
 		// The old `Add an item` disclosure is gone.
 		await expect(page.locator('details')).toHaveCount(0)
@@ -342,50 +374,50 @@ test.describe('Inventory (#114)', () => {
 		const createFields = await fieldNamesOf(d)
 		expect(createFields).toEqual(FIELD_NAMES)
 
-		await d.locator('#i-name').fill('E2E Shared Modal Asset')
+		await d.locator('#i-name').fill(name)
 		await d.getByRole('button', { name: 'Create item' }).click()
 		await expect(d).toBeHidden()
-		await expect(row(page, 'E2E Shared Modal Asset')).toBeVisible()
+		await expect(row(page, name)).toBeVisible()
 
 		// Edit mode renders the identical field set, with `Save` instead of `Create item`.
-		const edit = await openItem(page, 'E2E Shared Modal Asset')
+		const edit = await openItem(page, name)
 		await expect(edit.getByRole('button', { name: 'Save' })).toBeVisible()
 		expect(await fieldNamesOf(edit)).toEqual(createFields)
 		await page.keyboard.press('Escape')
 		await expect(edit).toBeHidden()
 
-		await deleteItem(page, 'E2E Shared Modal Asset')
+		await deleteItem(page, name)
 	})
 
 	test('delete from the modal, behind a confirm', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		await createItem(page, 'E2E Delete Asset')
+		const name = tempName('delete')
+		await createItem(page, name)
 
 		// Delete exists only inside the modal.
-		await expect(row(page, 'E2E Delete Asset').getByRole('button', { name: 'Delete' })).toHaveCount(
-			0
-		)
+		await expect(row(page, name).getByRole('button', { name: 'Delete' })).toHaveCount(0)
 
-		const d = await openItem(page, 'E2E Delete Asset')
+		const d = await openItem(page, name)
 		await d.getByRole('button', { name: 'Delete' }).click()
 
 		// The confirm step stands between the click and the removal.
 		const confirm = page.getByRole('alertdialog')
 		await expect(confirm).toBeVisible()
-		await expect(row(page, 'E2E Delete Asset')).toBeVisible()
+		await expect(row(page, name)).toBeVisible()
 
 		await confirm.getByRole('button', { name: 'Delete' }).click()
-		await expect(row(page, 'E2E Delete Asset')).toHaveCount(0)
+		await expect(row(page, name)).toHaveCount(0)
 		await expect(d).toBeHidden()
 	})
 
 	test('the assign invariant is enforced', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		await createItem(page, 'E2E Monitor')
+		const name = tempName('invariant')
+		await createItem(page, name)
 
-		const d = await openItem(page, 'E2E Monitor')
+		const d = await openItem(page, name)
 		await d.locator('#i-status').selectOption('ASSIGNED')
 		await d.getByRole('button', { name: 'Save' }).click()
 
@@ -397,15 +429,16 @@ test.describe('Inventory (#114)', () => {
 		await d.getByRole('button', { name: 'Save' }).click()
 		await expect(d).toBeHidden()
 
-		await deleteItem(page, 'E2E Monitor')
+		await deleteItem(page, name)
 	})
 
 	test('a rejected save keeps the modal open and the edits', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		await createItem(page, 'E2E Reject Asset')
+		const name = tempName('reject')
+		await createItem(page, name)
 
-		const d = await openItem(page, 'E2E Reject Asset')
+		const d = await openItem(page, name)
 		await d.locator('#i-status').selectOption('ASSIGNED')
 		await d.locator('#i-location').fill('Bench 7')
 		await d.getByRole('button', { name: 'Save' }).click()
@@ -421,7 +454,7 @@ test.describe('Inventory (#114)', () => {
 		await d.getByRole('button', { name: 'Save' }).click()
 		await expect(d).toBeHidden()
 
-		await deleteItem(page, 'E2E Reject Asset')
+		await deleteItem(page, name)
 	})
 
 	test('inactive holder is preserved on save', async ({ page }) => {
@@ -469,12 +502,13 @@ test.describe('Inventory (#114)', () => {
 	test('focus after a delete lands on the list', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		await createItem(page, 'E2E Focus Asset')
+		const name = tempName('focus')
+		await createItem(page, name)
 
-		const d = await openItem(page, 'E2E Focus Asset')
+		const d = await openItem(page, name)
 		await d.getByRole('button', { name: 'Delete' }).click()
 		await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
-		await expect(row(page, 'E2E Focus Asset')).toHaveCount(0)
+		await expect(row(page, name)).toHaveCount(0)
 		await expect(d).toBeHidden()
 
 		const focus = await page.evaluate((listSelector) => {

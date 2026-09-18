@@ -93,9 +93,18 @@ async function counts(page: Page) {
 	return { n: Number(m[1]), m: Number(m[2]) }
 }
 
+/**
+ * The assignments table has settled: it is on screen with at least one row. Auto-retrying, so
+ * every read after it is taken against a DOM that has stopped moving.
+ */
+async function settled(page: Page) {
+	await expect(assignments(page)).toBeVisible()
+	await expect(rows(page).first()).toBeVisible()
+}
+
 async function goto(page: Page, query: string) {
 	await page.goto(`/settings/org${query}`, { waitUntil: 'domcontentloaded' })
-	await expect(assignments(page)).toBeVisible()
+	await settled(page)
 }
 
 test.beforeEach(async ({ page }) => {
@@ -105,7 +114,7 @@ test.beforeEach(async ({ page }) => {
 test('table is bounded and offers a paging control', async ({ page }) => {
 	await goto(page, '')
 
-	expect(await rows(page).count()).toBeLessThanOrEqual(PAGE_SIZE)
+	expect((await rows(page).allInnerTexts()).length).toBeLessThanOrEqual(PAGE_SIZE)
 	await expect(assignments(page).getByRole('navigation', { name: 'Pagination' })).toBeVisible()
 })
 
@@ -141,24 +150,27 @@ test('the filter applies on every page, not just the first', async ({ page }) =>
 
 	let seen = 0
 	for (;;) {
-		const positions = assignments(page).locator('tbody tr select')
-		const count = await positions.count()
-		expect(count).toBeGreaterThan(0)
-		for (let i = 0; i < count; i++) await expect(positions.nth(i)).toHaveValue('')
-		seen += count
+		await settled(page)
+		// One atomic read of every select on this page. Counting and then indexing re-resolves
+		// the locator per index, and a row set that changes underneath turns nth() into a miss.
+		const values = await assignments(page)
+			.locator('tbody tr select')
+			.evaluateAll((els) => els.map((e) => (e as HTMLSelectElement).value))
+		expect(values.length).toBeGreaterThan(0)
+		expect(values.every((v) => v === '')).toBe(true)
+		seen += values.length
 
 		const next = assignments(page).getByRole('link', { name: 'Next →' })
 		if ((await next.count()) === 0) break
 		await next.click()
-		await page.waitForLoadState('domcontentloaded')
-		await expect(assignments(page)).toBeVisible()
+		await page.waitForURL(/empPage=/, { waitUntil: 'domcontentloaded' })
 	}
 	expect(seen).toBeGreaterThan(PAGE_SIZE)
 })
 
 test('a filter change resets to page 1, paging keeps the filter', async ({ page }) => {
 	await goto(page, `?empSearch=${SURNAME}&empPage=2`)
-	expect(await rows(page).count()).toBe(COUNT - PAGE_SIZE)
+	await expect(rows(page)).toHaveCount(COUNT - PAGE_SIZE)
 
 	await assignments(page).getByLabel('Only unassigned').check()
 	await page.waitForURL(/empUnassigned=1/, { waitUntil: 'domcontentloaded' })
@@ -166,10 +178,10 @@ test('a filter change resets to page 1, paging keeps the filter', async ({ page 
 	expect(url.searchParams.get('empUnassigned')).toBe('1')
 	expect(url.searchParams.get('empSearch')).toBe(SURNAME)
 	expect(url.searchParams.get('empPage') ?? '1').toBe('1')
-	expect(await rows(page).count()).toBe(PAGE_SIZE)
+	await expect(rows(page)).toHaveCount(PAGE_SIZE)
 
 	await assignments(page).getByRole('link', { name: 'Next →' }).click()
-	await page.waitForLoadState('domcontentloaded')
+	await page.waitForURL(/empPage=2/, { waitUntil: 'domcontentloaded' })
 	const paged = new URL(page.url())
 	expect(paged.searchParams.get('empUnassigned')).toBe('1')
 	expect(paged.searchParams.get('empSearch')).toBe(SURNAME)
@@ -198,9 +210,9 @@ test('the counter tells the truth', async ({ page }) => {
 	expect(filtered.m).toBe(unfiltered.m)
 	expect(filtered.n).toBe(COUNT)
 
-	let summed = await rows(page).count()
+	let summed = (await rows(page).allInnerTexts()).length
 	await goto(page, `?empSearch=${SURNAME}&empPage=2`)
-	summed += await rows(page).count()
+	summed += (await rows(page).allInnerTexts()).length
 	expect(summed).toBe(filtered.n)
 	expect((await counts(page)).n).toBe(filtered.n)
 })
@@ -208,7 +220,7 @@ test('the counter tells the truth', async ({ page }) => {
 test('no paging control when the filtered set fits on one page', async ({ page }) => {
 	await goto(page, `?empSearch=${SURNAME}%2C%20Row00`)
 
-	expect(await rows(page).count()).toBeLessThan(PAGE_SIZE)
+	expect((await rows(page).allInnerTexts()).length).toBeLessThan(PAGE_SIZE)
 	await expect(assignments(page).getByRole('navigation', { name: 'Pagination' })).toHaveCount(0)
 })
 
@@ -223,10 +235,12 @@ test('the filters and the paging control are reachable', async ({ page }) => {
 	await page.waitForURL(/empUnassigned=1/, { waitUntil: 'domcontentloaded' })
 	await expect(assignments(page).getByLabel('Only unassigned')).toBeChecked()
 
-	const links = assignments(page).getByRole('navigation', { name: 'Pagination' }).getByRole('link')
-	for (let i = 0; i < (await links.count()); i++) {
-		expect((await links.nth(i).innerText()).trim()).not.toBe('')
-	}
+	const linkNames = await assignments(page)
+		.getByRole('navigation', { name: 'Pagination' })
+		.getByRole('link')
+		.evaluateAll((els) => els.map((e) => (e.textContent ?? '').trim()))
+	expect(linkNames.length).toBeGreaterThan(0)
+	expect(linkNames.every((name) => name !== '')).toBe(true)
 
 	await assignments(page).getByLabel('Search employees').fill(SURNAME)
 	await assignments(page).getByRole('button', { name: 'Filter' }).click()
@@ -241,7 +255,7 @@ test('assigning a position from a row still works', async ({ page }) => {
 		.locator('section')
 		.filter({ has: page.getByRole('heading', { name: 'Positions' }) })
 		.locator('tbody tr')
-	const catalog = await positionRows.count()
+	const catalog = (await positionRows.allInnerTexts()).length
 	expect(catalog).toBeGreaterThan(0)
 
 	const row = rows(page).first()

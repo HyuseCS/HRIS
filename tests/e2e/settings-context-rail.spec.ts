@@ -38,6 +38,18 @@ const groupRow = (page: Page) => railRows(page).first()
 const siblingRow = (page: Page) => railRows(page).nth(1)
 const hub = (page: Page) => page.getByRole('region', { name: 'Settings destinations' })
 
+/**
+ * A hub card is a link wrapping TWO paragraphs — the label and the description — so its
+ * accessible name is the pair concatenated and an exact name match can never hit it. Identify
+ * the card by its label paragraph instead. `getByText(..., { exact: true })` is deliberate: a
+ * substring or `^label` match would let one destination's card answer for another whose label
+ * starts the same way.
+ */
+const hubCard = (page: Page, label: string) =>
+	hub(page)
+		.getByRole('link')
+		.filter({ has: page.getByText(label, { exact: true }) })
+
 const groupsFor = (roles: Role[]) => {
 	const visible = visibleSettings(roles)
 	return SETTINGS_GROUP_ORDER.filter((g) => visible.some((d) => d.group === g))
@@ -112,7 +124,7 @@ for (const { label, user, roles } of ROLES) {
 
 		for (const d of visibleSettings(roles)) {
 			await expect(rail(page).getByRole('link', { name: d.label, exact: true })).toHaveCount(0)
-			await expect(hub(page).getByRole('link', { name: d.label, exact: true })).toHaveCount(1)
+			await expect(hubCard(page, d.label)).toHaveCount(1)
 		}
 	})
 }
