@@ -182,8 +182,14 @@
 
 	$effect(() => {
 		if (!browser) return
-		const write = () =>
-			(document.cookie = `vp=${innerWidth}x${innerHeight}; path=/; SameSite=Lax; max-age=31536000`)
+		let written = /(?:^|;\s*)vp=([^;]*)/.exec(document.cookie)?.[1] ?? null
+		const write = () => {
+			const vp = `${innerWidth}x${innerHeight}`
+			if (vp === written) return
+			written = vp
+			document.cookie = `vp=${vp}; path=/; SameSite=Lax; max-age=31536000`
+			invalidateAll()
+		}
 		write()
 		let t: ReturnType<typeof setTimeout>
 		const onResize = () => {

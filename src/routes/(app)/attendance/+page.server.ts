@@ -201,19 +201,24 @@ export const load: PageServerLoad = async ({ locals, url, cookies, getClientAddr
 		view === 'employee' && selectedEmployeeId
 			? await countAttendanceDays(selectedEmployeeId, new Date(from), new Date(to), exceptionsOnly)
 			: 0
-	const pagination = paginate(
-		url,
-		view === 'team' ? await countTeamDay(user.organizationId, date, exceptionsOnly) : dayTotal,
-		{
-			pageSize: fitPageSize(cookies, {
-				rowPx: 45,
-				chromePx: view === 'team' ? 475 : 654
-			})
-		}
-	)
+	const pagination =
+		view === 'matrix'
+			? null
+			: paginate(
+					url,
+					view === 'team'
+						? await countTeamDay(user.organizationId, date, exceptionsOnly)
+						: dayTotal,
+					{
+						pageSize: fitPageSize(cookies, {
+							rowPx: 45,
+							chromePx: view === 'team' ? 475 : 654
+						})
+					}
+				)
 
 	const days =
-		view === 'employee' && selectedEmployeeId
+		view === 'employee' && selectedEmployeeId && pagination
 			? await listAttendanceDays(selectedEmployeeId, new Date(from), new Date(to), 'desc', {
 					skip: pagination.skip,
 					take: pagination.take,
@@ -222,7 +227,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies, getClientAddr
 			: []
 
 	const team =
-		view === 'team'
+		view === 'team' && pagination
 			? await listTeamDay(user.organizationId, date, {
 					exceptionsOnly,
 					skip: pagination.skip,

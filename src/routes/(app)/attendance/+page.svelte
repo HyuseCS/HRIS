@@ -482,7 +482,7 @@
 						<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
 					</label>
 					<span class="ml-auto text-xs text-muted-foreground"
-						>{data.view === 'team' ? data.pagination.total : dayRows.length} shown</span
+						>{data.view === 'team' && data.pagination ? data.pagination.total : dayRows.length} shown</span
 					>
 				{/if}
 			</div>
@@ -781,7 +781,9 @@
 			</table>
 		</div>
 
-		<Pagination meta={data.pagination} />
+		{#if data.pagination}
+			<Pagination meta={data.pagination} />
+		{/if}
 	{:else}
 		{#if data.canManage}
 			<div class="flex flex-wrap items-center gap-2">
@@ -1010,6 +1012,8 @@
 			</table>
 		</div>
 
-		<Pagination meta={data.pagination} />
+		{#if data.pagination}
+			<Pagination meta={data.pagination} />
+		{/if}
 	{/if}
 </div>
