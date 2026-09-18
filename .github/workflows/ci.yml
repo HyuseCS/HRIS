@@ -17,33 +17,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4 # version read from package.json "packageManager"
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2 # version pinned here, not read from package.json
+        with:
+          bun-version: 1.4.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       # Prisma client types are needed for the typecheck step.
       - name: Generate Prisma client
-        run: pnpm exec prisma generate
+        run: bunx prisma generate
 
       - name: Format check
-        run: pnpm format:check
+        run: bun run format:check
 
       - name: Lint
-        run: pnpm lint
+        run: bun run lint
 
       - name: Typecheck
-        run: pnpm check
+        run: bun run check
 
       - name: Unit tests
-        run: pnpm test
+        run: bun run test
 
   e2e:
     name: API / E2E (Playwright)
@@ -75,35 +76,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm exec prisma generate
+        run: bunx prisma generate
 
       - name: Provision database schema
-        run: pnpm exec prisma db push --skip-generate
+        run: bunx prisma db push --skip-generate
 
       - name: Seed database
         # Full E2E roster (manager/employee/verifier/approver + demo data the suite needs).
-        # Call the seed directly (not `pnpm db:seed:e2e`) so it uses the workflow-provided
+        # Call the seed directly (not `bun run db:seed:e2e`) so it uses the workflow-provided
         # env vars above; the db:seed:e2e script loads .env.dev, which does not exist in CI.
-        run: pnpm exec tsx prisma/seed-e2e.ts
+        run: bunx tsx prisma/seed-e2e.ts
 
       - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: E2E tests
-        run: pnpm test:e2e
+        run: bun run test:e2e
 
       - name: Upload Playwright report
         if: failure()
@@ -155,17 +157,18 @@ jobs:
       - name: Fetch the deployed schema
         run: git fetch --depth=1 --no-tags origin main:refs/remotes/origin/main
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Materialise the deployed schema and seed
         # These must land inside prisma/: Prisma infers the project root from the schema
@@ -180,14 +183,14 @@ jobs:
 
       - name: Provision the deployed schema
         run: |
-          pnpm exec prisma generate --schema=prisma/.deployed-schema.prisma
-          pnpm exec prisma db push --schema=prisma/.deployed-schema.prisma --skip-generate
+          bunx prisma generate --schema=prisma/.deployed-schema.prisma
+          bunx prisma db push --schema=prisma/.deployed-schema.prisma --skip-generate
 
       - name: Populate it
         # The deployed seed, so the rows match the deployed schema. It still pulls
         # DEFAULT_STATUTORY_RATE_CONFIG from the checked-out (new) src tree — the one place
         # old data meets new code here, and identical across the two as of #236.
-        run: pnpm exec tsx prisma/.deployed-seed-e2e.ts
+        run: bunx tsx prisma/.deployed-seed-e2e.ts
 
       - name: Upgrade to this branch's schema
         # The actual test, and the exact file the droplet runs on deploy.
@@ -213,7 +216,7 @@ jobs:
             exit 1
           fi
           # Redirect rather than pipe: `if cmd | tee` would test tee's exit status, not Prisma's.
-          if pnpm exec prisma db push --schema=prisma/.selftest-schema.prisma --skip-generate > prisma/.selftest-push.log 2>&1; then
+          if bunx prisma db push --schema=prisma/.selftest-schema.prisma --skip-generate > prisma/.selftest-push.log 2>&1; then
             cat prisma/.selftest-push.log
             echo "::error::db push added a required column to a populated table without complaint. Either the database is empty (the seed step is broken) or db push no longer refuses — either way this job can no longer detect the #236 failure mode."
             exit 1

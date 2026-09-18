@@ -1,7 +1,7 @@
 // Performance review reminders (#178, plan items 167-169). Nudges the people who still owe
 // something on an open review — in-app always, plus a real email for the two loud kinds.
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/send-review-reminders.ts --dry-run
+//   bunx dotenv -e .env.dev -- tsx scripts/send-review-reminders.ts --dry-run
 //
 // Runs several times a day from the droplet crontab (see scripts/README.md) — the app has no
 // scheduler. It is a companion to generate-review-cycles.ts, not part of it: "due soon" and

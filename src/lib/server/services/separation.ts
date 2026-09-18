@@ -138,7 +138,7 @@ export interface ClearanceActorRef {
 	// #304/N-1: OPTIONAL on purpose. Making it required would break every caller that feeds this
 	// shape a narrower projection, including `setClearanceItem`'s — and it is exactly why the
 	// in-transaction re-check below needs a PROJECTION assertion: a narrowed `select` degrades
-	// the bar to `clearedById`-only while `pnpm check` stays green.
+	// the bar to `clearedById`-only while `bun run check` stays green.
 	previouslyClearedById?: string | null
 }
 
@@ -387,7 +387,7 @@ export async function finalizeSeparation(id: string, organizationId: string, ctx
 			where: { separationId: id },
 			// #304/N-1: `previouslyClearedById` MUST be selected. `clearedAnyItem` reads it, the
 			// field is optional on ClearanceActorRef, so dropping it here silently degrades this
-			// half of the bar to `clearedById`-only with `pnpm check` still green. The pre-flight
+			// half of the bar to `clearedById`-only with `bun run check` still green. The pre-flight
 			// bar is safe — it gets `getSeparation`'s bare `clearanceItems` include, which carries
 			// the whole row — but this re-check exists ONLY for the race the pre-flight cannot
 			// cover, so it is the half that must not be narrower.

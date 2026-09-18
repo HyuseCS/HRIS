@@ -2,7 +2,7 @@
 // real AttendanceDay hours for every active employee, so the admin can approve
 // the run and then click Payslip on any row to view the PDF (#124).
 //
-//   pnpm tsx scripts/seed-payslip-demo.ts
+//   bunx tsx scripts/seed-payslip-demo.ts
 //
 // This script deliberately does NOT touch Organization.name / address / logoUrl —
 // whatever is set in /settings/company stands, and the PDF renders from there.
@@ -28,7 +28,7 @@ const DAILY_OT_HOURS = 2
 async function main() {
 	const org = await db.organization.findFirst({ orderBy: { createdAt: 'asc' } })
 	if (!org) {
-		throw new Error('No Organization found — run `pnpm db:seed` first for the base seed.')
+		throw new Error('No Organization found — run `bun run db:seed` first for the base seed.')
 	}
 
 	const employees = await db.employee.findMany({
@@ -36,7 +36,7 @@ async function main() {
 		select: { id: true, firstName: true, lastName: true, employeeNumber: true }
 	})
 	if (employees.length === 0) {
-		throw new Error('No active employees in the org — run `pnpm db:seed` first.')
+		throw new Error('No active employees in the org — run `bun run db:seed` first.')
 	}
 
 	// Build the weekday list once (Mon-Sat, skipping Sundays, capped at 13).
@@ -86,7 +86,9 @@ async function main() {
 		where: { organizationId: org.id, roles: { has: 'SUPER_ADMIN' } }
 	})
 	if (!admin) {
-		throw new Error('No SUPER_ADMIN user in the org — run `pnpm db:seed` first for the base seed.')
+		throw new Error(
+			'No SUPER_ADMIN user in the org — run `bun run db:seed` first for the base seed.'
+		)
 	}
 	// 5/11–5/25 is not a standard pay period, but it is a legal custom same-month range (#163),
 	// so it no longer needs an escape hatch. It keeps the paper template's dates.

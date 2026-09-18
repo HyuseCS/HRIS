@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
 // makes vite fail loudly instead of drifting to a port the baseURL doesn't match.
 //
 // #287: 4173 (vite preview's own default), NOT 5173 — the suite no longer shares a port with
-// `pnpm dev`, so running it never fights your dev server and never silently tests through it.
+// `bun run dev`, so running it never fights your dev server and never silently tests through it.
 const port = Number(process.env.E2E_PORT ?? 4173)
 
 export default defineConfig({
@@ -32,17 +32,17 @@ export default defineConfig({
 			use: { ...devices['Desktop Chrome'] }
 		}
 	],
-	// #287 — build once, then serve the BUILT app. The suite used to run against `pnpm dev`,
+	// #287 — build once, then serve the BUILT app. The suite used to run against `bun run dev`,
 	// where vite compiles each route on its first request. That cost landed on whichever test
 	// reached a route first and, under parallel workers, pushed hydration past the retry budgets
 	// in `selectTenant` and the dialog helpers: 9 failed / 24 skipped in 6.2m on a cold server,
 	// against 1 failed in 2.5m on a warm one. Nothing about the tests changed between those runs
 	// — only how warm vite was, which is exactly why a local run could not be trusted.
 	//
-	// Against the production build the same 127 tests pass in 35s. `pnpm build` costs ~12s, so
+	// Against the production build the same 127 tests pass in 35s. `bun run build` costs ~12s, so
 	// this is faster end to end as well as honest, and it tests what actually ships.
 	webServer: {
-		command: `pnpm build && pnpm preview --port ${port} --strictPort`,
+		command: `bun run build && bun run preview --port ${port} --strictPort`,
 		url: `http://localhost:${port}`,
 		// NOT `!CI`. Reuse would skip the build above and quietly test a stale bundle — the very
 		// "a green run is luck" failure #287 is about. A fresh build every run is worth 12s.

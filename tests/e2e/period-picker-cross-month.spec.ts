@@ -9,7 +9,7 @@ import { login, USERS } from './helpers'
  * does either. The mount that matters most is `/payroll/periods`, which is the only one that
  * OVERRIDES both field names (`startName="start" endName="end"`) to match the zod schema in
  * `payroll/periods/+page.server.ts` (`start` / `end`). Nothing type-checks that pairing: rename a
- * prop on either side and every unit test, `pnpm check` and `pnpm lint` stay green while the form
+ * prop on either side and every unit test, `bun run check` and `bun run lint` stay green while the form
  * silently posts fields the action cannot parse. These assertions are the only thing that notices.
  *
  * Read-only by construction. No test here submits, so the suite writes nothing to the database.

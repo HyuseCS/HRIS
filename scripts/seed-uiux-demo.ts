@@ -4,7 +4,7 @@
 //   npx dotenv -e .env.dev -- tsx scripts/seed-uiux-demo.ts --clear  # remove what this script wrote
 //
 // The `dotenv -e .env.dev` wrapper is required, not optional: there is no `.env` in this repo,
-// so a bare `pnpm tsx` has no DATABASE_URL and dies on connect. Every DB script in package.json
+// so a bare `bunx tsx` has no DATABASE_URL and dies on connect. Every DB script in package.json
 // carries the same wrapper.
 //
 // Punch map dialog: PunchMapDialog.svelte only ever needs a punch's own
@@ -86,7 +86,7 @@ async function main() {
 		},
 		select: { id: true }
 	})
-	if (!hrUser) throw new Error('No HR_ADMIN user found in org Veent — run `pnpm db:seed` first.')
+	if (!hrUser) throw new Error('No HR_ADMIN user found in org Veent — run `bun run db:seed` first.')
 
 	const existingPunch = await db.timeLog.findUnique({
 		where: { id: PUNCH_ID },

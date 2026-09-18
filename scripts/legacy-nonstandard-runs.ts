@@ -9,7 +9,7 @@
 // even then only when that share is not itself 0.5. LOCKED/RELEASED/VOIDED runs never recompute
 // at all, so they are not listed.
 //
-//   pnpm dotenv -e .env.dev -- tsx scripts/legacy-nonstandard-runs.ts
+//   bunx dotenv -e .env.dev -- tsx scripts/legacy-nonstandard-runs.ts
 //
 // Run this against EVERY database this change reaches (dev, staging, prod) — a clean dev
 // result proves nothing about the others (S9).

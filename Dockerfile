@@ -4,26 +4,26 @@
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM node:20-slim AS builder
 WORKDIR /app
-# openssl for Prisma's query engine; must precede pnpm install (postinstall runs generate).
+# openssl for Prisma's query engine; must precede bun install (postinstall runs generate).
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
-RUN corepack enable
-COPY package.json pnpm-lock.yaml ./
+RUN npm install -g bun@1.4.0
+COPY package.json bun.lock ./
 COPY prisma ./prisma
-RUN pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 COPY . .
-RUN pnpm build
+RUN bun run build
 # Strip devDependencies, then regenerate the Prisma client so it survives the prune.
 # bcrypt/esbuild/tsx are prod deps, so their built binaries are kept.
-RUN pnpm prune --prod && pnpm exec prisma generate
+RUN rm -rf node_modules && bun install --production --frozen-lockfile && bunx prisma generate
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
 WORKDIR /app
-# Prisma's engine needs libssl at runtime; corepack gives pnpm for the compose commands.
+# Prisma's engine needs libssl at runtime; the global bun serves the compose commands.
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
-RUN corepack enable
+RUN npm install -g bun@1.4.0
 ENV NODE_ENV=production
 # Copy the built app + pruned prod node_modules (incl. generated Prisma client + tsx).
 COPY --from=builder /app/node_modules ./node_modules

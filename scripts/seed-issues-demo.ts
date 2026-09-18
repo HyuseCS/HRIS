@@ -1,6 +1,6 @@
 // One-off: seed demo data for verifying issues #66, #70, #71, #72, #73.
 //
-//   pnpm tsx scripts/seed-issues-demo.ts
+//   bunx tsx scripts/seed-issues-demo.ts
 //
 // Idempotent — safe to re-run. Seeds:
 //   #66  custom deduction codes (UNIFORM, HMO_DEP) + a recurring UNIFORM ₱500/mo
@@ -22,7 +22,7 @@ const db = new PrismaClient()
 
 async function main() {
 	const org = await db.organization.findFirst()
-	if (!org) throw new Error('No organization — run `pnpm db:seed` first.')
+	if (!org) throw new Error('No organization — run `bun run db:seed` first.')
 
 	// ── #71/#73: departments + employees across them ─────────────────────────
 	const engineering = await db.department.upsert({

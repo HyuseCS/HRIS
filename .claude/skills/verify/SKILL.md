@@ -7,8 +7,8 @@ description: How to build, launch, and drive Veent HRIS locally to verify a chan
 
 ## Launch
 
-- Postgres must be up (Docker container `veent_wifiportal-db-1`, reachable at `localhost:5433`, db `veent_hris` per `.env`). `pnpm prisma db push` syncs the schema (repo uses db push, no migration files).
-- Dev server: `pnpm dev --port <port>` (run in background, poll `curl http://localhost:<port>/login` until 200; takes a few seconds).
+- Postgres must be up (Docker container `veent_wifiportal-db-1`, reachable at `localhost:5433`, db `veent_hris` per `.env`). `bun run prisma db push` syncs the schema (repo uses db push, no migration files).
+- Dev server: `bun run dev --port <port>` (run in background, poll `curl http://localhost:<port>/login` until 200; takes a few seconds).
 - Seeded logins (also in `tests/e2e/helpers.ts`): `admin@veent.ph`/`Admin@1234` (Super Admin), `manager@veent.ph`/`Manager@1234`, `employee@veent.ph`/`Employee@1234`, plus `payroll@veent.ph`, `finance@veent.ph`.
 
 ## Drive

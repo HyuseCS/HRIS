@@ -1,5 +1,5 @@
 /**
- * Veent HRIS — Discord time-tracking bot (standalone, run with `pnpm bot`).
+ * Veent HRIS — Discord time-tracking bot (standalone, run with `bun run bot`).
  *
  * Registers slash commands /in and /out. A member types the command (which is not a regular
  * chat message); the bot sends an HMAC-signed POST to the HRIS /api/v1/timesheets/log

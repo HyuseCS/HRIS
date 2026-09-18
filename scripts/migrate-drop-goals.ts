@@ -1,7 +1,7 @@
 // One-off: drop the Goals feature's table and enum (#178, Phase 1).
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-drop-goals.ts [--confirm]
-//   pnpm db:push
+//   bunx dotenv -e .env.dev -- tsx scripts/migrate-drop-goals.ts [--confirm]
+//   bun run db:push
 //
 // Run this BEFORE `prisma db push` on any database that already holds data. The schema no
 // longer declares `model Goal` or `enum GoalStatus`, so push would drop them itself — but it
@@ -62,7 +62,7 @@ async function main() {
 		`select count(*) as audit_rows from audit_logs where "entityType" = 'Goal'`
 	)
 	console.log(`✔ audit_logs rows with entityType='Goal': ${Number(audit_rows)} — untouched.`)
-	console.log('  Run `pnpm db:push` next.')
+	console.log('  Run `bun run db:push` next.')
 }
 
 main()

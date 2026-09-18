@@ -1,6 +1,6 @@
 // One-off: bump the Pag-IBIG EE/ER cap from the stale ₱100 to ₱200 (#220).
 //
-//   pnpm tsx scripts/migrate-pagibig-cap-200.ts
+//   bunx tsx scripts/migrate-pagibig-cap-200.ts
 //
 // ₱200 = 2% of the ₱10,000 monthly-compensation ceiling (HDMF Circular 460, effective Feb 2024).
 // The old ₱100 encoded the pre-2024 ₱5,000 ceiling, under-deducting everyone earning over ₱5,000/mo.

@@ -1,7 +1,7 @@
 // One-off: replace the free-text `department` column on the two clearance tables with the
 // `ClearanceArea` enum plus an optional plain `departmentId` column (#306).
 //
-//   pnpm dotenv -e .env.dev -- tsx scripts/migrate-clearance-area.ts
+//   bunx dotenv -e .env.dev -- tsx scripts/migrate-clearance-area.ts
 //
 // Run this BEFORE `prisma db push`. Push cannot express a column rename, let alone a
 // text→enum change: it sees one column dropped and another added, and offers to destroy the
@@ -95,7 +95,7 @@ async function main() {
 		END $$;
 	`)
 	for (const table of TABLES) await migrateTable(table)
-	console.log('Run `pnpm db:push` next.')
+	console.log('Run `bun run db:push` next.')
 }
 
 main()

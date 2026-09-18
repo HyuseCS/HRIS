@@ -3,9 +3,9 @@
 // #298 `lock()` wrote that field too. Owner decision 4: no backfill, so this quantifies the
 // residue rather than fixing it.
 //
-//   pnpm dotenv -e .env.dev -- tsx scripts/count-ambiguous-approvedby.ts
+//   bunx dotenv -e .env.dev -- tsx scripts/count-ambiguous-approvedby.ts
 //
-// This script performs NO writes: no update, updateMany, $executeRaw or create. `pnpm check` does
+// This script performs NO writes: no update, updateMany, $executeRaw or create. `bun run check` does
 // NOT typecheck scripts/**, so run it once by hand to prove it compiles.
 
 import { PrismaClient } from '@prisma/client'

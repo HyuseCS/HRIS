@@ -5,9 +5,9 @@ Automated coverage lives in `tests/unit` (Vitest) and `tests/e2e` (Playwright).
 
 ## 0. Setup
 
-- **Run**: `pnpm dev` (app) + `pnpm bot` (Discord), or `./start.sh` (boots DB + app + bot).
+- **Run**: `bun run dev` (app) + `bun run bot` (Discord), or `./start.sh` (boots DB + app + bot).
 - **Logins** (seeded): `admin@veent.ph` / `Admin@1234` (Super Admin) · `manager@veent.ph` / `Manager@1234` · `employee@veent.ph` / `Employee@1234`.
-- Inspect DB data with `pnpm db:studio`.
+- Inspect DB data with `bun run db:studio`.
 
 ## 1. Login & RBAC
 
@@ -64,7 +64,7 @@ _Prereq: bot invited with the **`applications.commands`** scope; the member's Di
 
 ## 9. `db:migrate` is idempotent
 
-- `pnpm db:migrate` twice → **"already in sync"** both times, no prompts, no data loss.
+- `bun run db:migrate` twice → **"already in sync"** both times, no prompts, no data loss.
 
 ## 10. Module scaffolds (smoke)
 
@@ -77,7 +77,7 @@ _Prereq: bot invited with the **`applications.commands`** scope; the member's Di
 
 Nobody moves their own pay, terms, role or account — enforced in the services, so the form actions
 and the v1 API twins are both covered. Seeded ids below are from `prisma/seed-core.ts`; confirm with
-`pnpm db:studio` if the seed changes.
+`bun run db:studio` if the seed changes.
 
 **11.1 Own pay and employment terms.** As `hr@veent.ph`, open your own 201 file
 (`/employees/<Hannah's id>`) and try each of: Change Compensation · Promote · toggle the SSS

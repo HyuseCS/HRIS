@@ -5,12 +5,12 @@ import { E2E_DISCORD_ID } from './helpers'
 /**
  * Resets the seeded employee's transactional data before the E2E run so tests
  * that create a current-week timesheet / leave request are deterministic across
- * repeated runs. Relies on the seed having been applied (`pnpm db:seed:e2e`).
+ * repeated runs. Relies on the seed having been applied (`bun run db:seed:e2e`).
  */
 /**
  * Prime the hot routes once, before any test's clock is running.
  *
- * Written when the suite ran against `pnpm dev`, where vite compiled each route on its first
+ * Written when the suite ran against `bun run dev`, where vite compiled each route on its first
  * request and that cost landed on whichever test reached it first. #287 moved the suite onto
  * the production build (see `playwright.config.ts`), so there is no compilation left to pay
  * and this is now belt-and-braces: it still primes the OS/page cache and the client bundle,
@@ -69,7 +69,7 @@ async function globalSetup(config: FullConfig) {
 
 		if (!employee) {
 			throw new Error(
-				'E2E seed missing: employee@veent.ph not found. Run `pnpm db:seed:e2e` before the E2E suite.'
+				'E2E seed missing: employee@veent.ph not found. Run `bun run db:seed:e2e` before the E2E suite.'
 			)
 		}
 
