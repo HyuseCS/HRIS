@@ -28,7 +28,7 @@ inherits it, along with every route below.
 
 ## Who is affected today
 
-Every route that renders `Pagination.svelte` — **19 files across 16 routes**:
+Every route that renders `Pagination.svelte` — **19 files across 17 routes**:
 
 `complaints`, `employees`, `inventory`, `leave`, `leave/balances`, `payslips`, `recruitment`,
 `reports/audit-log`, `requests`, `requests/approvals`, `requests/proposals`,
@@ -45,10 +45,10 @@ and last page of every list keep the bug after the obvious fix. Whoever takes th
 those two cases, not just add the attribute.
 
 The reason it was kept out of the N6 lane is not the size of the change, it is the size of the
-check. A shared component that 16 routes render cannot be altered inside a lane that was
+check. A shared component that 17 routes render cannot be altered inside a lane that was
 reviewed for something else — every route that renders it needs verifying before the change is
 done, and that work does not belong to a `/settings/org` ticket. The change also alters
-screen-reader route announcements on all 16, which is a behaviour change, not a fix.
+screen-reader route announcements on all 17, which is a behaviour change, not a fix.
 
 It also wants a moment's thought rather than a reflex: `keepfocus` keeps focus on the link that
 was activated, which is right for a pager. Whether the same is right when the row count changes
