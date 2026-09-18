@@ -27,7 +27,7 @@
 	<title>Leave Balances — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
 	<PageHeader title="Leave Balances">
 		{#snippet badge()}
 			<HelpTip label="About leave balances">
@@ -65,12 +65,12 @@
 			</form>
 		{/snippet}
 
-		<div class="overflow-x-auto">
+		<div class="min-h-0 flex-1 overflow-x-auto">
 			<table class="w-full min-w-max text-sm">
-				<thead class="bg-card">
+				<thead class="sticky top-0 z-10 bg-card">
 					<tr class="border-b">
 						<th
-							class="sticky left-0 z-20 border-r bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))] px-4 py-3 text-left font-medium text-muted-foreground"
+							class="sticky left-0 z-30 border-r bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))] px-4 py-3 text-left font-medium text-muted-foreground"
 							>Employee</th
 						>
 						<th class="bg-muted/50 px-4 py-3 text-left font-medium text-muted-foreground"
