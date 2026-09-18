@@ -280,7 +280,22 @@ CI=1 pnpm exec dotenv -e .env.dev -- playwright test  # full sweep; the bar is 1
 
 **Dependency changes.** None. No package added, removed or upgraded.
 
-## S4 — owner live probe (open)
+## S4 — owner live probe (closed by owner acceptance, 18-09-26)
 
-The 13-row checklist in the plan's S4 section is unchanged and unstarted. Record the results
-in this file, under this heading.
+The owner walked the dashboard live after S1–S3, on `feat/uiux-phase-6`. Their words: "moved
+them up, it's good as it is now, but I will be making changes." That is acceptance of the
+S1–S3 state, not a row-by-row sign-off — rows 3 and 5 (the 1-row card at ~112px, and an
+expanded Send-back note growing inside the scroll body) were not individually confirmed by
+name. Rows 1, 2, 4, 6–13 are covered by the owner's acceptance plus the dark-theme
+observations already recorded above. Treating S4 as **closed by owner acceptance**: the plan
+does not gate on a row the owner never flagged as broken, and the owner's own next action was
+to ask for more changes, not to reopen S1–S3.
+
+**Superseded by follow-ups.** The "more changes" the owner asked for landed the same day and
+replaced S2's zone-1 layout (`NEEDS A DECISION` as a card row) with three permanent title-row
+icon buttons and anchored dropdown panels — see
+`dashboard-layout_FOLLOWUPS_18-09-26.md` in this task folder for the full commit-by-commit
+account. S1's bounds (this REPORT, S1) now live on the dropdown `<ul>` instead of a
+page-body card; S2's `decisionCount`/`cols(decisionCount)` contract is retired along with the
+zone-1 section it sized. S3's Playwright coverage was rewritten in place (`bbdceaf`,
+`564e2df`) rather than superseded — the same file, updated assertions.

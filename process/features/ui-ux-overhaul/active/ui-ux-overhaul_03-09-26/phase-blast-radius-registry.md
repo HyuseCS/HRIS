@@ -152,3 +152,20 @@ the `/attendance` hint, the AggregatePanel copy, S1 and S4 replayed.
 | File | Section |
 |---|---|
 | `src/routes/(app)/dashboard/+page.svelte` | S1, S2 — alert-card min/max height + scroll body; four-zone reorder with derived grid columns |
+
+**Amendment, same-day follow-up (18-09-26), commits `bbdceaf`, `564e2df`:** superseded S2's
+zone-1 layout with title-row icon buttons + dropdown panels; expanded the claimed file set:
+
+| File | What |
+|---|---|
+| `src/routes/(app)/dashboard/+page.server.ts` | new capability booleans for the three icons |
+| `src/lib/server/services/approvals.ts` | new `listPendingApprovals()` |
+| `tests/e2e/helpers.ts` | new seeded `payroll` account |
+| `tests/e2e/dashboard-layout.spec.ts`, `tests/e2e/posting-approver-sod.spec.ts` | rewritten for buttons/regions |
+
+Overlaps Phase 06's claim on `src/routes/(app)/dashboard/+page.server.ts` (`pendingProposals
+forwarded`, 03-09-26) — Phase 06 is already `DONE`/rebased onto staging; no live conflict.
+
+**Status:** DONE. All gates green (format, lint, svelte-check 0 errors, vitest 2703/2703, e2e
+157/157). Claim closed — see `dashboard-layout_PLAN_17-09-26.md` (VERIFIED 18-09-26) and
+`dashboard-layout_FOLLOWUPS_18-09-26.md` for the full account.

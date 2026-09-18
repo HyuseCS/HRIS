@@ -15,7 +15,8 @@ orphan. S3 adds Playwright coverage for the bounds, the role×zone matrix and th
 S4 is the owner's live probe checklist. **No server load, query or data shape changes.**
 
 - **Date**: 17-09-26
-- **Status**: PLANNED
+- **Status**: VERIFIED (18-09-26) — S4 closed by owner acceptance; S2's zone-1 layout is
+  superseded by same-day follow-ups, see `dashboard-layout_FOLLOWUPS_18-09-26.md`
 - **Complexity**: SIMPLE (4 sections, 4 commits, 2 files)
 - **Feature**: ui-ux-overhaul
 - **Upstream**: `dashboard-layout_RESEARCH_17-09-26.md`, `dashboard-layout_INNOVATE_17-09-26.md` (option **O2**),
@@ -415,6 +416,12 @@ Record findings in `dashboard-layout_REPORT_17-09-26.md` in this task folder.
   `pnpm test:e2e` sweep matches the step-1 baseline.
 - The plan as a whole reaches `VERIFIED` only after S4's owner probe is walked and recorded in
   `dashboard-layout_REPORT_17-09-26.md`. Automated green alone is `CODE DONE`.
+
+**VERIFIED 18-09-26.** S4 closed by owner acceptance, recorded in the REPORT. Note for anyone
+reading S2 below: the zone-1 (`NEEDS A DECISION`) layout it describes was superseded the same
+day by follow-up commits that moved those three cards into title-row icon buttons with
+dropdown panels. S2's text below is left as written — it is the record of what shipped first
+and why — see `dashboard-layout_FOLLOWUPS_18-09-26.md` for what replaced it.
 - A red gate is never waived: fix in place if in blast radius, otherwise write a backlog note in
   `process/features/ui-ux-overhaul/backlog/` and keep the section CONDITIONAL.
 - Commit per section as its gates go green — do not batch.
