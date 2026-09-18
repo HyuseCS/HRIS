@@ -23,6 +23,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		category: url.searchParams.get('category') ?? '',
 		status: url.searchParams.get('status') ?? ''
 	}
+	const view = url.searchParams.get('view') === 'grid' ? 'grid' : 'list'
 
 	const [allItems, categories, employees] = await Promise.all([
 		listInventory(organizationId, filter),
@@ -40,7 +41,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const pagination = paginate(url, allItems.length, { pageSize: 20 })
 	const items = allItems.slice(pagination.skip, pagination.skip + pagination.take)
 
-	return { items, categories, employees, filter, pagination }
+	return { items, categories, employees, filter, pagination, view }
 }
 
 const itemSchema = z.object({
