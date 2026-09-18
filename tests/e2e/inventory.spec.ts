@@ -19,6 +19,12 @@ test.describe.configure({ mode: 'serial' })
 const SPEC_PREFIX = 'E2E '
 // Disposable items also carry a per-run, per-create suffix, so a leftover row from a failed
 // attempt can never collide with the row the retry creates.
+//
+// `label` is an opaque code, never an English word. A row's accessible name is "Edit " + the
+// item name, so an item called "…delete…" answers to a `{ name: 'Delete' }` role query — which
+// is how the "Delete lives only in the modal" assertion once failed against an innocent row.
+// Every name-bearing role query in this file is `exact: true` for the same reason; these codes
+// are the second lock, so a future non-exact query cannot be defeated by a fixture name.
 const RUN_ID = `${Date.now().toString(36)}${process.pid.toString(36)}`
 let tempSeq = 0
 const tempName = (label: string) => `${SPEC_PREFIX}Temp ${label} ${RUN_ID}-${++tempSeq}`
@@ -59,6 +65,8 @@ const dialog = (page: Page) => page.getByRole('dialog')
 
 async function gotoInventory(page: Page, query = '') {
 	await page.goto(`/inventory${query}`, { waitUntil: 'domcontentloaded' })
+	// The one deliberately non-exact name in this file: it is a page-ready wait, not an
+	// invariant, and the page title row is being reworked elsewhere in this phase.
 	await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
 }
 
@@ -74,19 +82,19 @@ async function openItem(page: Page, name: string) {
 }
 
 async function createItem(page: Page, name: string) {
-	await page.getByRole('button', { name: 'Add item' }).click()
+	await page.getByRole('button', { name: 'Add item', exact: true }).click()
 	const d = dialog(page)
 	await expect(d).toBeVisible()
 	await d.locator('#i-name').fill(name)
-	await d.getByRole('button', { name: 'Create item' }).click()
+	await d.getByRole('button', { name: 'Create item', exact: true }).click()
 	await expect(d).toBeHidden()
 	await expect(row(page, name)).toBeVisible()
 }
 
 async function deleteItem(page: Page, name: string) {
 	const d = await openItem(page, name)
-	await d.getByRole('button', { name: 'Delete' }).click()
-	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
+	await d.getByRole('button', { name: 'Delete', exact: true }).click()
+	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
 	await expect(row(page, name)).toHaveCount(0)
 }
 
@@ -232,12 +240,12 @@ test.describe('Inventory (#114)', () => {
 
 		// Filter to RETIRED → only the retired projector remains.
 		await page.locator('#f-status').selectOption('RETIRED')
-		await page.getByRole('button', { name: 'Filter' }).click()
+		await page.getByRole('button', { name: 'Filter', exact: true }).click()
 		await expect(page).toHaveURL(/status=RETIRED/)
 		await expect(row(page, 'Projector (old)')).toBeVisible()
 		await expect(row(page, 'Office Chair')).toHaveCount(0)
 
-		await page.getByRole('link', { name: 'Clear' }).click()
+		await page.getByRole('link', { name: 'Clear', exact: true }).click()
 		await expect(row(page, 'Office Chair')).toBeVisible()
 	})
 
@@ -293,8 +301,8 @@ test.describe('Inventory (#114)', () => {
 			// Title, Delete and the Save row stay inside the viewport — only the fields scroll.
 			for (const part of [
 				d.locator('#inv-edit-title'),
-				d.getByRole('button', { name: 'Delete' }),
-				d.getByRole('button', { name: 'Save' })
+				d.getByRole('button', { name: 'Delete', exact: true }),
+				d.getByRole('button', { name: 'Save', exact: true })
 			]) {
 				const box = await part.boundingBox()
 				expect(box, `part box at ${size.width}×${size.height}`).not.toBeNull()
@@ -327,16 +335,22 @@ test.describe('Inventory (#114)', () => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
 
-		const toggle = page.getByRole('group', { name: 'View' })
-		await expect(toggle.getByRole('link', { name: 'List' })).toHaveAttribute('aria-current', 'page')
+		const toggle = page.getByRole('group', { name: 'View', exact: true })
+		await expect(toggle.getByRole('link', { name: 'List', exact: true })).toHaveAttribute(
+			'aria-current',
+			'page'
+		)
 		await expect(page.locator(`${LIST_SELECTOR} table`)).toBeVisible()
 		await expect(page.locator(`${LIST_SELECTOR} ul`)).toBeHidden()
 
-		await toggle.getByRole('link', { name: 'Grid' }).click()
+		await toggle.getByRole('link', { name: 'Grid', exact: true }).click()
 		await expect(page).toHaveURL(/view=grid/)
 		await expect(page.locator(`${LIST_SELECTOR} ul`)).toBeVisible()
 		await expect(page.locator(`${LIST_SELECTOR} table`)).toHaveCount(0)
-		await expect(toggle.getByRole('link', { name: 'Grid' })).toHaveAttribute('aria-current', 'page')
+		await expect(toggle.getByRole('link', { name: 'Grid', exact: true })).toHaveAttribute(
+			'aria-current',
+			'page'
+		)
 
 		await page.reload({ waitUntil: 'domcontentloaded' })
 		await expect(page.locator(`${LIST_SELECTOR} ul`)).toBeVisible()
@@ -361,27 +375,27 @@ test.describe('Inventory (#114)', () => {
 	test('add item uses the shared modal', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		const name = tempName('shared-modal')
+		const name = tempName('SM')
 
 		// The old `Add an item` disclosure is gone.
 		await expect(page.locator('details')).toHaveCount(0)
 		await expect(page.locator('#a-name')).toHaveCount(0)
 
-		await page.getByRole('button', { name: 'Add item' }).click()
+		await page.getByRole('button', { name: 'Add item', exact: true }).click()
 		const d = dialog(page)
 		await expect(d).toBeVisible()
-		await expect(d.getByRole('button', { name: 'Create item' })).toBeVisible()
+		await expect(d.getByRole('button', { name: 'Create item', exact: true })).toBeVisible()
 		const createFields = await fieldNamesOf(d)
 		expect(createFields).toEqual(FIELD_NAMES)
 
 		await d.locator('#i-name').fill(name)
-		await d.getByRole('button', { name: 'Create item' }).click()
+		await d.getByRole('button', { name: 'Create item', exact: true }).click()
 		await expect(d).toBeHidden()
 		await expect(row(page, name)).toBeVisible()
 
 		// Edit mode renders the identical field set, with `Save` instead of `Create item`.
 		const edit = await openItem(page, name)
-		await expect(edit.getByRole('button', { name: 'Save' })).toBeVisible()
+		await expect(edit.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
 		expect(await fieldNamesOf(edit)).toEqual(createFields)
 		await page.keyboard.press('Escape')
 		await expect(edit).toBeHidden()
@@ -392,21 +406,23 @@ test.describe('Inventory (#114)', () => {
 	test('delete from the modal, behind a confirm', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		const name = tempName('delete')
+		const name = tempName('DX')
 		await createItem(page, name)
 
 		// Delete exists only inside the modal.
-		await expect(row(page, name).getByRole('button', { name: 'Delete' })).toHaveCount(0)
+		await expect(row(page, name).getByRole('button', { name: 'Delete', exact: true })).toHaveCount(
+			0
+		)
 
 		const d = await openItem(page, name)
-		await d.getByRole('button', { name: 'Delete' }).click()
+		await d.getByRole('button', { name: 'Delete', exact: true }).click()
 
 		// The confirm step stands between the click and the removal.
 		const confirm = page.getByRole('alertdialog')
 		await expect(confirm).toBeVisible()
 		await expect(row(page, name)).toBeVisible()
 
-		await confirm.getByRole('button', { name: 'Delete' }).click()
+		await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
 		await expect(row(page, name)).toHaveCount(0)
 		await expect(d).toBeHidden()
 	})
@@ -414,19 +430,19 @@ test.describe('Inventory (#114)', () => {
 	test('the assign invariant is enforced', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		const name = tempName('invariant')
+		const name = tempName('IV')
 		await createItem(page, name)
 
 		const d = await openItem(page, name)
 		await d.locator('#i-status').selectOption('ASSIGNED')
-		await d.getByRole('button', { name: 'Save' }).click()
+		await d.getByRole('button', { name: 'Save', exact: true }).click()
 
 		// The toaster renders the same words, so this is scoped to the first match.
 		await expect(page.getByText(/Select an employee/).first()).toBeVisible()
 		await expect(d).toBeVisible()
 
 		await d.locator('#i-assigned').selectOption({ index: 1 })
-		await d.getByRole('button', { name: 'Save' }).click()
+		await d.getByRole('button', { name: 'Save', exact: true }).click()
 		await expect(d).toBeHidden()
 
 		await deleteItem(page, name)
@@ -435,13 +451,13 @@ test.describe('Inventory (#114)', () => {
 	test('a rejected save keeps the modal open and the edits', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		const name = tempName('reject')
+		const name = tempName('RJ')
 		await createItem(page, name)
 
 		const d = await openItem(page, name)
 		await d.locator('#i-status').selectOption('ASSIGNED')
 		await d.locator('#i-location').fill('Bench 7')
-		await d.getByRole('button', { name: 'Save' }).click()
+		await d.getByRole('button', { name: 'Save', exact: true }).click()
 		await expect(page.getByText(/Select an employee/).first()).toBeVisible()
 
 		// The modal is still open AND the user's edits are still there. With `update()` left at
@@ -451,7 +467,7 @@ test.describe('Inventory (#114)', () => {
 		await expect(d.locator('#i-location')).toHaveValue('Bench 7')
 
 		await d.locator('#i-assigned').selectOption({ index: 1 })
-		await d.getByRole('button', { name: 'Save' }).click()
+		await d.getByRole('button', { name: 'Save', exact: true }).click()
 		await expect(d).toBeHidden()
 
 		await deleteItem(page, name)
@@ -473,7 +489,7 @@ test.describe('Inventory (#114)', () => {
 
 		// Save without touching the assignee.
 		await d.locator('#i-serial').fill('ZZ-INV-SERIAL')
-		await d.getByRole('button', { name: 'Save' }).click()
+		await d.getByRole('button', { name: 'Save', exact: true }).click()
 		await expect(d).toBeHidden()
 
 		const reopened = await openItem(page, FIXTURE_NAME)
@@ -491,7 +507,7 @@ test.describe('Inventory (#114)', () => {
 
 		// Change a DIFFERENT field and save.
 		await d.locator('#i-location').fill('Storeroom B')
-		await d.getByRole('button', { name: 'Save' }).click()
+		await d.getByRole('button', { name: 'Save', exact: true }).click()
 		await expect(d).toBeHidden()
 
 		const reopened = await openItem(page, FIXTURE_NAME)
@@ -502,12 +518,12 @@ test.describe('Inventory (#114)', () => {
 	test('focus after a delete lands on the list', async ({ page }) => {
 		await login(page, USERS.admin)
 		await gotoInventory(page)
-		const name = tempName('focus')
+		const name = tempName('FC')
 		await createItem(page, name)
 
 		const d = await openItem(page, name)
-		await d.getByRole('button', { name: 'Delete' }).click()
-		await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
+		await d.getByRole('button', { name: 'Delete', exact: true }).click()
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
 		await expect(row(page, name)).toHaveCount(0)
 		await expect(d).toBeHidden()
 
