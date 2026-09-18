@@ -1,7 +1,7 @@
 // One-off: seed a fully-detailed employee with leave balance, an active loan, and an
 // active cash advance so the Separation → final-pay computation has data to show.
 //
-//   pnpm tsx scripts/seed-separation-demo.ts
+//   bunx tsx scripts/seed-separation-demo.ts
 //
 // Numbers are chosen to be trivially checkable:
 //   basic monthly 44,000 → daily rate 44,000 / 22 = 2,000.00
@@ -21,7 +21,7 @@ const db = new PrismaClient()
 
 async function main() {
 	const org = await db.organization.findFirst()
-	if (!org) throw new Error('No organization — run `pnpm db:seed` first.')
+	if (!org) throw new Error('No organization — run `bun run db:seed` first.')
 
 	const dept = await db.department.findFirst({ where: { organizationId: org.id } })
 	if (!dept) throw new Error('No department found for the organization.')

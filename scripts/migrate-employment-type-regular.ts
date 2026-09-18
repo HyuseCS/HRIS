@@ -1,6 +1,6 @@
 // One-off: rename the EmploymentType value FULL_TIME → REGULAR (#172).
 //
-//   pnpm tsx scripts/migrate-employment-type-regular.ts
+//   bunx tsx scripts/migrate-employment-type-regular.ts
 //
 // Run this BEFORE `prisma db push` on any database that already holds data. Postgres can rename
 // an enum value in place, preserving every row that uses it — but Prisma's push cannot express
@@ -64,7 +64,7 @@ async function main() {
 	await db.$executeRawUnsafe(`ALTER TYPE "EmploymentType" RENAME VALUE 'FULL_TIME' TO 'REGULAR'`)
 	const count = await db.employee.count({ where: { employmentType: 'REGULAR' } })
 	console.log(`✔ Renamed FULL_TIME → REGULAR. ${count} employee(s) now read as REGULAR.`)
-	console.log('  Run `pnpm db:push` next to add the new ON_CALL and INTERN values.')
+	console.log('  Run `bun run db:push` next to add the new ON_CALL and INTERN values.')
 }
 
 main()

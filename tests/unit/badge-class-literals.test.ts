@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 /**
- * Two badge CSS contracts, both invisible to `pnpm check` because the markup is valid either way.
+ * Two badge CSS contracts, both invisible to `bun run check` because the markup is valid either way.
  *
  * 1. PURGING. Tailwind emits a `@layer components` rule only when its class name appears LITERALLY
  *    in a file matched by `content` in `tailwind.config.ts`. `Badge.svelte` used to build the class
@@ -69,7 +69,7 @@ describe('badge class literals survive Tailwind purging', () => {
  * This block guards the SOURCE rule in `src/app.css` — nothing more. It does NOT prove the dot
  * reaches the shipped stylesheet. That was verified once by hand on 2026-09-04 with:
  *
- *   rm -rf build && pnpm build
+ *   rm -rf build && bun run build
  *   grep -o '\.badge[a-zA-Z-]*:before{' build/client/_app/immutable/assets/*.css
  *
  * which returned a `:before` for `.badge` and all five tones. If a Tailwind upgrade ever changes

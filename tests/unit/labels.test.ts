@@ -62,7 +62,7 @@ import {
  * from `@prisma/client`, so adding a member to `prisma/schema.prisma` turns this file red.
  *
  * The maps are also typed `Record<Enum, string>`, so a missing key is a compile error too. That is
- * deliberate belt-and-braces: the type check only runs under `pnpm check`, and CI runs format
+ * deliberate belt-and-braces: the type check only runs under `bun run check`, and CI runs format
  * first and skips the rest on failure.
  */
 

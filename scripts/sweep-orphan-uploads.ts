@@ -3,9 +3,9 @@
 // disk against the storageKeys in employee_documents + request_documents and removes
 // the strays. The reverse (row without file) is already tolerated by deleteStoredFile.
 //
-//   pnpm tsx scripts/sweep-orphan-uploads.ts                 # dry run (lists orphans)
-//   pnpm tsx scripts/sweep-orphan-uploads.ts --delete        # actually remove them
-//   pnpm tsx scripts/sweep-orphan-uploads.ts --delete --grace-minutes=15
+//   bunx tsx scripts/sweep-orphan-uploads.ts                 # dry run (lists orphans)
+//   bunx tsx scripts/sweep-orphan-uploads.ts --delete        # actually remove them
+//   bunx tsx scripts/sweep-orphan-uploads.ts --delete --grace-minutes=15
 //
 // A grace period (default 60 min) skips very recent files so a sweep can't race an
 // in-flight upload whose row hasn't committed yet.

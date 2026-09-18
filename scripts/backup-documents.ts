@@ -5,8 +5,8 @@
 // prunes to the org's retention setting, and notifies that org's system administrators
 // when a run is not clean.
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/backup-documents.ts --dry-run
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/backup-documents.ts --force
+//   bunx dotenv -e .env.dev -- tsx scripts/backup-documents.ts --dry-run
+//   bunx dotenv -e .env.dev -- tsx scripts/backup-documents.ts --force
 //
 // Runs nightly from the droplet crontab (see scripts/README.md) — the app has no
 // scheduler. Schedule and retention are per organization and edited at

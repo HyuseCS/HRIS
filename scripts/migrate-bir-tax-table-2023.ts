@@ -1,7 +1,7 @@
 // One-off: move every seeded StatutoryRateConfig from the 2018 TRAIN withholding table to the one
 // in force since 1 Jan 2023.
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-bir-tax-table-2023.ts
+//   bunx dotenv -e .env.dev -- tsx scripts/migrate-bir-tax-table-2023.ts
 //
 // The engine default and the seed are already the 2023 table; existing rows are not, because the
 // seed upsert leaves existing rows untouched (`update: {}`). A row still on the 2018 rates

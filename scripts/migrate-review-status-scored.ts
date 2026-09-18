@@ -1,7 +1,7 @@
 // One-off: rename the ReviewStatus value MANAGER_REVIEW → SCORED (#178, Phase 2).
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-review-status-scored.ts
-//   pnpm db:push
+//   bunx dotenv -e .env.dev -- tsx scripts/migrate-review-status-scored.ts
+//   bun run db:push
 //
 // Run this BEFORE `prisma db push` on any database that already holds data. Postgres can
 // rename an enum value in place, preserving every row that uses it — but Prisma's push cannot
@@ -73,7 +73,7 @@ async function main() {
 	// The normal path: rename in place. Every row keeps its value, no rewrite, no downtime.
 	await db.$executeRawUnsafe(`ALTER TYPE "ReviewStatus" RENAME VALUE 'MANAGER_REVIEW' TO 'SCORED'`)
 	console.log(`✔ Renamed MANAGER_REVIEW → SCORED. ${Number(count)} review(s) now read as SCORED.`)
-	console.log('  Run `pnpm db:push` next to add the new SIGNING value.')
+	console.log('  Run `bun run db:push` next to add the new SIGNING value.')
 }
 
 main()

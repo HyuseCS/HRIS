@@ -333,7 +333,7 @@ describe('complaints list scoping (#112)', () => {
 })
 
 /**
- * `pnpm check` proves `actorRoles` is PRESENT, never that it is COMPLETE — `actorRoles:
+ * `bun run check` proves `actorRoles` is PRESENT, never that it is COMPLETE — `actorRoles:
  * [user.roles[0]]` type-checks perfectly clean. That narrowing is the #247/#272/#275 failure class,
  * and a single-role fixture would hide it, hence the two-hat actor.
  */

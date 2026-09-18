@@ -1,7 +1,7 @@
 // One-off: add the `review_cycles` composite unique index on (organizationId, startDate, endDate)
 // (#178).
 //
-//   pnpm tsx scripts/migrate-review-cycle-period-key.ts
+//   bunx tsx scripts/migrate-review-cycle-period-key.ts
 //
 // Run this BEFORE `prisma db push` on any database that already holds review cycles. Push CAN add
 // the index, but it refuses to add a unique constraint to a populated table without
@@ -82,7 +82,7 @@ async function main() {
 	)
 
 	console.log(`✔ ${INDEX} is in place.`)
-	console.log('  Run `pnpm db:push` next.')
+	console.log('  Run `bun run db:push` next.')
 }
 
 main()

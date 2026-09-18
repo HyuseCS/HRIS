@@ -1,7 +1,7 @@
 // Remove employees left behind by E2E runs.
 //
-//   pnpm tsx scripts/clean-e2e-employees.ts           # list what would go
-//   pnpm tsx scripts/clean-e2e-employees.ts --apply   # delete it
+//   bunx tsx scripts/clean-e2e-employees.ts           # list what would go
+//   bunx tsx scripts/clean-e2e-employees.ts --apply   # delete it
 //
 // The suite onboards a real employee on each run and its teardown is deliberately best-effort:
 // payroll compute in a concurrently running spec attaches a payroll entry to whatever is ACTIVE,

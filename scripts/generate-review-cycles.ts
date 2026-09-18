@@ -3,8 +3,8 @@
 // chance to generate. It creates the next ReviewCycle as ACTIVE, opens a review for every
 // active employee that can have one, and notifies each of them.
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/generate-review-cycles.ts --dry-run
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/generate-review-cycles.ts --force
+//   bunx dotenv -e .env.dev -- tsx scripts/generate-review-cycles.ts --dry-run
+//   bunx dotenv -e .env.dev -- tsx scripts/generate-review-cycles.ts --force
 //
 // Runs nightly from the droplet crontab (see scripts/README.md) — the app has no scheduler.
 //
@@ -59,7 +59,7 @@ async function main() {
 	})
 	if (!systemUser) {
 		console.error(
-			`No ${SYSTEM_EMAIL} user found — the audit trail needs it. Run \`pnpm db:seed\` first.`
+			`No ${SYSTEM_EMAIL} user found — the audit trail needs it. Run \`bun run db:seed\` first.`
 		)
 		process.exit(1)
 	}
