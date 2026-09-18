@@ -29,7 +29,14 @@
 
 	// One guard per board row (#117) so saving one channel doesn't freeze the others.
 	const channelGuards: Record<string, ReturnType<typeof submitFeedback>> = {}
-	const channelGuard = (id: string) => (channelGuards[id] ??= submitFeedback({ error: null }))
+	const channelGuard = (id: string) =>
+		(channelGuards[id] ??= submitFeedback({
+			error: null,
+			inner:
+				() =>
+				async ({ update }) =>
+					await update({ reset: false })
+		}))
 
 	const { posting, applicants, userRoles, boards, postedCount, stillLive } = $derived(data)
 
@@ -104,52 +111,54 @@
 			</div>
 
 			<!-- The posting actions sit under the summary they act on, not on the title row. -->
-			<div class="flex flex-wrap justify-end gap-2">
-				{#if posting.status === 'OPEN'}
-					<a
-						href="/recruitment/{posting.id}/apply"
-						class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-					>
-						Add Applicant
-					</a>
-				{/if}
-				{#if isHrAdmin}
+			{#if posting.status === 'OPEN' || isHrAdmin}
+				<div class="flex flex-wrap justify-end gap-2">
 					{#if posting.status === 'OPEN'}
-						<form method="POST" action="?/updateStatus" use:enhance={closePosting.enhance}>
-							<input type="hidden" name="status" value="CLOSED" />
-							<button
-								type="submit"
-								disabled={closePosting.busy}
-								class="rounded-md border px-4 py-2 text-sm font-medium text-destructive border-destructive/30 hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
-							>
-								{closePosting.busy ? 'Closing…' : 'Close Posting'}
-							</button>
-						</form>
-					{:else if posting.status === 'DRAFT'}
-						<form method="POST" action="?/updateStatus" use:enhance={publishPosting.enhance}>
-							<input type="hidden" name="status" value="OPEN" />
-							<button
-								type="submit"
-								disabled={publishPosting.busy}
-								class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-							>
-								{publishPosting.busy ? 'Publishing…' : 'Publish'}
-							</button>
-						</form>
-					{:else if posting.status === 'CLOSED'}
-						<form method="POST" action="?/updateStatus" use:enhance={reopenPosting.enhance}>
-							<input type="hidden" name="status" value="OPEN" />
-							<button
-								type="submit"
-								disabled={reopenPosting.busy}
-								class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-							>
-								{reopenPosting.busy ? 'Reopening…' : 'Reopen'}
-							</button>
-						</form>
+						<a
+							href="/recruitment/{posting.id}/apply"
+							class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+						>
+							Add Applicant
+						</a>
 					{/if}
-				{/if}
-			</div>
+					{#if isHrAdmin}
+						{#if posting.status === 'OPEN'}
+							<form method="POST" action="?/updateStatus" use:enhance={closePosting.enhance}>
+								<input type="hidden" name="status" value="CLOSED" />
+								<button
+									type="submit"
+									disabled={closePosting.busy}
+									class="rounded-md border px-4 py-2 text-sm font-medium text-destructive border-destructive/30 hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
+								>
+									{closePosting.busy ? 'Closing…' : 'Close Posting'}
+								</button>
+							</form>
+						{:else if posting.status === 'DRAFT'}
+							<form method="POST" action="?/updateStatus" use:enhance={publishPosting.enhance}>
+								<input type="hidden" name="status" value="OPEN" />
+								<button
+									type="submit"
+									disabled={publishPosting.busy}
+									class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+								>
+									{publishPosting.busy ? 'Publishing…' : 'Publish'}
+								</button>
+							</form>
+						{:else if posting.status === 'CLOSED'}
+							<form method="POST" action="?/updateStatus" use:enhance={reopenPosting.enhance}>
+								<input type="hidden" name="status" value="OPEN" />
+								<button
+									type="submit"
+									disabled={reopenPosting.busy}
+									class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+								>
+									{reopenPosting.busy ? 'Reopening…' : 'Reopen'}
+								</button>
+							</form>
+						{/if}
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		{#if posting.description}

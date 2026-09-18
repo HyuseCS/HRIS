@@ -41,37 +41,33 @@
 
 {#snippet notices()}
 	<!-- The submit action sits above the list it publishes into, not on the title row. -->
-	<div class="flex flex-wrap items-center justify-end gap-2">
-		<div class="flex items-center gap-2">
-			{#if selectedDraftIds.length}
-				<form
-					method="POST"
-					action="?/submitMany"
-					use:enhance={() => {
-						publishing = true
-						return async ({ update }) => {
-							selectedIds = []
-							await update()
-							publishing = false
-						}
-					}}
+	{#if selectedDraftIds.length}
+		<div class="flex flex-wrap items-center justify-end gap-2">
+			<form
+				method="POST"
+				action="?/submitMany"
+				use:enhance={() => {
+					publishing = true
+					return async ({ update }) => {
+						selectedIds = []
+						await update()
+						publishing = false
+					}
+				}}
+			>
+				{#each selectedDraftIds as id (id)}
+					<input type="hidden" name="ids" value={id} />
+				{/each}
+				<button
+					type="submit"
+					disabled={publishing}
+					class="rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					{#each selectedDraftIds as id (id)}
-						<input type="hidden" name="ids" value={id} />
-					{/each}
-					<button
-						type="submit"
-						disabled={publishing}
-						class="rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-					>
-						{publishing
-							? 'Submitting…'
-							: `Submit selected for approval (${selectedDraftIds.length})`}
-					</button>
-				</form>
-			{/if}
+					{publishing ? 'Submitting…' : `Submit selected for approval (${selectedDraftIds.length})`}
+				</button>
+			</form>
 		</div>
-	</div>
+	{/if}
 
 	{#if form?.success && form.message}
 		<div
