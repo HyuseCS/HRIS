@@ -20,15 +20,16 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader
-		title="Separations"
-		description="Record resignations and terminations, run clearance, and settle final pay."
-	/>
-
-	<div class="flex justify-end">
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader
+				title="Separations"
+				description="Record resignations and terminations, run clearance, and settle final pay."
+			/>
+		</div>
 		<button
 			onclick={() => (showForm = true)}
-			class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+			class="inline-flex h-9 shrink-0 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		>
 			New Separation
 		</button>
