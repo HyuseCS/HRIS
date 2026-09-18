@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
+	import HelpTip from './HelpTip.svelte'
 
 	// One page title treatment for every route. Before this the app carried six different
 	// heading class strings across 52 pages, plus a legacy pair of CSS utility classes used on
@@ -35,10 +36,10 @@
 		<div class="relative flex flex-wrap items-center gap-2">
 			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
 			{#if badge}{@render badge()}{/if}
+			{#if description}
+				<HelpTip label={`About ${title}`}>{description}</HelpTip>
+			{/if}
 		</div>
-		{#if description}
-			<p class="max-w-2xl text-sm text-muted-foreground">{description}</p>
-		{/if}
 	</div>
 	{#if back}
 		<div
