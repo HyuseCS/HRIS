@@ -17,6 +17,7 @@ import { login, USERS } from './helpers'
 const STAMP = Date.now()
 const PROBIE = `E2E-LAYOUT-probie-${STAMP}`
 const PROBIE_EMAIL = `e2e_layout_${STAMP}@veent.ph`
+const POSTING = `E2E-LAYOUT-posting-${STAMP}`
 
 /** startDate + 6 months is already past, so the row is inside the 21-day notice window. */
 function probationStartDate() {
@@ -50,10 +51,13 @@ async function boundsOf(panel: Locator) {
 	return panel.evaluate((el) => {
 		const list = el.querySelector('ul')
 		if (!list) throw new Error('panel has no row list')
+		const box = el.getBoundingClientRect()
 		return {
 			overflowY: getComputedStyle(list).overflowY,
-			height: el.getBoundingClientRect().height,
-			cap: window.innerHeight * 0.7
+			height: box.height,
+			bottom: box.bottom,
+			cap: Number.parseFloat(getComputedStyle(el).maxHeight),
+			viewport: window.innerHeight
 		}
 	})
 }
@@ -77,12 +81,15 @@ test.describe('(a) the decision panels are bounded and scroll their rows', () =>
 				where: { user: { email: PROBIE_EMAIL } },
 				data: { employmentStatus: 'OFFBOARDED' }
 			})
+			await db.jobPosting.deleteMany({ where: { title: POSTING } })
 		} finally {
 			await db.$disconnect()
 		}
 	})
 
-	test('the regularizations panel stops at 70vh and scrolls its list', async ({ page }) => {
+	test('the regularizations panel stays inside the viewport and scrolls its list', async ({
+		page
+	}) => {
 		await login(page, USERS.admin)
 
 		await page.goto('/employees/new', { waitUntil: 'domcontentloaded' })
@@ -110,24 +117,52 @@ test.describe('(a) the decision panels are bounded and scroll their rows', () =>
 
 		const bounds = await boundsOf(panel)
 		expect(bounds.overflowY).toBe('auto')
+		expect(bounds.cap).toBeGreaterThan(0)
 		expect(bounds.height).toBeLessThanOrEqual(bounds.cap + 0.5)
+		expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewport + 0.5)
 	})
 
-	test('the postings panel stops at 70vh and scrolls its list', async ({ page }) => {
-		// No fixture: this card is driven by whatever listPostingsAwaitingApprover already
-		// returns for the account under test. Building one would rewrite the department
-		// mapping posting-approver-sod.spec.ts owns and restores, and that spec races this
-		// one whenever workers > 1.
-		await login(page, USERS.hr)
+	test('the postings panel stays inside the viewport and scrolls its list', async ({ browser }) => {
+		// Its own fixture: reading whatever listPostingsAwaitingApprover already returns passed
+		// locally on a dev database full of residue and failed on a freshly seeded CI one. HR
+		// files the posting into Human Resources — a department posting-approver-sod.spec.ts
+		// never maps, so it falls back to HR — and the SUBMITTER cannot decide it, which is why
+		// the panel is read as admin.
+		const hrCtx = await browser.newContext()
+		const hr = await hrCtx.newPage()
+		await login(hr, USERS.hr)
+		await hr.goto('/recruitment', { waitUntil: 'domcontentloaded' })
+		await hr
+			.getByRole('button', { name: /New Job Posting|Create/i })
+			.first()
+			.click()
+		await hr.getByLabel('Job Title').fill(POSTING)
+		await hr.getByLabel('Department').selectOption({ label: 'Human Resources' })
+		await hr.getByLabel('Description').fill('E2E fixture for the dashboard postings panel.')
+		await hr.getByRole('button', { name: 'Create Draft' }).click()
+		const row = hr.locator('tr', { hasText: POSTING })
+		await expect(row).toBeVisible()
+		await row.locator('input[type="checkbox"]').check()
+		await hr.getByRole('button', { name: /Submit selected for approval/ }).click()
+		await expect(hr.locator('tr', { hasText: POSTING })).toContainText(/PENDING|Pending/i)
+		await hrCtx.close()
+
+		const adminCtx = await browser.newContext()
+		const page = await adminCtx.newPage()
+		await login(page, USERS.admin)
 		const button = decisionButton(page, /postings awaiting your approval$/)
 		await expect(button).toBeVisible()
 		expect(await badgeCount(button)).toBeGreaterThanOrEqual(1)
 
 		const panel = await openPanel(page, button, 'Postings awaiting your approval')
+		await expect(panel.getByText(POSTING)).toBeVisible()
 
 		const bounds = await boundsOf(panel)
 		expect(bounds.overflowY).toBe('auto')
+		expect(bounds.cap).toBeGreaterThan(0)
 		expect(bounds.height).toBeLessThanOrEqual(bounds.cap + 0.5)
+		expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewport + 0.5)
+		await adminCtx.close()
 	})
 })
 

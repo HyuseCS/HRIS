@@ -143,6 +143,8 @@
 					type="button"
 					onclick={() => (openPanel = openPanel === 'regularizations' ? null : 'regularizations')}
 					aria-expanded={openPanel === 'regularizations'}
+					aria-controls="panel-regularizations"
+					aria-haspopup="true"
 					aria-label="{data.regularizations.length} upcoming regularizations"
 					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
 				>
@@ -175,6 +177,8 @@
 					type="button"
 					onclick={() => (openPanel = openPanel === 'postings' ? null : 'postings')}
 					aria-expanded={openPanel === 'postings'}
+					aria-controls="panel-postings"
+					aria-haspopup="true"
 					aria-label="{data.postingsToApprove.length} postings awaiting your approval"
 					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
 				>
@@ -207,6 +211,8 @@
 					type="button"
 					onclick={() => (openPanel = openPanel === 'awaiting' ? null : 'awaiting')}
 					aria-expanded={openPanel === 'awaiting'}
+					aria-controls="panel-awaiting"
+					aria-haspopup="true"
 					aria-label="{metrics.pendingApprovals} awaiting your decision"
 					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
 				>
@@ -237,9 +243,10 @@
 			<!-- Upcoming regularizations — HR's advance warning (#168) -->
 			{#if openPanel === 'regularizations'}
 				<div
+					id="panel-regularizations"
 					role="region"
 					aria-label="Upcoming Regularizations"
-					class="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col gap-3 overflow-visible rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
+					class="absolute right-0 top-full z-50 mt-2 flex max-h-[calc(100dvh-9rem)] w-[calc(100vw-2rem)] flex-col gap-3 overflow-visible rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
 				>
 					<div class="relative flex items-center gap-2">
 						<h2 class="text-sm font-semibold">Upcoming Regularizations</h2>
@@ -278,9 +285,10 @@
 				<!-- Job postings awaiting your approval (#195) -->
 			{:else if openPanel === 'postings'}
 				<div
+					id="panel-postings"
 					role="region"
 					aria-label="Postings awaiting your approval"
-					class="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
+					class="absolute right-0 top-full z-50 mt-2 flex max-h-[calc(100dvh-9rem)] w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
 				>
 					<h2 class="text-sm font-semibold">Postings awaiting your approval</h2>
 					<!-- Scoped: with the award panel open, a posting failure used to render under
@@ -353,9 +361,10 @@
 			     doing. -->
 			{:else if openPanel === 'awaiting'}
 				<div
+					id="panel-awaiting"
 					role="region"
 					aria-label="Awaiting you"
-					class="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
+					class="absolute right-0 top-full z-50 mt-2 flex max-h-[calc(100dvh-9rem)] w-[calc(100vw-2rem)] flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 shadow-2xl sm:w-96"
 				>
 					<h2 class="text-sm font-semibold">Awaiting you</h2>
 					{#if data.pendingItems.length === 0}
@@ -382,6 +391,11 @@
 								</li>
 							{/each}
 						</ul>
+						{#if metrics.pendingApprovals > data.pendingItems.length}
+							<a href="/requests/approvals" class="block pt-2 text-xs text-primary hover:underline"
+								>View all {metrics.pendingApprovals}</a
+							>
+						{/if}
 					{/if}
 				</div>
 			{/if}
@@ -467,7 +481,7 @@
 				</p>
 				<p class="text-xs text-muted-foreground">
 					{metrics.pendingRequests} requests · {metrics.pendingTimesheets} timesheets · {metrics.pendingPayrollRuns}
-					payroll
+					payroll · {metrics.pendingProposals} pay changes
 				</p>
 			</a>
 

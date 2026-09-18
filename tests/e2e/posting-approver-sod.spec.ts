@@ -61,7 +61,7 @@ async function openPostings(page: Page) {
 	const button = page
 		.getByRole('main')
 		.getByRole('button', { name: /postings awaiting your approval$/ })
-	if ((await button.count()) === 0) return
+	await expect(button).toBeVisible()
 	const panel = page.getByRole('region', { name: 'Postings awaiting your approval' })
 	await expect(async () => {
 		await button.click()

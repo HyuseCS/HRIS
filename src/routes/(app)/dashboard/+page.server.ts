@@ -4,7 +4,7 @@ import { db } from '$lib/server/db'
 import { manilaDayKey } from '$lib/utils/dates'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { listRecentAnnouncements, createAnnouncement } from '$lib/server/services/announcements'
-import { countPendingApprovals, listPendingApprovals } from '$lib/server/services/approvals'
+import { listPendingApprovals } from '$lib/server/services/approvals'
 import { listRecent } from '$lib/server/services/notifications'
 import { grantAward, listRecentAwards } from '$lib/server/services/awards'
 import {
@@ -32,46 +32,40 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const todayKey = manilaDayKey(new Date())
 	const today = new Date(`${todayKey}T00:00:00Z`)
 
-	const [headcount, onLeaveToday, pending, pendingItems, lastPayrollRun, attendanceGroups] =
-		await Promise.all([
-			db.employee.count({
-				where: { organizationId: orgId, employmentStatus: 'ACTIVE' }
-			}),
-			// Employees on approved leave that spans today.
-			db.request.count({
-				where: {
-					employee: { organizationId: orgId },
-					type: 'LEAVE',
-					status: 'APPROVED',
-					dateFrom: { lte: today },
-					dateTo: { gte: today }
-				}
-			}),
-			// Items awaiting THIS user's decision — requests, timesheets, and payroll runs
-			// (#134) — the same per-user, stage-aware count the sidebar badge uses, so the two
-			// always agree. A payroll run pending sign-off now shows here (previously missing).
-			countPendingApprovals({
-				id: user.id,
-				roles: user.roles,
-				organizationId: orgId
-			}),
-			listPendingApprovals({
-				id: user.id,
-				roles: user.roles,
-				organizationId: orgId
-			}),
-			db.payrollRun.findFirst({
-				where: { organizationId: orgId },
-				orderBy: { createdAt: 'desc' },
-				select: { periodStart: true, periodEnd: true, status: true, totalNet: true }
-			}),
-			// Today's derived attendance, grouped by status.
-			db.attendanceDay.groupBy({
-				by: ['status'],
-				where: { date: today, employee: { organizationId: orgId } },
-				_count: { _all: true }
-			})
-		])
+	const [headcount, onLeaveToday, pending, lastPayrollRun, attendanceGroups] = await Promise.all([
+		db.employee.count({
+			where: { organizationId: orgId, employmentStatus: 'ACTIVE' }
+		}),
+		// Employees on approved leave that spans today.
+		db.request.count({
+			where: {
+				employee: { organizationId: orgId },
+				type: 'LEAVE',
+				status: 'APPROVED',
+				dateFrom: { lte: today },
+				dateTo: { gte: today }
+			}
+		}),
+		// Items awaiting THIS user's decision — requests, timesheets, and payroll runs
+		// (#134) — the same per-user, stage-aware count the sidebar badge uses, so the two
+		// always agree. A payroll run pending sign-off now shows here (previously missing).
+		listPendingApprovals({
+			id: user.id,
+			roles: user.roles,
+			organizationId: orgId
+		}),
+		db.payrollRun.findFirst({
+			where: { organizationId: orgId },
+			orderBy: { createdAt: 'desc' },
+			select: { periodStart: true, periodEnd: true, status: true, totalNet: true }
+		}),
+		// Today's derived attendance, grouped by status.
+		db.attendanceDay.groupBy({
+			by: ['status'],
+			where: { date: today, employee: { organizationId: orgId } },
+			_count: { _all: true }
+		})
+	])
 
 	const attStatus = (s: string) => attendanceGroups.find((g) => g.status === s)?._count._all ?? 0
 	const attendance = {
@@ -149,15 +143,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		postingsToApprove,
 		recentActivity,
 		upcomingEvents,
-		pendingItems,
+		pendingItems: pending.items,
 		metrics: {
 			headcount,
 			onLeaveToday,
-			pendingApprovals: pending.total,
-			pendingRequests: pending.requests,
-			pendingTimesheets: pending.timesheets,
-			pendingPayrollRuns: pending.payrollRuns,
-			pendingProposals: pending.proposals,
+			pendingApprovals: pending.counts.total,
+			pendingRequests: pending.counts.requests,
+			pendingTimesheets: pending.counts.timesheets,
+			pendingPayrollRuns: pending.counts.payrollRuns,
+			pendingProposals: pending.counts.proposals,
 			// Withhold payroll figures from clients that may not view them.
 			lastPayrollRun: canViewPayroll ? lastPayrollRun : null,
 			attendance

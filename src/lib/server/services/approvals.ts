@@ -479,6 +479,8 @@ export async function countPendingApprovals(user: {
 	}
 }
 
+const PENDING_ITEM_LIMIT = 20
+
 export interface PendingApprovalItem {
 	id: string
 	href: string
@@ -491,9 +493,13 @@ export async function listPendingApprovals(user: {
 	id: string
 	roles: Role[]
 	organizationId: string
-}): Promise<PendingApprovalItem[]> {
+}): Promise<{ items: PendingApprovalItem[]; counts: PendingApprovalCounts }> {
 	const roles = user.roles
-	if (!canAny(roles, 'APPROVE_REQUESTS')) return []
+	if (!canAny(roles, 'APPROVE_REQUESTS'))
+		return {
+			items: [],
+			counts: { timesheets: 0, requests: 0, payrollRuns: 0, proposals: 0, total: 0 }
+		}
 
 	const myEmployee = await db.employee.findFirst({
 		where: { userId: user.id, organizationId: user.organizationId },
@@ -514,7 +520,7 @@ export async function listPendingApprovals(user: {
 		listActionableProposals(user.organizationId, { actorId: user.id, roles })
 	])
 
-	return [
+	const items = [
 		...requests.map((r) => ({
 			id: r.id,
 			href: `/requests/${r.id}?from=/dashboard`,
@@ -544,6 +550,17 @@ export async function listPendingApprovals(user: {
 			person: null
 		}))
 	]
+
+	return {
+		items: items.slice(0, PENDING_ITEM_LIMIT),
+		counts: {
+			timesheets: timesheets.length,
+			requests: requests.length,
+			payrollRuns: payrollRuns.length,
+			proposals: proposals.length,
+			total: timesheets.length + requests.length + payrollRuns.length + proposals.length
+		}
+	}
 }
 
 // COMPUTED payroll runs whose live maker-checker stage this user can sign off (#134).
