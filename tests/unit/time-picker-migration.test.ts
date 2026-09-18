@@ -37,14 +37,14 @@ describe('F11a — every native type="time" input is migrated to TimePicker', ()
 		const files = sourceFiles().map((path) => path.slice(SRC.length + 1))
 
 		expect(files.length).toBeGreaterThan(100)
-		expect(files).toContain('routes/(app)/attendance/+page.svelte')
+		expect(files).toContain('lib/components/attendance/AttendanceHrGrid.svelte')
 		expect(files).toContain('lib/components/timesheets/TimesheetModal.svelte')
 		expect(files).toContain('routes/(app)/settings/schedules/+page.svelte')
 		expect(files).toContain('routes/(app)/recruitment/applicant/[applicantId]/+page.svelte')
 	})
 
 	const CALL_SITES: { file: string; count: number }[] = [
-		{ file: 'routes/(app)/attendance/+page.svelte', count: 4 },
+		{ file: 'lib/components/attendance/AttendanceHrGrid.svelte', count: 4 },
 		{ file: 'lib/components/timesheets/TimesheetModal.svelte', count: 2 },
 		{ file: 'routes/(app)/settings/schedules/+page.svelte', count: 2 },
 		{ file: 'routes/(app)/recruitment/applicant/[applicantId]/+page.svelte', count: 1 }

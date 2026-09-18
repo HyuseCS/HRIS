@@ -297,7 +297,7 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'attendance resetDay',
-		page: 'routes/(app)/attendance/+page.svelte',
+		page: 'lib/components/attendance/AttendanceHrGrid.svelte',
 		server: 'routes/(app)/attendance/+page.server.ts',
 		action: 'resetDay',
 		surface: 'toast',
@@ -307,7 +307,7 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'attendance saveAll',
-		page: 'routes/(app)/attendance/+page.svelte',
+		page: 'lib/components/attendance/AttendanceHrGrid.svelte',
 		server: 'routes/(app)/attendance/+page.server.ts',
 		action: 'saveAll',
 		surface: 'documented-double',
@@ -322,7 +322,7 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'attendance resetAll',
-		page: 'routes/(app)/attendance/+page.svelte',
+		page: 'lib/components/attendance/AttendanceHrGrid.svelte',
 		server: 'routes/(app)/attendance/+page.server.ts',
 		action: 'resetAll',
 		surface: 'documented-double',
