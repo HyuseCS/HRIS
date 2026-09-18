@@ -9,7 +9,7 @@
 #   docker compose down -v             # stop AND delete the db volume (wipes data)
 #
 # First run only — seed the database once the stack is up (minimal prod seed):
-#   docker compose run --rm app pnpm exec tsx prisma/seed.ts
+#   docker compose run --rm app bunx tsx prisma/seed.ts
 #
 # 512MB box: add swap first, or Postgres + app + bot will OOM.
 #   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
@@ -67,7 +67,7 @@ services:
   # Discord time-tracking bot — a separate long-running process, not part of `node build`.
   # Reuses the app image (tsx + scripts/ are baked in). Requires DISCORD_BOT_TOKEN in
   # .env.prod; if you stop running a bot, delete this service (and leave the token unset).
-  # Calls tsx directly (not `pnpm bot`, which is wrapped for .env.dev) since compose
+  # Calls tsx directly (not `bun run bot`, which is wrapped for .env.dev) since compose
   # injects env from env_file.
   bot:
     image: ghcr.io/aguynamedkent7/veent-hris:latest
@@ -75,7 +75,7 @@ services:
     env_file: .env.prod
     depends_on:
       - app
-    command: pnpm exec tsx scripts/discord-bot.ts
+    command: bunx tsx scripts/discord-bot.ts
 
 volumes:
   pgdata:

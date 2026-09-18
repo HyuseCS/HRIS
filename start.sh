@@ -94,7 +94,7 @@ fi
 echo "==> Syncing Prisma schema..."
 # Load .env.dev explicitly: this calls prisma directly (not the db:push npm script),
 # and prisma only auto-loads a file literally named .env, which no longer exists.
-pnpm exec dotenv -e .env.dev -- prisma db push --skip-generate
+bunx dotenv -e .env.dev -- prisma db push --skip-generate
 
 echo "==> Checking if seed is needed..."
 ORG_COUNT=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -p "${DB_PORT}" -tc \
@@ -103,8 +103,8 @@ ORG_COUNT=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -p "
 if [ "${ORG_COUNT}" = "0" ] || [ -z "${ORG_COUNT}" ]; then
   echo "==> Seeding database..."
   # Local dev uses the full roster (manager/employee/verifier/approver + demo data),
-  # matching what the E2E suite expects. Prod uses the minimal `pnpm db:seed`.
-  pnpm db:seed:e2e
+  # matching what the E2E suite expects. Prod uses the minimal `bun run db:seed`.
+  bun run db:seed:e2e
 else
   echo "    Database already seeded (${ORG_COUNT} organization(s) found)."
 fi
@@ -113,5 +113,5 @@ echo "==> Starting dev server + Discord bot (Ctrl-C stops both)..."
 # Kill the whole process group on exit so the bot doesn't linger.
 trap 'kill 0' EXIT INT TERM
 # Bot in the background (fails soft if its env is missing); dev server in the foreground.
-pnpm bot &
-pnpm dev
+bun run bot &
+bun run dev

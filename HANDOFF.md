@@ -10,7 +10,7 @@
 - **DB is on port 5434** (container `veent-db-5434`, user/pass `veent`, db `veent_hris`). `.env.dev`'s
   `DATABASE_URL` points to `localhost:5434/veent_hris`, and `./start.sh` loads it explicitly
   (`dotenv -e .env.dev`) since prisma no longer auto-loads a plain `.env`. `start.sh` brings up the
-  container, syncs the schema, seeds if empty, and runs `pnpm dev` + `pnpm bot`. The dev container
+  container, syncs the schema, seeds if empty, and runs `bun run dev` + `bun run bot`. The dev container
   binds to localhost only and must never be reused outside local development. (Port moved off 5433 to
   avoid a clash with the `veent_wifiportal-db-1` container, which publishes host :5433.)
 - **The DB container uses `--network host`** (Postgres binds the host directly via `-c port=5434`),
@@ -18,13 +18,13 @@
   down/IP-less here to stop it shadowing `wlan0`). If you have an old bridge-mode container, recreate
   it once: `docker rm -f veent-db-5434 && ./start.sh`. `start.sh` probes host→DB reachability and
   fails loudly (instead of hanging on Prisma P1001) if the path is broken.
-- **After pulling, run `pnpm db:push`** (or `./start.sh`) to apply schema changes, then restart
-  `pnpm dev` — the running server caches the Prisma client and will 500 on new columns until
+- **After pulling, run `bun run db:push`** (or `./start.sh`) to apply schema changes, then restart
+  `bun run dev` — the running server caches the Prisma client and will 500 on new columns until
   restarted.
 - **⚠️ Enum rename requires a migration script, not just `db:push` (#172).** `EmploymentType.FULL_TIME`
   was renamed to **`REGULAR`**. Renaming a Postgres enum value drops/recreates the type, which
   `db:push` cannot do against existing data. On any DB that predates #172, run
-  `pnpm tsx scripts/migrate-employment-type-regular.ts` **before** the push. Fresh/seeded DBs are fine.
+  `bunx tsx scripts/migrate-employment-type-regular.ts` **before** the push. Fresh/seeded DBs are fine.
 - Seeded logins (CEO, Super Admin, Manager, Employee, Payroll Officer, Finance) are created by
   `prisma/seed.ts` — see the seed script for the local-only credentials. Development defaults only;
   never commit real passwords.
@@ -117,7 +117,7 @@ reviews, Reports, Org chart, RBAC, Audit log, Inventory, and a rebuilt Dashboard
 
 `format:check` ✅ · `lint` ✅ (0 errors, 1 known a11y warning in `CalculatorWindow.svelte`) ·
 `check` (typecheck) ✅ · **67 unit test files / 777 tests on `staging`** at 2026-07-31, plus ~26 e2e
-specs. Run `pnpm test` for the live pass count before relying on a number.
+specs. Run `bun run test` for the live pass count before relying on a number.
 
 Two conventions worth keeping when adding tests for a guard:
 
