@@ -6,6 +6,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -31,19 +32,7 @@
 	const inputClass =
 		'mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
-	// Assignment-wall filters. Client-side only: the load already holds every assignable employee,
-	// so filtering here costs no query and keeps the bulk-assign workflow on one screen.
-	let search = $state('')
-	let onlyUnassigned = $state(false)
-	const filteredEmployees = $derived.by(() => {
-		const q = search.trim().toLowerCase()
-		return data.employees.filter(
-			(e) =>
-				(!onlyUnassigned || !e.positionId) &&
-				(q === '' || e.name.toLowerCase().includes(q) || e.jobTitle.toLowerCase().includes(q))
-		)
-	})
-	const filtering = $derived(search.trim() !== '' || onlyUnassigned)
+	const filtering = $derived(data.empSearch !== '' || data.empUnassigned)
 </script>
 
 <svelte:head>
@@ -270,25 +259,42 @@
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold">Employee Assignments</h2>
 		<p class="text-sm text-muted-foreground">Assign each employee to a position in the catalog.</p>
-		<div class="flex flex-wrap items-center gap-3">
+		<form method="GET" data-sveltekit-keepfocus class="flex flex-wrap items-center gap-3">
 			<div class="min-w-56 flex-1">
 				<label for="employee-search" class="sr-only">Search employees</label>
 				<input
 					id="employee-search"
 					type="search"
-					bind:value={search}
+					name="empSearch"
+					value={data.empSearch}
 					placeholder="Search by name or job title"
 					class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				/>
 			</div>
 			<label class="flex items-center gap-2 text-sm">
-				<input type="checkbox" bind:checked={onlyUnassigned} class="rounded border-input" />
+				<input
+					type="checkbox"
+					name="empUnassigned"
+					value="1"
+					checked={data.empUnassigned}
+					onchange={(e) => e.currentTarget.form?.requestSubmit()}
+					class="rounded border-input"
+				/>
 				Only unassigned
 			</label>
-			<p class="text-sm text-muted-foreground">
-				Showing {filteredEmployees.length} of {data.employees.length} employees
+			<button type="submit" class="h-9 rounded-md border px-4 text-sm font-medium hover:bg-accent"
+				>Filter</button
+			>
+			{#if filtering}
+				<a
+					href="/settings/org"
+					class="h-9 rounded-md border px-4 text-sm font-medium leading-9 hover:bg-accent">Clear</a
+				>
+			{/if}
+			<p aria-live="polite" class="text-sm text-muted-foreground">
+				Showing {data.employeePagination.total} of {data.employeeTotal} employees
 			</p>
-		</div>
+		</form>
 		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
@@ -301,7 +307,7 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y">
-					{#each filteredEmployees as emp (emp.id)}
+					{#each data.employees as emp (emp.id)}
 						{@const assign = assignGuard(emp.id)}
 						<tr class="hover:bg-muted/30">
 							<td class="px-4 py-2 font-medium">{emp.name}</td>
@@ -352,5 +358,6 @@
 				</tbody>
 			</table>
 		</div>
+		<Pagination meta={data.employeePagination} />
 	</section>
 </div>
