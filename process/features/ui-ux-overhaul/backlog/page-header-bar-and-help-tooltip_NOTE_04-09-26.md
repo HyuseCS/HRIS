@@ -184,3 +184,105 @@ Notes for whoever builds it:
 ## Related
 
 - `[[surface-background-inconsistency]]` / issue #20 — blocks the bar's background choice.
+
+---
+
+# OWNER DECISION 18-09-26 — the `?` carries all of it
+
+Date: 2026-09-18
+Source: owner, during the 18-09-26 click pass, asked for the `?` on three separate pages
+(`/settings`, `/separations`, `/inventory`) before settling it program-wide.
+
+> "the ? carries all of it. Also since we are doing a lot of tooltips. Scan page header for
+> subtexts and if there are any then put them in ?"
+
+## The ruling
+
+**No short description stays visible.** The title row shows the title and a `?`. The whole
+description moves into the tooltip. That closes Part 1's open question — there is no
+"short line plus tooltip copy" split to author, because nothing stays inline.
+
+This also means **every** description moves, not just the ten over 120 characters. The owner's
+instruction is to scan for subtexts and put them in the `?`, without a length threshold.
+
+## Full inventory — measured 18-09-26, not sampled
+
+Scanned every `.svelte` under `src/` for a `<PageHeader ... />` tag carrying a `description`.
+
+| | Count |
+|---|---|
+| files rendering `PageHeader` | 59 |
+| `description` values found | **33** |
+| string literals | 31 |
+| `{expression}` values | 2 |
+| over 120 characters | 9 |
+
+Two files pass two descriptions each from different branches — `complaints/+page.svelte` (HR
+view and employee view) and `requests/+page.svelte`. One is not a route at all:
+`src/lib/components/attendance/AttendanceHrGrid.svelte`, phase 07's extracted component.
+
+### Every description, longest first
+
+| Chars | File | Text |
+|---|---|---|
+| 290 | `settings/offboarding` | The clearance steps every separation case starts with… |
+| 224 | `settings/job-boards` | The sites HR can mark a posting as published to… |
+| 214 | `complaints/[id]` | *(generated — category · employee · opened date)* |
+| 202 | `settings/leave-types` | Master data for the leave/request flow… |
+| 199 | `settings/posting-approvers` | Job postings must be approved before they go live… |
+| 167 | `branches` | Your physical stores — address, contact, branch manager… |
+| 134 | `settings/salary-grades` | Pay bands assignable to positions… |
+| 133 | `requests/proposals` | Pay and promotion changes someone else filed… |
+| 122 | `performance/templates` | The evaluation forms HR issues… |
+| 104 | `payroll/periods` | A period is the pay window… |
+| 102 | `settings/pay-codes` | Codes used by the payroll engine… |
+| 100 | `inventory` | Track company assets, equipment, and supplies… |
+| 99 | `settings/performance` | How often performance reviews are opened… |
+| 92 | `separations/[id]` | *(generated — job title · department · number)* |
+| 89 | `settings/backup` | Copies every employee 201 file and request attachment… |
+| 74 | `separations` | Record resignations and terminations, run clearance… |
+| 71 | `performance/reviews/[id]` | *(generated — cycle · reviewer)* |
+| 68 | `complaints` (HR) | Raise a question or concern to an employee… |
+| 55 | `settings/org-chart` | Reporting hierarchy built from each employee's manager. |
+| 52 | `complaints` (employee) | Questions HR has raised with you. Open one to reply. |
+| 52 | `settings` | Master data and configuration for your organization. |
+| 49 | `settings/company` | Appears on payslips, reports, and the org header. |
+| 47 | `settings/holidays` | Manage public holidays for payroll computation. |
+| 43 | `components/attendance/AttendanceHrGrid` | Team overview, daily records & corrections. |
+| 43 | `punch` | *(expression — employee name when linked)* |
+| 42 | `performance/templates/[id]` | Compose the evaluation form HR will issue. |
+| 41 | `payslips` | View and download your approved payslips. |
+| 40 | `requests/timesheets` | Review and approve submitted timesheets. |
+| 39 | `requests/approvals` | Review requests awaiting your decision. |
+| 35 | `payroll/calculator` | What-if preview — nothing is saved. |
+| 29 | `recruitment/[id]/apply` | *(expression — department name)* |
+| 29 | `requests` | File and track your requests. |
+| 29 | `requests` | File and track your requests. |
+
+## The one thing the ruling does NOT cover — needs the owner
+
+**Five of the 33 are not help text. They are record identity.**
+
+`complaints/[id]`, `separations/[id]`, `performance/reviews/[id]`, `punch`, and
+`recruitment/[id]/apply` build their description from the record: who the complaint is about,
+which employee is separating, which cycle and reviewer. This note already flagged the shape in
+Part 3 — *"the description line on a detail page is generated, not authored… so the
+~90-character rule does not apply to it."*
+
+Hiding those behind a `?` hides **who the page is about** until the user hovers. That is a
+different change from hiding an explanation, and the owner's ruling was given about
+explanations.
+
+Recommendation: the `?` takes the 28 authored descriptions; the 5 generated ones stay visible as
+a subtitle. Owner confirms or overrides. Do not start the sweep until this is answered — it
+decides whether the work is 28 pages or 33.
+
+## What changes in the plan above
+
+- Part 1's "short line plus tooltip copy" authoring job is **gone**. No new copy to write.
+- Scope grows from "10 route pages" to **28 or 33**, per the answer above.
+- `PageHeader`'s `description` prop becomes the tooltip body. Whether the prop is renamed, or
+  kept and simply rendered inside `HelpTip`, is an implementation choice — keeping the name means
+  33 call sites need no edit at all, which is the cheaper path.
+- `src/lib/components/ui/HelpTip.svelte` **already exists** and renders this control. The Scope
+  section above names a new `HelpTooltip.svelte` — that is stale, use `HelpTip`.

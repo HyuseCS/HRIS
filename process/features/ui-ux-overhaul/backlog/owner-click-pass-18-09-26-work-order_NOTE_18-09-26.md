@@ -28,6 +28,7 @@ not dropped and it is not optional — it moves to the end of the queue.
 | N4 | `/separations` | `separations-action-on-title-row_NOTE_18-09-26.md` | no |
 | N5 | `/inventory` | `inventory-row-editing-to-modal_NOTE_18-09-26.md` | partly — where Delete lives |
 | N6 | `/settings/org` | `settings-org-employee-assignments-pagination_NOTE_18-09-26.md` | yes — A1 or A2 |
+| N7 | all 33 `PageHeader` descriptions | `page-header-bar-and-help-tooltip_NOTE_04-09-26.md` | yes — 28 pages or 33 |
 
 Passed with no changes: **`/complaints`**, **`/employees/[id]`** (after the tab fix below).
 
@@ -41,9 +42,23 @@ the measurements (34 pages carry a description, 10 over 120 characters, longest 
 owner's ruling in favour of the `?`. `src/lib/components/ui/HelpTip.svelte` already renders the
 control.
 
-**Do it once, across all 34 pages, not per page.** One question blocks it: does a short
-description stay visible beside the `?`, or does the `?` carry all of it. That is the highest-
-leverage answer the owner can give — it unblocks three of these six notes at once.
+**SETTLED 18-09-26 — the `?` carries all of it.** No short description stays visible. The owner
+also widened the ask: scan every `PageHeader` for a subtext and put it in the `?`, with no length
+threshold, so all of them move rather than only the long ones.
+
+The full measured inventory lives at the bottom of
+`page-header-bar-and-help-tooltip_NOTE_04-09-26.md`: 59 files render `PageHeader`, **33** pass a
+`description`, 9 of those run over 120 characters.
+
+That note now carries the one remaining question, and it is small: **5 of the 33 are record
+identity, not help text** — `complaints/[id]`, `separations/[id]`, `performance/reviews/[id]`,
+`punch` and `recruitment/[id]/apply` build their subtitle from the record (who the complaint is
+about, which employee is separating). Hiding those behind a `?` hides who the page is about.
+Recommendation there: the `?` takes the 28 authored ones, the 5 generated ones stay visible.
+Answering it decides whether the sweep is 28 pages or 33.
+
+This becomes its own work item, **N7**, rather than three separate copy edits inside N2, N4 and
+N5. Those three notes keep their layout items and drop their tooltip item.
 
 ## O1 — extend the e2e suite (LAST)
 
