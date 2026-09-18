@@ -28,22 +28,27 @@ inherits it, along with every route below.
 
 ## Who is affected today
 
-Every route that renders `Pagination.svelte`. Measured with
-`grep -rn "paginate(\|fitPageSize(" src/` — 19 files, 23 call sites:
+Every route that renders `Pagination.svelte` — **19 files across 16 routes**:
 
-`attendance` (x3), `employees`, `leave`, `leave/balances`, `payslips`, `recruitment`,
-`reports/audit-log`, `requests`, `requests/approvals`, `requests/timesheets`,
-`requests/proposals`, `separations`, `settings/roles`, `team`, `timesheets` (x2, `myPage` and
-`teamPage`), `inventory`, `complaints` (x2, `page` and `myPage`).
+`complaints`, `employees`, `inventory`, `leave`, `leave/balances`, `payslips`, `recruitment`,
+`reports/audit-log`, `requests`, `requests/approvals`, `requests/proposals`,
+`requests/timesheets`, `separations`, `settings/roles`, `team`, plus `/attendance` (three
+components) and `/timesheets`.
 
 ## The likely fix, and why it is its own item
 
-`data-sveltekit-keepfocus` on the page links inside `Pagination.svelte`. One attribute.
+`data-sveltekit-keepfocus` on the page links inside `Pagination.svelte` (`:33` and `:48`).
+
+**On its own that is not enough.** On page 1 and on the last page the clicked control is not a
+link at all — it is a `<span>` (`:40`, `:55`) with no anchor for focus to stay on. So the first
+and last page of every list keep the bug after the obvious fix. Whoever takes this must handle
+those two cases, not just add the attribute.
 
 The reason it was kept out of the N6 lane is not the size of the change, it is the size of the
-check. A shared component that 19 files render cannot be altered inside a lane that was reviewed
-for something else — every route that renders it needs verifying before the change is done, and
-that work does not belong to a `/settings/org` ticket.
+check. A shared component that 16 routes render cannot be altered inside a lane that was
+reviewed for something else — every route that renders it needs verifying before the change is
+done, and that work does not belong to a `/settings/org` ticket. The change also alters
+screen-reader route announcements on all 16, which is a behaviour change, not a fix.
 
 It also wants a moment's thought rather than a reflex: `keepfocus` keeps focus on the link that
 was activated, which is right for a pager. Whether the same is right when the row count changes
