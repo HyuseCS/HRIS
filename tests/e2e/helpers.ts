@@ -6,6 +6,7 @@ export const USERS = {
 	// Settings cards. Seeded by seedProd; see prisma/seed-core.ts.
 	hr: { email: 'hr@veent.ph', password: 'Hr@1234' },
 	manager: { email: 'manager@veent.ph', password: 'Manager@1234' },
+	payroll: { email: 'payroll@veent.ph', password: 'Payroll@1234' },
 	employee: { email: 'employee@veent.ph', password: 'Employee@1234' },
 	// Maker-checker sign-off accounts (#134).
 	verifier: { email: 'verifier@veent.ph', password: 'Verifier@1234' },
@@ -54,6 +55,12 @@ export async function login(page: Page, user: { email: string; password: string 
 	// domcontentloaded here too — waitForURL's default 'load' hangs the same way.
 	await page.waitForURL('**/dashboard', { waitUntil: 'domcontentloaded' })
 	await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+	// Rows-per-page is computed server-side from the `vp` viewport cookie the app layout
+	// writes on hydration. Waiting for it here keeps every later list navigation deterministic
+	// instead of racing the fallback page size.
+	await expect
+		.poll(async () => (await page.context().cookies()).some((c) => c.name === 'vp'))
+		.toBe(true)
 }
 
 /**

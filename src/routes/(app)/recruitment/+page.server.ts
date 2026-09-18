@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
-import { paginate } from '$lib/server/pagination'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
 	countJobPostings,
 	listJobPostings,
@@ -13,12 +13,14 @@ import { db } from '$lib/server/db'
 import { z } from 'zod'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
 
 	// #64: paginate the postings list (the per-posting Kanban board is not paginated).
 	const total = await countJobPostings(locals.user!.organizationId)
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 47, chromePx: 258 })
+	})
 
 	const [postings, departments] = await Promise.all([
 		listJobPostings(locals.user!.organizationId, undefined, {

@@ -1,11 +1,12 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import { login, USERS } from './helpers'
 
 // #64: shared server-side pagination. Seeds 25 employees with a distinctive
 // surname so the search filter isolates them from rows other tests create, then
-// walks the /employees list: ≤20 rows per page, range label, page + filter in
-// the URL, browser back restoring page 1.
+// walks the /employees list: range label, page + filter in the URL, browser back
+// restoring page 1. Rows per page now follow the window height, so every expectation
+// here is derived from the pager label rather than pinned to a number.
 test.describe.configure({ mode: 'serial' })
 
 const SURNAME = 'Zzpagetest'
@@ -80,28 +81,50 @@ test.afterAll(async () => {
 	}
 })
 
+// The pager's "start–end of total" label is the page's own statement of what it is
+// showing; reading it keeps this spec true at any window height.
+async function range(page: Page) {
+	const label = await page
+		.getByRole('navigation', { name: 'Pagination' })
+		.getByText(/of /)
+		.first()
+		.innerText()
+	const m = /(\d+)–(\d+) of (\d+)/.exec(label)
+	if (!m) throw new Error(`Unreadable pager label: ${label}`)
+	return { start: Number(m[1]), end: Number(m[2]), total: Number(m[3]) }
+}
+
 test('employees list paginates with filter and page state in the URL', async ({ page }) => {
 	await login(page, USERS.admin)
 
-	// Filter applied: 25 matches at 10 per page → 3 pages, the first one full.
+	// Filter applied: the first page starts at row 1 and is full, with more behind it.
 	await page.goto(`/employees?search=${SURNAME}`, { waitUntil: 'domcontentloaded' })
-	await expect(page.getByText(`1–10 of ${COUNT}`)).toBeVisible()
-	await expect(page.locator('tbody tr')).toHaveCount(10)
+	const first = await range(page)
+	expect(first.start).toBe(1)
+	expect(first.total).toBe(COUNT)
+	expect(first.end).toBeLessThan(COUNT)
+	await expect(page.locator('tbody tr')).toHaveCount(first.end)
+	const pageSize = first.end
 
 	// Next → page 2: URL carries BOTH the filter and the page.
 	await page.getByRole('link', { name: 'Next →' }).click()
 	await page.waitForURL(`**/employees?search=${SURNAME}&page=2`, {
 		waitUntil: 'domcontentloaded'
 	})
-	await expect(page.getByText(`11–20 of ${COUNT}`)).toBeVisible()
-	await expect(page.locator('tbody tr')).toHaveCount(10)
+	const second = await range(page)
+	expect(second.start).toBe(pageSize + 1)
+	expect(second.end).toBe(Math.min(pageSize * 2, COUNT))
+	await expect(page.locator('tbody tr')).toHaveCount(second.end - second.start + 1)
 
 	// Browser back restores page 1 with the filter intact.
 	await page.goBack({ waitUntil: 'domcontentloaded' })
 	await expect(page).toHaveURL(new RegExp(`search=${SURNAME}(?!.*page=2)`))
-	await expect(page.getByText(`1–10 of ${COUNT}`)).toBeVisible()
+	await expect(page.getByText(`1–${pageSize} of ${COUNT}`)).toBeVisible()
 
 	// Out-of-range pages clamp to the last real page instead of rendering empty.
 	await page.goto(`/employees?search=${SURNAME}&page=99`, { waitUntil: 'domcontentloaded' })
-	await expect(page.getByText(`21–25 of ${COUNT}`)).toBeVisible()
+	const last = await range(page)
+	expect(last.end).toBe(COUNT)
+	expect(last.start).toBe(COUNT - ((COUNT - 1) % pageSize))
+	await expect(page.locator('tbody tr')).toHaveCount(last.end - last.start + 1)
 })

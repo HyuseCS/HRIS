@@ -3,15 +3,15 @@ import { requireAnyCapability, canAny } from '$lib/server/rbac'
 import { db } from '$lib/server/db'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { listReportIdsFor } from '$lib/server/services/supervisors'
-import { paginate } from '$lib/server/pagination'
+import { paginate, fitPageSize } from '$lib/server/pagination'
 import { autoDeriveFromPunches } from '$lib/server/services/attendance'
 import { manilaDayKey } from '$lib/utils/dates'
-import { parseView, type Person } from '$lib/components/people/people'
+import { parseView, PEOPLE_PAGE_SIZE, type Person } from '$lib/components/people/people'
 import type { PageServerLoad } from './$types'
 
 const SEARCH_MAX = 100
 
-export const load: PageServerLoad = async ({ locals, url, getClientAddress }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies, getClientAddress }) => {
 	const user = locals.user!
 	requireAnyCapability(user.roles, 'VIEW_TEAM')
 
@@ -19,7 +19,16 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 	// Food-service tenants label this roster "Branches" (#182), so the heading follows suit.
 	const isFoodService = isFoodServiceOrg(user.organizationId)
 	const search = (url.searchParams.get('search') ?? '').trim().slice(0, SEARCH_MAX)
-	const { view, pageSize } = parseView(url.searchParams.get('view'))
+	const view = parseView(url.searchParams.get('view'))
+	const pageSize =
+		view === 'grid'
+			? fitPageSize(cookies, {
+					rowPx: 100,
+					chromePx: 242,
+					fallback: PEOPLE_PAGE_SIZE.grid,
+					cols: (vw) => (vw >= 1024 ? 3 : vw >= 640 ? 2 : 1)
+				})
+			: fitPageSize(cookies, { rowPx: 40, chromePx: 279, fallback: PEOPLE_PAGE_SIZE.list })
 
 	// Get team members. A manager's team is everyone who reports to them as primary OR
 	// additional supervisor (#176); HR/Super Admin see the whole org.

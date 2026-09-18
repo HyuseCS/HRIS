@@ -16,9 +16,8 @@ export interface Person {
 	todayStatus?: AttendanceStatus | null
 }
 
-export function parseView(raw: string | null): { view: PeopleView; pageSize: number } {
-	const view: PeopleView = raw === 'list' ? 'list' : 'grid'
-	return { view, pageSize: PEOPLE_PAGE_SIZE[view] }
+export function parseView(raw: string | null): PeopleView {
+	return raw === 'list' ? 'list' : 'grid'
 }
 
 const segmenter = new Intl.Segmenter()

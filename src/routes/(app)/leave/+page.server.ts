@@ -1,7 +1,7 @@
 import { canAny } from '$lib/server/rbac'
 import { fail } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
-import { paginate } from '$lib/server/pagination'
+import { paginate, fitPageSize } from '$lib/server/pagination'
 import { getLeaveBalances } from '$lib/server/services/leave'
 import { countRequests, listRequests, deleteRequest } from '$lib/server/services/requests'
 import { listVisibleEmployeeIds } from '$lib/server/services/employee-access'
@@ -9,7 +9,7 @@ import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
 // Read-only leave view. Leave filing/approval now flows through the unified
 // Requests/Approvals page; this page lists leave (Request type=LEAVE) + balances.
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	const isManager = canAny(user.roles, 'VIEW_TEAM')
 	// #150: HR/admin/CEO have no balances of their own (often no employee record at all), so
@@ -46,7 +46,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		type: 'LEAVE' as const
 	}
 	const total = canListLeave ? await countRequests(listParams) : 0
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 47, chromePx: 291 })
+	})
 
 	const [requests, leaveTypes, balances] = await Promise.all([
 		canListLeave

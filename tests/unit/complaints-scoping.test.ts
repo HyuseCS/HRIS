@@ -102,6 +102,7 @@ const actor = (roles: Role[]) => ({ id: ACTOR_USER, roles, organizationId: ORG }
 const listLoadEvent = (roles: Role[]) =>
 	({
 		locals: { user: { id: ACTOR_USER, organizationId: ORG, roles } },
+		cookies: { get: () => undefined },
 		url: new URL('http://localhost/complaints')
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	}) as any

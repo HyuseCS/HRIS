@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { ComplaintCategory, ComplaintStatus } from '@prisma/client'
 import { db } from '$lib/server/db'
 import { canAny } from '$lib/rbac'
-import { paginate } from '$lib/server/pagination'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
 	openComplaint,
 	listComplaintsForOrg,
@@ -16,7 +16,7 @@ import type { Actions, PageServerLoad } from './$types'
 
 const STATUSES: ComplaintStatus[] = ['OPEN', 'RESPONDED', 'RESOLVED']
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	const isHr = canAny(user.roles, 'MANAGE_HR')
 
@@ -31,7 +31,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const filters = { status, ...(visibleIds && { employeeIds: visibleIds }) }
 
 		const total = await countComplaintsForOrg(user.organizationId, filters)
-		const pagination = paginate(url, total)
+		const pagination = paginate(url, total, {
+			pageSize: fitPageSize(cookies, { rowPx: 39, chromePx: 226 })
+		})
 		const [complaints, employees] = await Promise.all([
 			listComplaintsForOrg(user.organizationId, filters, {
 				skip: pagination.skip,

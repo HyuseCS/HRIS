@@ -524,7 +524,7 @@ the overlap visible and sequenced, not to prevent it.
 | 3 | design-system | PLANNED | contract written — **CONDITIONAL** |
 | 4 | feedback-contract | PLANNED | contract written — **CONDITIONAL** |
 | 5 | destructive-actions | PLANNED | contract written — **CONDITIONAL** |
-| 6 | surface-consolidation | PLANNED | contract written — **BLOCKED → supplement in progress** |
+| 6 | surface-consolidation | PLANNED | contract written — **BLOCKED → supplement in progress**. NOTE (18-09-26): this row predates execution and is stale — the phase itself is `DONE (CODE DONE)` per the registry, and the on-branch `dashboard-layout` task (same branch, `feat/uiux-phase-6`, not one of the 8 phase plans) is `VERIFIED` as of 18-09-26. See `phase-blast-radius-registry.md` §"Phase 06" and §"Task — dashboard-layout" and `../dashboard-layout_17-09-26/dashboard-layout_FOLLOWUPS_18-09-26.md`. Full umbrella-table reconciliation against actual execution state is out of scope of this note. |
 | 7 | page-splits | PLANNED | contract written — **CONDITIONAL** |
 | 8 | copy-a11y | PLANNED | contract written — **CONDITIONAL** |
 

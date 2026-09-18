@@ -4,7 +4,7 @@ import { db } from '$lib/server/db'
 import { manilaDayKey } from '$lib/utils/dates'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { listRecentAnnouncements, createAnnouncement } from '$lib/server/services/announcements'
-import { countPendingApprovals } from '$lib/server/services/approvals'
+import { listPendingApprovals } from '$lib/server/services/approvals'
 import { listRecent } from '$lib/server/services/notifications'
 import { grantAward, listRecentAwards } from '$lib/server/services/awards'
 import {
@@ -26,6 +26,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Since #165 employees don't create timesheets, so the quick action would only send them
 	// to a 403. Same capability the /timesheets create action enforces.
 	const canCreateTimesheet = canAny(user.roles, 'MANAGE_HR')
+	const canApprove = canAny(user.roles, 'APPROVE_REQUESTS')
 
 	// Today's PHT day, stored as the UTC-midnight date key used by AttendanceDay.
 	const todayKey = manilaDayKey(new Date())
@@ -48,7 +49,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// Items awaiting THIS user's decision — requests, timesheets, and payroll runs
 		// (#134) — the same per-user, stage-aware count the sidebar badge uses, so the two
 		// always agree. A payroll run pending sign-off now shows here (previously missing).
-		countPendingApprovals({
+		listPendingApprovals({
 			id: user.id,
 			roles: user.roles,
 			organizationId: orgId
@@ -114,6 +115,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		roles,
 		user.id
 	)
+	const canDecidePostings =
+		canPost ||
+		(myEmployee != null &&
+			(await db.postingApprover.count({
+				where: { organizationId: orgId, approverId: myEmployee.id }
+			})) > 0)
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the
 	// toast is gone.
@@ -123,6 +130,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		canPost,
+		canApprove,
+		canDecidePostings,
 		canViewPayroll,
 		canCreateTimesheet,
 		announcements,
@@ -134,13 +143,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		postingsToApprove,
 		recentActivity,
 		upcomingEvents,
+		pendingItems: pending.items,
 		metrics: {
 			headcount,
 			onLeaveToday,
-			pendingApprovals: pending.total,
-			pendingRequests: pending.requests,
-			pendingTimesheets: pending.timesheets,
-			pendingPayrollRuns: pending.payrollRuns,
+			pendingApprovals: pending.counts.total,
+			pendingRequests: pending.counts.requests,
+			pendingTimesheets: pending.counts.timesheets,
+			pendingPayrollRuns: pending.counts.payrollRuns,
+			pendingProposals: pending.counts.proposals,
 			// Withhold payroll figures from clients that may not view them.
 			lastPayrollRun: canViewPayroll ? lastPayrollRun : null,
 			attendance

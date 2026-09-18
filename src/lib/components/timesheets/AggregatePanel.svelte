@@ -83,9 +83,10 @@
 
 <section class="space-y-3 rounded-lg border bg-card p-4">
 	<div>
-		<h2 class="text-lg font-semibold">Aggregate from time logs</h2>
+		<h2 class="text-lg font-semibold">Aggregate from time logs — one week</h2>
 		<p class="text-sm text-muted-foreground">
-			Preview a week of an employee's Discord punches, then roll them into a draft timesheet.
+			Preview one whole week (Monday to Sunday, Manila time) of an employee's Discord punches, then
+			roll them into a draft timesheet. Pick any day in the week you want.
 		</p>
 	</div>
 

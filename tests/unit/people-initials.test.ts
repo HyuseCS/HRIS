@@ -26,17 +26,17 @@ describe('initials', () => {
 })
 
 describe('parseView', () => {
-	it('defaults to the grid of 15', () => {
-		expect(parseView(null)).toEqual({ view: 'grid', pageSize: 15 })
+	it('defaults to the grid', () => {
+		expect(parseView(null)).toBe('grid')
 	})
 
-	it('reads list as 12 per page', () => {
-		expect(parseView('list')).toEqual({ view: 'list', pageSize: 12 })
+	it('reads list', () => {
+		expect(parseView('list')).toBe('list')
 	})
 
 	it('treats anything else as the grid', () => {
 		for (const raw of ['', 'LIST', 'table', 'grid ']) {
-			expect(parseView(raw)).toEqual({ view: 'grid', pageSize: 15 })
+			expect(parseView(raw)).toBe('grid')
 		}
 	})
 })

@@ -59,15 +59,21 @@ test.describe('Job-board tracking (#117)', () => {
 		}
 
 		// Save the URL. On a taken-down tile this Save also re-posts the board.
-		await jobStreet.locator('input[name="url"]').fill('https://jobstreet.com/jobs/123')
-		const savedOk = page.waitForResponse((r) => r.url().includes('setChannel'))
+		const urlInput = jobStreet.locator('input[name="url"]')
+		await urlInput.fill('https://jobstreet.com/jobs/123')
+		const savedOk = page.waitForResponse(
+			(r) => r.url().includes('setChannel') && !!r.request().postData()?.includes('jobstreet.com')
+		)
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
 		await savedOk
 		await expect(jobStreet.getByText(/^Posted /)).toBeVisible()
+		await expect(urlInput).toHaveValue('https://jobstreet.com/jobs/123')
 
 		// A bad URL is rejected with a field-level error.
-		await jobStreet.locator('input[name="url"]').fill('not-a-url')
-		const savedBad = page.waitForResponse((r) => r.url().includes('setChannel'))
+		await urlInput.fill('not-a-url')
+		const savedBad = page.waitForResponse(
+			(r) => r.url().includes('setChannel') && !!r.request().postData()?.includes('not-a-url')
+		)
 		await jobStreet.getByRole('button', { name: 'Save' }).click()
 		await savedBad
 		await expect(jobStreet.getByText(/valid URL/)).toBeVisible()

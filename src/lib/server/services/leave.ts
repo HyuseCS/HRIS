@@ -172,28 +172,41 @@ export interface OrgBalanceFilters {
 	search?: string
 }
 
+function orgBalanceWhere({ organizationId, departmentId, search }: OrgBalanceFilters) {
+	const term = search?.trim()
+
+	return {
+		organizationId,
+		employmentStatus: 'ACTIVE' as const,
+		...(departmentId && { departmentId }),
+		...(term && {
+			OR: [
+				{ firstName: { contains: term, mode: 'insensitive' as const } },
+				{ lastName: { contains: term, mode: 'insensitive' as const } },
+				{ employeeNumber: { contains: term, mode: 'insensitive' as const } }
+			]
+		})
+	}
+}
+
+export function countOrgLeaveBalances(filters: OrgBalanceFilters) {
+	return db.employee.count({ where: orgBalanceWhere(filters) })
+}
+
 /**
  * Every employee's balances for the HR-facing view (#137/#150), one row per employee with
  * their types nested. Active employees only — an offboarded 201 file keeps its ledger, but
  * it is noise on a page HR uses to answer "who can still take leave".
  */
-export async function listOrgLeaveBalances(filters: OrgBalanceFilters) {
-	const { organizationId, year, departmentId, search } = filters
-	const term = search?.trim()
+export async function listOrgLeaveBalances(
+	filters: OrgBalanceFilters,
+	range?: { skip: number; take: number }
+) {
+	const { year } = filters
 
 	return db.employee.findMany({
-		where: {
-			organizationId,
-			employmentStatus: 'ACTIVE',
-			...(departmentId && { departmentId }),
-			...(term && {
-				OR: [
-					{ firstName: { contains: term, mode: 'insensitive' as const } },
-					{ lastName: { contains: term, mode: 'insensitive' as const } },
-					{ employeeNumber: { contains: term, mode: 'insensitive' as const } }
-				]
-			})
-		},
+		where: orgBalanceWhere(filters),
+		...range,
 		select: {
 			id: true,
 			employeeNumber: true,
@@ -212,6 +225,6 @@ export async function listOrgLeaveBalances(filters: OrgBalanceFilters) {
 				}
 			}
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }]
 	})
 }

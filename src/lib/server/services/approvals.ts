@@ -9,6 +9,7 @@ import { evictTombstonedBytes } from './requests/documents'
 import { buildApprovalChain } from './requests/routing'
 import { notify } from './notifications'
 import type { AuditContext } from './types'
+import { formatDateRange } from '$lib/utils/format'
 
 // Which capability governs each maker-checker stage (#134). MAKE is branch HR/Manager,
 // VERIFY the Verifier, APPROVE the Approver — enforced by capability, not exact role,
@@ -478,6 +479,90 @@ export async function countPendingApprovals(user: {
 	}
 }
 
+const PENDING_ITEM_LIMIT = 20
+
+export interface PendingApprovalItem {
+	id: string
+	href: string
+	label: string
+	sub: string
+	person: { firstName: string; lastName: string } | null
+}
+
+export async function listPendingApprovals(user: {
+	id: string
+	roles: Role[]
+	organizationId: string
+}): Promise<{ items: PendingApprovalItem[]; counts: PendingApprovalCounts }> {
+	const roles = user.roles
+	if (!canAny(roles, 'APPROVE_REQUESTS'))
+		return {
+			items: [],
+			counts: { timesheets: 0, requests: 0, payrollRuns: 0, proposals: 0, total: 0 }
+		}
+
+	const myEmployee = await db.employee.findFirst({
+		where: { userId: user.id, organizationId: user.organizationId },
+		select: { id: true }
+	})
+
+	const canReviewTimesheets =
+		canAny(roles, 'MANAGE_HR') ||
+		canAny(roles, 'VERIFY_REQUESTS') ||
+		canAny(roles, 'APPROVE_SIGNOFF')
+
+	const [requests, timesheets, payrollRuns, proposals] = await Promise.all([
+		listPendingRequestsForApprover(user.organizationId, roles, myEmployee?.id ?? null, user.id),
+		canReviewTimesheets
+			? listActionableTimesheets(user.organizationId, roles, myEmployee?.id ?? null, user.id)
+			: Promise.resolve([]),
+		listActionablePayrollRuns(user.organizationId, roles, user.id),
+		listActionableProposals(user.organizationId, { actorId: user.id, roles })
+	])
+
+	const items = [
+		...requests.map((r) => ({
+			id: r.id,
+			href: `/requests/${r.id}?from=/dashboard`,
+			label: `${r.employee.lastName}, ${r.employee.firstName}`,
+			sub: `${r.type.toLowerCase().replace(/_/g, ' ')} request`,
+			person: { firstName: r.employee.firstName, lastName: r.employee.lastName }
+		})),
+		...timesheets.map((ts) => ({
+			id: ts.id,
+			href: '/requests/timesheets',
+			label: `${ts.employee.lastName}, ${ts.employee.firstName}`,
+			sub: `Timesheet ${formatDateRange(ts.periodStart, ts.periodEnd)}`,
+			person: { firstName: ts.employee.firstName, lastName: ts.employee.lastName }
+		})),
+		...proposals.map((p) => ({
+			id: p.id,
+			href: '/requests/proposals',
+			label: `${p.target.lastName}, ${p.target.firstName}`,
+			sub: 'Pay change',
+			person: { firstName: p.target.firstName, lastName: p.target.lastName }
+		})),
+		...payrollRuns.map((run) => ({
+			id: run.id,
+			href: `/payroll/${run.id}`,
+			label: `Payroll ${formatDateRange(run.periodStart, run.periodEnd)}`,
+			sub: run.organization.name,
+			person: null
+		}))
+	]
+
+	return {
+		items: items.slice(0, PENDING_ITEM_LIMIT),
+		counts: {
+			timesheets: timesheets.length,
+			requests: requests.length,
+			payrollRuns: payrollRuns.length,
+			proposals: proposals.length,
+			total: timesheets.length + requests.length + payrollRuns.length + proposals.length
+		}
+	}
+}
+
 // COMPUTED payroll runs whose live maker-checker stage this user can sign off (#134).
 // Only the sign-off roles act on runs; anyone who already decided the live attempt — the maker
 // included — is excluded (SoD, #283/F5).
@@ -490,13 +575,25 @@ export async function countActionablePayrollRuns(
 	roles: Role[],
 	userId: string
 ): Promise<number> {
-	if (!canAny(roles, 'VERIFY_REQUESTS') && !canAny(roles, 'APPROVE_FINANCE')) return 0
+	return (await listActionablePayrollRuns(organizationId, roles, userId)).length
+}
+
+export async function listActionablePayrollRuns(
+	organizationId: string,
+	roles: Role[],
+	userId: string
+) {
+	if (!canAny(roles, 'VERIFY_REQUESTS') && !canAny(roles, 'APPROVE_FINANCE')) return []
 	// A finance approver counts pending runs across every tenant they sign off for (#174);
 	// a Verifier only sees their own org's queue.
 	const financeApprover = canAny(roles, 'APPROVE_FINANCE')
 	const runs = await db.payrollRun.findMany({
 		where: { status: 'COMPUTED', ...(financeApprover ? {} : { organizationId }) },
 		select: {
+			id: true,
+			periodStart: true,
+			periodEnd: true,
+			organization: { select: { name: true } },
 			approvalSteps: {
 				select: {
 					id: true,
@@ -520,7 +617,7 @@ export async function countActionablePayrollRuns(
 			decidedActorIds: decidedActorIds(r.approvalSteps, live.attempt),
 			verifiedDocActorIds: []
 		})
-	}).length
+	})
 }
 
 // SUBMITTED timesheets whose live maker-checker stage this user can act on (#134).
@@ -532,6 +629,16 @@ export async function countActionableTimesheets(
 	actorEmployeeId: string | null,
 	actorUserId: string
 ): Promise<number> {
+	return (await listActionableTimesheets(organizationId, roles, actorEmployeeId, actorUserId))
+		.length
+}
+
+export async function listActionableTimesheets(
+	organizationId: string,
+	roles: Role[],
+	actorEmployeeId: string | null,
+	actorUserId: string
+) {
 	const submitted = await db.timesheet.findMany({
 		where: {
 			status: 'SUBMITTED',
@@ -543,6 +650,10 @@ export async function countActionableTimesheets(
 			employee: { organizationId }
 		},
 		select: {
+			id: true,
+			periodStart: true,
+			periodEnd: true,
+			employee: { select: { firstName: true, lastName: true } },
 			employeeId: true,
 			// `actorId` is what the #283 bar reads. Omit it and decidedActorIds returns [] for every
 			// row — the guard stops existing, silently, with every test still green.
@@ -562,7 +673,7 @@ export async function countActionableTimesheets(
 			ts.employeeId,
 			timesheetSoD(actorUserId, ts.approvalSteps, live.attempt)
 		)
-	}).length
+	})
 }
 
 // ─── Payroll-run approval chain (#134) ──────────────────────────────────────────

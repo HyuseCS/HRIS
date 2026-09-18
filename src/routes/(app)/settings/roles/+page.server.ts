@@ -3,11 +3,11 @@ import { z } from 'zod'
 import { ASSIGNABLE_ROLES } from '$lib/rbac'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
-import { paginate } from '$lib/server/pagination'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import { listOrgUsers, setUserRoles, setUserActive } from '$lib/server/services/settings/org'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	// Role-change is CEO-only (#132); account activation stays with Super Admin. The
 	// page serves both, so it opens for either capability and the UI shows only the
@@ -27,7 +27,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					(u.employeeName ?? '').toLowerCase().includes(needle)
 			)
 		: all
-	const pagination = paginate(url, filtered.length)
+	const pagination = paginate(url, filtered.length, {
+		pageSize: fitPageSize(cookies, { rowPx: 65, chromePx: 285 })
+	})
 
 	return {
 		users: filtered.slice(pagination.skip, pagination.skip + pagination.take),

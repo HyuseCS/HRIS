@@ -40,44 +40,34 @@
 </svelte:head>
 
 {#snippet notices()}
-	<!-- The posting actions sit above the list they publish into, not on the title row. -->
-	<div class="flex flex-wrap items-center justify-end gap-2">
-		<div class="flex items-center gap-2">
-			{#if selectedDraftIds.length}
-				<form
-					method="POST"
-					action="?/submitMany"
-					use:enhance={() => {
-						publishing = true
-						return async ({ update }) => {
-							selectedIds = []
-							await update()
-							publishing = false
-						}
-					}}
-				>
-					{#each selectedDraftIds as id (id)}
-						<input type="hidden" name="ids" value={id} />
-					{/each}
-					<button
-						type="submit"
-						disabled={publishing}
-						class="rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-					>
-						{publishing
-							? 'Submitting…'
-							: `Submit selected for approval (${selectedDraftIds.length})`}
-					</button>
-				</form>
-			{/if}
-			<button
-				onclick={() => (showCreate = true)}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+	<!-- The submit action sits above the list it publishes into, not on the title row. -->
+	{#if selectedDraftIds.length}
+		<div class="flex flex-wrap items-center justify-end gap-2">
+			<form
+				method="POST"
+				action="?/submitMany"
+				use:enhance={() => {
+					publishing = true
+					return async ({ update }) => {
+						selectedIds = []
+						await update()
+						publishing = false
+					}
+				}}
 			>
-				New Job Posting
-			</button>
+				{#each selectedDraftIds as id (id)}
+					<input type="hidden" name="ids" value={id} />
+				{/each}
+				<button
+					type="submit"
+					disabled={publishing}
+					class="rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{publishing ? 'Submitting…' : `Submit selected for approval (${selectedDraftIds.length})`}
+				</button>
+			</form>
 		</div>
-	</div>
+	{/if}
 
 	{#if form?.success && form.message}
 		<div
@@ -98,7 +88,19 @@
 {/snippet}
 
 <div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
-	<PageHeader title="Recruitment" />
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader title="Recruitment" />
+		</div>
+		<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
+			<button
+				onclick={() => (showCreate = true)}
+				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+			>
+				New Job Posting
+			</button>
+		</div>
+	</div>
 
 	<div class="flex shrink-0 flex-col gap-3">
 		{@render notices()}

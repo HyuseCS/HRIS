@@ -142,8 +142,10 @@ const ROUTE_GUARDS: Record<string, { file: string; capabilities: Capability[] }>
 		file: 'src/routes/(app)/performance/templates/+page.server.ts',
 		capabilities: ['ADMINISTER_HR_ORGWIDE']
 	},
+	// Phase 06 moved payroll's predicates out of the layout and into `$lib/payroll-tabs`, which the
+	// layout's 403 gate and its tab bar both read. The gate is unchanged; only its text moved.
 	'/payroll': {
-		file: 'src/routes/(app)/payroll/+layout.server.ts',
+		file: 'src/lib/payroll-tabs.ts',
 		capabilities: ['MANAGE_PAYROLL', 'VERIFY_REQUESTS', 'APPROVE_FINANCE']
 	}
 }

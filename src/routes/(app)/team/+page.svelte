@@ -33,10 +33,10 @@
 	<title>{title} — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
 	<PageHeader {title} />
 
-	<div class="flex flex-col overflow-hidden rounded-lg border bg-card lg:h-[39.75rem]">
+	<div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
 		<div class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
 			<form method="GET" role="search" class="w-full sm:w-auto sm:min-w-0 sm:flex-1">
 				<label for="team-search" class="sr-only">Search people</label>
@@ -72,7 +72,7 @@
 			</div>
 		</div>
 
-		<div class="min-h-0 flex-1">
+		<div class="min-h-0 flex-1 overflow-y-auto">
 			{#if data.people.length === 0}
 				{#if data.search}
 					<EmptyState variant="no-results" title="No one matches “{data.search}”">

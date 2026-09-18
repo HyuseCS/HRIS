@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores'
 	import CalculatorWindow from '$lib/components/payroll/CalculatorWindow.svelte'
+	import { activePayrollTab, payrollTabs } from '$lib/payroll-tabs'
 	import type { LayoutData } from './$types'
 	import type { Snippet } from 'svelte'
 
@@ -11,7 +12,30 @@
 	// follows you from a run to periods and back.
 	let calcOpen = $state(false)
 	const onCalculatorPage = $derived($page.url.pathname.startsWith('/payroll/calculator'))
+
+	// Payroll's five pages were reachable only from the sidebar and from each other's Back links,
+	// so runs and periods read as unrelated areas. Each tab is filtered on its own capability —
+	// see `$lib/payroll-tabs`.
+	const tabs = $derived(payrollTabs(data))
+	const activeHref = $derived(activePayrollTab(tabs, $page.url.pathname))
 </script>
+
+<!-- Every role that passes the layout's 403 gate holds at least the Runs tab, so this branch is a
+     safety net rather than a reachable state. -->
+{#if tabs.length}
+	<nav aria-label="Payroll" class="mb-6 flex flex-wrap gap-1 border-b">
+		{#each tabs as tab (tab.href)}
+			<a
+				href={tab.href}
+				aria-current={tab.href === activeHref ? 'page' : undefined}
+				class="-mb-px border-b-2 px-3 py-2 text-sm font-medium {tab.href === activeHref
+					? 'border-primary text-foreground'
+					: 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}"
+				>{tab.label}</a
+			>
+		{/each}
+	</nav>
+{/if}
 
 {@render children()}
 
