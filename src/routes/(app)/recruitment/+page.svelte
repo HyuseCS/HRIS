@@ -40,7 +40,7 @@
 </svelte:head>
 
 {#snippet notices()}
-	<!-- The posting actions sit above the list they publish into, not on the title row. -->
+	<!-- The submit action sits above the list it publishes into, not on the title row. -->
 	<div class="flex flex-wrap items-center justify-end gap-2">
 		<div class="flex items-center gap-2">
 			{#if selectedDraftIds.length}
@@ -70,12 +70,6 @@
 					</button>
 				</form>
 			{/if}
-			<button
-				onclick={() => (showCreate = true)}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-			>
-				New Job Posting
-			</button>
 		</div>
 	</div>
 
@@ -98,7 +92,19 @@
 {/snippet}
 
 <div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
-	<PageHeader title="Recruitment" />
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader title="Recruitment" />
+		</div>
+		<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
+			<button
+				onclick={() => (showCreate = true)}
+				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+			>
+				New Job Posting
+			</button>
+		</div>
+	</div>
 
 	<div class="flex shrink-0 flex-col gap-3">
 		{@render notices()}

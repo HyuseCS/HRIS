@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import ApplicantKanban from '$lib/components/recruitment/ApplicantKanban.svelte'
@@ -84,6 +85,9 @@
 						{posting.status}
 					</span>
 				{/snippet}
+				{#snippet back()}
+					<BackButton fallback="/recruitment" label="Recruitment" />
+				{/snippet}
 			</PageHeader>
 			<div class="space-y-1">
 				<div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -144,9 +148,6 @@
 							</button>
 						</form>
 					{/if}
-					<a href="/recruitment" class="rounded-md border px-4 py-2 text-sm hover:bg-accent">
-						Back
-					</a>
 				{/if}
 			</div>
 		</div>
