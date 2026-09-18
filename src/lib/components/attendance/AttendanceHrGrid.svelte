@@ -11,6 +11,8 @@
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import CalendarDays from 'lucide-svelte/icons/calendar-days'
+	import Table2 from 'lucide-svelte/icons/table-2'
 	import TeamMatrix from '$lib/components/attendance/TeamMatrix.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
@@ -208,55 +210,47 @@
 		<div class="min-w-0 flex-1">
 			<PageHeader title="Attendance" description="Team overview, daily records & corrections." />
 		</div>
-		<div class="inline-flex w-full max-w-full flex-wrap rounded-lg border p-1 text-sm sm:w-auto">
-			<a
-				href="?view=matrix"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'matrix'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				Whole team
-			</a>
-			<a
-				href="?view=team&date={data.date}"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'team'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				Team day
-			</a>
-			<a
-				href="?view=employee&employeeId={data.selectedEmployeeId ??
-					''}&from={data.from}&to={data.to}"
-				class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
-					? 'bg-primary text-primary-foreground'
-					: 'text-muted-foreground hover:bg-accent'}"
-			>
-				By employee
-			</a>
+		<div class="flex flex-wrap items-center gap-2">
+			<div class="inline-flex max-w-full flex-wrap rounded-lg border p-1 text-sm">
+				<a
+					href="?view=matrix"
+					class="rounded-md px-3 py-1.5 font-medium {data.view !== 'employee'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					Whole team
+				</a>
+				<a
+					href="?view=employee&employeeId={data.selectedEmployeeId ??
+						''}&from={data.from}&to={data.to}"
+					class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-accent'}"
+				>
+					By employee
+				</a>
+			</div>
+			{#if data.view !== 'employee'}
+				<a
+					href={data.view === 'matrix' ? `?view=team&date=${data.date}` : '?view=matrix'}
+					aria-label={data.view === 'matrix' ? 'Show one day' : 'Show the week grid'}
+					class="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{#if data.view === 'matrix'}
+						<CalendarDays class="h-4 w-4" aria-hidden="true" />
+					{:else}
+						<Table2 class="h-4 w-4" aria-hidden="true" />
+					{/if}
+				</a>
+			{/if}
 		</div>
 	</div>
 
 	{#if data.view !== 'matrix'}
-		<div class="space-y-4 rounded-lg border bg-card p-4">
-			<div class="flex flex-wrap items-start justify-between gap-3">
-				<!-- Filters -->
-				{#if data.view === 'team'}
-					<form bind:this={dayForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
-						<input type="hidden" name="view" value="team" />
-						{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
-						<div class="flex flex-col gap-1">
-							<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
-							<DatePicker
-								id="date"
-								name="date"
-								value={data.date}
-								onchange={() => dayForm?.requestSubmit()}
-								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
-							/>
-						</div>
-					</form>
-				{:else if data.view === 'employee'}
+		<div class="rounded-lg border bg-card p-4 {data.view === 'team' ? '' : 'space-y-4'}">
+			{#if data.view === 'employee'}
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<!-- Filters -->
 					<form bind:this={rangeForm} method="GET" class="flex flex-1 flex-wrap items-end gap-3">
 						{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
 						<input type="hidden" name="view" value="employee" />
@@ -312,15 +306,15 @@
 							Range is capped at {data.maxRangeDays} days (~2 months); longer spans are trimmed automatically.
 						</p>
 					</form>
-				{/if}
-			</div>
+				</div>
+			{/if}
 
 			<!-- Bulk actions.
 			     E3: one flat row of five buttons made a re-derive read the same as a lock. They are now
 			     two labelled clusters — a read-ish recalculate, and the irreversible lock/release pair —
 			     split by a visible divider, with "Save as timesheet" held apart as this bar's primary
 			     action. -->
-			<div class="flex flex-wrap items-center gap-2 border-t pt-4">
+			<div class="flex flex-wrap items-center gap-2 {data.view === 'team' ? '' : 'border-t pt-4'}">
 				{#if data.view === 'employee' && data.selectedEmployeeId}
 					<div role="group" aria-label="Recalculate" class="flex flex-wrap items-center gap-2">
 						<form method="POST" action="?/derive" use:enhance={derive.enhance}>
@@ -443,6 +437,22 @@
 				<span class="ml-auto text-xs text-muted-foreground"
 					>{data.view === 'team' && data.pagination ? data.pagination.total : dayRows.length} shown</span
 				>
+				{#if data.view === 'team'}
+					<form bind:this={dayForm} method="GET" class="ml-auto flex flex-wrap items-end gap-3">
+						<input type="hidden" name="view" value="team" />
+						{#if data.exceptionsOnly}<input type="hidden" name="exceptions" value="1" />{/if}
+						<div class="flex flex-col gap-1">
+							<label for="date" class="text-xs font-medium text-muted-foreground">Day</label>
+							<DatePicker
+								id="date"
+								name="date"
+								value={data.date}
+								onchange={() => dayForm?.requestSubmit()}
+								class="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
+							/>
+						</div>
+					</form>
+				{/if}
 			</div>
 		</div>
 	{/if}
