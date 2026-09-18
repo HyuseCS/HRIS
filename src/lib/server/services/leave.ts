@@ -225,6 +225,6 @@ export async function listOrgLeaveBalances(
 				}
 			}
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }]
 	})
 }

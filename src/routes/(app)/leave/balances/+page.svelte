@@ -67,7 +67,7 @@
 
 		<div class="min-h-0 flex-1 overflow-x-auto">
 			<table class="w-full min-w-max text-sm">
-				<thead class="sticky top-0 z-10 bg-card">
+				<thead class="sticky top-0 z-20 bg-card">
 					<tr class="border-b">
 						<th
 							class="sticky left-0 z-30 border-r bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))] px-4 py-3 text-left font-medium text-muted-foreground"
