@@ -90,3 +90,32 @@ Swept `src/` for the same pattern. Result:
   `goto` does update `page.url`, so it is not affected.
 
 **No second instance of this bug exists.** Nothing to do.
+
+## OWNER DECISIONS 18-09-26 — grilling session
+
+Every question in the table above is now answered. Recorded here so the notes stop reading as open.
+
+| | Item | Decision |
+|---|---|---|
+| D1 | N7 method | `PageHeader` wraps `description` in a `HelpTip` itself. One file. All 33 call sites keep the prop they pass today and are not edited. The visible `<p>` goes. |
+| D2 | N7 scope | All 33, no exceptions, no opt-out prop. The 28-vs-33 question is closed at 33. |
+| D3 | N6 | `search` and `onlyUnassigned` move into the query string; the load filters the fetched array then `paginate()` + slice, with its own page param. Positions stays out — `data.positions` feeds the per-row assign select and cannot be paged. |
+| D4 | N2 | Not a deletion. Redesign the settings nav bar. Constraint: `/settings` must stop reading as the same list twice; method is the designer's. |
+| D5 | N2 search | Top-right of the Settings title line for now. Final placement decided once the redesigned bar exists. |
+| D6 | N1 | The three-way toggle becomes a two-state switch, `Whole team` / `By employee`. An icon beside it flips Matrix <-> Per day in one click — a link, not a menu, no new component. Matrix stays the landing view. |
+| D6b | N1 | Unchanged from the original note: on the Per day view the controls collapse to one row, Day picker right, bulk actions up into the row it vacates. |
+| D7 | N3 | Design round. Boxes side by side is the starting direction, not the ceiling. |
+| D8 | N5 | Delete lives inside the modal. The row is purely clickable. Two sibling forms in one Dialog are valid — the nested-form objection was wrong. |
+| D9 | N5 | Design round, and it must also propose a grid view as an alternative. `/team` already ships a grid/list pair to copy from. |
+| D10 | Order | Build N1/N4/N6/N7 now; design N2/N3/N5 in parallel; O1 last, unchanged. |
+
+### Corrections to earlier claims in these notes
+
+- **"5 of the 33 descriptions are record identity."** Only one is. Source check: `separations/[id]:97` titles `"{lastName}, {firstName}"`, `performance/reviews/[id]:96` titles the employee name, `recruitment/[id]/apply:19` titles `"Add applicant to {posting}"` and its description is a department name only, and `punch:201` passes `undefined` unless the user is linked. Only `complaints/[id]:42` titles the complaint subject while its description carries the employee — it is the single page where D2 removes something from view.
+- **N4 is now layout only.** Its tooltip half is delivered by N7.
+- **A vacuous test guards nothing here.** `tests/e2e/employee-view-only.spec.ts:170` asserts a link named `Whole team (day)` has count 0. That string exists nowhere in `src/`, so the assertion cannot fail. N1 rewrites those labels, so the correction and a negative control are folded into N1.
+
+### Where the work lives
+
+- Build lane SPEC and PLAN: `process/features/ui-ux-overhaul/active/owner-click-pass-build-lane_18-09-26/`
+- Design round: `process/features/ui-ux-overhaul/active/owner-click-pass-design-round_18-09-26/`
