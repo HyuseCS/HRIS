@@ -129,6 +129,8 @@ test.describe('PageHeader description HelpTip', () => {
 test.describe('PageHeader description snippets', () => {
 	const CONFIG_TEXT = 'Configure payroll frequency and cutoff dates'
 	const RATES_TEXT = 'the payroll engine computes with'
+	const LEAVE_TEXT = 'Your leave balances and history'
+	const ONBOARDING_TEXT = "The steps shown on each employee's 201 file"
 
 	test('a link in the description is reachable by keyboard and clickable', async ({ page }) => {
 		await login(page, USERS.admin)
@@ -178,6 +180,52 @@ test.describe('PageHeader description snippets', () => {
 		await expect(tip).toHaveCSS('opacity', '1')
 		await expect(tip).toContainText(RATES_TEXT)
 		await expect(tip).toContainText('You can edit and apply these directly.')
+	})
+
+	test('the leave description link is reachable by keyboard and clickable', async ({ page }) => {
+		await login(page, USERS.admin)
+		await page.goto('/leave', { waitUntil: 'domcontentloaded' })
+
+		await expect(page.getByText(LEAVE_TEXT, { exact: false })).toHaveCount(1)
+
+		const button = page.getByRole('button', { name: 'About Leave', exact: true })
+		await expect(button).toHaveCount(1)
+		const tip = page.getByRole('tooltip')
+		await expect(tip).toHaveCount(1)
+		await expect(tip).toHaveCSS('opacity', '0')
+
+		await button.focus()
+		await expect(tip).toHaveCSS('opacity', '1')
+		await expect(tip).toContainText(LEAVE_TEXT)
+
+		const link = tip.getByRole('link', { name: 'Requests/Approvals', exact: true })
+		await page.keyboard.press('Tab')
+		expect(
+			await link.evaluate((el) => el === document.activeElement),
+			'the description link is the next tab stop after the ? control'
+		).toBe(true)
+		await expect(tip).toHaveCSS('opacity', '1')
+
+		await link.click()
+		await page.waitForURL('**/requests', { waitUntil: 'domcontentloaded' })
+	})
+
+	test('the onboarding description keeps its emphasis inside the tooltip', async ({ page }) => {
+		await login(page, USERS.admin)
+		await page.goto('/settings/onboarding', { waitUntil: 'domcontentloaded' })
+
+		await expect(page.getByText(ONBOARDING_TEXT, { exact: false })).toHaveCount(1)
+
+		const button = page.getByRole('button', { name: 'About Onboarding Checklist', exact: true })
+		await expect(button).toHaveCount(1)
+		await button.focus()
+
+		const tip = page.getByRole('tooltip')
+		await expect(tip).toHaveCount(1)
+		await expect(tip).toHaveCSS('opacity', '1')
+		await expect(tip).toContainText(ONBOARDING_TEXT)
+		await expect(tip.locator('span.font-medium', { hasText: 'Derived' })).toHaveCount(1)
+		await expect(tip.locator('span.font-medium', { hasText: 'Manual' })).toHaveCount(1)
 	})
 })
 
