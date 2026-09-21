@@ -38,9 +38,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 				}
 			}
 		},
-		orderBy: {
-			payrollRun: { periodStart: 'desc' }
-		},
+		orderBy: [{ payrollRun: { periodStart: 'desc' } }, { id: 'desc' }],
 		skip: pagination.skip,
 		take: pagination.take
 	})
