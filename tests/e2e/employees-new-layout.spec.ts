@@ -7,7 +7,7 @@ const VIEWPORTS = [390, 1024, 1280, 1440, 1536, 1920]
 const TOLERANCE = 8
 const STICKY_TOP = 32
 const SCROLL_SPAN = 500
-const SUMMARY_TEXT = 'Complete later — 12 optional fields'
+const SUMMARY_TEXT = 'Complete later — 11 optional fields'
 const SECTION_LINKS = [
 	'Personal Information',
 	'Contact Information',

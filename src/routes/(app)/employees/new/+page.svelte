@@ -38,7 +38,7 @@
 			? true
 			: undefined
 
-	// The "Complete later" disclosure hides 12 optional fields, so a server rejection inside it
+	// The "Complete later" disclosure hides 11 optional fields, so a server rejection inside it
 	// would otherwise render in a collapsed container — a silent failure. Open it in that case.
 	const OPTIONAL_FIELDS = [
 		'sssNumber',
@@ -456,7 +456,7 @@
 
 				<details open={optionalHasError} class="rounded-md border">
 					<summary class="cursor-pointer px-4 py-3 text-sm font-semibold"
-						>Complete later — 12 optional fields</summary
+						>Complete later — 11 optional fields</summary
 					>
 					<div class="space-y-8 border-t p-4">
 						<p class="text-sm text-muted-foreground">
