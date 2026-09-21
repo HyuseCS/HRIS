@@ -2,15 +2,16 @@ import { test, expect, type Page } from '@playwright/test'
 import { login, USERS } from './helpers'
 
 /**
- * N1 (owner click pass 18-09-26 / D6): the attendance view switch is two states —
- * `Whole team` and `By employee` — plus one link that flips matrix <-> per-day in a
- * single click. `?view=` values are unchanged, so every saved link still resolves.
+ * N1 (owner click pass 18-09-26 / D6, revised 21-09-26): the attendance view switch is
+ * two states — `Whole team` and `By employee` — plus a second labelled switch, styled the
+ * same way, that flips matrix <-> per-day: `Week grid` / `Single day`. `?view=` values are
+ * unchanged, so every saved link still resolves.
  */
 
 const WHOLE_TEAM = { name: 'Whole team', exact: true } as const
 const BY_EMPLOYEE = { name: 'By employee', exact: true } as const
-const TO_DAY = { name: 'Show one day', exact: true } as const
-const TO_GRID = { name: 'Show the week grid', exact: true } as const
+const TO_DAY = { name: 'Single day', exact: true } as const
+const TO_GRID = { name: 'Week grid', exact: true } as const
 
 function flip(page: Page, names: { name: string; exact: true }) {
 	return page.getByRole('link', names)
@@ -32,6 +33,8 @@ test.describe('Attendance view switch (N1)', () => {
 		await expect(page.getByRole('link', WHOLE_TEAM)).toHaveCount(1)
 		await expect(page.getByRole('link', BY_EMPLOYEE)).toHaveCount(1)
 		await expect(page.getByRole('link', { name: 'Team day' })).toHaveCount(0)
+		await expect(page.getByRole('link', TO_GRID)).toHaveCount(1)
+		await expect(page.getByRole('link', TO_DAY)).toHaveCount(1)
 	})
 
 	test('flip to per day in one click', async ({ page }) => {
@@ -144,7 +147,7 @@ test.describe('Attendance view switch (N1)', () => {
 		// the switch, which is the "tabbing from the page title" order N1-AC8 names.
 		await page.getByRole('button', { name: 'About Attendance', exact: true }).focus()
 
-		for (const expected of ['Whole team', 'By employee', 'Show one day']) {
+		for (const expected of ['Whole team', 'By employee', 'Week grid', 'Single day']) {
 			await page.keyboard.press('Tab')
 			const name = await page.evaluate(() => {
 				const el = document.activeElement as HTMLElement | null
@@ -154,7 +157,7 @@ test.describe('Attendance view switch (N1)', () => {
 		}
 
 		const toDay = flip(page, TO_DAY)
-		expect((await toDay.getAttribute('aria-label'))?.trim()).toBeTruthy()
+		expect((await toDay.textContent())?.trim()).toBeTruthy()
 		expect(
 			await toDay.evaluate((el) => el.matches(':focus-visible')),
 			'the flip link shows its focus ring'

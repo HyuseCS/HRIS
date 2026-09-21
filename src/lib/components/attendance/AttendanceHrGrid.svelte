@@ -11,8 +11,6 @@
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
-	import CalendarDays from 'lucide-svelte/icons/calendar-days'
-	import Table2 from 'lucide-svelte/icons/table-2'
 	import TeamMatrix from '$lib/components/attendance/TeamMatrix.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
@@ -214,7 +212,8 @@
 			<div class="inline-flex max-w-full flex-wrap rounded-lg border p-1 text-sm">
 				<a
 					href="?view=matrix"
-					class="rounded-md px-3 py-1.5 font-medium {data.view !== 'employee'
+					class="rounded-md px-3 py-1.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {data.view !==
+					'employee'
 						? 'bg-primary text-primary-foreground'
 						: 'text-muted-foreground hover:bg-accent'}"
 				>
@@ -223,7 +222,8 @@
 				<a
 					href="?view=employee&employeeId={data.selectedEmployeeId ??
 						''}&from={data.from}&to={data.to}"
-					class="rounded-md px-3 py-1.5 font-medium {data.view === 'employee'
+					class="rounded-md px-3 py-1.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {data.view ===
+					'employee'
 						? 'bg-primary text-primary-foreground'
 						: 'text-muted-foreground hover:bg-accent'}"
 				>
@@ -231,17 +231,26 @@
 				</a>
 			</div>
 			{#if data.view !== 'employee'}
-				<a
-					href={data.view === 'matrix' ? `?view=team&date=${data.date}` : '?view=matrix'}
-					aria-label={data.view === 'matrix' ? 'Show one day' : 'Show the week grid'}
-					class="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-				>
-					{#if data.view === 'matrix'}
-						<CalendarDays class="h-4 w-4" aria-hidden="true" />
-					{:else}
-						<Table2 class="h-4 w-4" aria-hidden="true" />
-					{/if}
-				</a>
+				<div class="inline-flex max-w-full flex-wrap rounded-lg border p-1 text-sm">
+					<a
+						href="?view=matrix"
+						class="rounded-md px-3 py-1.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {data.view ===
+						'matrix'
+							? 'bg-primary text-primary-foreground'
+							: 'text-muted-foreground hover:bg-accent'}"
+					>
+						Week grid
+					</a>
+					<a
+						href="?view=team&date={data.date}"
+						class="rounded-md px-3 py-1.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {data.view ===
+						'matrix'
+							? 'text-muted-foreground hover:bg-accent'
+							: 'bg-primary text-primary-foreground'}"
+					>
+						Single day
+					</a>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -434,9 +443,6 @@
 					<span class="font-medium">Exceptions only</span>
 					<span class="text-xs text-muted-foreground">absent, incomplete &amp; late</span>
 				</label>
-				<span class="ml-auto text-xs text-muted-foreground"
-					>{data.view === 'team' && data.pagination ? data.pagination.total : dayRows.length} shown</span
-				>
 				{#if data.view === 'team'}
 					<form bind:this={dayForm} method="GET" class="ml-auto flex flex-wrap items-end gap-3">
 						<input type="hidden" name="view" value="team" />
@@ -580,10 +586,15 @@
 	{/if}
 
 	{#if data.view !== 'matrix'}
-		<p class="text-xs text-muted-foreground">
-			Reg and OT are worked out from the punches and the approved overtime, and cannot be typed in.
-			Correct a day by editing its In and Out.
-		</p>
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<p class="text-xs text-muted-foreground">
+				Reg and OT are worked out from the punches and the approved overtime, and cannot be typed
+				in. Correct a day by editing its In and Out.
+			</p>
+			<span class="shrink-0 text-xs text-muted-foreground"
+				>{data.view === 'team' && data.pagination ? data.pagination.total : dayRows.length} shown</span
+			>
+		</div>
 	{/if}
 
 	{#if data.view === 'matrix' && data.matrix}
