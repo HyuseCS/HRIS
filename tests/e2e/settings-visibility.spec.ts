@@ -54,8 +54,15 @@ for (const { label, user } of LOCKED_OUT) {
 	test(`${label} still does not see the system-admin cards (#237)`, async ({ page }) => {
 		await login(page, user)
 		await page.goto('/settings', { waitUntil: 'domcontentloaded' })
-		await expect(page.getByRole('link', { name: /Payroll Config/ })).toHaveCount(0)
-		await expect(page.getByRole('link', { name: /Roles & Access/ })).toHaveCount(0)
+		// Positive control, in the same two scopes: an unscoped count of 0 also passes on a blank
+		// page, on a bounce to /login, and on a hub that never rendered, and it cannot tell
+		// "absent from the hub" from "absent from the sidebar".
+		await expect(hubCard(page, /Holiday Calendar/)).toHaveCount(1)
+		await expect(sidebarRow(page, 'Holiday Calendar')).toHaveCount(1)
+		await expect(hubCard(page, /Payroll Config/)).toHaveCount(0)
+		await expect(sidebarRow(page, 'Payroll Config')).toHaveCount(0)
+		await expect(hubCard(page, /Roles & Access/)).toHaveCount(0)
+		await expect(sidebarRow(page, 'Roles & Access')).toHaveCount(0)
 	})
 }
 
