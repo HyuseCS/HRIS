@@ -46,7 +46,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			entries: { orderBy: { date: 'asc' } },
 			approvalSteps: true
 		},
-		orderBy: { submittedAt: 'asc' }
+		orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }]
 	})
 
 	const pendingTimesheets = submitted

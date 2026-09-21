@@ -385,7 +385,7 @@ export async function listPendingRequestsForApprover(
 			// the same bypass as at decide()'s include, on the reader that is watched least.
 			documents: { select: { id: true, verifiedAt: true, verifiedById: true, deletedAt: true } }
 		},
-		orderBy: { createdAt: 'asc' }
+		orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
 	})
 
 	// #299/P-5 + I-5: `documents` serves two consumers with OPPOSITE needs. verifiedDocActorIds
