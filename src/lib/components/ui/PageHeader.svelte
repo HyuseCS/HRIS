@@ -13,8 +13,9 @@
 		back
 	}: {
 		title: string
-		/** One line under the title. Say what the page is for, not what it is called. */
-		description?: string
+		/** One line under the title, shown in the `?` tooltip. Say what the page is for, not what it
+		 *  is called. Pass a snippet instead of a string when the line needs a link or a branch. */
+		description?: string | Snippet
 		/** A status pill for the record the page is about. Sits beside the title, because it
 		 *  qualifies the name — it is not a navigation control like Back. */
 		badge?: Snippet
@@ -37,7 +38,14 @@
 			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
 			{#if badge}{@render badge()}{/if}
 			{#if description}
-				<HelpTip label={`About ${title}`}>{description}</HelpTip>
+				<HelpTip label={`About ${title}`}>
+					<!-- HelpTip's bubble is pointer-events-none so it never eats clicks on the page under
+					     it. The content opts back in, or a link in a description snippet could not be
+					     hovered or clicked. -->
+					<span class="pointer-events-auto block">
+						{#if typeof description === 'function'}{@render description()}{:else}{description}{/if}
+					</span>
+				</HelpTip>
 			{/if}
 		</div>
 	</div>

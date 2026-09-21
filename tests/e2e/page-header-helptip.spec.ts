@@ -126,6 +126,61 @@ test.describe('PageHeader description HelpTip', () => {
 	})
 })
 
+test.describe('PageHeader description snippets', () => {
+	const CONFIG_TEXT = 'Configure payroll frequency and cutoff dates'
+	const RATES_TEXT = 'the payroll engine computes with'
+
+	test('a link in the description is reachable by keyboard and clickable', async ({ page }) => {
+		await login(page, USERS.admin)
+		await page.goto('/payroll/config', { waitUntil: 'domcontentloaded' })
+
+		await expect(page.getByText(CONFIG_TEXT, { exact: false })).toHaveCount(1)
+
+		const button = page.getByRole('button', { name: 'About Payroll Configuration', exact: true })
+		await expect(button).toHaveCount(1)
+		const tip = page.getByRole('tooltip')
+		await expect(tip).toHaveCount(1)
+		await expect(tip).toHaveCSS('opacity', '0')
+
+		await button.focus()
+		await expect(tip).toHaveCSS('opacity', '1')
+		await expect(tip).toContainText(CONFIG_TEXT)
+
+		// The link sits next in the tab order, and focus inside the bubble keeps it open —
+		// without both, a description link would be unreachable.
+		const link = tip.getByRole('link', { name: 'Statutory Rates', exact: true })
+		await page.keyboard.press('Tab')
+		expect(
+			await link.evaluate((el) => el === document.activeElement),
+			'the description link is the next tab stop after the ? control'
+		).toBe(true)
+		await expect(tip).toHaveCSS('opacity', '1')
+
+		// A real pointer click — it fails if the bubble refuses pointer events.
+		await link.click()
+		await page.waitForURL('**/payroll/statutory-rates', { waitUntil: 'domcontentloaded' })
+	})
+
+	test('a description that branches on capability renders its branch in the tooltip', async ({
+		page
+	}) => {
+		await login(page, USERS.admin)
+		await page.goto('/payroll/statutory-rates', { waitUntil: 'domcontentloaded' })
+
+		await expect(page.getByText(RATES_TEXT, { exact: false })).toHaveCount(1)
+
+		const button = page.getByRole('button', { name: 'About Statutory Rates', exact: true })
+		await expect(button).toHaveCount(1)
+		await button.focus()
+
+		const tip = page.getByRole('tooltip')
+		await expect(tip).toHaveCount(1)
+		await expect(tip).toHaveCSS('opacity', '1')
+		await expect(tip).toContainText(RATES_TEXT)
+		await expect(tip).toContainText('You can edit and apply these directly.')
+	})
+})
+
 test.describe('complaints detail keeps an identifying title', () => {
 	const SUBJECT = 'Zzhelptip inquiry fixture'
 	let complaintId = ''

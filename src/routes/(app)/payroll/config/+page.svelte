@@ -79,13 +79,13 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<!-- The description carries a link, which PageHeader's string `description` cannot, so it
-	     stays its own paragraph directly under the title. -->
-	<PageHeader title="Payroll Configuration" />
-	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
-		Configure payroll frequency and cutoff dates. Statutory rate tables live under
-		<a href="/payroll/statutory-rates" class="underline hover:text-foreground">Statutory Rates</a>.
-	</p>
+	<PageHeader title="Payroll Configuration">
+		{#snippet description()}
+			Configure payroll frequency and cutoff dates. Statutory rate tables live under
+			<a href="/payroll/statutory-rates" class="underline hover:text-foreground">Statutory Rates</a
+			>.
+		{/snippet}
+	</PageHeader>
 
 	<form
 		method="POST"

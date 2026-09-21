@@ -19,10 +19,22 @@ describe('PageHeader renders its description as a HelpTip', () => {
 	})
 
 	it('renders exactly one HelpTip, named from the title, guarded by description', () => {
-		expect(header).toMatch(
-			/\{#if description\}\s*<HelpTip label=\{`About \$\{title\}`\}>\{description\}<\/HelpTip>/
-		)
+		expect(header).toMatch(/\{#if description\}\s*<HelpTip label=\{`About \$\{title\}`\}>/)
 		expect(header.match(/<HelpTip/g)).toHaveLength(1)
+	})
+
+	it('renders the description whether it is a string or a snippet', () => {
+		expect(header).toMatch(
+			/\{#if typeof description === 'function'\}\{@render description\(\)\}\{:else\}\{description\}\{\/if\}/
+		)
+		expect(header.slice(header.indexOf('let {'), header.indexOf('} = $props()'))).toContain(
+			'description?: string | Snippet'
+		)
+	})
+
+	it('lets the tooltip content take pointer events, so a description link stays clickable', () => {
+		const tip = header.slice(header.indexOf('<HelpTip'), header.indexOf('</HelpTip>'))
+		expect(tip).toMatch(/class="[^"]*\bpointer-events-auto\b/)
 	})
 
 	it('keeps the HelpTip inside the only relative ancestor it can anchor to', () => {
@@ -44,7 +56,10 @@ describe('PageHeader renders its description as a HelpTip', () => {
 		const offenders = sourceFiles('src').filter((path) => {
 			const src = readFileSync(path, 'utf8')
 			const openingTags = [...src.matchAll(/<PageHeader\b[^>]*>/g)].map((m) => m[0])
-			if (!openingTags.some((tag) => /\bdescription=/.test(tag))) return false
+			const described =
+				openingTags.some((tag) => /\bdescription=/.test(tag)) ||
+				/\{#snippet description\(\)\}/.test(src)
+			if (!described) return false
 			const badge = src.match(/\{#snippet badge\(\)\}([\s\S]*?)\{\/snippet\}/)
 			return !!badge && badge[1].includes('HelpTip')
 		})
