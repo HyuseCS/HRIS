@@ -91,6 +91,7 @@ const event = (fields: Record<string, string>, actorRoles: Role[] = SUPER) => {
 	for (const [k, v] of Object.entries(fields)) body.set(k, v)
 	return {
 		request: { formData: async () => body },
+		cookies: { get: () => undefined },
 		params: { id: 'run1' },
 		locals: { user: { id: 'actor', organizationId: 'org1', roles: actorRoles } },
 		getClientAddress: () => '127.0.0.1'

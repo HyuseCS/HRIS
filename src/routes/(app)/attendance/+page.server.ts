@@ -318,7 +318,7 @@ const correctSchema = z.object({
 })
 const bulkRowSchema = correctSchema.extend({ date: z.string().min(1) })
 const bulkResetRowSchema = z.object({ id: z.string().min(1), date: z.string().min(1) })
-const MAX_BULK_ROWS = paginate(new URL('http://localhost/'), 0).take
+const maxBulkRows = (cookies: Cookies) => fitPageSize(cookies, { rowPx: 45, chromePx: 654 })
 
 export const actions: Actions = {
 	derive: async (event) => {
@@ -370,8 +370,9 @@ export const actions: Actions = {
 		}
 		const parsed = z.array(bulkRowSchema).min(1).safeParse(decoded)
 		if (!parsed.success) return fail(400, { error: 'Could not read the days to save.' })
-		if (parsed.data.length > MAX_BULK_ROWS)
-			return fail(400, { error: `Too many days in one save — ${MAX_BULK_ROWS} at a time.` })
+		const maxRows = maxBulkRows(event.cookies)
+		if (parsed.data.length > maxRows)
+			return fail(400, { error: `Too many days in one save — ${maxRows} at a time.` })
 
 		const organizationId = event.locals.user!.organizationId
 		const ctx = ctxOf(event)
@@ -432,9 +433,10 @@ export const actions: Actions = {
 		}
 		const parsed = z.array(bulkResetRowSchema).min(1).safeParse(decoded)
 		if (!parsed.success) return fail(400, { error: 'Could not read the days to recalculate.' })
-		if (parsed.data.length > MAX_BULK_ROWS)
+		const maxRows = maxBulkRows(event.cookies)
+		if (parsed.data.length > maxRows)
 			return fail(400, {
-				error: `Too many days in one recalculate — ${MAX_BULK_ROWS} at a time.`
+				error: `Too many days in one recalculate — ${maxRows} at a time.`
 			})
 
 		const organizationId = event.locals.user!.organizationId
