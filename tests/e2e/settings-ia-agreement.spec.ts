@@ -6,7 +6,7 @@ import { login, USERS } from './helpers'
 /**
  * A2 — the three settings surfaces must AGREE, proven in the DOM.
  *
- * `settings-context-rail.spec.ts` already pins the rail's own shape, and its 17/14/12 check is a
+ * `settings-context-rail.spec.ts` already pins the rail's own shape, and its 13/11/10 check is a
  * straight module call: it proves `visibleSettings`, never a rendered page. Everything here is
  * read out of the browser and compared against the array, so a surface that drifts from the
  * source of truth — an EXTRA card for a hidden destination, a sidebar child the hub never shows,
@@ -25,10 +25,12 @@ import { login, USERS } from './helpers'
  */
 
 const ROLES = [
-	{ label: 'Super Admin', user: USERS.admin, roles: ['SUPER_ADMIN'] as Role[], hub: 17, side: 8 },
-	{ label: 'HR Admin', user: USERS.hr, roles: ['HR_ADMIN'] as Role[], hub: 14, side: 7 },
-	{ label: 'Manager', user: USERS.manager, roles: ['MANAGER'] as Role[], hub: 12, side: 7 },
-	{ label: 'CEO', user: USERS.ceo, roles: ['CEO'] as Role[], hub: 17, side: 8 }
+	// hub/side dropped by the removed Payroll group: four destinations left the hub, two of them
+	// (Earnings & Deductions, Salary Grades) were also sidebar rows. `side` counts 'All settings'.
+	{ label: 'Super Admin', user: USERS.admin, roles: ['SUPER_ADMIN'] as Role[], hub: 13, side: 6 },
+	{ label: 'HR Admin', user: USERS.hr, roles: ['HR_ADMIN'] as Role[], hub: 11, side: 5 },
+	{ label: 'Manager', user: USERS.manager, roles: ['MANAGER'] as Role[], hub: 10, side: 5 },
+	{ label: 'CEO', user: USERS.ceo, roles: ['CEO'] as Role[], hub: 13, side: 6 }
 ]
 
 const hub = (page: Page) => page.getByRole('region', { name: 'Settings destinations' })

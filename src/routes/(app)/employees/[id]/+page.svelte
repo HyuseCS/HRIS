@@ -1404,9 +1404,9 @@
 
 					<h3 class="text-sm font-medium">Custom deductions</h3>
 					<p class="text-xs text-muted-foreground">
-						Monthly amounts against a deduction code from Settings &rarr; Pay Codes, prorated to
-						each payroll period and taken before loan/cash-advance installments. Ended items stop
-						from the next payroll run.
+						Monthly amounts against a deduction code from Payroll &rarr; Earnings &amp; Deductions,
+						prorated to each payroll period and taken before loan/cash-advance installments. Ended
+						items stop from the next payroll run.
 					</p>
 					{#if data.recurringDeductions.length}
 						<table class="w-full text-sm">
@@ -1485,7 +1485,9 @@
 					{:else}
 						<p class="text-xs text-muted-foreground">
 							No assignable deduction codes yet — create one under
-							<a href="/settings/pay-codes" class="underline">Settings &rarr; Pay Codes</a>.
+							<a href="/payroll/pay-codes" class="underline"
+								>Payroll &rarr; Earnings &amp; Deductions</a
+							>.
 						</p>
 					{/if}
 				</section>

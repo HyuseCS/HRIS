@@ -94,11 +94,15 @@ async function tabTrail(page: Page, stop: (el: { id: string; inRail: boolean }) 
  * collection instead of contributing a silent zero to a green run.
  */
 test('settings-destinations resolves under the Playwright runner', () => {
-	expect(SETTINGS_GROUP_ORDER).toHaveLength(5)
-	expect(visibleSettings(['SUPER_ADMIN'] as Role[])).toHaveLength(17)
-	expect(visibleSettings(['HR_ADMIN'] as Role[])).toHaveLength(14)
-	expect(visibleSettings(['MANAGER'] as Role[])).toHaveLength(12)
-	expect(groupsFor(['MANAGER'] as Role[])).toHaveLength(4)
+	// Counts dropped by the four destinations of the removed Payroll group (17/14/12 -> 13/11/10):
+	// pay is reached from the /payroll tab rail now, not from the settings hub.
+	expect(SETTINGS_GROUP_ORDER).toHaveLength(4)
+	expect(visibleSettings(['SUPER_ADMIN'] as Role[])).toHaveLength(13)
+	expect(visibleSettings(['HR_ADMIN'] as Role[])).toHaveLength(11)
+	expect(visibleSettings(['MANAGER'] as Role[])).toHaveLength(10)
+	// MANAGER reaches Organization, Time & Attendance and Hiring & Separation — not System
+	// (Review Schedule and Document Backup are both above it), and Payroll no longer exists.
+	expect(groupsFor(['MANAGER'] as Role[])).toHaveLength(3)
 })
 
 // N2-T1 — N2-AC1

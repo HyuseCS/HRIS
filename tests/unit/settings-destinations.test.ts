@@ -28,18 +28,26 @@ describe('settings destinations', () => {
 		}
 	})
 
-	it('keeps the sidebar Settings group to the curated seven (OD-2)', () => {
-		// The sidebar shows a subset, not all 17 — growing it is a navigation-IA change that belongs
+	it('keeps the sidebar Settings group to the curated five (OD-2)', () => {
+		// The sidebar shows a subset, not all 13 — growing it is a navigation-IA change that belongs
 		// to the nav phase, not to whoever adds a settings page.
 		expect(SETTINGS_DESTINATIONS.filter((d) => d.inSidebar).map((d) => d.href)).toEqual([
 			'/settings/company',
 			'/settings/org',
 			'/settings/roles',
 			'/settings/schedules',
-			'/settings/holidays',
-			'/settings/pay-codes',
-			'/settings/salary-grades'
+			'/settings/holidays'
 		])
+	})
+
+	it('keeps every pay-related destination off the settings surface', () => {
+		// The owner moved the whole Payroll group to /payroll (N6-AC10 follow-up): pay is reached
+		// from the payroll tab rail, never from the settings hub. `payroll-tabs-capability.test.ts` pins the
+		// other half — that the two pay masters are actually ON that rail, gated on MANAGE_HR.
+		expect(SETTINGS_DESTINATIONS.map((d) => d.href)).not.toContain('/settings/pay-codes')
+		expect(SETTINGS_DESTINATIONS.map((d) => d.href)).not.toContain('/settings/salary-grades')
+		expect(SETTINGS_DESTINATIONS.filter((d) => d.href.startsWith('/payroll'))).toEqual([])
+		expect(SETTINGS_GROUP_ORDER).not.toContain('Payroll')
 	})
 
 	it('never shows a sidebar row the role cannot open', () => {

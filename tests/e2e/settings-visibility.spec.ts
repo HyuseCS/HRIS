@@ -59,8 +59,12 @@ for (const { label, user } of LOCKED_OUT) {
 		// "absent from the hub" from "absent from the sidebar".
 		await expect(hubCard(page, /Holiday Calendar/)).toHaveCount(1)
 		await expect(sidebarRow(page, 'Holiday Calendar')).toHaveCount(1)
-		await expect(hubCard(page, /Payroll Config/)).toHaveCount(0)
-		await expect(sidebarRow(page, 'Payroll Config')).toHaveCount(0)
+		// Document Backup replaces Payroll Config here: same ADMINISTER_SYSTEM gate, and Payroll
+		// Config is no longer a settings destination at all — asserting its absence would pass for
+		// every role and prove nothing. Its sidebar leg is gone with it: Document Backup is not an
+		// `inSidebar` row either, so a 0 there could not fail. Roles & Access carries that scope —
+		// it IS a sidebar row, and Super Admin's positive case below keeps it honest.
+		await expect(hubCard(page, /Document Backup/)).toHaveCount(0)
 		await expect(hubCard(page, /Roles & Access/)).toHaveCount(0)
 		await expect(sidebarRow(page, 'Roles & Access')).toHaveCount(0)
 	})
@@ -70,8 +74,11 @@ test('Super Admin keeps every card and nav entry it already had (#237)', async (
 	await login(page, USERS.admin)
 	await page.goto('/settings', { waitUntil: 'domcontentloaded' })
 	await expect(hubCard(page, /Holiday Calendar/)).toBeVisible()
-	await expect(hubCard(page, /Payroll Config/)).toBeVisible()
+	await expect(hubCard(page, /Document Backup/)).toBeVisible()
 	// Gated on the Roles & Access capability OR after #237; must not have narrowed for the Super Admin.
 	await expect(hubCard(page, /Roles & Access/)).toBeVisible()
 	await expect(sidebarRow(page, 'Holiday Calendar')).toBeVisible()
+	// The negative control's sidebar leg, proven positive: Roles & Access IS a sidebar row for this
+	// role, so the count-0 assertions above are reading a scope that can actually hold it.
+	await expect(sidebarRow(page, 'Roles & Access')).toBeVisible()
 })

@@ -38,10 +38,6 @@ const SUPER_ADMIN_HREFS = [
 	'/settings/schedules',
 	'/settings/holidays',
 	'/settings/leave-types',
-	'/payroll/config',
-	'/payroll/statutory-rates',
-	'/settings/pay-codes',
-	'/settings/salary-grades',
 	'/settings/onboarding',
 	'/settings/offboarding',
 	'/settings/posting-approvers',
@@ -58,10 +54,6 @@ const CEO_HREFS = [
 	'/settings/schedules',
 	'/settings/holidays',
 	'/settings/leave-types',
-	'/payroll/config',
-	'/payroll/statutory-rates',
-	'/settings/pay-codes',
-	'/settings/salary-grades',
 	'/settings/onboarding',
 	'/settings/offboarding',
 	'/settings/posting-approvers',
@@ -70,8 +62,9 @@ const CEO_HREFS = [
 	'/settings/backup'
 ]
 
-// HR Admin proposes statutory rates and administers HR org-wide, but is neither a system admin
-// nor a role-changer: no Roles & Access, no Payroll Config, no Document Backup.
+// HR Admin administers HR org-wide, but is neither a system admin nor a role-changer:
+// no Roles & Access, no Document Backup. (Statutory Rates, which HR Admin may propose, is no
+// longer a settings destination — it is reached from the /payroll tab rail.)
 const HR_ADMIN_HREFS = [
 	'/settings/company',
 	'/settings/org',
@@ -79,9 +72,6 @@ const HR_ADMIN_HREFS = [
 	'/settings/schedules',
 	'/settings/holidays',
 	'/settings/leave-types',
-	'/payroll/statutory-rates',
-	'/settings/pay-codes',
-	'/settings/salary-grades',
 	'/settings/onboarding',
 	'/settings/offboarding',
 	'/settings/posting-approvers',
@@ -91,8 +81,8 @@ const HR_ADMIN_HREFS = [
 
 // The whole point of the ADMINISTER_HR_ORGWIDE gate (#178): MANAGER clears the MANAGE_HR guard on
 // this surface but NOT /settings/performance's ADMINISTER_HR_ORGWIDE, so Review Schedule must stay
-// hidden. Gate it on anything wider and this list goes red — as do Payroll Config, Statutory Rates,
-// Roles & Access and Document Backup.
+// hidden. Gate it on anything wider and this list goes red — as do Roles & Access and Document
+// Backup.
 const MANAGER_HREFS = [
 	'/settings/company',
 	'/settings/org',
@@ -100,8 +90,6 @@ const MANAGER_HREFS = [
 	'/settings/schedules',
 	'/settings/holidays',
 	'/settings/leave-types',
-	'/settings/pay-codes',
-	'/settings/salary-grades',
 	'/settings/onboarding',
 	'/settings/offboarding',
 	'/settings/posting-approvers',

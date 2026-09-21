@@ -14,8 +14,7 @@ import { canAny, type Capability } from '$lib/rbac'
  * do not read it as "visible to everyone".
  */
 
-export type SettingsGroup =
-	'Organization' | 'Time & Attendance' | 'Payroll' | 'Hiring & Separation' | 'System'
+export type SettingsGroup = 'Organization' | 'Time & Attendance' | 'Hiring & Separation' | 'System'
 
 export interface SettingsDestination {
 	href: string
@@ -33,7 +32,6 @@ export interface SettingsDestination {
 export const SETTINGS_GROUP_ORDER: SettingsGroup[] = [
 	'Organization',
 	'Time & Attendance',
-	'Payroll',
 	'Hiring & Separation',
 	'System'
 ]
@@ -100,39 +98,6 @@ export const SETTINGS_DESTINATIONS: SettingsDestination[] = [
 		group: 'Time & Attendance',
 		capabilities: [],
 		inSidebar: false
-	},
-	{
-		href: '/payroll/config',
-		label: 'Payroll Config',
-		desc: 'Cutoffs, frequency, premium multipliers',
-		group: 'Payroll',
-		capabilities: ['ADMINISTER_SYSTEM'],
-		inSidebar: false
-	},
-	{
-		href: '/payroll/statutory-rates',
-		label: 'Statutory Rates',
-		desc: 'SSS, PhilHealth, Pag-IBIG, BIR tax',
-		group: 'Payroll',
-		// Statutory Rates page is reachable by editors (CEO/Super Admin) and proposers (HR Admin).
-		capabilities: ['MANAGE_STATUTORY_RATES', 'PROPOSE_STATUTORY_RATES'],
-		inSidebar: false
-	},
-	{
-		href: '/settings/pay-codes',
-		label: 'Earnings & Deductions',
-		desc: 'Payroll codes',
-		group: 'Payroll',
-		capabilities: [],
-		inSidebar: true
-	},
-	{
-		href: '/settings/salary-grades',
-		label: 'Salary Grades',
-		desc: 'Pay bands per position',
-		group: 'Payroll',
-		capabilities: [],
-		inSidebar: true
 	},
 	{
 		href: '/settings/onboarding',
