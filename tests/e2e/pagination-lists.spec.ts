@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import type { ComplaintStatus, InventoryStatus } from '@prisma/client'
 import { login, USERS } from './helpers'
@@ -75,6 +75,26 @@ async function rowKeys(page: Page, selector: string, attr: string): Promise<stri
 		`every row carries ${attr}`
 	).toEqual([])
 	return keys
+}
+
+/**
+ * The same ONE-snapshot rule for a surface that renders no row-identity attribute at all:
+ * `TimesheetListTab` is a bare <tr onclick> and the review queue a bare <li>, so identity has
+ * to come from rendered TEXT (adding a data-* to either is banned). The text is only unique
+ * because every fixture employee below is unique, so that uniqueness is asserted here — a
+ * collision would hide a repeated row and make the disjointness check pass for free.
+ */
+async function rowTexts(cells: Locator, what: string): Promise<string[]> {
+	const texts = await cells.evaluateAll((els) =>
+		els.map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim())
+	)
+	expect(texts.length, `${what} rendered no rows to compare`).toBeGreaterThan(0)
+	expect(
+		texts.filter((t) => t === ''),
+		`every ${what} renders an identity`
+	).toEqual([])
+	expect(new Set(texts).size, `${what} identities are unique within the page`).toBe(texts.length)
+	return texts
 }
 
 function assertDisjoint(page1: string[], page2: string[]) {
@@ -496,5 +516,217 @@ test.describe('complaints list pagination (HR branch)', () => {
 		expect(last.start).toBe(CMP_COUNT - ((CMP_COUNT - 1) % size))
 		await expect(page.locator(CMP_ROWS)).toHaveCount(last.end - last.start + 1)
 		await expectLastPageEnds(page)
+	})
+})
+
+// ---------------------------------------------------------------------------
+// Tied-`periodStart` page walk — the behavioural guard for the /timesheets team
+// table's sort tiebreaker. A list that sorts on a non-unique column has no total
+// order: page 1 and page 2 are separate requests, each re-running the sort, so
+// Postgres may legally hand back tied rows in a different relative order per
+// request and a row can render twice while another becomes unreachable. Only
+// fixtures that DELIBERATELY TIE the sort key can see that — a fixture with
+// distinct keys makes the sort total on its own and is green either way.
+//
+// Observed RED for the right reason: with `services/timesheets.ts` reverted to a
+// bare `orderBy: { periodStart: 'desc' }` this walk fails on `page 2 repeats no
+// row from page 1` with 8 repeated rows, at 20 rows, through the browser.
+//
+// A SIBLING WALK AGAINST /requests/timesheets WAS WRITTEN AND DELETED. Reverting
+// that route's tiebreaker left it green — it could not fail, so it was a fixture
+// bill for no coverage. Ordering is a database property; that site is guarded at
+// the integration tier, with two independent queries instead of a rendered page.
+// Do not re-add a browser walk there without first seeing it red.
+//
+// Four things below are load-bearing and none of them are free:
+//
+//   1. PAGE SIZE IS 10, NOT VIEWPORT-DERIVED. The team table uses the shared
+//      `paginate()` default, so two pages hold exactly 20 rows — 20 is what makes
+//      "page1 ∪ page2 covers the seeded set" satisfiable at all. The number is
+//      still read off the pager, and the seed count is checked against it.
+//   2. NO ROW IDENTITY ATTRIBUTE, AND NONE MAY BE ADDED. `TimesheetListTab`
+//      renders a bare <tr onclick> with no href and no data-*, so identity is
+//      rendered TEXT: the Employee cell's `{lastName}, {firstName}`, unique only
+//      because each of the 20 fixtures is a distinct person.
+//   3. THE LIST HAS NO SEARCH FILTER, so the fixtures cannot be isolated the way
+//      pagination.spec.ts isolates its employees with `?search=`. They have to
+//      DOMINATE the sort instead — periodStart at month +30, against a suite whose
+//      next-highest timesheet fixture is +24 — or pages 1 and 2 hold other rows.
+//   4. THE TEAM ROWS ARE STREAMED (`{#await rows}`), so a `goto` does NOT land a
+//      server-rendered table — the header's "no gate needed after goto" note is
+//      false for that route. Every navigation, goto included, is gated on
+//      `expectRangeStart`. The pager lives inside the resolved branch, so the range
+//      label appearing is itself the proof that the table and not the skeleton is up.
+//
+// `@@unique([employeeId, periodStart])` is why the walk needs TWENTY employees: one
+// person cannot hold 20 timesheets tied on one periodStart. They are OFFBOARDED so a
+// concurrent payroll compute cannot sweep them in and attach a RESTRICT-ed entry
+// between the teardown's deletes.
+
+const TIED_COUNT = 20
+
+/** FK order is load-bearing: timesheets → payroll entries → employee → user, all RESTRICT. */
+async function sweepTiedFixtures(db: PrismaClient, lastName: string, emailPrefix: string) {
+	await db.timesheet.deleteMany({ where: { employee: { lastName } } })
+	await db.payrollEntry.deleteMany({ where: { employee: { lastName } } })
+	await db.employee.deleteMany({ where: { lastName } })
+	await db.user.deleteMany({ where: { email: { startsWith: emailPrefix } } })
+}
+
+/** 20 opaque-coded people in one org; returns each row's rendered `Last, First` identity. */
+async function seedTiedEmployees(
+	db: PrismaClient,
+	organizationId: string,
+	departmentId: string,
+	code: string,
+	lastName: string
+) {
+	const people: { id: string; name: string }[] = []
+	for (let i = 1; i <= TIED_COUNT; i++) {
+		const n = String(i).padStart(2, '0')
+		const firstName = `${code}${n}`
+		const email = `${code.toLowerCase()}${n}@example.test`
+		const user = await db.user.upsert({
+			where: { email },
+			update: {},
+			create: {
+				organizationId,
+				email,
+				passwordHash: 'not-a-real-hash',
+				roles: ['EMPLOYEE'],
+				isActive: false
+			}
+		})
+		const employee = await db.employee.upsert({
+			where: { userId: user.id },
+			update: { employmentStatus: 'OFFBOARDED' },
+			create: {
+				userId: user.id,
+				organizationId,
+				employeeNumber: `${code}-${n}`,
+				firstName,
+				lastName,
+				departmentId,
+				jobTitle: 'Tiebreaker Pagination Fixture',
+				employmentType: 'REGULAR',
+				employmentStatus: 'OFFBOARDED',
+				startDate: new Date('2026-01-05'),
+				basicMonthlySalary: 10000,
+				rateType: 'MONTHLY'
+			},
+			select: { id: true }
+		})
+		people.push({ id: employee.id, name: `${lastName}, ${firstName}` })
+	}
+	return people
+}
+
+// ---------------------------------------------------------------------------
+// /timesheets (Team tab) — 20 rows tied on one periodStart.
+// ---------------------------------------------------------------------------
+
+const TEAM_CODE = 'ZZTSA'
+const TEAM_LAST = 'Zzpgtsa'
+const TEAM_EMAILS = 'zztsa'
+// Only the active tab's panel is rendered, so `?tab=team` leaves exactly one table and one
+// pager on the page. The scope is still pinned to the table that HAS an Employee column —
+// the "mine" table has none — so a future second table cannot silently join the snapshot.
+const teamTable = (page: Page) =>
+	page.locator('table', { has: page.locator('thead th', { hasText: 'Employee' }) })
+const teamRows = (page: Page) => teamTable(page).locator('tbody tr')
+// The Employee cell is the only `truncate` cell in the row, and the only per-row distinct
+// text on this surface: all 20 fixtures share the period, the hours and the status.
+const teamNames = (page: Page) => teamRows(page).locator('td.truncate')
+
+const seededTeamNames: string[] = []
+
+test.describe('timesheets team table pagination (tied periodStart)', () => {
+	test.beforeAll(async () => {
+		const db = new PrismaClient()
+		try {
+			const admin = await db.user.findFirstOrThrow({
+				where: { email: USERS.admin.email },
+				select: { organizationId: true }
+			})
+			const department = await db.department.findFirstOrThrow({
+				where: { organizationId: admin.organizationId },
+				select: { id: true }
+			})
+			// Sweep first: a killed or retried run leaves 20 people and 20 rows behind, and the
+			// duplicates would take pages 1 and 2 on their own.
+			await sweepTiedFixtures(db, TEAM_LAST, TEAM_EMAILS)
+			const people = await seedTiedEmployees(
+				db,
+				admin.organizationId,
+				department.id,
+				TEAM_CODE,
+				TEAM_LAST
+			)
+
+			const now = new Date()
+			const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 30, 5))
+			const periodEnd = new Date(
+				Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth() + 1, 4)
+			)
+			await db.timesheet.createMany({
+				data: people.map((p) => ({
+					employeeId: p.id,
+					periodStart,
+					periodEnd,
+					status: 'DRAFT' as const,
+					totalHours: 8
+				}))
+			})
+			seededTeamNames.splice(0, seededTeamNames.length, ...people.map((p) => p.name))
+
+			const seeded = await db.timesheet.count({ where: { employee: { lastName: TEAM_LAST } } })
+			expect(seeded, 'team timesheet fixtures exist before the walk').toBe(TIED_COUNT)
+		} finally {
+			await db.$disconnect()
+		}
+	})
+
+	test.afterAll(async () => {
+		const db = new PrismaClient()
+		try {
+			await sweepTiedFixtures(db, TEAM_LAST, TEAM_EMAILS)
+		} catch {
+			// Leftovers are swept by this spec's own beforeAll on the next run.
+		} finally {
+			await db.$disconnect()
+			seededTeamNames.length = 0
+		}
+	})
+
+	test('pages a tied-periodStart team table without repeating or losing a row', async ({
+		page
+	}) => {
+		await login(page, USERS.admin)
+		await page.goto('/timesheets?tab=team', { waitUntil: 'domcontentloaded' })
+
+		// Gate even this first read: the rows stream, and the pager only exists once they land.
+		await expectRangeStart(page, 1)
+		const first = await range(page)
+		const size = first.end
+		expect(size * 2, 'the seeded set is exactly two pages of this pager').toBe(TIED_COUNT)
+		// No filter on this list, so `total` is the whole org — the seeded rows are a floor.
+		expect(first.total, 'the org holds at least the seeded rows').toBeGreaterThanOrEqual(TIED_COUNT)
+		await expect(teamRows(page)).toHaveCount(size)
+		const page1 = await rowTexts(teamNames(page), 'team row')
+		expect(page1, 'one Employee cell per rendered row').toHaveLength(size)
+
+		await page.getByRole('link', { name: 'Next →', exact: true }).click()
+		await page.waitForURL(/[?&]teamPage=2(&|$)/, { waitUntil: 'domcontentloaded' })
+		await expect(page).toHaveURL(/[?&]tab=team(&|$)/)
+		await expectRangeStart(page, size + 1)
+		await expect(teamRows(page)).toHaveCount(size)
+		const page2 = await rowTexts(teamNames(page), 'team row')
+		expect(page2, 'one Employee cell per rendered row').toHaveLength(size)
+
+		assertDisjoint(page1, page2)
+		expect(
+			[...page1, ...page2].sort(),
+			'page 1 ∪ page 2 is exactly the seeded set — no row is unreachable'
+		).toEqual([...seededTeamNames].sort())
 	})
 })
