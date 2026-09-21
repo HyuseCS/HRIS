@@ -39,12 +39,7 @@
 			{#if badge}{@render badge()}{/if}
 			{#if description}
 				<HelpTip label={`About ${title}`}>
-					<!-- HelpTip's bubble is pointer-events-none so it never eats clicks on the page under
-					     it. The content opts back in, or a link in a description snippet could not be
-					     hovered or clicked. -->
-					<span class="pointer-events-auto block">
-						{#if typeof description === 'function'}{@render description()}{:else}{description}{/if}
-					</span>
+					{#if typeof description === 'function'}{@render description()}{:else}{description}{/if}
 				</HelpTip>
 			{/if}
 		</div>

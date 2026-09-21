@@ -34,6 +34,29 @@ test.describe('PageHeader description HelpTip', () => {
 		await expect(tip).toHaveCSS('opacity', '1')
 	})
 
+	test('hovering where the bubble will appear does not reveal it', async ({ page }) => {
+		await login(page, USERS.hr)
+		await page.goto('/separations', { waitUntil: 'domcontentloaded' })
+		const tip = page.getByRole('tooltip')
+		await expect(tip).toHaveCSS('opacity', '0')
+
+		const bubble = (await tip.boundingBox())!
+		const button = (await tipButton(page).boundingBox())!
+		const probeX = bubble.x + 24
+		const probeY = bubble.y + bubble.height / 2
+		expect(probeX, 'the probe sits left of the ? control').toBeLessThan(button.x)
+		expect(probeY, 'the probe sits below the ? control').toBeGreaterThan(button.y + button.height)
+
+		await page.mouse.move(probeX, probeY)
+		await page.waitForTimeout(400)
+		await expect(tip, 'the hidden bubble must not reveal itself').toHaveCSS('opacity', '0')
+
+		// Negative control: the same pointer, on the ?, does reveal it — so a pass above is a real
+		// pass, not a mouse that never worked.
+		await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2)
+		await expect(tip).toHaveCSS('opacity', '1')
+	})
+
 	test('no standalone description paragraph', async ({ page }) => {
 		await login(page, USERS.hr)
 		await page.goto('/separations', { waitUntil: 'domcontentloaded' })
@@ -160,6 +183,47 @@ test.describe('PageHeader description snippets', () => {
 
 		// A real pointer click — it fails if the bubble refuses pointer events.
 		await link.click()
+		await page.waitForURL('**/payroll/statutory-rates', { waitUntil: 'domcontentloaded' })
+	})
+
+	test('the pointer can travel from the ? into the tooltip and click the link', async ({
+		page
+	}) => {
+		await login(page, USERS.admin)
+		await page.goto('/payroll/config', { waitUntil: 'domcontentloaded' })
+
+		const button = page.getByRole('button', { name: 'About Payroll Configuration', exact: true })
+		const tip = page.getByRole('tooltip')
+		await expect(tip).toHaveCSS('opacity', '0')
+
+		const b = (await button.boundingBox())!
+		await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+		await expect(tip).toHaveCSS('opacity', '1')
+		expect(
+			await button.evaluate((el) => el === document.activeElement),
+			'this is the hover path — the ? must not be focused'
+		).toBe(false)
+
+		// This link wraps onto a second line, and the centre of a wrapped inline element's bounding
+		// box sits in the dead space between its line boxes — there it hits the bubble, not the
+		// link. Aim at the first line box. `link.click()` would paper over this; raw mouse events
+		// do not hit-test, so they click whatever is really there.
+		const link = tip.getByRole('link', { name: 'Statutory Rates', exact: true })
+		const point = await link.evaluate((el) => {
+			const r = el.getClientRects()[0]
+			return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+		})
+
+		// Crossing the gap between the ? and the bubble leaves the pointer over neither.
+		await page.mouse.move(point.x, point.y, { steps: 12 })
+		await expect(tip, 'the bubble survives the gap').toHaveCSS('opacity', '1')
+		expect(
+			await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, point),
+			'the pointer really is on the link when the click below lands'
+		).toBe('A')
+
+		await page.mouse.down()
+		await page.mouse.up()
 		await page.waitForURL('**/payroll/statutory-rates', { waitUntil: 'domcontentloaded' })
 	})
 

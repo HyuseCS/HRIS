@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const header = readFileSync('src/lib/components/ui/PageHeader.svelte', 'utf8')
+const helpTip = readFileSync('src/lib/components/ui/HelpTip.svelte', 'utf8')
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
 	for (const entry of readdirSync(dir)) {
@@ -32,9 +33,20 @@ describe('PageHeader renders its description as a HelpTip', () => {
 		)
 	})
 
-	it('lets the tooltip content take pointer events, so a description link stays clickable', () => {
+	it('leaves pointer events to HelpTip instead of overriding them', () => {
 		const tip = header.slice(header.indexOf('<HelpTip'), header.indexOf('</HelpTip>'))
-		expect(tip).toMatch(/class="[^"]*\bpointer-events-auto\b/)
+		expect(tip).not.toMatch(/\bpointer-events-auto\b/)
+	})
+
+	it('HelpTip takes pointer events only once the bubble is shown', () => {
+		const bubble = helpTip.slice(helpTip.indexOf('role="tooltip"'))
+		expect(bubble).toMatch(/shown[\s\S]*?'pointer-events-auto opacity-100'/)
+		expect(bubble).toMatch(/'pointer-events-none opacity-0'/)
+		expect(bubble).toMatch(/group-focus-within:pointer-events-auto/)
+	})
+
+	it('HelpTip never reveals the bubble from hovering the bubble itself', () => {
+		expect(helpTip).not.toMatch(/group-hover:/)
 	})
 
 	it('keeps the HelpTip inside the only relative ancestor it can anchor to', () => {
