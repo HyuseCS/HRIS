@@ -26,7 +26,7 @@ export async function listJobPostings(
 			department: { select: { name: true } },
 			_count: { select: { applicants: true } }
 		},
-		orderBy: { createdAt: 'desc' },
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }
