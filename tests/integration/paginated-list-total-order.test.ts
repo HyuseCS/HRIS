@@ -472,25 +472,39 @@ describe('every paginated list orders totally against real Postgres', () => {
 	 * out loud, instead of letting F10 sit there passing and proving nothing.
 	 */
 	it('control — the fetch-everything walk without the id term loses or repeats a row', async () => {
-		const pages: string[][] = []
-		for (let skip = 0; skip < ROWS; skip += PAGE) {
-			const rows = await verifyDb.request.findMany({
-				where: { status: 'PENDING', employee: { organizationId } },
-				orderBy: { createdAt: 'asc' }
-			})
-			pages.push(rows.slice(skip, skip + PAGE).map((r) => r.id))
-			if (skip + PAGE < ROWS) {
-				await verifyDb.request.update({
-					where: { id: requestIds[pages.length - 1] },
-					data: { reason: CODE }
+		// Whether the write forces a page relocation is a storage detail that can miss on a given
+		// run (seen once in CI). Reset the growth and retry up to 3x before calling it vacuous — see
+		// [[a-symptom-seen-once-is-a-sighting]].
+		let sawDefect = false
+		for (let attempt = 0; attempt < 3 && !sawDefect; attempt++) {
+			if (attempt > 0) {
+				await verifyDb.request.updateMany({
+					where: { id: { in: requestIds } },
+					data: { reason: null }
 				})
 			}
+
+			const pages: string[][] = []
+			for (let skip = 0; skip < ROWS; skip += PAGE) {
+				const rows = await verifyDb.request.findMany({
+					where: { status: 'PENDING', employee: { organizationId } },
+					orderBy: { createdAt: 'asc' }
+				})
+				pages.push(rows.slice(skip, skip + PAGE).map((r) => r.id))
+				if (skip + PAGE < ROWS) {
+					await verifyDb.request.update({
+						where: { id: requestIds[pages.length - 1] },
+						data: { reason: CODE }
+					})
+				}
+			}
+			sawDefect = new Set(pages.flat()).size < ROWS
 		}
 
 		expect(
-			new Set(pages.flat()).size,
-			'the fetch-everything fixture no longer reproduces the defect: a write between pages stopped moving the row, so F10 is vacuous'
-		).toBeLessThan(ROWS)
+			sawDefect,
+			'the fetch-everything fixture no longer reproduces the defect across 3 attempts: a write between pages stopped moving the row, so F10 is vacuous'
+		).toBe(true)
 	})
 
 	it('F1 — /payslips, payroll runs tied on periodStart', async () => {
