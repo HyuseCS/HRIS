@@ -23,7 +23,7 @@
 	<!-- Card -->
 	<div class="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-xl">
 		<div class="mb-5">
-			<h1 class="text-base font-semibold">Sign in</h1>
+			<h1 class="text-base font-semibold">Sign In</h1>
 			<p class="mt-1 text-xs text-muted-foreground">Enter your work credentials to continue</p>
 		</div>
 
