@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { isRedirect } from '@sveltejs/kit'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -44,6 +45,9 @@ const REDIRECT_STUBS = [
 	'routes/(app)/complaints/[id]/+page.svelte'
 ]
 
+const { load: loadDetail } = await import('../../src/routes/(app)/complaints/[id]/+page.server')
+const DETAIL_URL = 'http://localhost/complaints/abc123?tab=x'
+
 describe('the inquiries route alias (S2 items 10-11)', () => {
 	/**
 	 * A URL, not the module path. `$lib/server/services/complaints` is a data key and stays — the
@@ -61,12 +65,27 @@ describe('the inquiries route alias (S2 items 10-11)', () => {
 		expect(offenders).toEqual([])
 	})
 
+	it('a deep link keeps its query string across the 308', () => {
+		let thrown: unknown
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			loadDetail({ params: { id: 'abc123' }, url: new URL(DETAIL_URL) } as any)
+		} catch (e) {
+			thrown = e
+		}
+
+		expect(isRedirect(thrown)).toBe(true)
+		expect(thrown).toMatchObject({ status: 308, location: '/inquiries/abc123?tab=x' })
+	})
+
 	it('all four redirect stubs exist and 308 to the new URL', () => {
 		for (const stub of REDIRECT_STUBS) {
 			expect(existsSync(join(SRC, stub)), `${stub} is missing`).toBe(true)
 		}
 		expect(read(REDIRECT_STUBS[0])).toContain("redirect(308, '/inquiries')")
-		expect(read(REDIRECT_STUBS[2])).toContain('redirect(308, `/inquiries/${params.id}`)')
+		expect(read(REDIRECT_STUBS[2])).toContain(
+			'redirect(308, `/inquiries/${params.id}${url.search}`)'
+		)
 	})
 
 	it('the complaints service still writes its notification links to /inquiries', () => {
