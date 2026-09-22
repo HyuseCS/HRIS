@@ -77,7 +77,7 @@
 				aria-checked={data.orgTracksTardiness}
 				aria-label="Track tardiness for this organization"
 				class="rounded-full px-3 py-1 text-xs font-medium {data.orgTracksTardiness
-					? 'bg-green-500/15 text-green-700 dark:text-green-400'
+					? 'bg-green-500/15 text-green-800 dark:text-green-400'
 					: 'bg-muted text-muted-foreground'}">{data.orgTracksTardiness ? 'On' : 'Off'}</button
 			>
 		</form>
@@ -279,7 +279,7 @@
 											? 'Toggle tardiness tracking for this schedule'
 											: 'Turn on the org-wide setting in Company Info first'}
 										class="rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 {s.trackTardiness
-											? 'bg-green-500/15 text-green-700 dark:text-green-400'
+											? 'bg-green-500/15 text-green-800 dark:text-green-400'
 											: 'bg-muted text-muted-foreground'}">{s.trackTardiness ? 'On' : 'Off'}</button
 									>
 								</form>
