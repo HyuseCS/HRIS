@@ -74,7 +74,6 @@
 					type="password"
 					autocomplete="current-password"
 					required
-					placeholder="••••••••"
 					class="input"
 				/>
 			</div>
