@@ -55,30 +55,30 @@ const { load: timesheetQueueLoad } =
  * different threshold — the e2e `/timesheets` walk reddens at 20 rows where this file's plain
  * `timesheets` read does not. Do not carry 50 and 250 to another test; measure that test.
  *
- * THE FETCH-EVERYTHING SITES: ONE IS GUARDED, THREE ARE NOT (F7, F8, F9, F10). These four have
- * no `LIMIT` — they read the whole set and slice in JS — so the top-N mechanism above cannot reach
- * them. With no LIMIT the planner does one full sort of the heap, and two back-to-back calls sort
- * an identical input and return an identical order. Measured: with all four tiebreakers removed
+ * THE FETCH-EVERYTHING SITES: NONE ARE GUARDED (F7, F8, F9, F10). These four have no `LIMIT` —
+ * they read the whole set and slice in JS — so the top-N mechanism above cannot reach them. With
+ * no LIMIT the planner does one full sort of the heap, and two back-to-back calls sort an
+ * identical input and return an identical order. Measured: with all four tiebreakers removed
  * these walks passed 5/5.
  *
  * The only thing that moves a tied row in a no-LIMIT query is a WRITE that RELOCATES the tuple,
- * which changes the sort's input order. And that is where three of the four die: Postgres usually
- * applies the update in place (a HOT update), which leaves the tuple at its original scan position
- * and changes nothing. It relocates only when the new row version cannot fit back on its heap
- * page. So whether the guard fires is decided by free space, which no test controls and which
- * differs per machine and per run. Measured over 5 runs with the tiebreaker removed, and again
+ * which changes the sort's input order. And that is where all four die: Postgres usually applies
+ * the update in place (a HOT update), which leaves the tuple at its original scan position and
+ * changes nothing. It relocates only when the new row version cannot fit back on its heap page.
+ * So whether the guard fires is decided by free space, which no test controls and which differs
+ * per machine and per run. Measured over 5 runs with the tiebreaker removed, and again
  * independently on a second machine over 3:
  *
  *     F7  1/5 red (and 1/3 elsewhere)   F8  3/5 (0/3)   F9  5/5 (0/3)   F10  5/5 (3/3)
  *
- * F10 is the exception and it is not luck: a `requests` row carries a Json `payload`, so growing
- * `reason` from null cannot fit back on the page and the update relocates the tuple every time.
- * F10 therefore keeps its between-pages write and is a real guard, watched by a control below.
- *
- * F7, F8 and F9 do NOT. A guard that fires one run in three is worse than none, so their
- * between-pages write was removed rather than left in to look like coverage. Their tests remain,
- * renamed to what they actually check — that the filters and slice arithmetic return every row —
- * and they are listed under "WHAT THIS FILE DOES NOT PROVE".
+ * F10 was believed to be the exception: a `requests` row carries a Json `payload`, so growing
+ * `reason` from null was measured never fitting back on the page on two local machines, forcing a
+ * relocation every time. CI's Postgres proved that wrong — 0/3 there, same code, same fixture.
+ * "Wide enough to always relocate" was a property of the machines it was measured on, not of
+ * Postgres in general, exactly like F7-F9. A guard that fires on some machines and not others is
+ * worse than none, so F10's between-pages write was removed along with F7-F9's. Their tests
+ * remain, renamed to what they actually check — that the filters and slice arithmetic return every
+ * row — and all four are listed under "WHAT THIS FILE DOES NOT PROVE".
  *
  * WHY THE WHOLE LIST IS WALKED rather than just pages 1 and 2. Once the fixture has to be larger
  * than two pages, "page 1 ∪ page 2 covers the seeded set" is arithmetically false. Walking every
@@ -94,14 +94,15 @@ const { load: timesheetQueueLoad } =
  *
  * F7, F8, F9 and F10 fetch the whole set and slice per request rather than using `skip`/`take`.
  * Each page is a fresh, independent call — never one call sliced twice, which would be consistent
- * by construction and could not fail — plus the intervening write described above.
+ * by construction and could not fail.
  *
- * WHAT THIS FILE DOES NOT PROVE. F7 (`listAssignableEmployees`), F8 (`listActionableProposals`)
- * and F9 (`/requests/timesheets`) have NO behavioural proof that their order is total. Their only
- * guard is the query-contract assertion in `tests/unit/list-order-totality.test.ts`, which proves
- * the query ASKS for a tiebreaker and nothing about what the database returns. The defect is real
- * at all three; it is the reproduction that is not available at this tier, for the reason set out
- * above. Behaviourally proven here: F1–F6 and F10.
+ * WHAT THIS FILE DOES NOT PROVE. F7 (`listAssignableEmployees`), F8 (`listActionableProposals`),
+ * F9 (`/requests/timesheets`) and F10 (`listPendingRequestsForApprover`) have NO behavioural proof
+ * that their order is total. Their only guard is the query-contract assertion in
+ * `tests/unit/list-order-totality.test.ts`, which proves the query ASKS for a tiebreaker and
+ * nothing about what the database returns. The defect is real at all four; it is the reproduction
+ * that is not available at this tier, for the reason set out above. Behaviourally proven here:
+ * F1–F6.
  *
  * FIXTURE HYGIENE. Every row hangs off a `MARKER`-named organization and is swept in `beforeAll`
  * as well as `afterAll`, because this tier has no global sweep and a killed run leaves residue.
@@ -461,52 +462,6 @@ describe('every paginated list orders totally against real Postgres', () => {
 		).toBeLessThan(ROWS)
 	})
 
-	/**
-	 * The second negative control, for the fetch-everything class, and the tripwire for F10.
-	 *
-	 * It is F10's own query with the `{ id: 'asc' }` term removed and the same write between pages,
-	 * and it asserts the walk breaks. F10's guard works only because a `requests` row is wide enough
-	 * that growing `reason` cannot fit back on its heap page, forcing a non-HOT update that
-	 * relocates the tuple. That is a storage detail, not a promise. If it ever stops holding — a
-	 * narrower row, a different fillfactor, a Postgres change — this control goes green and says so
-	 * out loud, instead of letting F10 sit there passing and proving nothing.
-	 */
-	it('control — the fetch-everything walk without the id term loses or repeats a row', async () => {
-		// Whether the write forces a page relocation is a storage detail that can miss on a given
-		// run (seen once in CI). Reset the growth and retry up to 3x before calling it vacuous — see
-		// [[a-symptom-seen-once-is-a-sighting]].
-		let sawDefect = false
-		for (let attempt = 0; attempt < 3 && !sawDefect; attempt++) {
-			if (attempt > 0) {
-				await verifyDb.request.updateMany({
-					where: { id: { in: requestIds } },
-					data: { reason: null }
-				})
-			}
-
-			const pages: string[][] = []
-			for (let skip = 0; skip < ROWS; skip += PAGE) {
-				const rows = await verifyDb.request.findMany({
-					where: { status: 'PENDING', employee: { organizationId } },
-					orderBy: { createdAt: 'asc' }
-				})
-				pages.push(rows.slice(skip, skip + PAGE).map((r) => r.id))
-				if (skip + PAGE < ROWS) {
-					await verifyDb.request.update({
-						where: { id: requestIds[pages.length - 1] },
-						data: { reason: CODE }
-					})
-				}
-			}
-			sawDefect = new Set(pages.flat()).size < ROWS
-		}
-
-		expect(
-			sawDefect,
-			'the fetch-everything fixture no longer reproduces the defect across 3 attempts: a write between pages stopped moving the row, so F10 is vacuous'
-		).toBe(true)
-	})
-
 	it('F1 — /payslips, payroll runs tied on periodStart', async () => {
 		const user = { id: actorId, organizationId }
 		await expectPagesPartition(payrollEntryIds, PAGE, async (skip) => {
@@ -586,21 +541,17 @@ describe('every paginated list orders totally against real Postgres', () => {
 		})
 	})
 
+	// NOT an ordering guard — see "WHAT THIS FILE DOES NOT PROVE". It covers the approver's queue
+	// filter and stage arithmetic, nothing about tie order.
 	it('F10 — listPendingRequestsForApprover, requests tied on createdAt', async () => {
-		await expectPagesPartition(
-			requestIds,
-			PAGE,
-			async (skip, take) => {
-				const rows = await listPendingRequestsForApprover(
-					organizationId,
-					['HR_ADMIN'],
-					null,
-					queueUserId
-				)
-				return rows.slice(skip, skip + take).map((r) => r.id)
-			},
-			// reason: leaves status PENDING and the approval chain untouched.
-			(id) => verifyDb.request.update({ where: { id }, data: { reason: CODE } }).then()
-		)
+		await expectPagesPartition(requestIds, PAGE, async (skip, take) => {
+			const rows = await listPendingRequestsForApprover(
+				organizationId,
+				['HR_ADMIN'],
+				null,
+				queueUserId
+			)
+			return rows.slice(skip, skip + take).map((r) => r.id)
+		})
 	})
 })
