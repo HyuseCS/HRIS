@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	// DEV ONLY — dev-gated (dev && !navigator.webdriver), never ships enabled; remove after the
 	// program's owner test pass
 	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte'
@@ -34,6 +35,7 @@
 			     was pale red on near-white. Now phase 03's Banner pair. Not the Banner component
 			     itself: this is the (auth) group, which does not carry the app shell. -->
 			<div
+				use:scrollToError
 				role="alert"
 				class="mb-4 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
 			>
