@@ -45,8 +45,10 @@ const REDIRECT_STUBS = [
 	'routes/(app)/complaints/[id]/+page.svelte'
 ]
 
+const { load: loadList } = await import('../../src/routes/(app)/complaints/+page.server')
 const { load: loadDetail } = await import('../../src/routes/(app)/complaints/[id]/+page.server')
 const DETAIL_URL = 'http://localhost/complaints/abc123?tab=x'
+const LIST_URL = 'http://localhost/complaints?status=OPEN'
 
 describe('the inquiries route alias (S2 items 10-11)', () => {
 	/**
@@ -63,6 +65,23 @@ describe('the inquiries route alias (S2 items 10-11)', () => {
 			.filter((path) => COMPLAINTS_URL.test(readFileSync(path, 'utf8')))
 			.map(rel)
 		expect(offenders).toEqual([])
+	})
+
+	/**
+	 * `inquiries/+page.server.ts` filters the HR queue on `status`, so dropping the query here
+	 * turned a stored `/complaints?status=OPEN` link into the unfiltered queue: wrong rows, no error.
+	 */
+	it('a filtered list link keeps its query string across the 308', () => {
+		let thrown: unknown
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			loadList({ url: new URL(LIST_URL) } as any)
+		} catch (e) {
+			thrown = e
+		}
+
+		expect(isRedirect(thrown)).toBe(true)
+		expect(thrown).toMatchObject({ status: 308, location: '/inquiries?status=OPEN' })
 	})
 
 	it('a deep link keeps its query string across the 308', () => {
@@ -82,7 +101,7 @@ describe('the inquiries route alias (S2 items 10-11)', () => {
 		for (const stub of REDIRECT_STUBS) {
 			expect(existsSync(join(SRC, stub)), `${stub} is missing`).toBe(true)
 		}
-		expect(read(REDIRECT_STUBS[0])).toContain("redirect(308, '/inquiries')")
+		expect(read(REDIRECT_STUBS[0])).toContain('redirect(308, `/inquiries${url.search}`)')
 		expect(read(REDIRECT_STUBS[2])).toContain(
 			'redirect(308, `/inquiries/${params.id}${url.search}`)'
 		)
