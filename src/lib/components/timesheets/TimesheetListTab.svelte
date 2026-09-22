@@ -164,7 +164,7 @@
 									aria-label="Review timesheet for {formatShortDate(
 										ts.periodStart
 									)} to {formatShortDate(ts.periodEnd)}"
-									class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									class="min-h-6 inline-flex items-center hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 									>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</button
 								>
 							</td>
