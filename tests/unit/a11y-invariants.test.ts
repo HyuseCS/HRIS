@@ -218,7 +218,7 @@ describe('per-area affordances (S6 items 34, 38-40)', () => {
 		const page = read('routes/(auth)/login/+page.svelte')
 		expect(page).toContain('role="alert"')
 		// `text-red-400` alone is a dark-mode colour; on light it was pale red on near-white.
-		expect(page).toContain('text-red-600 dark:text-red-400')
+		expect(page).toContain('text-red-700 dark:text-red-400')
 		expect(page).not.toMatch(/class="mb-4 rounded bg-destructive\/15[^"]*text-red-400"/)
 	})
 
