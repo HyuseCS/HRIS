@@ -18,7 +18,6 @@
 	<!-- Veent HRIS brand -->
 	<div class="mb-8 flex flex-col items-center gap-3">
 		<img src="/veent-logo.png" alt="Veent" class="h-16 w-auto" />
-		<p class="text-sm text-muted-foreground">Log in to your company</p>
 	</div>
 
 	<!-- Card -->
