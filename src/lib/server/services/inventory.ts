@@ -39,7 +39,7 @@ export async function listInventory(organizationId: string, filter: InventoryFil
 	return db.inventoryItem.findMany({
 		where,
 		include: { assignedTo: { select: { id: true, firstName: true, lastName: true } } },
-		orderBy: [{ createdAt: 'desc' }]
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
 	})
 }
 

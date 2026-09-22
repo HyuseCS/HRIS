@@ -149,7 +149,7 @@ export async function listRequests(
 			employee: { select: { id: true, firstName: true, lastName: true } },
 			steps: { orderBy: { stageIndex: 'asc' } }
 		},
-		orderBy: { createdAt: 'desc' },
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }

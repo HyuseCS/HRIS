@@ -101,6 +101,14 @@ jobs:
         # env vars above; the db:seed:e2e script loads .env.dev, which does not exist in CI.
         run: bunx tsx prisma/seed-e2e.ts
 
+      - name: Integration tests (real Postgres)
+        # This tier ran nowhere automatically until now, so its guards could rot unnoticed. It
+        # lives in this job because this is the only one with a database, and it runs before the
+        # browser download because it needs no browser — a failure here stops the job a minute
+        # sooner. Call vitest directly, for the same reason the seed step does: the
+        # `test:integration` script loads .env.dev, which does not exist in CI.
+        run: bunx vitest run --config vitest.integration.config.ts
+
       - name: Install Playwright browser
         run: bunx playwright install --with-deps chromium
 

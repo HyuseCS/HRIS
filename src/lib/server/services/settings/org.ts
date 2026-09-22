@@ -404,7 +404,7 @@ export async function listAssignableEmployees(organizationId: string) {
 			position: { select: { title: true } },
 			department: { select: { name: true } }
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }]
 	})
 
 	return employees.map((e) => ({

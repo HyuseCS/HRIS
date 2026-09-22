@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
+	import HelpTip from './HelpTip.svelte'
 
 	// One page title treatment for every route. Before this the app carried six different
 	// heading class strings across 52 pages, plus a legacy pair of CSS utility classes used on
@@ -12,8 +13,9 @@
 		back
 	}: {
 		title: string
-		/** One line under the title. Say what the page is for, not what it is called. */
-		description?: string
+		/** One line under the title, shown in the `?` tooltip. Say what the page is for, not what it
+		 *  is called. Pass a snippet instead of a string when the line needs a link or a branch. */
+		description?: string | Snippet
 		/** A status pill for the record the page is about. Sits beside the title, because it
 		 *  qualifies the name — it is not a navigation control like Back. */
 		badge?: Snippet
@@ -35,10 +37,12 @@
 		<div class="relative flex flex-wrap items-center gap-2">
 			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
 			{#if badge}{@render badge()}{/if}
+			{#if description}
+				<HelpTip label={`About ${title}`}>
+					{#if typeof description === 'function'}{@render description()}{:else}{description}{/if}
+				</HelpTip>
+			{/if}
 		</div>
-		{#if description}
-			<p class="max-w-2xl text-sm text-muted-foreground">{description}</p>
-		{/if}
 	</div>
 	{#if back}
 		<div

@@ -161,6 +161,9 @@
 		{#snippet footer()}
 			{#if data.complaints.length && data.isHr && data.pagination}
 				<Pagination meta={data.pagination} />
+			{:else if data.complaints.length && !data.isHr && data.myPagination}
+				<!-- Own key and `myPage` param so the two branches' pagers cannot read each other's page. -->
+				<Pagination meta={data.myPagination} />
 			{/if}
 		{/snippet}
 	</Container>

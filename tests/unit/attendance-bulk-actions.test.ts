@@ -46,22 +46,26 @@ const SUPER: Role[] = ['SUPER_ADMIN']
 type Row = Record<string, string>
 type Result = { id: string; date: string; ok: boolean; reason?: string }
 
-const saveAll = (rows: Row[] | string) => {
+const cookies = (vp?: string) => ({ get: () => vp })
+
+const saveAll = (rows: Row[] | string, vp?: string) => {
 	const body = new FormData()
 	body.set('rows', typeof rows === 'string' ? rows : JSON.stringify(rows))
 	return attendance.actions.saveAll({
 		request: { formData: async () => body },
+		cookies: cookies(vp),
 		locals: { user: { id: 'actor', organizationId: 'org1', roles: SUPER } },
 		getClientAddress: () => '127.0.0.1'
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} as any) as Promise<any>
 }
 
-const resetAll = (rows: { id?: string; date?: string }[] | string) => {
+const resetAll = (rows: { id?: string; date?: string }[] | string, vp?: string) => {
 	const body = new FormData()
 	body.set('rows', typeof rows === 'string' ? rows : JSON.stringify(rows))
 	return attendance.actions.resetAll({
 		request: { formData: async () => body },
+		cookies: cookies(vp),
 		locals: { user: { id: 'actor', organizationId: 'org1', roles: SUPER } },
 		getClientAddress: () => '127.0.0.1'
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,6 +164,25 @@ describe('?/saveAll reports every row it touched (#F11c, D9)', () => {
 
 		expect(res.action).toBe('saveAll')
 		expect(correctDay).toHaveBeenCalledTimes(10)
+	})
+
+	it('caps at the page size the viewport rendered, not a fixed 10', async () => {
+		const tall = '1920x1554' // (1554 − 654 chrome) / 45 per row = 20 rows
+
+		const res = await saveAll(
+			Array.from({ length: 15 }, (_, i) => row(`day${i}`, '2026-09-01')),
+			tall
+		)
+
+		expect(res.status).toBeUndefined()
+		expect(res.action).toBe('saveAll')
+		expect(correctDay).toHaveBeenCalledTimes(15)
+
+		const over = await saveAll(
+			Array.from({ length: 21 }, (_, i) => row(`day${i}`, '2026-09-01')),
+			tall
+		)
+		expect(over.data.error).toContain('20 at a time')
 	})
 
 	it('refuses a malformed body instead of trusting it', async () => {
@@ -278,7 +301,7 @@ describe('?/resetAll recalculates every edited day and reports each row (#F11c, 
 // the button renders or that the number shown is right — that is the owner's L7 step.
 describe('the Recalculate-all trigger states its scope', () => {
 	const page = readFileSync(
-		join(import.meta.dirname, '../../src/routes/(app)/attendance/+page.svelte'),
+		join(import.meta.dirname, '../../src/lib/components/attendance/AttendanceHrGrid.svelte'),
 		'utf8'
 	).replace(/\s+/g, ' ')
 

@@ -6,6 +6,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -30,6 +31,8 @@
 
 	const inputClass =
 		'mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
+	const filtering = $derived(data.empSearch !== '' || data.empUnassigned)
 </script>
 
 <svelte:head>
@@ -256,6 +259,42 @@
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold">Employee Assignments</h2>
 		<p class="text-sm text-muted-foreground">Assign each employee to a position in the catalog.</p>
+		<form method="GET" data-sveltekit-keepfocus class="flex flex-wrap items-center gap-3">
+			<div class="min-w-56 flex-1">
+				<label for="employee-search" class="sr-only">Search employees</label>
+				<input
+					id="employee-search"
+					type="search"
+					name="empSearch"
+					value={data.empSearch}
+					placeholder="Search by name or job title"
+					class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			</div>
+			<label class="flex items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					name="empUnassigned"
+					value="1"
+					checked={data.empUnassigned}
+					onchange={(e) => e.currentTarget.form?.requestSubmit()}
+					class="rounded border-input"
+				/>
+				Only unassigned
+			</label>
+			<button type="submit" class="h-9 rounded-md border px-4 text-sm font-medium hover:bg-accent"
+				>Filter</button
+			>
+			{#if filtering}
+				<a
+					href="/settings/org"
+					class="h-9 rounded-md border px-4 text-sm font-medium leading-9 hover:bg-accent">Clear</a
+				>
+			{/if}
+			<p aria-live="polite" class="text-sm text-muted-foreground">
+				Showing {data.employeePagination.total} of {data.employeeTotal} employees
+			</p>
+		</form>
 		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
@@ -303,11 +342,22 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="5" class="p-0"><EmptyState title="No employees found" /></td>
+							<td colspan="5" class="p-0">
+								{#if filtering}
+									<EmptyState
+										variant="no-results"
+										title="No employees match this filter"
+										description="Clear the search box or untick “Only unassigned” to see the full list."
+									/>
+								{:else}
+									<EmptyState title="No employees found" />
+								{/if}
+							</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+		<Pagination meta={data.employeePagination} />
 	</section>
 </div>

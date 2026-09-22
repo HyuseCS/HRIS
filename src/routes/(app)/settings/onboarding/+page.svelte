@@ -26,20 +26,18 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<!-- The description carries emphasis markup, which PageHeader's string `description` cannot,
-	     so it stays its own paragraph directly under the title. -->
 	<PageHeader title="Onboarding Checklist">
+		{#snippet description()}
+			The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps
+			tick themselves off from the employee record (position, salary, government IDs, contract…);
+			you can reorder, rename, or hide them but not delete them.
+			<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
+			are ticked off by HR per employee.
+		{/snippet}
 		{#snippet back()}
 			<BackButton fallback="/settings" label="Settings" preferFallback />
 		{/snippet}
 	</PageHeader>
-	<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
-		The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps tick
-		themselves off from the employee record (position, salary, government IDs, contract…); you can
-		reorder, rename, or hide them but not delete them.
-		<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
-		are ticked off by HR per employee.
-	</p>
 
 	{#if form?.error}
 		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" />

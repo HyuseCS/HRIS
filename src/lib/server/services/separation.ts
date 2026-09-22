@@ -102,7 +102,7 @@ export async function createSeparation(
 export async function listSeparations(organizationId: string) {
 	return db.separationRecord.findMany({
 		where: { organizationId },
-		orderBy: { createdAt: 'desc' },
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
 		include: {
 			employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
 			clearanceItems: { select: { status: true } }

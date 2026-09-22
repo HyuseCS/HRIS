@@ -240,7 +240,7 @@ export function listComplaintsForOrg(
 			employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
 			_count: { select: { messages: true } }
 		},
-		orderBy: { updatedAt: 'desc' },
+		orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
 		...(page && { skip: page.skip, take: page.take })
 	})
 }
@@ -259,7 +259,7 @@ export function listComplaintsForEmployee(employeeId: string, organizationId: st
 			employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
 			_count: { select: { messages: true } }
 		},
-		orderBy: { updatedAt: 'desc' }
+		orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }]
 	})
 }
 

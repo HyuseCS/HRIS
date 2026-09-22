@@ -1,111 +1,35 @@
 <script lang="ts">
+	import { page } from '$app/stores'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
+	import {
+		SETTINGS_GROUP_ORDER,
+		groupSlug,
+		visibleSettings,
+		type SettingsDestination,
+		type SettingsGroup
+	} from '$lib/settings-destinations'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
 
-	const cards = [
-		{
-			href: '/settings/company',
-			title: 'Company Information',
-			desc: 'Name, address, logo',
-			super: false
-		},
-		{
-			href: '/settings/org',
-			title: 'Org Structure',
-			desc: 'Departments & positions',
-			super: false
-		},
-		{
-			href: '/settings/org-chart',
-			title: 'Org Chart',
-			desc: 'Reporting hierarchy',
-			super: false
-		},
-		{ href: '/settings/schedules', title: 'Work Schedules', desc: 'Shift templates', super: false },
-		{
-			href: '/settings/pay-codes',
-			title: 'Earnings & Deductions',
-			desc: 'Payroll codes',
-			super: false
-		},
-		{
-			href: '/settings/salary-grades',
-			title: 'Salary Grades',
-			desc: 'Pay bands per position',
-			super: false
-		},
-		{
-			href: '/settings/leave-types',
-			title: 'Leave Types',
-			desc: 'Paid/unpaid, allocation, carry-over',
-			super: false
-		},
-		{
-			href: '/settings/onboarding',
-			title: 'Onboarding Checklist',
-			desc: 'Derived & manual 201-file steps',
-			super: false
-		},
-		{
-			href: '/settings/offboarding',
-			title: 'Offboarding Checklist',
-			desc: 'Clearance steps for separations',
-			super: false
-		},
-		{
-			href: '/settings/performance',
-			title: 'Review Schedule',
-			desc: 'How often reviews open, and time to complete',
-			hrOrgwide: true
-		},
-		{
-			href: '/settings/posting-approvers',
-			title: 'Posting Approvers',
-			desc: 'Who approves each department’s job postings',
-			super: false
-		},
-		{
-			href: '/settings/job-boards',
-			title: 'Job Boards',
-			desc: 'Where postings can be published',
-			super: false
-		},
-		{
-			href: '/payroll/config',
-			title: 'Payroll Config',
-			desc: 'Cutoffs, frequency, premium multipliers',
-			super: true
-		},
-		{
-			href: '/settings/backup',
-			title: 'Document Backup',
-			desc: 'Automatic 201-file and attachment backups',
-			super: true
-		},
-		{
-			href: '/payroll/statutory-rates',
-			title: 'Statutory Rates',
-			desc: 'SSS, PhilHealth, Pag-IBIG, BIR tax',
-			statutory: true
-		},
-		{
-			href: '/settings/holidays',
-			title: 'Holiday Calendar',
-			desc: 'Regular & special holidays',
-			super: false
-		},
-		{ href: '/settings/roles', title: 'Roles & Access', desc: 'User role management', roles: true }
-	]
-	const visible = $derived(
-		cards.filter((c) => {
-			if ('statutory' in c && c.statutory) return data.canStatutory
-			if ('roles' in c && c.roles) return data.canRoles
-			// Narrower than this page's own MANAGE_HR guard, so it cannot ride on the default (#178).
-			if ('hrOrgwide' in c && c.hrOrgwide) return data.canHrOrgwide
-			return !('super' in c && c.super) || data.isSuperAdmin
-		})
+	let q = $state('')
+
+	// One source for the hub, the sub-nav and the sidebar. Capability filtering happens in
+	// visibleSettings via the same rbac table the server enforces.
+	const visible = $derived(visibleSettings(data.user.roles))
+	const g = $derived($page.url.searchParams.get('g'))
+	const needle = $derived(q.trim().toLowerCase())
+	const matches = $derived(
+		visible
+			.filter((d) => !g || groupSlug(d.group) === g)
+			.filter((d) => !needle || `${d.label} ${d.desc} ${d.group}`.toLowerCase().includes(needle))
+	)
+	const groups = $derived(
+		SETTINGS_GROUP_ORDER.map(
+			(group) =>
+				[group, matches.filter((d) => d.group === group)] as [SettingsGroup, SettingsDestination[]]
+		).filter(([, items]) => items.length > 0)
 	)
 </script>
 
@@ -114,17 +38,48 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<PageHeader title="Settings" description="Master data and configuration for your organization." />
+	<div class="flex flex-wrap items-start gap-3">
+		<div class="min-w-0 flex-1">
+			<PageHeader
+				title="Settings"
+				description="Master data and configuration for your organization."
+			/>
+		</div>
+		<div class="ml-auto w-full sm:w-72">
+			<label for="settings-search" class="sr-only">Search settings</label>
+			<SearchInput
+				id="settings-search"
+				bind:value={q}
+				autocomplete="off"
+				placeholder="Search settings…"
+				class="input w-full"
+			/>
+		</div>
+	</div>
 
-	<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-		{#each visible as c (c.href)}
-			<a
-				href={c.href}
-				class="rounded-lg border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-card/80"
-			>
-				<p class="font-medium">{c.title}</p>
-				<p class="mt-0.5 text-xs text-muted-foreground">{c.desc}</p>
-			</a>
+	<!-- Landmark so a locator can tell a hub card from the same destination's sub-nav row. -->
+	<div role="region" aria-label="Settings destinations" class="space-y-6">
+		<p aria-live="polite" class="sr-only">{matches.length} of {visible.length} settings shown</p>
+		{#each groups as [group, items] (group)}
+			<section class="space-y-3">
+				<h2 class="text-sm font-semibold text-muted-foreground">{group}</h2>
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+					{#each items as d (d.href)}
+						<a
+							href={d.href}
+							class="rounded-lg border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							<p class="font-medium">{d.label}</p>
+							<p class="mt-0.5 text-xs text-muted-foreground">{d.desc}</p>
+						</a>
+					{/each}
+				</div>
+			</section>
 		{/each}
+		{#if matches.length === 0}
+			<p class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+				No settings match “{q}”.
+			</p>
+		{/if}
 	</div>
 </div>

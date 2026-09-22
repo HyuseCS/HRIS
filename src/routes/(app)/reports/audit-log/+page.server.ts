@@ -49,7 +49,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const logs = await db.auditLog.findMany({
 		where,
-		orderBy: { createdAt: 'desc' },
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
 		skip: pagination.skip,
 		take: pagination.take,
 		// An explicit select, not `include`: `include` returns every scalar, and the rows are

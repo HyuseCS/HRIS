@@ -47,7 +47,9 @@ const WIRING: { file: string; actions: string[] }[] = [
 	{ file: 'routes/(app)/performance/reviews/[id]/+page.svelte', actions: ['?/release'] },
 	{ file: 'routes/(app)/settings/roles/+page.svelte', actions: ['?/setActive'] },
 	{ file: 'routes/(app)/separations/[id]/+page.svelte', actions: ['?/finalize', '?/undo'] },
-	{ file: 'routes/(app)/attendance/+page.svelte', actions: ['?/resetDay'] }
+	// Phase 07 §S5 split the attendance page by persona: both `?/resetDay` render sites moved with
+	// the correction grid into this component. The route file no longer carries a confirm.
+	{ file: 'lib/components/attendance/AttendanceHrGrid.svelte', actions: ['?/resetDay'] }
 ]
 
 describe('G1 — every §T3 destructive action is routed through the kit confirm', () => {
@@ -215,14 +217,16 @@ const COPY: { site: string; file: string; needle: string }[] = [
 	},
 	{
 		site: '15 attendance reset',
-		file: 'routes/(app)/attendance/+page.svelte',
+		// Phase 07 §S5: moved with the correction grid — see the WIRING note above.
+		file: 'lib/components/attendance/AttendanceHrGrid.svelte',
 		needle: 'thrown away and re-derived from the raw punches'
 	},
 	{
 		// Deliberately NOT site 15's needle: that one pins the single-row dialog's `message`, so
 		// reusing it would stay green with the bulk dialog deleted outright.
 		site: '16 attendance recalculate all',
-		file: 'routes/(app)/attendance/+page.svelte',
+		// Phase 07 §S5: moved with the correction grid — see the WIRING note above.
+		file: 'lib/components/attendance/AttendanceHrGrid.svelte',
 		needle: 'Anything typed by hand on those days is lost'
 	}
 ]

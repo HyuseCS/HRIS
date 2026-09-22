@@ -32,7 +32,7 @@
 		description="Codes used by the payroll engine. Deactivate instead of deleting — historical payslips reference them."
 	>
 		{#snippet back()}
-			<BackButton fallback="/settings" label="Settings" preferFallback />
+			<BackButton fallback="/payroll" label="Payroll" />
 		{/snippet}
 	</PageHeader>
 

@@ -1,5 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { login, USERS } from './helpers'
+
+// The hub cards live in their own landmark; the sub-nav that repeats the same labels does not.
+const hubCard = (page: Page, name: string | RegExp) =>
+	page.getByRole('region', { name: 'Settings destinations' }).getByRole('link', { name })
+const sidebarRow = (page: Page, name: string) =>
+	page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })
 
 /**
  * #237 — the Holiday Calendar card and the Holidays nav entry were gated on ADMINISTER_SYSTEM
@@ -23,10 +29,13 @@ for (const { label, user } of LOCKED_OUT) {
 		await login(page, user)
 		await page.goto('/settings', { waitUntil: 'domcontentloaded' })
 
-		const card = page.getByRole('link', { name: /Holiday Calendar/ })
+		// Scoped: the hub card and the sidebar row carry the SAME canonical label, so an unscoped
+		// locator matches two links and Playwright strict mode throws. (Before the settings
+		// Context Rail there was a third — the sub-nav repeated every destination on /settings.)
+		const card = hubCard(page, /Holiday Calendar/)
 		await expect(card).toBeVisible()
 		// The Settings nav group auto-expands on a /settings route, so the child row is on screen.
-		await expect(page.getByRole('link', { name: 'Holidays', exact: true })).toBeVisible()
+		await expect(sidebarRow(page, 'Holiday Calendar')).toBeVisible()
 
 		// The link is real, not a card pointing at a 403 — the inverse of the #237 failure.
 		await card.click()
@@ -45,17 +54,31 @@ for (const { label, user } of LOCKED_OUT) {
 	test(`${label} still does not see the system-admin cards (#237)`, async ({ page }) => {
 		await login(page, user)
 		await page.goto('/settings', { waitUntil: 'domcontentloaded' })
-		await expect(page.getByRole('link', { name: /Payroll Config/ })).toHaveCount(0)
-		await expect(page.getByRole('link', { name: /Roles & Access/ })).toHaveCount(0)
+		// Positive control, in the same two scopes: an unscoped count of 0 also passes on a blank
+		// page, on a bounce to /login, and on a hub that never rendered, and it cannot tell
+		// "absent from the hub" from "absent from the sidebar".
+		await expect(hubCard(page, /Holiday Calendar/)).toHaveCount(1)
+		await expect(sidebarRow(page, 'Holiday Calendar')).toHaveCount(1)
+		// Document Backup replaces Payroll Config here: same ADMINISTER_SYSTEM gate, and Payroll
+		// Config is no longer a settings destination at all — asserting its absence would pass for
+		// every role and prove nothing. Its sidebar leg is gone with it: Document Backup is not an
+		// `inSidebar` row either, so a 0 there could not fail. Roles & Access carries that scope —
+		// it IS a sidebar row, and Super Admin's positive case below keeps it honest.
+		await expect(hubCard(page, /Document Backup/)).toHaveCount(0)
+		await expect(hubCard(page, /Roles & Access/)).toHaveCount(0)
+		await expect(sidebarRow(page, 'Roles & Access')).toHaveCount(0)
 	})
 }
 
 test('Super Admin keeps every card and nav entry it already had (#237)', async ({ page }) => {
 	await login(page, USERS.admin)
 	await page.goto('/settings', { waitUntil: 'domcontentloaded' })
-	await expect(page.getByRole('link', { name: /Holiday Calendar/ })).toBeVisible()
-	await expect(page.getByRole('link', { name: /Payroll Config/ })).toBeVisible()
-	// Gated on canRoles after #237; must not have narrowed for the Super Admin.
-	await expect(page.getByRole('link', { name: /Roles & Access/ })).toBeVisible()
-	await expect(page.getByRole('link', { name: 'Holidays', exact: true })).toBeVisible()
+	await expect(hubCard(page, /Holiday Calendar/)).toBeVisible()
+	await expect(hubCard(page, /Document Backup/)).toBeVisible()
+	// Gated on the Roles & Access capability OR after #237; must not have narrowed for the Super Admin.
+	await expect(hubCard(page, /Roles & Access/)).toBeVisible()
+	await expect(sidebarRow(page, 'Holiday Calendar')).toBeVisible()
+	// The negative control's sidebar leg, proven positive: Roles & Access IS a sidebar row for this
+	// role, so the count-0 assertions above are reading a scope that can actually hold it.
+	await expect(sidebarRow(page, 'Roles & Access')).toBeVisible()
 })

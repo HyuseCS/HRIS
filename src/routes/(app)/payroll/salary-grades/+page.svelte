@@ -33,7 +33,7 @@
 		description="Pay bands assignable to positions. Employees inherit their band via their position; HR is warned when a basic salary falls outside it."
 	>
 		{#snippet back()}
-			<BackButton fallback="/settings" label="Settings" preferFallback />
+			<BackButton fallback="/payroll" label="Payroll" />
 		{/snippet}
 	</PageHeader>
 

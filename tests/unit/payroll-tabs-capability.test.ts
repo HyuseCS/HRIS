@@ -8,7 +8,7 @@ import { activePayrollTab, payrollTabCapabilities, payrollTabs } from '$lib/payr
  * tab from a role that can open the page — the second is the same reach regression as the first,
  * seen from the other side.
  *
- * The four booleans come from `payrollTabCapabilities`, the SAME function
+ * The five booleans come from `payrollTabCapabilities`, the SAME function
  * `payroll/+layout.server.ts` calls, applied to the real role table — so neither a `rbac.ts`
  * change nor a predicate that drifts off the route it mirrors can slip past this file.
  */
@@ -17,23 +17,48 @@ const capsFor = (...roles: Role[]) => payrollTabCapabilities(roles)
 const labels = (...roles: Role[]) => payrollTabs(capsFor(...roles)).map((t) => t.label)
 
 describe('payroll tab visibility per role', () => {
-	it('shows all five tabs to SUPER_ADMIN', () => {
+	it('shows all seven tabs to SUPER_ADMIN', () => {
 		expect(labels('SUPER_ADMIN')).toEqual([
 			'Runs',
 			'Periods',
 			'Config',
 			'Statutory Rates',
+			'Earnings & Deductions',
+			'Salary Grades',
 			'Calculator'
 		])
 	})
 
-	it('shows all five tabs to the CEO', () => {
-		expect(labels('CEO')).toEqual(['Runs', 'Periods', 'Config', 'Statutory Rates', 'Calculator'])
+	it('shows all seven tabs to the CEO', () => {
+		expect(labels('CEO')).toEqual([
+			'Runs',
+			'Periods',
+			'Config',
+			'Statutory Rates',
+			'Earnings & Deductions',
+			'Salary Grades',
+			'Calculator'
+		])
 	})
 
-	it('hides Config and Statutory Rates from a PAYROLL_OFFICER', () => {
-		// Holds MANAGE_PAYROLL, but neither ADMINISTER_SYSTEM nor either statutory capability.
+	it('hides Config, Statutory Rates and the pay masters from a PAYROLL_OFFICER', () => {
+		// Holds MANAGE_PAYROLL, but neither ADMINISTER_SYSTEM nor either statutory capability — and
+		// not MANAGE_HR, which the two pay-master pages enforce on load. This role clears the payroll
+		// layout's 403 and would 403 on /payroll/pay-codes, so the tabs must not offer them.
+		expect(canAny(['PAYROLL_OFFICER'], 'MANAGE_HR')).toBe(false)
 		expect(labels('PAYROLL_OFFICER')).toEqual(['Runs', 'Periods', 'Calculator'])
+	})
+
+	it('gives a MANAGER the pay masters it lost when the settings Payroll group was removed', () => {
+		// The reachability half of that removal: MANAGER holds MANAGE_HR and MANAGE_PAYROLL, so both
+		// pages stay reachable — from here now, instead of from the settings hub.
+		expect(labels('MANAGER')).toEqual([
+			'Runs',
+			'Periods',
+			'Earnings & Deductions',
+			'Salary Grades',
+			'Calculator'
+		])
 	})
 
 	it('shows Statutory Rates to an HR_ADMIN who holds PROPOSE_STATUTORY_RATES only', () => {
@@ -41,7 +66,14 @@ describe('payroll tab visibility per role', () => {
 		// a page every HR Admin can legitimately open and file a rate proposal from.
 		expect(canAny(['HR_ADMIN'], 'MANAGE_STATUTORY_RATES')).toBe(false)
 		expect(canAny(['HR_ADMIN'], 'PROPOSE_STATUTORY_RATES')).toBe(true)
-		expect(labels('HR_ADMIN')).toEqual(['Runs', 'Periods', 'Statutory Rates', 'Calculator'])
+		expect(labels('HR_ADMIN')).toEqual([
+			'Runs',
+			'Periods',
+			'Statutory Rates',
+			'Earnings & Deductions',
+			'Salary Grades',
+			'Calculator'
+		])
 	})
 
 	it('shows the Runs tab, and only that, to a sign-off-only VERIFIER', () => {
@@ -61,6 +93,8 @@ describe('payroll tab visibility per role', () => {
 			'Runs',
 			'Periods',
 			'Statutory Rates',
+			'Earnings & Deductions',
+			'Salary Grades',
 			'Calculator'
 		])
 	})
@@ -73,6 +107,8 @@ describe('activePayrollTab', () => {
 		expect(activePayrollTab(tabs, '/payroll/periods')).toBe('/payroll/periods')
 		expect(activePayrollTab(tabs, '/payroll/statutory-rates')).toBe('/payroll/statutory-rates')
 		expect(activePayrollTab(tabs, '/payroll/calculator')).toBe('/payroll/calculator')
+		expect(activePayrollTab(tabs, '/payroll/pay-codes')).toBe('/payroll/pay-codes')
+		expect(activePayrollTab(tabs, '/payroll/salary-grades')).toBe('/payroll/salary-grades')
 	})
 
 	it('marks Runs on the list and on a run detail page', () => {

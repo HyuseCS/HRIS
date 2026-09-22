@@ -22,12 +22,14 @@ export type PayrollTabCapabilities = {
 	canAdministerSystem: boolean
 	/** MANAGE_STATUTORY_RATES || PROPOSE_STATUTORY_RATES */
 	canSeeStatutoryRates: boolean
+	/** MANAGE_HR */
+	canManageHr: boolean
 }
 
 export type PayrollTab = { label: string; href: string }
 
 /**
- * The four predicates, in ONE place. `payroll/+layout.server.ts` calls this and returns the result
+ * The five predicates, in ONE place. `payroll/+layout.server.ts` calls this and returns the result
  * to the layout; the unit gate calls the same function, so a predicate that drifts away from the
  * route it mirrors cannot pass the gate by drifting in both files at once.
  */
@@ -41,7 +43,11 @@ export function payrollTabCapabilities(roles: Role[]): PayrollTabCapabilities {
 		// `payroll/statutory-rates/+page.server.ts` — MANAGE_STATUTORY_RATES || PROPOSE_STATUTORY_RATES.
 		// PROPOSE is HR Admin's; filtering on MANAGE alone would hide a page every HR Admin can open.
 		canSeeStatutoryRates:
-			canAny(roles, 'MANAGE_STATUTORY_RATES') || canAny(roles, 'PROPOSE_STATUTORY_RATES')
+			canAny(roles, 'MANAGE_STATUTORY_RATES') || canAny(roles, 'PROPOSE_STATUTORY_RATES'),
+		// `payroll/pay-codes` and `payroll/salary-grades` — requireAnyCapability(MANAGE_HR) each.
+		// Their own load gate is MANAGE_HR and not MANAGE_PAYROLL — a Payroll Officer clears this
+		// layout's 403 but would 403 on those two pages.
+		canManageHr: canAny(roles, 'MANAGE_HR')
 	}
 }
 
@@ -56,6 +62,12 @@ export function payrollTabs(caps: PayrollTabCapabilities): PayrollTab[] {
 	if (caps.canAdministerSystem) tabs.push({ label: 'Config', href: '/payroll/config' })
 	if (caps.canSeeStatutoryRates)
 		tabs.push({ label: 'Statutory Rates', href: '/payroll/statutory-rates' })
+	// Pay masters, moved off the settings hub: everything pay-related is reached from /payroll.
+	// Labels stay the canonical ones the pages' own headings use.
+	if (caps.canManageHr) {
+		tabs.push({ label: 'Earnings & Deductions', href: '/payroll/pay-codes' })
+		tabs.push({ label: 'Salary Grades', href: '/payroll/salary-grades' })
+	}
 	if (caps.canManage) tabs.push({ label: 'Calculator', href: '/payroll/calculator' })
 	return tabs
 }

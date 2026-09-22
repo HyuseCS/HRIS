@@ -207,7 +207,7 @@ export async function listEmployees(
 			branch: { select: { id: true, name: true } },
 			user: { select: { email: true, roles: true, isActive: true } }
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }

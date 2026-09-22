@@ -85,7 +85,7 @@ export async function listTimesheets(
 			employee: { select: { id: true, firstName: true, lastName: true, employeeNumber: true } },
 			entries: { orderBy: { date: 'asc' } }
 		},
-		orderBy: { periodStart: 'desc' },
+		orderBy: [{ periodStart: 'desc' }, { id: 'desc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }

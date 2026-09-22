@@ -48,10 +48,15 @@
 </svelte:head>
 
 <div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	{#snippet leaveDescription()}
+		Your leave balances and history. File leave from
+		<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
+	{/snippet}
+
 	{#if data.canViewOrgBalances}
 		<div class="flex flex-wrap items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
-				<PageHeader title="Leave" />
+				<PageHeader title="Leave" description={leaveDescription} />
 			</div>
 			<div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:pt-1">
 				<a
@@ -63,16 +68,10 @@
 			</div>
 		</div>
 	{:else}
-		<PageHeader title="Leave" />
+		<PageHeader title="Leave" description={leaveDescription} />
 	{/if}
 
 	<div class="flex shrink-0 flex-col gap-3">
-		<!-- The description carries a link, which PageHeader's string `description` cannot, so it
-		     stays its own paragraph directly under the title. -->
-		<p class="-mt-4 max-w-2xl text-sm text-muted-foreground">
-			Your leave balances and history. File leave from
-			<a href="/requests" class="text-primary hover:underline">Requests/Approvals</a>.
-		</p>
 		{#if data.balances.length > 0}
 			<BalanceSummary balances={data.balances} />
 		{/if}

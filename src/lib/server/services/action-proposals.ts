@@ -339,7 +339,7 @@ export async function listActionableProposals(
 				}
 			}
 		},
-		orderBy: { createdAt: 'desc' }
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
 	})
 
 	return rows.filter(
