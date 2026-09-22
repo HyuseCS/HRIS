@@ -1538,7 +1538,9 @@
 						<Banner kind="success" message="Saved." />
 					{:else if form?.action === 'changeCompensation' && form?.error}
 						<div
-							class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
+							use:scrollToError
+							role="alert"
+							class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
 						>
 							{form.error}
 						</div>
