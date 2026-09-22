@@ -42,4 +42,35 @@ test.describe('Cross-org tenancy switch', () => {
 		await page.goto('/employees', { waitUntil: 'domcontentloaded' })
 		await expect(page.getByText('Head of Operations').first()).toBeVisible()
 	})
+
+	test('a failed switch puts the switcher back to the org the app is still in', async ({
+		page
+	}) => {
+		await login(page, USERS.ceo)
+
+		const switcher = page.getByRole('combobox', { name: 'Active organization' })
+		await expect(switcher).toBeVisible()
+		const startingOrg = await switcher.inputValue()
+		expect(startingOrg).not.toBe('')
+
+		await page.route('**/api/v1/session/switch-org', (route) =>
+			route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+		)
+
+		await expect(async () => {
+			await Promise.all([
+				page.waitForResponse(
+					(r) => r.url().includes('/api/v1/session/switch-org') && r.request().method() === 'POST',
+					{ timeout: 2000 }
+				),
+				page
+					.getByRole('combobox', { name: 'Active organization' })
+					.selectOption({ label: 'JoJo Potato' })
+			])
+		}).toPass({ timeout: 15000 })
+
+		// The failure path really ran, so the value below is a reset and not a switch that worked.
+		await expect(page.getByText('Could not switch organization.')).toBeVisible()
+		await expect(switcher).toHaveValue(startingOrg)
+	})
 })

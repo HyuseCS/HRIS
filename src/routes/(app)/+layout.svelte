@@ -40,7 +40,7 @@
 	)
 	let switchingOrg = $state(false)
 
-	async function switchOrg(organizationId: string) {
+	async function switchOrg(organizationId: string, select: HTMLSelectElement) {
 		if (switchingOrg || organizationId === data.user.organizationId) return
 		switchingOrg = true
 		try {
@@ -51,12 +51,16 @@
 			})
 			if (!res.ok) {
 				addToast('Could not switch organization.', { kind: 'error' })
+				// The select is one-way bound, so a failed switch leaves the user's pick on screen
+				// and the switcher names a tenant the app is not in. Put it back.
+				select.value = data.user.organizationId
 				return
 			}
 			await invalidateAll()
 		} catch {
 			// Offline, or the request threw. Without this the switcher just silently gave up.
 			addToast('Could not switch organization.', { kind: 'error' })
+			select.value = data.user.organizationId
 		} finally {
 			switchingOrg = false
 		}
@@ -403,7 +407,7 @@
 					aria-label="Active organization"
 					disabled={switchingOrg}
 					value={data.user.organizationId}
-					onchange={(e) => switchOrg(e.currentTarget.value)}
+					onchange={(e) => switchOrg(e.currentTarget.value, e.currentTarget)}
 					class="min-w-0 flex-1 truncate rounded-md bg-transparent px-1 py-1 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
 				>
 					{#each memberOrgs as org (org.id)}

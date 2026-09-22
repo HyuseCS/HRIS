@@ -109,7 +109,7 @@ describe('the mobile drawer and the org switcher are keyboard-operable (S5 items
 	it('the org switcher is a native select, not a hand-rolled popover', () => {
 		const page = layout()
 		expect(page).toContain(`aria-label="Active organization"`)
-		expect(page).toContain('onchange={(e) => switchOrg(e.currentTarget.value)}')
+		expect(page).toContain('onchange={(e) => switchOrg(e.currentTarget.value, e.currentTarget)}')
 		// The popover's open/close state is gone with it — a leftover would mean both exist.
 		expect(page).not.toContain('orgMenuOpen')
 	})
