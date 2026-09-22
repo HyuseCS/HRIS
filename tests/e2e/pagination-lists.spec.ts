@@ -4,7 +4,7 @@ import type { ComplaintStatus, InventoryStatus } from '@prisma/client'
 import { login, USERS } from './helpers'
 
 // A4 — page-2-and-back coverage for the three paginated lists that had none:
-// /separations, /inventory and /complaints (HR branch). /employees and /settings/org are
+// /separations, /inventory and /inquiries (HR branch). /employees and /settings/org are
 // covered by pagination.spec.ts and settings-org-assignments.spec.ts; nothing here touches them.
 //
 // Expectations are derived from source, not from a run:
@@ -12,7 +12,7 @@ import { login, USERS } from './helpers'
 //     page links, and turns `← Previous` / `Next →` into plain <span>s at the ends. The label
 //     is `start–end of total` with an EN-DASH.
 //   - /separations and /inventory paginate on `page` at a fixed 20 (+page.server.ts).
-//   - /complaints (HR) paginates on `page` at fitPageSize(rowPx 39, chromePx 226), which is
+//   - /inquiries (HR) paginates on `page` at fitPageSize(rowPx 39, chromePx 226), which is
 //     viewport-derived and clamped to [5,50] — so its page size is READ OFF THE PAGER, never
 //     assumed. The employee branch's second pager uses `myPage`; logging in as HR keeps this
 //     spec on the `page` one.
@@ -382,7 +382,7 @@ test.describe('inventory list pagination', () => {
 })
 
 // ---------------------------------------------------------------------------
-// /complaints (HR branch) — page size is viewport-derived; nothing here assumes a number.
+// /inquiries (HR branch) — page size is viewport-derived; nothing here assumes a number.
 // ---------------------------------------------------------------------------
 
 const CMP_PREFIX = 'ZZPGCMP-'
@@ -390,7 +390,7 @@ const CMP_LAST = 'Zzpgcmp'
 const CMP_EMAIL = 'zzpgcmp001@example.test'
 // fitPageSize clamps to [5,50], so 60 rows put a pager on the page at ANY window height.
 const CMP_COUNT = 60
-const CMP_ROWS = 'tbody tr a[href^="/complaints/"]'
+const CMP_ROWS = 'tbody tr a[href^="/inquiries/"]'
 
 test.describe('complaints list pagination (HR branch)', () => {
 	test.beforeAll(async () => {
@@ -474,7 +474,7 @@ test.describe('complaints list pagination (HR branch)', () => {
 		page
 	}) => {
 		await login(page, USERS.hr)
-		await page.goto('/complaints?status=RESOLVED', { waitUntil: 'domcontentloaded' })
+		await page.goto('/inquiries?status=RESOLVED', { waitUntil: 'domcontentloaded' })
 
 		// The page size is whatever fitPageSize derived for THIS window — read it, never assume it.
 		const first = await range(page)
@@ -509,7 +509,7 @@ test.describe('complaints list pagination (HR branch)', () => {
 		expect(await rowKeys(page, CMP_ROWS, 'href')).toEqual(page1)
 
 		// ?page=99 clamps to the last real page of the filtered set.
-		await page.goto('/complaints?status=RESOLVED&page=99', { waitUntil: 'domcontentloaded' })
+		await page.goto('/inquiries?status=RESOLVED&page=99', { waitUntil: 'domcontentloaded' })
 		const last = await range(page)
 		expect(last.total).toBe(CMP_COUNT)
 		expect(last.end).toBe(CMP_COUNT)
