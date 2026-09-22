@@ -196,14 +196,16 @@ describe('per-area affordances (S6 items 34, 38-40)', () => {
 		expect(page).not.toContain('mt-0.5 flex h-4 w-4 flex-none')
 	})
 
-	it('the audit-log filters reflect the active URL params', () => {
+	it('the audit-log filters reflect the active filter', () => {
 		const page = read('routes/(app)/reports/audit-log/+page.svelte')
 		// All five controls, or the active filter goes invisible after submit for the missing one.
-		expect(page).toContain(`selected={param('actor') === actor.id}`)
-		expect(page).toContain(`selected={param('entity') === et}`)
-		expect(page).toContain(`selected={param('action') === a}`)
-		expect(page).toContain(`value={param('start')}`)
-		expect(page).toContain(`value={param('end')}`)
+		// The loader echoes the parsed params back as `data.filters`, so the controls read that
+		// rather than re-parsing the URL in the component.
+		expect(page).toContain('value={data.filters.actor}')
+		expect(page).toContain('selected={data.filters.entity === et}')
+		expect(page).toContain('selected={data.filters.action === a}')
+		expect(page).toContain('value={data.filters.start}')
+		expect(page).toContain('value={data.filters.end}')
 	})
 
 	it('the audit-log entity id can be read and copied', () => {

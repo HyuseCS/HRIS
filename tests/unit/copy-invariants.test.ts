@@ -50,7 +50,7 @@ describe('the inquiries route alias (S2 items 10-11)', () => {
 	 * `(?<!services)` is what tells the two apart, so this must never be loosened to a bare
 	 * `includes('/complaints')`.
 	 */
-	const COMPLAINTS_URL = /(?<!services)\/complaints(?![A-Za-z])/
+	const COMPLAINTS_URL = /(?<!services|components)\/complaints(?![A-Za-z])/
 
 	it('no source file outside the four redirect stubs points at /complaints', () => {
 		const offenders = sourceFiles()
@@ -78,6 +78,9 @@ describe('the inquiries route alias (S2 items 10-11)', () => {
 	it('the scan sees a stray URL but not the service import (guards against a vacuous pass)', () => {
 		expect(COMPLAINTS_URL.test('href="/complaints/{c.id}"')).toBe(true)
 		expect(COMPLAINTS_URL.test("import x from '$lib/server/services/complaints'")).toBe(false)
+		expect(
+			COMPLAINTS_URL.test("import D from '$lib/components/complaints/ComplaintCreateDialog.svelte'")
+		).toBe(false)
 	})
 })
 
@@ -297,7 +300,15 @@ describe('the Stores/Team noun ruling reaches non-nav surfaces (S2 item 14)', ()
 		const page = read('routes/(app)/team/+page.svelte')
 		expect(page).toContain('<title>Team — Veent HRIS</title>')
 		expect(page).toContain('title="Team"')
-		expect(page).not.toMatch(/isFoodService \?/)
+		// `isFoodService` survives here as a data-shape flag — it picks the unit column's source —
+		// but no surface word may vary by tenant, so "Branch" must not appear at all.
+		expect(page).toContain("data.isFoodService ? 'Store' : 'Department'")
+		const visibleBranchWords = page
+			.split('\n')
+			.filter((line) => /branch/i.test(line))
+			// The ruling itself is written down at the top of the file; that comment is the record.
+			.filter((line) => !/^\s*(<!--|\s+page —|\s+called the roster)/.test(line))
+		expect(visibleBranchWords).toEqual([])
 	})
 
 	/**

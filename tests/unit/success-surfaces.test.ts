@@ -291,7 +291,7 @@ const SITES: Row[] = [
 		surface: 'inline',
 		expectServerSaved: false,
 		present: [
-			'{#if form?.undone} <Banner kind="success"> Finalization undone. The case is back to {form.status} and the employee\'s login is enabled again. </Banner>'
+			'{#if form?.undone} <Banner kind="success"> Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the employee\'s login is enabled again. </Banner>'
 		],
 		absent: []
 	},
