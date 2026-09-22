@@ -2,6 +2,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
+	import { scrollToError } from '$lib/actions/scrollToError'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { beforeNavigate, goto } from '$app/navigation'
@@ -259,7 +260,9 @@
 	</PageHeader>
 
 	{#if form?.error}
+		<!-- Addendum §F — long page, error renders above the fold the person is looking at. -->
 		<div
+			use:scrollToError
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{form.error}

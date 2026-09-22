@@ -10,7 +10,6 @@
 
 	let { data }: { data: PageData } = $props()
 
-	const title = $derived(data.isFoodService ? 'Branches' : 'Team')
 	const views: { value: PeopleView; label: string }[] = [
 		{ value: 'grid', label: 'Grid' },
 		{ value: 'list', label: 'List' }
@@ -30,11 +29,14 @@
 </script>
 
 <svelte:head>
-	<title>{title} — Veent HRIS</title>
+	<!-- Owner ruling 03-09-26 (#182): a physical location is a "Store" on every surface, and this
+	     page — the people roster — is "Team" for every tenant. The old food-service branch, which
+	     called the roster "Branches" and the store registry "Stores", is the inversion being killed. -->
+	<title>Team — Veent HRIS</title>
 </svelte:head>
 
 <div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
-	<PageHeader {title} />
+	<PageHeader title="Team" />
 
 	<div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
 		<div class="flex flex-wrap items-center gap-3 border-b px-4 py-3">
@@ -90,7 +92,7 @@
 			{:else if data.view === 'list'}
 				<EmployeeTable
 					people={data.people}
-					unitLabel={data.isFoodService ? 'Branch' : 'Department'}
+					unitLabel={data.isFoodService ? 'Store' : 'Department'}
 					hrefFor={employeeHref}
 				/>
 			{:else}

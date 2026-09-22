@@ -9,23 +9,11 @@ import type { Actions, PageServerLoad } from './$types'
 
 const loginSchema = z.object({
 	email: z.string().email(),
-	password: z.string().min(1),
-	// The tenant chosen on the Avipa login (#135). Credentials are resolved against
-	// this org: a valid email/password for an org the user doesn't belong to fails
-	// with the same generic message, so login never reveals which tenant an account
-	// lives in.
-	selectedOrg: z.string().min(1)
+	password: z.string().min(1)
 })
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) redirect(302, '/dashboard')
-
-	// Tenant selector options — every org is a login target under the Avipa brand.
-	const orgs = await db.organization.findMany({
-		select: { id: true, name: true },
-		orderBy: { name: 'asc' }
-	})
-	return { orgs }
 }
 
 export const actions: Actions = {
@@ -37,7 +25,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'Invalid email or password' })
 		}
 
-		const { email, password, selectedOrg } = parsed.data
+		const { email, password } = parsed.data
 		const ip = getClientAddress()
 		const rateKey = `${ip}:${email.toLowerCase()}`
 
@@ -58,17 +46,7 @@ export const actions: Actions = {
 
 		const validPassword = await bcrypt.compare(password, user.passwordHash)
 
-		// Membership is checked alongside the password so a correct credential paired
-		// with the wrong tenant fails identically to a bad password — the selected org
-		// must be one the user actually belongs to (primary org or a UserOrganization
-		// row). This is the same tenant-isolation boundary the org switcher enforces.
-		const isMember =
-			user.organizationId === selectedOrg ||
-			(await db.userOrganization.findUnique({
-				where: { userId_organizationId: { userId: user.id, organizationId: selectedOrg } }
-			})) !== null
-
-		if (!validPassword || !isMember) {
+		if (!validPassword) {
 			recordFailure(rateKey)
 			// #5: deliberately NOT transactional — `db`, not a `tx`. No mutation happens on a failed
 			// login, so there is nothing to roll back with; the audit row IS the event.
@@ -87,9 +65,9 @@ export const actions: Actions = {
 
 		recordSuccess(rateKey)
 
-		// Land the session in the tenant the user picked (drives currentOrgId; a CEO
-		// who belongs to every org starts in their selected tenant, then switches).
-		const session = await lucia.createSession(user.id, { currentOrgId: selectedOrg })
+		// Land the session in the user's own org (drives currentOrgId; a multi-org user
+		// starts in their home org, then switches).
+		const session = await lucia.createSession(user.id, { currentOrgId: user.organizationId })
 		const sessionCookie = lucia.createSessionCookie(session.id)
 
 		cookies.set(sessionCookie.name, sessionCookie.value, {
@@ -104,7 +82,7 @@ export const actions: Actions = {
 			db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
 			writeAuditLog(
 				{
-					organizationId: selectedOrg,
+					organizationId: user.organizationId,
 					actorId: user.id,
 					actorRoles: user.roles,
 					ipAddress: ip

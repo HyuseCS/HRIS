@@ -10,6 +10,7 @@
 	import { CLEARANCE_AREA_LABELS } from '$lib/utils/clearance-area'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import { SEPARATION_STATUS_LABELS, SEPARATION_TYPE_LABELS, labelFor } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -53,7 +54,9 @@
 </script>
 
 <svelte:head>
-	<title>Separation — {s.employee.lastName}, {s.employee.firstName}</title>
+	<!-- R2: a separation is itself the adverse fact, so no name in the tab, the history list or a
+	     shared screen. The page body still names the person. -->
+	<title>Separation — Veent HRIS</title>
 </svelte:head>
 
 <div class="space-y-6">
@@ -62,7 +65,8 @@
 	{/if}
 	{#if form?.undone}
 		<Banner kind="success">
-			Finalization undone. The case is back to {form.status} and the employee's login is enabled again.
+			Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the
+			employee's login is enabled again.
 		</Banner>
 	{/if}
 	{#if data.partiallyRestored}
@@ -106,7 +110,8 @@
 			{/snippet}
 		</PageHeader>
 		<p class="text-sm">
-			<span class="font-medium">{s.type}</span> · effective {formatShortDate(s.effectiveDate)}
+			<span class="font-medium">{labelFor(SEPARATION_TYPE_LABELS, s.type)}</span> · effective
+			{formatShortDate(s.effectiveDate)}
 		</p>
 		{#if s.reason}<p class="text-sm text-muted-foreground">{s.reason}</p>{/if}
 	</div>

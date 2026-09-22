@@ -60,7 +60,7 @@ const validCsv = () =>
 
 /** Open the collapsed import card and return it. Everything else is scoped to this locator. */
 async function openImportCard(page: Page): Promise<Locator> {
-	await login(page, USERS.jojoManager, 'JoJo Potato')
+	await login(page, USERS.jojoManager)
 	await page.goto('/attendance', { waitUntil: 'domcontentloaded' })
 	const card = page.locator('details').filter({ hasText: 'Import backlog CSV' })
 	await expect(card).toHaveCount(1)

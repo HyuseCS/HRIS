@@ -46,7 +46,6 @@ const event = () => {
 	const body = new FormData()
 	body.set('email', 'a@b.com')
 	body.set('password', 'pw')
-	body.set('selectedOrg', ORG)
 	return {
 		request: new Request('http://x/login', { method: 'POST', body }),
 		cookies: { set: vi.fn() },
@@ -87,5 +86,6 @@ describe('login audit writes — class D, outside any transaction', () => {
 		const [, payload, client] = writeAuditLog.mock.calls[0]
 		expect(payload).toMatchObject({ action: 'LOGIN', entityType: 'User', entityId: USER.id })
 		expect(client).toBe(dbMock)
+		expect(dbMock.userOrganization.findUnique).not.toHaveBeenCalled()
 	})
 })

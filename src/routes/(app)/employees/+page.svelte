@@ -64,10 +64,10 @@
 				{#if data.showBranches}
 					<select
 						name="branch"
-						aria-label="Branch"
+						aria-label="Store"
 						class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					>
-						<option value="">All branches</option>
+						<option value="">All stores</option>
 						{#each data.branches as br (br.id)}
 							<option value={br.id} selected={data.branchFilter === br.id}>{br.name}</option>
 						{/each}
@@ -112,7 +112,7 @@
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
 								{#if data.showBranches}
-									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Branch</th>
+									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Store</th>
 								{/if}
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -123,20 +123,22 @@
 						</thead>
 						<tbody class="divide-y">
 							{#each employees as emp (emp.id)}
+								<!-- R1: the real link lives in the name cell. The whole-row click stays as a mouse
+								     convenience only — the row is not focusable and carries no key handler, so a
+								     keyboard reader gets a plain table row containing a link. -->
 								<tr
 									class="cursor-pointer hover:bg-muted/30"
-									role="link"
-									tabindex="0"
-									onclick={() => goto(`/employees/${emp.id}`)}
-									onkeydown={(e) => {
-										if (e.key === 'Enter' || e.key === ' ') {
-											e.preventDefault()
-											goto(`/employees/${emp.id}`)
-										}
+									onclick={(e) => {
+										if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+										goto(`/employees/${emp.id}`)
 									}}
 								>
 									<td class="px-4 py-3">
-										<div class="font-medium">{emp.lastName}, {emp.firstName}</div>
+										<a
+											href="/employees/{emp.id}"
+											class="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											>{emp.lastName}, {emp.firstName}</a
+										>
 										<div class="text-xs text-muted-foreground">{emp.employeeNumber}</div>
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">{emp.department.name}</td>
@@ -170,7 +172,7 @@
 							variant={filtered ? 'no-results' : 'empty'}
 							title={data.tab === 'offboarded' ? 'No offboarded employees' : 'No employees found'}
 							description={filtered
-								? 'No employee matches your search or branch filter.'
+								? 'No employee matches your search or store filter.'
 								: undefined}
 						/>
 					</div>

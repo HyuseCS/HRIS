@@ -19,7 +19,6 @@ import { login } from './helpers'
 test.describe.configure({ mode: 'serial' })
 
 const CREW = { email: 'benjie@jojo.ph', password: 'Employee@1234' }
-const TENANT = 'JoJo Potato'
 
 // Cagayan de Oro — where the seeded JoJo stores are.
 const FIX = { latitude: 8.4772, longitude: 124.6459 }
@@ -69,7 +68,7 @@ async function slowGeolocation(context: BrowserContext) {
 
 async function openPunchPage(context: BrowserContext): Promise<Page> {
 	const page = await context.newPage()
-	await login(page, CREW, TENANT)
+	await login(page, CREW)
 	await page.goto('/punch', { waitUntil: 'domcontentloaded' })
 	await expect(page.getByRole('heading', { name: 'Punch', exact: true })).toBeVisible()
 	// Wait for hydration. A pre-hydration click submits the form natively and punches WITHOUT a
