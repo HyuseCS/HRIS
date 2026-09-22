@@ -22,7 +22,7 @@ test.describe('Branches', () => {
 	})
 
 	test('JoJo HR sees the stores and can filter by status', async ({ page }) => {
-		await login(page, USERS.jojoManager, 'JoJo Potato')
+		await login(page, USERS.jojoManager)
 		// "Stores" everywhere for a physical location, per the owner's 03-09-26 #182 ruling; the
 		// roster tab is "Team" for every tenant now, not "Branches".
 		await expect(page.getByRole('link', { name: 'Stores' })).toBeVisible()
@@ -59,7 +59,7 @@ test.describe('Branches', () => {
 			await db.$disconnect()
 		}
 
-		await login(page, USERS.jojoManager, 'JoJo Potato')
+		await login(page, USERS.jojoManager)
 		await page.goto('/branches', { waitUntil: 'domcontentloaded' })
 		await page.waitForLoadState('networkidle')
 
@@ -81,7 +81,7 @@ test.describe('Branches', () => {
 	})
 
 	test('the employees roster filters by branch', async ({ page }) => {
-		await login(page, USERS.jojoManager, 'JoJo Potato')
+		await login(page, USERS.jojoManager)
 		await page.goto('/employees', { waitUntil: 'domcontentloaded' })
 
 		await page.locator('select[name="branch"]').selectOption({ label: 'SM CDO Downtown Premier' })

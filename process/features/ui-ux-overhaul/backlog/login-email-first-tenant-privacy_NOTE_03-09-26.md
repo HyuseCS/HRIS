@@ -7,6 +7,8 @@ feature: ui-ux-overhaul
 
 # Login step 1 stops listing every tenant — email-first
 
+**RESOLVED 22-09-26** by `process/general-plans/active/login-email-first_PLAN_22-09-26.md`, which diverges from option C below: the org step is removed outright rather than made email-first, because resolving orgs before the password creates an account-enumeration oracle. Body kept as the record of the 03-09-26 decision.
+
 **Status:** NEW PLAN REQUIRED. Owner decision taken 2026-09-03. Not built in phase 08.
 
 ## What is wrong today

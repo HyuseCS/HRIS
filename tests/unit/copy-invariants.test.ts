@@ -98,27 +98,11 @@ describe('the login page reads Veent HRIS, not Avipa (S2 item 12)', () => {
 		expect(login()).toContain('Veent HRIS · {new Date().getFullYear()}')
 	})
 
-	/**
-	 * One documented survivor: a comment INSIDE `loginSchema`. Phase 08's AC5 requires that schema
-	 * block to stay byte-for-byte untouched so the "the auth flow was not silently changed" check
-	 * is a plain empty diff, and a brand word in a comment is not worth weakening that proof. It
-	 * goes with the email-first login plan (see the backlog note).
-	 */
-	const ALLOWED_AVIPA = 'routes/(auth)/login/+page.server.ts'
-
-	it('leaves no Avipa string anywhere in src/ except the one AC5 protects', () => {
+	it('leaves no Avipa string anywhere in src/', () => {
 		const offenders = sourceFiles()
 			.filter((path) => /avipa/i.test(readFileSync(path, 'utf8')))
 			.map(rel)
-		expect(offenders).toEqual([ALLOWED_AVIPA])
-	})
-
-	it('the surviving Avipa mention is a comment inside loginSchema, not rendered copy', () => {
-		const lines = read(ALLOWED_AVIPA)
-			.split('\n')
-			.filter((line) => /avipa/i.test(line))
-		expect(lines).toHaveLength(1)
-		expect(lines[0].trim().startsWith('//')).toBe(true)
+		expect(offenders).toEqual([])
 	})
 })
 

@@ -11,8 +11,8 @@ import { login, USERS } from './helpers'
 // unchanged, and that is what actually proves the switch.
 test.describe('Cross-org tenancy switch', () => {
 	test('CEO switches from Veent to JoJo Potato and sees that org’s roster', async ({ page }) => {
-		// Land in Veent (the CEO picks a tenant on the login page).
-		await login(page, USERS.ceo, 'Veent')
+		// Land in Veent (the CEO's home org — login no longer offers a tenant choice).
+		await login(page, USERS.ceo)
 
 		// The switcher shows the current org and is only rendered for multi-org members.
 		const switcher = page.getByRole('combobox', { name: 'Active organization' })
