@@ -35,7 +35,7 @@
 			     itself: this is the (auth) group, which does not carry the app shell. -->
 			<div
 				role="alert"
-				class="mb-4 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400"
+				class="mb-4 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
 			>
 				{form.error}
 			</div>
