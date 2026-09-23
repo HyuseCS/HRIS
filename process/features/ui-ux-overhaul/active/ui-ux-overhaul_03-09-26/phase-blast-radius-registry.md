@@ -337,37 +337,39 @@ the consolidated list is the PROGRAM CLOSE section of
 
 **Plan:** `phase-10-container-bounds_PLAN_03-09-26.md`
 **Claimed:** 04-09-26
-**Built on:** `feat/uiux-phase-9` tip `6decf06` (phase-10 branch tip at claim time)
+**Built on:** `staging` `9cc3dcc` (re-ported 23-09-26; the original `feat/uiux-phase-10` was built on
+`feat/uiux-phase-9` tip `6decf06` and replaced by PR #30)
 
 **Files claimed:**
 
 | File | What |
 |---|---|
 | `src/app.css` | new `.card-scroll` companion class beside `.card` |
-| `src/lib/server/services/dashboard.ts` | `listUpcomingEvents` + `listUpcomingRegularizations` optional `limit` (D-1 narrow lift) |
-| `src/lib/server/services/recruitment.ts` | `listPostingsAwaitingApprover` optional `limit` (D-1) |
-| `src/routes/(app)/dashboard/+page.server.ts` | three cap call sites (10 each) |
-| `src/routes/(app)/dashboard/+page.svelte` | 3 scroll boxes, 2 view-all links, 1 a11y region |
-| `src/routes/(app)/employees/[id]/+page.svelte` | render caps + scroll boxes on 8 panels |
-| `src/routes/(app)/team/+page.svelte` | vertical bound on the existing `overflow-x-auto` wrapper |
+| `src/lib/server/services/dashboard.ts` | `listUpcomingEvents` optional `limit`; `listUpcomingRegularizations` gains `orderBy`, no limit |
+| `src/routes/(app)/dashboard/+page.server.ts` | Events capped via the service; Regularizations and Postings sliced to 10 in the load, with `*Total` counts |
+| `src/routes/(app)/dashboard/+page.svelte` | badges read the totals, 2 view-all links (postings gated on `canPost`), 1 a11y region |
+| `src/routes/(app)/employees/[id]/+page.svelte` | scroll boxes on 10 panels; render cap 25 on loans, cash advances and history only |
 | `src/routes/(app)/benefits/+page.svelte` | 2 bounds |
-| `src/routes/(app)/leave/balances/+page.svelte` | scroll-only bound, NO cap (D-6) |
-| `src/routes/(app)/performance/+page.svelte` | 4 bounds |
-| `src/routes/(app)/payroll/[id]/+page.svelte` | bounds on the money tables |
+| `src/routes/(app)/performance/+page.svelte` | 4 bounds, admin view only |
+| `src/routes/(app)/payroll/[id]/+page.svelte` | 1 bound |
 | `src/routes/(app)/profile/+page.svelte` | 3 bounds |
-| `src/routes/(app)/settings/org/+page.svelte` | 2 bounds |
-| `src/routes/(app)/settings/roles/+page.svelte` | 1 bound |
-| config-scale pages (branches, departments, offboarding, posting-approvers, statutory-rates, salary-grades, schedules, pay-codes, org-chart) | markup backstop only |
-| `tests/unit/container-bounds.test.ts` | **new** — G1/G1b/G2/G3/G3b |
-| `tests/unit/container-bounds-scan.test.ts` | **new** — G5/G10 |
-| `tests/e2e/container-bounds.spec.ts` | **new** — G6/G7/G8/G9, self-seeded (E3) |
+| config-scale pages (branches, departments, statutory-rates, settings/offboarding, settings/org, settings/posting-approvers, settings/schedules, payroll/pay-codes, payroll/salary-grades) | markup backstop only |
+| `tests/unit/container-bounds.test.ts` | **new** — G2/G3/G3b |
+| `tests/unit/container-bounds-scan.test.ts` | **new** — G5/G10/G13/G14 |
+| `tests/e2e/container-bounds.spec.ts` | **new** — G6-G9/G15/G16, self-seeded (E3) |
+| `tests/e2e/dashboard-layout.spec.ts`, `tests/e2e/posting-approver-sod.spec.ts` | fixture backdates and residue sweeps against the cap |
+
+`src/lib/server/services/recruitment.ts` is unchanged. Owner decision D2 keeps staging's lg
+fill-window shape on `team`, `leave/balances`, `settings/roles` and the performance employee view:
+no bound is claimed there. Owner decision D3 files the uncovered surfaces in
+`backlog/container-bounds-gaps_NOTE_23-09-26.md`.
 
 **NOT claimed (explicitly out of bounds):** `src/lib/components/ui/Table.svelte` (E2 dropped the
 prop — zero consumers), every picker `<select>` (T4), `team/+page.server.ts` (T3),
 `employees/[id]/+page.server.ts` (T5), the thirteen paginated route loads (T6), `/api/v1/dashboard`.
 
 **Overlap with earlier phases:** `dashboard/+page.svelte` (01, 02, 04),
-`employees/[id]/+page.svelte` (05, 07), `app.css` (03), `settings/roles/+page.svelte` (05).
+`employees/[id]/+page.svelte` (05, 07), `app.css` (03).
 All additive wrapper/class edits; no earlier phase's markup semantics changed.
 
 **Status:** DONE
