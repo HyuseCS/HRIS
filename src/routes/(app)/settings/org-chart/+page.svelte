@@ -3,6 +3,7 @@
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
+	import { labelFor, EMPLOYMENT_STATUS_LABELS } from '$lib/labels'
 
 	let { data }: { data: PageData } = $props()
 
@@ -68,7 +69,7 @@
 					{#if n.employmentStatus !== 'ACTIVE'}
 						<span
 							class="ml-1 rounded-full bg-foreground/15 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-							>{n.employmentStatus}</span
+							>{labelFor(EMPLOYMENT_STATUS_LABELS, n.employmentStatus)}</span
 						>
 					{/if}
 				</p>

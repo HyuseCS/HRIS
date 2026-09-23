@@ -16,6 +16,7 @@ import type {
 	AttendanceStatus,
 	BackupRunStatus,
 	BenefitEnrollmentStatus,
+	BenefitPlanType,
 	BranchStatus,
 	ClearanceStatus,
 	ComplaintCategory,
@@ -52,6 +53,15 @@ export const BENEFIT_ENROLLMENT_STATUS_LABELS: Record<BenefitEnrollmentStatus, s
 	ACTIVE: 'Active',
 	WAIVED: 'Waived',
 	TERMINATED: 'Terminated'
+}
+
+export const BENEFIT_PLAN_TYPE_LABELS: Record<BenefitPlanType, string> = {
+	HMO: 'HMO',
+	INSURANCE: 'Insurance',
+	RETIREMENT: 'Retirement',
+	ALLOWANCE: 'Allowance',
+	LEAVE_CREDIT: 'Leave credit',
+	OTHER: 'Other'
 }
 
 export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = {

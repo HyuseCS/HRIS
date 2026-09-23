@@ -12,6 +12,7 @@
 	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import type { PageData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import { labelFor, EMPLOYMENT_TYPE_LABELS } from '$lib/labels'
 
 	let { data }: { data: PageData } = $props()
 	let search = $state($page.url.searchParams.get('search') ?? '')
@@ -147,7 +148,7 @@
 									{/if}
 									<td class="px-4 py-3">{emp.jobTitle}</td>
 									<td class="px-4 py-3 text-muted-foreground"
-										>{emp.employmentType.replace('_', ' ')}</td
+										>{labelFor(EMPLOYMENT_TYPE_LABELS, emp.employmentType)}</td
 									>
 									<td class="px-4 py-3">
 										<Badge status={emp.employmentStatus} domain="employment" />

@@ -10,6 +10,8 @@
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
+	import { labelFor } from '$lib/labels'
+	import { ROLE_LABELS } from '$lib/rbac'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
@@ -65,21 +67,7 @@
 	const isStale = (submittedAt: Date | string) =>
 		Date.now() - new Date(submittedAt).getTime() >= 3 * 86_400_000
 
-	const roleLabels: Record<string, string> = {
-		HR_ADMIN: 'HR',
-		SUPER_ADMIN: 'Admin',
-		MANAGER: 'Manager',
-		VERIFIER: 'Verifier',
-		APPROVER: 'Approver',
-		CEO: 'CEO',
-		PAYROLL_OFFICER: 'Payroll'
-	}
-	const roleLabel = (r: string) =>
-		roleLabels[r] ??
-		r
-			.toLowerCase()
-			.replace(/_/g, ' ')
-			.replace(/^\w/, (c) => c.toUpperCase())
+	const roleLabel = (r: string) => labelFor(ROLE_LABELS, r)
 
 	function stageLabel(kind: string | null, role: string | null) {
 		if (!kind) return ''

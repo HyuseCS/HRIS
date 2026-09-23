@@ -25,6 +25,7 @@
 	import { page } from '$app/stores'
 	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
 	import { resolveTab } from '$lib/components/employees/employee-tabs'
+	import { labelFor, EMPLOYMENT_TYPE_LABELS, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -392,7 +393,7 @@
 					<dt class="text-muted-foreground">Job Title</dt>
 					<dd>{employee.jobTitle}</dd>
 					<dt class="text-muted-foreground">Employment Type</dt>
-					<dd>{employee.employmentType.replace('_', ' ')}</dd>
+					<dd>{labelFor(EMPLOYMENT_TYPE_LABELS, employee.employmentType)}</dd>
 					<dt class="text-muted-foreground">Start Date</dt>
 					<dd>{formatShortDate(employee.startDate)}</dd>
 					<dt class="text-muted-foreground">Tenure</dt>
@@ -1081,7 +1082,9 @@
 								{#each data.benefits as b (b.id)}
 									<tr class="hover:bg-muted/30 {b.status === 'ACTIVE' ? '' : 'opacity-60'}">
 										<td class="px-3 py-2 font-medium">{b.plan.name}</td>
-										<td class="px-3 py-2 text-muted-foreground">{b.plan.type.replace('_', ' ')}</td>
+										<td class="px-3 py-2 text-muted-foreground"
+											>{labelFor(BENEFIT_PLAN_TYPE_LABELS, b.plan.type)}</td
+										>
 										<td class="px-3 py-2 text-muted-foreground">{b.coverageLevel ?? '—'}</td>
 										<td class="px-3 py-2 text-right">
 											{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}

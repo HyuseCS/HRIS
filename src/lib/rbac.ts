@@ -174,8 +174,8 @@ export const ASSIGNABLE_ROLES = [
  * every surface that shows a role needs the same answer, so the mapping lives here rather than
  * being re-derived per component.
  *
- * NOTE: `(app)/+layout.svelte:299` and `(app)/requests/approvals/+page.svelte:79` each still carry
- * their own copy, predating this one. Fold them in next time either is touched.
+ * NOTE: `(app)/+layout.svelte:171` still carries its own copy, predating this one. Fold it in next
+ * time it is touched.
  */
 export const ROLE_LABELS: Record<Role, string> = {
 	EMPLOYEE: 'Employee',

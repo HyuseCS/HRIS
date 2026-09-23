@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
 	ApplicantStage,
@@ -7,6 +7,7 @@ import {
 	AttendanceStatus,
 	BackupRunStatus,
 	BenefitEnrollmentStatus,
+	BenefitPlanType,
 	BranchStatus,
 	ClearanceStatus,
 	ComplaintCategory,
@@ -24,6 +25,7 @@ import {
 	RequestType,
 	ReviewCycleStatus,
 	ReviewStatus,
+	Role,
 	SeparationStatus,
 	SeparationType,
 	TimesheetStatus
@@ -34,6 +36,7 @@ import {
 	ATTENDANCE_STATUS_LABELS,
 	BACKUP_RUN_STATUS_LABELS,
 	BENEFIT_ENROLLMENT_STATUS_LABELS,
+	BENEFIT_PLAN_TYPE_LABELS,
 	BRANCH_STATUS_LABELS,
 	CLEARANCE_STATUS_LABELS,
 	COMPLAINT_CATEGORY_LABELS,
@@ -57,6 +60,7 @@ import {
 	TIMESHEET_STATUS_LABELS,
 	labelFor
 } from '$lib/labels'
+import { ROLE_LABELS } from '$lib/rbac'
 
 /**
  * `$lib/labels.ts` is what stops a status pill rendering blank. The failure mode is silent: a new
@@ -94,12 +98,14 @@ const CASES: [string, Record<string, string>, Record<string, string>][] = [
 	['LoanStatus', LoanStatus, LOAN_STATUS_LABELS],
 	['BackupRunStatus', BackupRunStatus, BACKUP_RUN_STATUS_LABELS],
 	['JobPostingStatus', JobPostingStatus, JOB_POSTING_STATUS_LABELS],
-	['OfferStatus', OfferStatus, OFFER_STATUS_LABELS]
+	['OfferStatus', OfferStatus, OFFER_STATUS_LABELS],
+	['BenefitPlanType', BenefitPlanType, BENEFIT_PLAN_TYPE_LABELS],
+	['Role', Role, ROLE_LABELS]
 ]
 
 describe('labels.ts covers every mapped Prisma enum', () => {
 	it('maps every enum the phase-03 badges render', () => {
-		expect(CASES).toHaveLength(25)
+		expect(CASES).toHaveLength(27)
 	})
 
 	for (const [name, prismaEnum, labels] of CASES) {
@@ -119,47 +125,89 @@ describe('labels.ts covers every mapped Prisma enum', () => {
 
 // ── Phase 08 S1 — adoption, not just totality ────────────────────────────────
 /**
- * WHAT THESE TWO GATES DO NOT PROVE. They are source scans. The first proves the eight files below
- * contain no raw `{x.status}` / `{x.type}` interpolation; it cannot prove the label that replaced
- * one reads well, or that the element ever renders. The second proves every declared report column
- * has a header entry; it cannot prove the header is the right English for the number under it.
+ * WHAT THESE TWO GATES DO NOT PROVE. They are source scans. The first proves no `.svelte` file
+ * under `src/routes` or `src/lib` renders an enum raw or dressed up; it cannot prove the label that
+ * replaced one reads well, or that the element ever renders. The second proves every declared
+ * report column has a header entry; it cannot prove the header is the right English for the
+ * number under it.
  *
- * The scan is deliberately SCOPED to the eight files phase 08 item 7 names. 13 further raw-enum
- * sites exist in other enum families and are a recorded known gap
- * (`process/features/ui-ux-overhaul/backlog/raw-enum-sweep-remaining-enums_NOTE_03-09-26.md`).
- * Widening this list without adding the matching maps would make the gate unpassable.
+ * The scan walks every `.svelte` file under `src/routes` and `src/lib` with three regexes:
+ * BARE catches a raw `{x.status}` / `{x.type}` / `{x.employmentType}` / `{x.employmentStatus}` /
+ * `{x.role}` interpolation; DRESSED catches an enum field dressed up in place
+ * (`x.type.replace(...)`, `x.status.toLowerCase(...)`); UNDERSCORE catches any
+ * `.replace('_', ' ')` / `.replace(/_/g, ' ')` fallback, wherever the value came from. One hit is
+ * allowed: `{$page.status}` in `src/routes/+error.svelte`, an HTTP status code, not an enum. It is
+ * matched by file AND exact text, so a second hit in that file still fails.
+ *
+ * Measured blind spots — none of these is caught: `{x?.status}`, `{x.status ?? …}`,
+ * `{fn(x.status)}`, `.split('_').join(' ')`, enum fields outside BARE's name list (e.g. `source`,
+ * `action`), string builders in `.ts` files, and an enum aliased into a variable with an unrelated
+ * name and rendered bare. Latent false positive: a script template literal `${x.status}` matches
+ * BARE.
  */
 const APP = join(import.meta.dirname, '../../src/routes/(app)')
+const ROOT = join(import.meta.dirname, '../..')
 
-const ENUM_ADOPTION_FILES = [
-	'performance/+page.svelte',
-	'separations/+page.svelte',
-	'separations/[id]/+page.svelte',
-	'requests/+page.svelte',
-	'requests/[id]/+page.svelte',
-	'requests/approvals/+page.svelte',
-	'leave/+page.svelte',
-	'reports/[type]/+page.svelte'
-]
+const SVELTE_FILES = ['src/routes', 'src/lib'].flatMap((dir) =>
+	readdirSync(join(ROOT, dir), { recursive: true, encoding: 'utf8' })
+		.filter((rel) => rel.endsWith('.svelte'))
+		.map((rel) => join(dir, rel))
+)
 
 /**
  * A raw enum reaching the page as text: `{req.status}`, `{s.type}`, `{form.status}`. The
  * `(?<!=)` rules out `status={s.status}`, which is a prop binding into `Badge` — that path already
  * goes through `$lib/labels`, so it is the fix, not the defect.
  */
-const RAW_ENUM = /(?<!=)\{\s*[A-Za-z_$][\w$]*(?:\.[\w$]+)*\.(?:status|type)\s*\}/g
+const BARE =
+	/(?<!=)\{\s*[A-Za-z_$][\w$]*(?:\.[\w$]+)*\.(?:status|type|employmentType|employmentStatus|role)\s*\}/g
+const DRESSED =
+	/\.(?:status|type|employmentType|employmentStatus|role|stage|category)\s*\.\s*(?:replace|replaceAll|toLowerCase)\s*\(/g
+const UNDERSCORE = /\.replace(?:All)?\(\s*(?:'_'|"_"|\/_\/g?)\s*,\s*['"] ['"]\s*\)/g
 
-describe('the six phase-08 enums are rendered through $lib/labels, not raw', () => {
-	for (const file of ENUM_ADOPTION_FILES) {
-		it(`${file} interpolates no raw enum`, () => {
-			const source = readFileSync(join(APP, file), 'utf8')
-			expect(source.match(RAW_ENUM) ?? []).toEqual([])
+const SCANS: [string, RegExp][] = [
+	['BARE', BARE],
+	['DRESSED', DRESSED],
+	['UNDERSCORE', UNDERSCORE]
+]
+
+const ALLOWED: [string, string] = [join('src/routes', '+error.svelte'), '{$page.status}']
+
+function enumHits(file: string, source: string): string[] {
+	return SCANS.flatMap(([name, regex]) =>
+		[...source.matchAll(regex)]
+			.filter((match) => !(file === ALLOWED[0] && match[0] === ALLOWED[1]))
+			.map((match) => {
+				const line = source.slice(0, match.index).split('\n').length
+				return `${file}:${line} ${name} ${match[0]}`
+			})
+	)
+}
+
+describe('every .svelte file renders enums through $lib/labels, not raw or dressed up', () => {
+	it('the walk found the svelte files (guards against an empty walk)', () => {
+		expect(SVELTE_FILES.length).toBeGreaterThan(50)
+	})
+
+	for (const file of SVELTE_FILES) {
+		it(`${file} interpolates no raw or dressed-up enum`, () => {
+			expect(enumHits(file, readFileSync(join(ROOT, file), 'utf8'))).toEqual([])
 		})
 	}
 
-	it('the scan can still see a raw enum (guards against a regex that matches nothing)', () => {
-		expect('<td>{s.status}</td>'.match(RAW_ENUM)).toEqual(['{s.status}'])
-		expect('<Badge status={s.status} />'.match(RAW_ENUM)).toBeNull()
+	it('the scan can still see a raw, a dressed and an underscore-fallback enum', () => {
+		expect('<td>{s.status}</td>'.match(BARE)).toEqual(['{s.status}'])
+		expect('<Badge status={s.status} />'.match(BARE)).toBeNull()
+		expect("x.employmentType.replace('_', ' ')".match(DRESSED)).toEqual([
+			'.employmentType.replace('
+		])
+		expect('x.employmentStatus.toLowerCase()'.match(DRESSED)).toEqual([
+			'.employmentStatus.toLowerCase('
+		])
+		expect("r.toLowerCase().replace(/_/g, ' ')".match(UNDERSCORE)).toEqual([".replace(/_/g, ' ')"])
+		for (const [, regex] of SCANS) {
+			expect("x.replace('-', ' ')".match(regex)).toBeNull()
+		}
 	})
 })
 

@@ -9,6 +9,7 @@
 	import Trash2 from 'lucide-svelte/icons/trash-2'
 	import { formatShortDate } from '$lib/utils/format'
 	import { canAny } from '$lib/rbac'
+	import { labelFor, JOB_POSTING_STATUS_LABELS } from '$lib/labels'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -89,7 +90,7 @@
 							posting.status
 						)}"
 					>
-						{posting.status}
+						{labelFor(JOB_POSTING_STATUS_LABELS, posting.status)}
 					</span>
 				{/snippet}
 				{#snippet back()}

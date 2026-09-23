@@ -7,6 +7,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import { labelFor, EMPLOYMENT_TYPE_LABELS, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -72,7 +73,9 @@
 					</div>
 					<div>
 						<dt class="text-xs text-muted-foreground">Employment Type</dt>
-						<dd class="mt-0.5 text-sm font-medium">{emp.employmentType.replace(/_/g, ' ')}</dd>
+						<dd class="mt-0.5 text-sm font-medium">
+							{labelFor(EMPLOYMENT_TYPE_LABELS, emp.employmentType)}
+						</dd>
 					</div>
 				</div>
 				<div class="grid grid-cols-2 gap-4">
@@ -332,7 +335,9 @@
 						{#each data.benefits as b (b.id)}
 							<tr class="hover:bg-muted/30 {b.status === 'ACTIVE' ? '' : 'opacity-60'}">
 								<td class="px-3 py-2 font-medium">{b.plan.name}</td>
-								<td class="px-3 py-2 text-muted-foreground">{b.plan.type.replace('_', ' ')}</td>
+								<td class="px-3 py-2 text-muted-foreground"
+									>{labelFor(BENEFIT_PLAN_TYPE_LABELS, b.plan.type)}</td
+								>
 								<td class="px-3 py-2 text-muted-foreground">{b.coverageLevel ?? '—'}</td>
 								<td class="px-3 py-2 text-right"
 									>{b.plan.employeeCost != null

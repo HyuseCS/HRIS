@@ -6,6 +6,7 @@
 	import Table from '$lib/components/ui/Table.svelte'
 	import type { Column } from '$lib/components/ui/table'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
+	import { labelFor, PAYROLL_RUN_STATUS_LABELS } from '$lib/labels'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
@@ -59,7 +60,9 @@
 						>{formatCurrency(Number(payslip.netPay))}</span
 					>
 				{:else if column.key === 'status'}
-					<span class="badge-green">{payslip.payrollRun.status}</span>
+					<span class="badge-green"
+						>{labelFor(PAYROLL_RUN_STATUS_LABELS, payslip.payrollRun.status)}</span
+					>
 				{:else if column.key === 'actions'}
 					<a href="/payslips/{payslip.id}" class="btn-row">View</a>
 				{/if}

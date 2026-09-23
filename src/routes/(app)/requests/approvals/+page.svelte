@@ -9,6 +9,8 @@
 	import Pagination from '$lib/components/Pagination.svelte'
 	import ReasonDialog from '$lib/components/ui/ReasonDialog.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
+	import { labelFor } from '$lib/labels'
+	import { ROLE_LABELS } from '$lib/rbac'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
@@ -88,21 +90,7 @@
 
 	// Roles reach the template as raw enum values (HR_ADMIN), which read as database
 	// internals on a card an HR user looks at all day.
-	const roleLabels: Record<string, string> = {
-		HR_ADMIN: 'HR',
-		SUPER_ADMIN: 'Admin',
-		MANAGER: 'Manager',
-		VERIFIER: 'Verifier',
-		APPROVER: 'Approver',
-		CEO: 'CEO',
-		PAYROLL_OFFICER: 'Payroll'
-	}
-	const roleLabel = (r: string) =>
-		roleLabels[r] ??
-		r
-			.toLowerCase()
-			.replace(/_/g, ' ')
-			.replace(/^\w/, (c) => c.toUpperCase())
+	const roleLabel = (r: string) => labelFor(ROLE_LABELS, r)
 
 	function currentStageLabel(r: {
 		steps: { stageIndex: number; stageKind: string; role: string | null }[]
