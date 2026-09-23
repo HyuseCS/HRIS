@@ -7,6 +7,7 @@ import {
 	AttendanceStatus,
 	BackupRunStatus,
 	BenefitEnrollmentStatus,
+	BenefitPlanType,
 	BranchStatus,
 	ClearanceStatus,
 	ComplaintCategory,
@@ -24,6 +25,7 @@ import {
 	RequestType,
 	ReviewCycleStatus,
 	ReviewStatus,
+	Role,
 	SeparationStatus,
 	SeparationType,
 	TimesheetStatus
@@ -34,6 +36,7 @@ import {
 	ATTENDANCE_STATUS_LABELS,
 	BACKUP_RUN_STATUS_LABELS,
 	BENEFIT_ENROLLMENT_STATUS_LABELS,
+	BENEFIT_PLAN_TYPE_LABELS,
 	BRANCH_STATUS_LABELS,
 	CLEARANCE_STATUS_LABELS,
 	COMPLAINT_CATEGORY_LABELS,
@@ -57,6 +60,7 @@ import {
 	TIMESHEET_STATUS_LABELS,
 	labelFor
 } from '$lib/labels'
+import { ROLE_LABELS } from '$lib/rbac'
 
 /**
  * `$lib/labels.ts` is what stops a status pill rendering blank. The failure mode is silent: a new
@@ -94,12 +98,14 @@ const CASES: [string, Record<string, string>, Record<string, string>][] = [
 	['LoanStatus', LoanStatus, LOAN_STATUS_LABELS],
 	['BackupRunStatus', BackupRunStatus, BACKUP_RUN_STATUS_LABELS],
 	['JobPostingStatus', JobPostingStatus, JOB_POSTING_STATUS_LABELS],
-	['OfferStatus', OfferStatus, OFFER_STATUS_LABELS]
+	['OfferStatus', OfferStatus, OFFER_STATUS_LABELS],
+	['BenefitPlanType', BenefitPlanType, BENEFIT_PLAN_TYPE_LABELS],
+	['Role', Role, ROLE_LABELS]
 ]
 
 describe('labels.ts covers every mapped Prisma enum', () => {
 	it('maps every enum the phase-03 badges render', () => {
-		expect(CASES).toHaveLength(25)
+		expect(CASES).toHaveLength(27)
 	})
 
 	for (const [name, prismaEnum, labels] of CASES) {
