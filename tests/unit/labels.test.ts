@@ -162,7 +162,7 @@ const SVELTE_FILES = ['src/routes', 'src/lib'].flatMap((dir) =>
 const BARE =
 	/(?<!=)\{\s*[A-Za-z_$][\w$]*(?:\.[\w$]+)*\.(?:status|type|employmentType|employmentStatus|role)\s*\}/g
 const DRESSED =
-	/\.(?:status|type|employmentType|role|stage|category)\s*\.\s*(?:replace|replaceAll|toLowerCase)\s*\(/g
+	/\.(?:status|type|employmentType|employmentStatus|role|stage|category)\s*\.\s*(?:replace|replaceAll|toLowerCase)\s*\(/g
 const UNDERSCORE = /\.replace(?:All)?\(\s*(?:'_'|"_"|\/_\/g?)\s*,\s*['"] ['"]\s*\)/g
 
 const SCANS: [string, RegExp][] = [
@@ -200,6 +200,9 @@ describe('every .svelte file renders enums through $lib/labels, not raw or dress
 		expect('<Badge status={s.status} />'.match(BARE)).toBeNull()
 		expect("x.employmentType.replace('_', ' ')".match(DRESSED)).toEqual([
 			'.employmentType.replace('
+		])
+		expect('x.employmentStatus.toLowerCase()'.match(DRESSED)).toEqual([
+			'.employmentStatus.toLowerCase('
 		])
 		expect("r.toLowerCase().replace(/_/g, ' ')".match(UNDERSCORE)).toEqual([".replace(/_/g, ' ')"])
 		for (const [, regex] of SCANS) {
