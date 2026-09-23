@@ -20,11 +20,37 @@ const PROBIE_EMAIL = `e2e_layout_${STAMP}@veent.ph`
 const POSTING = `E2E-LAYOUT-posting-${STAMP}`
 
 /** startDate + 6 months is already past, so the row is inside the 21-day notice window. */
-function probationStartDate() {
+async function probationStartDate() {
 	const d = new Date()
 	d.setMonth(d.getMonth() - 6)
 	d.setDate(d.getDate() - 7)
+	const db = new PrismaClient()
+	try {
+		const { _min } = await db.employee.aggregate({
+			where: {
+				organizationId: await adminOrg(db),
+				employmentType: 'PROBATIONARY',
+				employmentStatus: 'ACTIVE'
+			},
+			_min: { startDate: true }
+		})
+		if (_min.startDate) {
+			const floor = new Date(_min.startDate)
+			floor.setUTCDate(floor.getUTCDate() - 4)
+			if (floor < d) return floor.toISOString().slice(0, 10)
+		}
+	} finally {
+		await db.$disconnect()
+	}
 	return d.toISOString().slice(0, 10)
+}
+
+async function adminOrg(db: PrismaClient) {
+	const admin = await db.user.findFirstOrThrow({
+		where: { email: USERS.admin.email },
+		select: { organizationId: true }
+	})
+	return admin.organizationId
 }
 
 const AWAITING_BUTTON = /awaiting your decision$/
@@ -72,6 +98,15 @@ async function badgeCount(button: Locator) {
 test.describe('(a) the decision panels are bounded and scroll their rows', () => {
 	test.describe.configure({ mode: 'serial' })
 
+	test.beforeAll(async () => {
+		const db = new PrismaClient()
+		try {
+			await db.jobPosting.deleteMany({ where: { title: { startsWith: 'E2E-LAYOUT-posting-' } } })
+		} finally {
+			await db.$disconnect()
+		}
+	})
+
 	test.afterAll(async () => {
 		const db = new PrismaClient()
 		try {
@@ -99,7 +134,7 @@ test.describe('(a) the decision panels are bounded and scroll their rows', () =>
 		await page.getByLabel('Email').fill(PROBIE_EMAIL)
 		await page.getByLabel('Department').selectOption({ label: 'Human Resources' })
 		await page.getByLabel('Job Title').fill('QA Engineer')
-		await page.getByLabel('Start Date').fill(probationStartDate())
+		await page.getByLabel('Start Date').fill(await probationStartDate())
 		await page.getByLabel('Basic Monthly Salary').fill('28000')
 		await page.getByRole('button', { name: 'Create Employee' }).click()
 		await page.waitForURL(/\/employees\/c[a-z0-9]{10,}$/)
@@ -146,6 +181,25 @@ test.describe('(a) the decision panels are bounded and scroll their rows', () =>
 		await hr.getByRole('button', { name: /Submit selected for approval/ }).click()
 		await expect(hr.locator('tr', { hasText: POSTING })).toContainText(/PENDING|Pending/i)
 		await hrCtx.close()
+
+		const db = new PrismaClient()
+		try {
+			const organizationId = await adminOrg(db)
+			const { _min } = await db.jobPosting.aggregate({
+				where: { organizationId, status: 'PENDING_APPROVAL', title: { not: POSTING } },
+				_min: { updatedAt: true }
+			})
+			if (_min.updatedAt) {
+				const before = new Date(_min.updatedAt)
+				before.setUTCDate(before.getUTCDate() - 1)
+				await db.jobPosting.updateMany({
+					where: { organizationId, title: POSTING },
+					data: { updatedAt: before }
+				})
+			}
+		} finally {
+			await db.$disconnect()
+		}
 
 		const adminCtx = await browser.newContext()
 		const page = await adminCtx.newPage()

@@ -94,7 +94,7 @@
 		{#if data.items.length === 0}
 			<p class="text-sm text-muted-foreground">No steps yet.</p>
 		{:else}
-			<ul class="divide-y">
+			<ul class="card-scroll divide-y">
 				{#each data.items as item, i (item.id)}
 					{@const save = saveGuard(item.id)}
 					{@const toggle = toggleGuard(item.id)}

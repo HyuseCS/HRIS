@@ -44,7 +44,7 @@
 	<!-- Grades -->
 	<section class="space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Grades</h2>
-		<div class="overflow-x-auto rounded-md border">
+		<div class="card-scroll overflow-x-auto rounded-md border">
 			<table class="w-full min-w-max text-sm">
 				<thead class="border-b bg-muted/50">
 					<!-- The name column absorbs the slack (`w-full`) so the money and action
@@ -141,7 +141,7 @@
 	<section class="space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Position Grades</h2>
 		{#if data.positions.length}
-			<div class="overflow-x-auto rounded-md border">
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<!-- Same column rule as the Grades table above: the title absorbs the

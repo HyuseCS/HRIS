@@ -141,7 +141,7 @@
 	{/if}
 
 	<!-- Table -->
-	<div class="overflow-x-auto rounded-lg border bg-card">
+	<div class="card-scroll overflow-x-auto rounded-lg border bg-card">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -250,7 +250,7 @@
 			>
 		</form>
 
-		<div class="overflow-x-auto rounded-lg border bg-card">
+		<div class="card-scroll overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full min-w-max text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>

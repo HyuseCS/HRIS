@@ -17,6 +17,8 @@ import { listPostingsAwaitingApprover, decideJobPosting } from '$lib/server/serv
 import { isHttpError } from '@sveltejs/kit'
 import type { Actions, PageServerLoad } from './$types'
 
+const DASHBOARD_LIST_CAP = 10
+
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!
 	const orgId = user.organizationId
@@ -87,7 +89,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listRecentAwards(orgId),
 		// Side panel. Employment matters (probation reviews, contract ends, other people's
 		// leave) go only to the HR ladder; everyone still sees their own.
-		listUpcomingEvents(orgId, { userId: user.id, canSeeSensitive: canPost })
+		listUpcomingEvents(
+			orgId,
+			{ userId: user.id, canSeeSensitive: canPost },
+			new Date(),
+			DASHBOARD_LIST_CAP
+		)
 	])
 
 	// HR grants awards from the dashboard — roster for the recipient picker.
@@ -100,7 +107,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		: []
 
 	// HR's advance warning of probationary staff coming up for regularization (#168).
-	const regularizations = canPost ? await listUpcomingRegularizations(orgId) : []
+	const allRegularizations = canPost ? await listUpcomingRegularizations(orgId) : []
 
 	// Job postings awaiting this user's approval (#195) — the departments they're the
 	// approver for, plus HR-fallback postings. Needs the viewer's employee id.
@@ -109,7 +116,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		where: { userId: user.id, organizationId: orgId },
 		select: { id: true }
 	})
-	const postingsToApprove = await listPostingsAwaitingApprover(
+	const allPostingsToApprove = await listPostingsAwaitingApprover(
 		orgId,
 		myEmployee?.id ?? null,
 		roles,
@@ -135,12 +142,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		canViewPayroll,
 		canCreateTimesheet,
 		announcements,
-		regularizations,
+		regularizations: allRegularizations.slice(0, DASHBOARD_LIST_CAP),
+		regularizationsTotal: allRegularizations.length,
 		birthdays,
 		myStatus,
 		awards,
 		awardEmployees,
-		postingsToApprove,
+		postingsToApprove: allPostingsToApprove.slice(0, DASHBOARD_LIST_CAP),
+		postingsToApproveTotal: allPostingsToApprove.length,
 		recentActivity,
 		upcomingEvents,
 		pendingItems: pending.items,

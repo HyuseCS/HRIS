@@ -236,7 +236,7 @@
 			<span class="text-xs text-muted-foreground">Last {data.punchWindowDays} days</span>
 		</div>
 		{#if data.punches.length}
-			<div class="overflow-x-auto rounded-md border">
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -274,7 +274,7 @@
 			My Documents
 		</h2>
 		{#if data.documents.length}
-			<div class="overflow-x-auto rounded-md border">
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -317,7 +317,7 @@
 			My Benefits
 		</h2>
 		{#if data.benefits.length}
-			<div class="overflow-x-auto rounded-md border">
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>

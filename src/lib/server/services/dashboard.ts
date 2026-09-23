@@ -33,7 +33,8 @@ export async function listUpcomingRegularizations(organizationId: string, asOf: 
 			jobTitle: true,
 			startDate: true,
 			department: { select: { name: true } }
-		}
+		},
+		orderBy: { startDate: 'asc' }
 	})
 
 	return employees
@@ -449,7 +450,8 @@ function nextAnniversaryKey(source: Date, todayKey: string, endKey: string): str
 export async function listUpcomingEvents(
 	organizationId: string,
 	viewer: { userId: string; canSeeSensitive: boolean },
-	asOf: Date = new Date()
+	asOf: Date = new Date(),
+	limit?: number
 ): Promise<UpcomingEvent[]> {
 	const todayKey = manilaDayKey(asOf)
 	const endKey = dayKeyIn(asOf, UPCOMING_EVENT_DAYS)
@@ -588,5 +590,8 @@ export async function listUpcomingEvents(
 		})
 	}
 
-	return events.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+	const sorted = events.sort(
+		(a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)
+	)
+	return limit === undefined ? sorted : sorted.slice(0, limit)
 }

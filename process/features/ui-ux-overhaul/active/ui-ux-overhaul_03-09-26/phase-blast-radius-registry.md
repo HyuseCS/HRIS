@@ -330,3 +330,46 @@ remain OPEN and neither was built. See `phase-08-copy-a11y-s1-s3_REPORT_03-09-26
 **PROGRAMME STATUS: all 8 phases CODE DONE.** The owner's test pass is the only remaining gate —
 the consolidated list is the PROGRAM CLOSE section of
 `phase-08-copy-a11y-s4-s6_REPORT_03-09-26.md`.
+
+---
+
+## Phase 10 — `container-bounds`
+
+**Plan:** `phase-10-container-bounds_PLAN_03-09-26.md`
+**Claimed:** 04-09-26
+**Built on:** `staging` `9cc3dcc` (re-ported 23-09-26; the original `feat/uiux-phase-10` was built on
+`feat/uiux-phase-9` tip `6decf06` and replaced by PR #30)
+
+**Files claimed:**
+
+| File | What |
+|---|---|
+| `src/app.css` | new `.card-scroll` companion class beside `.card` |
+| `src/lib/server/services/dashboard.ts` | `listUpcomingEvents` optional `limit`; `listUpcomingRegularizations` gains `orderBy`, no limit |
+| `src/routes/(app)/dashboard/+page.server.ts` | Events capped via the service; Regularizations and Postings sliced to 10 in the load, with `*Total` counts |
+| `src/routes/(app)/dashboard/+page.svelte` | badges read the totals, 2 view-all links (postings gated on `canPost`), 1 a11y region |
+| `src/routes/(app)/employees/[id]/+page.svelte` | scroll boxes on 10 panels; render cap 25 on loans, cash advances and history only |
+| `src/routes/(app)/benefits/+page.svelte` | 2 bounds |
+| `src/routes/(app)/performance/+page.svelte` | 4 bounds, admin view only |
+| `src/routes/(app)/payroll/[id]/+page.svelte` | 1 bound |
+| `src/routes/(app)/profile/+page.svelte` | 3 bounds |
+| config-scale pages (branches, departments, statutory-rates, settings/offboarding, settings/org, settings/posting-approvers, settings/schedules, payroll/pay-codes, payroll/salary-grades) | markup backstop only |
+| `tests/unit/container-bounds.test.ts` | **new** — G2/G3/G3b |
+| `tests/unit/container-bounds-scan.test.ts` | **new** — G5/G10/G13/G14 |
+| `tests/e2e/container-bounds.spec.ts` | **new** — G6-G9/G15/G16, self-seeded (E3) |
+| `tests/e2e/dashboard-layout.spec.ts`, `tests/e2e/posting-approver-sod.spec.ts` | fixture backdates and residue sweeps against the cap |
+
+`src/lib/server/services/recruitment.ts` is unchanged. Owner decision D2 keeps staging's lg
+fill-window shape on `team`, `leave/balances`, `settings/roles` and the performance employee view:
+no bound is claimed there. Owner decision D3 files the uncovered surfaces in
+`backlog/container-bounds-gaps_NOTE_23-09-26.md`.
+
+**NOT claimed (explicitly out of bounds):** `src/lib/components/ui/Table.svelte` (E2 dropped the
+prop — zero consumers), every picker `<select>` (T4), `team/+page.server.ts` (T3),
+`employees/[id]/+page.server.ts` (T5), the thirteen paginated route loads (T6), `/api/v1/dashboard`.
+
+**Overlap with earlier phases:** `dashboard/+page.svelte` (01, 02, 04),
+`employees/[id]/+page.svelte` (05, 07), `app.css` (03).
+All additive wrapper/class edits; no earlier phase's markup semantics changed.
+
+**Status:** DONE

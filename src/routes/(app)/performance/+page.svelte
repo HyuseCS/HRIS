@@ -39,7 +39,7 @@
 			{#snippet toolbar()}
 				<h2 class="text-lg font-semibold">Review Cycles</h2>
 			{/snippet}
-			<div class="overflow-x-auto">
+			<div class="card-scroll overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -84,7 +84,7 @@
 				Reviews that are already under way but cannot move: the next person to sign is not assigned.
 				This is not the same as a review that was never created.
 			</p>
-			<div class="overflow-x-auto">
+			<div class="card-scroll overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -127,7 +127,7 @@
 			{#snippet toolbar()}
 				<h2 class="text-lg font-semibold">My Reviews</h2>
 			{/snippet}
-			<div class="overflow-x-auto">
+			<div class="card-scroll overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -168,7 +168,7 @@
 				{#snippet toolbar()}
 					<h2 class="text-lg font-semibold">Reviews to Complete</h2>
 				{/snippet}
-				<div class="overflow-x-auto">
+				<div class="card-scroll overflow-x-auto">
 					<table class="w-full text-sm">
 						<thead class="border-b bg-muted/50">
 							<tr>
