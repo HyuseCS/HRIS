@@ -8,6 +8,15 @@ import { defineConfig, devices } from '@playwright/test'
 // `bun run dev`, so running it never fights your dev server and never silently tests through it.
 const port = Number(process.env.E2E_PORT ?? 4173)
 
+const fixturesHardDelete = [
+	'**/pagination.spec.ts',
+	'**/admin.spec.ts',
+	'**/container-bounds.spec.ts',
+	'**/employees-new-disclosure.spec.ts',
+	'**/settings-org-assignments.spec.ts',
+	'**/separations.spec.ts'
+]
+
 export default defineConfig({
 	testDir: 'tests/e2e',
 	globalSetup: './tests/e2e/global-setup.ts',
@@ -28,7 +37,15 @@ export default defineConfig({
 	},
 	projects: [
 		{
+			name: 'fixtures-hard-delete',
+			testMatch: fixturesHardDelete,
+			workers: 1,
+			use: { ...devices['Desktop Chrome'] }
+		},
+		{
 			name: 'chromium',
+			testIgnore: fixturesHardDelete,
+			dependencies: process.env.CI ? [] : ['fixtures-hard-delete'],
 			use: { ...devices['Desktop Chrome'] }
 		}
 	],
