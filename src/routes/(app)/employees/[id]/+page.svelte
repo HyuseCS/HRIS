@@ -1254,7 +1254,7 @@
 						<div class="card-scroll">
 							<table class="w-full text-sm">
 								<tbody class="divide-y">
-									{#each data.recurringEarnings.slice(0, LIST_RENDER_CAP) as e (e.id)}
+									{#each data.recurringEarnings as e (e.id)}
 										<tr>
 											<td class="py-1.5">{e.label}</td>
 											<td class="py-1.5 text-muted-foreground"
@@ -1289,7 +1289,6 @@
 								</tbody>
 							</table>
 						</div>
-						{@render truncated(data.recurringEarnings.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recurring allowances or incentives.</p>
 					{/if}
@@ -1459,7 +1458,7 @@
 						<div class="card-scroll">
 							<table class="w-full text-sm">
 								<tbody class="divide-y">
-									{#each data.recurringDeductions.slice(0, LIST_RENDER_CAP) as d (d.id)}
+									{#each data.recurringDeductions as d (d.id)}
 										<tr>
 											<td class="py-1.5">{d.label ?? d.deductionType.label}</td>
 											<td class="py-1.5 text-muted-foreground">{d.deductionType.code}</td>
@@ -1492,7 +1491,6 @@
 								</tbody>
 							</table>
 						</div>
-						{@render truncated(data.recurringDeductions.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recurring deductions.</p>
 					{/if}
@@ -1825,7 +1823,7 @@
 									</tr>
 								</thead>
 								<tbody class="divide-y">
-									{#each data.documents.slice(0, LIST_RENDER_CAP) as doc (doc.id)}
+									{#each data.documents as doc (doc.id)}
 										<tr class="hover:bg-muted/30">
 											<td class="px-3 py-2">{catLabel(doc.category)}</td>
 											<td class="px-3 py-2">
@@ -1855,7 +1853,6 @@
 								</tbody>
 							</table>
 						</div>
-						{@render truncated(data.documents.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No documents uploaded yet.</p>
 					{/if}
