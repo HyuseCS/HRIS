@@ -5,6 +5,7 @@
 	import { enhance } from '$app/forms'
 	import { formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import { labelFor, BENEFIT_PLAN_TYPE_LABELS, BENEFIT_ENROLLMENT_STATUS_LABELS } from '$lib/labels'
 	import type { ActionData, PageData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -157,7 +158,9 @@
 				{#each data.plans as plan (plan.id)}
 					<tr class="hover:bg-muted/30">
 						<td class="px-4 py-3 font-medium">{plan.name}</td>
-						<td class="px-4 py-3 text-muted-foreground">{plan.type.replace('_', ' ')}</td>
+						<td class="px-4 py-3 text-muted-foreground"
+							>{labelFor(BENEFIT_PLAN_TYPE_LABELS, plan.type)}</td
+						>
 						<td class="px-4 py-3 text-muted-foreground">{plan.provider ?? '—'}</td>
 						<td class="px-4 py-3 text-right tabular-nums"
 							>{plan.employeeCost != null ? formatCurrency(Number(plan.employeeCost)) : '—'}</td
@@ -281,7 +284,8 @@
 										? 'bg-green-500/15 text-green-400'
 										: en.status === 'WAIVED'
 											? 'bg-yellow-500/15 text-yellow-400'
-											: 'bg-gray-500/15 text-gray-400'}">{en.status}</span
+											: 'bg-gray-500/15 text-gray-400'}"
+									>{labelFor(BENEFIT_ENROLLMENT_STATUS_LABELS, en.status)}</span
 								>
 							</td>
 							<td class="px-4 py-3 text-right">
