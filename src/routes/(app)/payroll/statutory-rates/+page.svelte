@@ -398,7 +398,7 @@
 								band. The total is derived from EE + ER on save.
 							</p>
 						</div>
-						<div class="overflow-x-auto">
+						<div class="card-scroll overflow-x-auto">
 							<table class="w-full text-sm">
 								<thead>
 									<tr class="text-left text-xs text-muted-foreground">
@@ -561,7 +561,7 @@
 								and rates on save.
 							</p>
 						</div>
-						<div class="overflow-x-auto">
+						<div class="card-scroll overflow-x-auto">
 							<table class="w-full text-sm">
 								<thead>
 									<tr class="text-left text-xs text-muted-foreground">

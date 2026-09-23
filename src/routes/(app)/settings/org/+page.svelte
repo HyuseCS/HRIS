@@ -117,7 +117,7 @@
 				</button>
 			</div>
 		</div>
-		<div class="overflow-x-auto rounded-lg border bg-card">
+		<div class="card-scroll overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -295,7 +295,7 @@
 				Showing {data.employeePagination.total} of {data.employeeTotal} employees
 			</p>
 		</form>
-		<div class="overflow-x-auto rounded-lg border bg-card">
+		<div class="card-scroll overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
