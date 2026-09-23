@@ -210,16 +210,20 @@ Test gates (C3 5-column table):
 | criterion id | behavior | strategy | proving test | gap-resolution |
 |---|---|---|---|---|
 | AC1 | no raw / `_`-dressed enum text at the 12 sites | Fully-Automated | `bun run test -- tests/unit/labels.test.ts` (widened scan, 0 hits) | B |
-Failing stub:
-test("every .svelte file under src/routes and src/lib interpolates no raw or dressed-up enum", () => { throw new Error("NOT IMPLEMENTED — TDD stub: widened scan") })
 | AC2 | BenefitPlanType + Role maps are exhaustive | Fully-Automated | same file, CASES 27 rows + `bun run check` | B |
-Failing stub:
-test("BenefitPlanType and Role: every member has a non-blank label and no extra key", () => { throw new Error("NOT IMPLEMENTED — TDD stub: CASES 27") })
 | AC3 | the gate can fail | Fully-Automated | NC-1 (13 lines / 10 files RED after D2=A), NC-2, NC-3, empty-walk guard, self-test | B |
-Failing stub:
-test("the scan still sees a raw, a dressed and an underscore-fallback enum", () => { throw new Error("NOT IMPLEMENTED — TDD stub: self-test") })
 | AC4 | rendered strings match the label table, chips do not wrap badly | Agent-Probe | step 14 live probe of 9 routes (owner servers only) | C |
 | AC5 | no regressions | Fully-Automated | `bun run format:check && bun run lint && bun run check && bun run test` | A |
+
+Failing stub:
+test("every .svelte file under src/routes and src/lib interpolates no raw or dressed-up enum", () => { throw new Error("NOT IMPLEMENTED — TDD stub: widened scan") })
+
+Failing stub:
+test("BenefitPlanType and Role: every member has a non-blank label and no extra key", () => { throw new Error("NOT IMPLEMENTED — TDD stub: CASES 27") })
+
+Failing stub:
+test("the scan still sees a raw, a dressed and an underscore-fallback enum", () => { throw new Error("NOT IMPLEMENTED — TDD stub: self-test") })
+
 Failing stub:
 test("full CI gate set green", () => { throw new Error("NOT IMPLEMENTED — TDD stub: CI gate set") })
 
