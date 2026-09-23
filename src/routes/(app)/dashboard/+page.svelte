@@ -145,7 +145,7 @@
 					aria-expanded={openPanel === 'regularizations'}
 					aria-controls="panel-regularizations"
 					aria-haspopup="true"
-					aria-label="{data.regularizations.length} upcoming regularizations"
+					aria-label="{data.regularizationsTotal} upcoming regularizations"
 					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
 				>
 					<svg
@@ -162,11 +162,11 @@
 							d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
 						/>
 					</svg>
-					{#if data.regularizations.length > 0}
+					{#if data.regularizationsTotal > 0}
 						<span
 							aria-hidden="true"
 							class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
-							>{data.regularizations.length}</span
+							>{data.regularizationsTotal}</span
 						>
 					{/if}
 				</button>
@@ -179,7 +179,7 @@
 					aria-expanded={openPanel === 'postings'}
 					aria-controls="panel-postings"
 					aria-haspopup="true"
-					aria-label="{data.postingsToApprove.length} postings awaiting your approval"
+					aria-label="{data.postingsToApproveTotal} postings awaiting your approval"
 					class="relative flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
 				>
 					<svg
@@ -196,11 +196,11 @@
 							d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 6.006a2.18 2.18 0 0 1-.75.402m0 0a48.108 48.108 0 0 1-15 0m15 0a2.18 2.18 0 0 0 .75-.402M3.75 14.15a2.18 2.18 0 0 1-.75-1.661V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z"
 						/>
 					</svg>
-					{#if data.postingsToApprove.length > 0}
+					{#if data.postingsToApproveTotal > 0}
 						<span
 							aria-hidden="true"
 							class="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-foreground"
-							>{data.postingsToApprove.length}</span
+							>{data.postingsToApproveTotal}</span
 						>
 					{/if}
 				</button>
@@ -280,6 +280,7 @@
 								</li>
 							{/each}
 						</ul>
+						<a href="/employees" class="btn-row self-start">View all employees</a>
 					{/if}
 				</div>
 				<!-- Job postings awaiting your approval (#195) -->
@@ -354,6 +355,9 @@
 								</li>
 							{/each}
 						</ul>
+						{#if data.canPost}
+							<a href="/recruitment" class="btn-row self-start">View all postings</a>
+						{/if}
 					{/if}
 				</div>
 				<!-- Awaiting you — one door to the four approval inboxes. Hidden entirely at zero, matching the
@@ -831,30 +835,40 @@
 					Upcoming Events
 				</p>
 				{#if data.upcomingEvents.length}
-					<ul class="max-h-80 divide-y divide-border/40 overflow-y-auto">
-						{#each data.upcomingEvents as event (event.kind + event.date + event.title)}
-							<li class="flex items-start gap-3 py-2">
-								<div class="w-11 shrink-0 text-center">
-									<p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-										{monthOf(event.date)}
-									</p>
-									<p class="text-base font-semibold leading-none">{dayOf(event.date)}</p>
-								</div>
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-sm {event.mine ? 'font-medium text-foreground' : ''}">
-										{event.title}
-									</p>
-									{#if event.detail}
-										<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
-											<span class="h-1.5 w-1.5 shrink-0 rounded-full {EVENT_DOT[event.kind]}"
-											></span>
-											{event.detail}
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<div
+						tabindex="0"
+						role="region"
+						aria-label="Upcoming events"
+						class="max-h-80 overflow-y-auto"
+					>
+						<ul class="divide-y divide-border/40">
+							{#each data.upcomingEvents as event (event.kind + event.date + event.title)}
+								<li class="flex items-start gap-3 py-2">
+									<div class="w-11 shrink-0 text-center">
+										<p
+											class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+										>
+											{monthOf(event.date)}
 										</p>
-									{/if}
-								</div>
-							</li>
-						{/each}
-					</ul>
+										<p class="text-base font-semibold leading-none">{dayOf(event.date)}</p>
+									</div>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-sm {event.mine ? 'font-medium text-foreground' : ''}">
+											{event.title}
+										</p>
+										{#if event.detail}
+											<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
+												<span class="h-1.5 w-1.5 shrink-0 rounded-full {EVENT_DOT[event.kind]}"
+												></span>
+												{event.detail}
+											</p>
+										{/if}
+									</div>
+								</li>
+							{/each}
+						</ul>
+					</div>
 				{:else}
 					<!-- An empty card beside full siblings is a void. A centred empty state fills it deliberately
 					     instead of leaving a lone sentence at the top. -->
