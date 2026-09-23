@@ -15,7 +15,7 @@ cap 10 on three lists, and the two dropdown badges show the **real** total. The 
 red on the branch today gets fixed so it can still fail for the right reason.
 
 **Date**: 03-09-26 (written) · **Revised**: 23-09-26 (port)
-**Status**: PORT PLANNED — re-PVL pending. On branch: `.card-scroll` + the scan test only (`197cf02`).
+**Status**: PORT PLANNED — port PVL CONDITIONAL 23-09-26 (VC-1..VC-15). On branch: `.card-scroll` + the scan test only (`197cf02`).
 **Complexity**: COMPLEX (single phase plan, ~20 source files, 6 parallel lanes)
 **Feature**: ui-ux-overhaul
 **Phase**: 10 of 10 — `container-bounds`
@@ -474,9 +474,131 @@ Events; e2e is flaky (#287) — read every red.
 
 ## Validate Contract
 
-**Status: RE-PVL PENDING (port revision 23-09-26).** The 03-09-26 contract below stays as the
-historical record. Every item is marked here. A new VALIDATE pass writes the port contract above this
-table.
+### Port contract (23-09-26) — CURRENT
+
+Status: CONDITIONAL
+Date: 23-09-26
+date: 2026-09-23
+generated-by: outer-pvl
+supersedes: 2026-09-03 (outer-pvl) — outer PVL has current evidence for the port revision
+
+Parallel strategy: sequential (single validate-agent, direct source reads)
+Rationale: 4/7 signals (S4 phase program, S5 owner demanded seven named checks, S6 dashboard load-shape change, S7 22 files). Every check is a read of the same ~25 files plus one read-only DB count; a fan-out would re-read them N times with no cross-agent finding. Cost guard: not triggered (1 agent). EXECUTE: 6 parallel lanes as planned (opus for code lanes A, B, C1, C2; D1/D2 test lanes), orchestrator holds git, e2e, build, `bun run check`.
+
+Pre-checks run: `validate-plan-artifact.mjs` → 0 failures / 0 warnings. Branch `feat/uiux-phase-10-bounds` at `0f806b0`, clean, contains `197cf02`. `bun run test -- container-bounds-scan` → 4 failed / 30 passed (3 × G5 string slices + T3 `/team`), exactly as P-9 says. `dashboard.ts` is byte-identical to base `f9514d7` (`git diff --stat` empty), so `5c939d3`/`854c2b0` and their unit-test mock apply as-is. Read-only dev DB count: 337 ACTIVE PROBATIONARY rows, all `startDate 2026-03-02` (all in the notice window, overdue 21 days); 46 `E2E-F4-self-*` rows `PENDING_APPROVAL`; `posting_approvers` empty (Software Developers unmapped).
+
+Test gates (C3 5-column table):
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC1 | Events, Regularizations, Postings each render at most 10 rows | Fully-Automated | e2e G6 `tests/e2e/container-bounds.spec.ts` (orchestrator) | B |
+| AC1b | badge text and `aria-label` show the true total | Fully-Automated | e2e G15 | B |
+| AC2 | regs under the cap are the most overdue, across the month-end overflow | Fully-Automated | `bun run test -- container-bounds.test` G3, G3b; runtime corroboration: `dashboard-layout.spec.ts` PROBIE-ranks-first (VC-6) | B |
+| AC3 | events cut on the merged sorted output | Fully-Automated | `bun run test -- container-bounds.test` G2 | B |
+| AC4 | postings cut after the approver filter | Fully-Automated | e2e G6 as manager (source: route slices service output) | B |
+| AC5 | bounded containers scroll inside their box | Fully-Automated (dashboard G7, plain-site text G13) + Agent-Probe (P2) | G7, G13, P2 | B / D |
+| AC6 | view-all links right; Events has none; no dead link | Fully-Automated | e2e G16, G9 | B |
+| AC8 | paginated pages gained no constant cap | Fully-Automated | `bun run test -- container-bounds-scan` G5 (per VC-9) | B |
+| AC9 | documents + attendance members not constant-capped | Fully-Automated | scan G10-T5, G10-T3 (per VC-10) | B |
+| AC10 | no picker capped, incl. salary-grade select | Fully-Automated | scan G10-pickers (per VC-2) | B |
+| AC11 | 390px dashboard: no horizontal overflow, panels inside viewport | Fully-Automated | e2e G8 (per VC-8 mutations) | B |
+| AC12 | dropped sites keep staging's shape | Fully-Automated | scan G14 | B |
+| AC13 | e2e no worse than 275/2/1 | Fully-Automated (read on red, #287) | full e2e + `dashboard-layout` + `posting-approver-sod` | B |
+| AC15 | CI gate set green in CI order | Fully-Automated | `bun run format` check → lint → `bun run check` → `bun run test` | B |
+| AC14 | look pass 390/1440 on every changed surface | Agent-Probe | owner manual list + P2 + A1 impeccable | D |
+
+Failing stubs (Fully-Automated rows; red-first starting points, not files):
+- `test("should cut upcoming events after the merge so the earliest roster events survive", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G2") })`
+- `test("should return regularizations in ascending daysUntil from reverse-declared fixtures", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G3") })`
+- `test("should rank the 2025-09-01 start above 2025-08-30 and 2025-08-31", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G3b") })`
+- `test("should find no constant slice in a paginated load after stripping the exact allowlist", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G5") })`
+- `test("should keep take: pagination.take on the attendance members query", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G10-T3") })`
+- `test("should keep both data.grades each blocks in salary-grades uncapped", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G10-pickers") })`
+- `test("should find card-scroll N times in each plain-site file", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G13") })`
+- `test("should find no card-scroll on leave/balances, settings/roles, team", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G14") })`
+- `test("should render exactly 10 rows in each capped dashboard list", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G6") })`
+- `test("should show the same true total above 10 in badge and aria-label", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G15") })`
+- `test("should show View all links with the right href and none in Events", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G16/G9") })`
+- `test("should keep the dashboard inside a 390px viewport", () => { throw new Error("NOT IMPLEMENTED — TDD stub: G8") })`
+
+C-4 reconciliation: `strategy` carries only Fully-Automated / Hybrid / Agent-Probe. Known-gaps are named residuals below.
+
+Legacy line form:
+- dashboard service ordering and cut: [Fully-automated: `bun run test -- container-bounds.test` G2/G3/G3b]
+- source scans: [Fully-automated: `bun run test -- container-bounds-scan` G5/G10/G13/G14]
+- dashboard counts, totals, links, geometry, 390px: [Fully-automated: e2e `tests/e2e/container-bounds.spec.ts` G6/G7/G8/G9/G15/G16 — orchestrator only]
+- cap-collision regressions: [Fully-automated (flaky #287): e2e `dashboard-layout.spec.ts`, `posting-approver-sod.spec.ts`, read on red]
+- plain-site geometry, 201 file, look: [agent-probe: P2, A1, owner look pass]
+- query cost of every list except Events: [known-gap: documented — `query-level-pagination-unbounded-lists_NOTE_03-09-26.md`]
+
+Dimension findings:
+- Infra fit: PASS — one SvelteKit app, no container/port/deploy surface; `.card-scroll` already compiled on branch (`src/app.css:249-251`); `dashboard.ts` unchanged since `f9514d7`.
+- Test coverage: CONCERN — four gates as written cannot fail or fail for the wrong reason: G10-pickers (VC-2), G13 on the four bare 201 tables (VC-3), G8's named mutation (VC-8), G10-T3's own needle (VC-10). Two e2e rows the cap can drop are only half-fixed (VC-5, VC-6).
+- Breaking changes: CONCERN — load data gains two totals; only `dashboard/+page.svelte` reads `regularizations`/`postingsToApprove` (grep of `src` + `tests`: `+page.svelte:148,165,169,182,199,203,258,262,299,303`; no layout, no `/api/v1/dashboard` read, no unit test imports the load). Public Contracts misstates the events signature (VC-11).
+- Security surface: CONCERN — no auth/schema/trust change, no evidence pack needed. But "View all postings" as written renders for mapped approvers without MANAGE_HR and points at a MANAGE_HR-only page (VC-1): a dead link, the nav-mirrors-load-guard rule.
+- Section 1 (Lane A dashboard): CONCERN — cap/total/sort order correct; VC-1, VC-7, VC-11.
+- Section 2 (Lane B 201 file): CONCERN — all 16 line refs exact; VC-3 (bare tables), VC-4 (history mis-cite).
+- Section 3 (Lane C1): PASS — `benefits:144,253`, `performance:42,87,130,171`, `payroll/[id]:209`, `profile:239,277,320` are all existing `overflow-x-auto` wrappers; matches `76bd34a` (benefits half), `313dd78`, `dc024fc` hunk for hunk; no conflicting `max-h`/`overflow-y`.
+- Section 4 (Lane C2): PASS — all 13 refs are the existing wrappers (`offboarding:97` is the `<ul>`, as in `ef3fb0f`); every `ef3fb0f` hunk except the D2-dropped roles hunk is mapped, pay-codes/salary-grades retargeted to `/payroll/*`.
+- Section 5 (Lane D1 scan): CONCERN — G5 allowlist strings exact and complete (attendance `:61,62,109,117`, audit-log `:14`, requests `:60`); T3 needle verified at `attendance/+page.server.ts:100`; VC-2, VC-9, VC-10.
+- Section 6 (Lane D2 e2e): CONCERN — manager mapping works; VC-5, VC-6, VC-12.
+
+#### Answers to the seven questions
+
+1. **True total everywhere: PASS once items 9-10 land.** Every read of the two arrays is in `dashboard/+page.svelte` (lines above). Badge `:169/:203`, badge condition `:165/:199`, `aria-label` `:148/:182` all move to the total. The link text carries no count. Empty states `:258/:299` use `=== 0` on the sliced list — still right, since `slice(0,10)` of a non-empty list is non-empty. Sort before slice: yes — the service sorts by `daysUntil` (`dashboard.ts:53`) and the route slices its output; `slice` is on the route side only.
+2. **Postings order: PASS.** `recruitment.ts:236-238` orders `updatedAt asc`, filters in JS (`:248-259`), so the 10 shown are the **10 longest-waiting approvable** postings, the same order `5b454a8` capped. Nothing in D1 asks otherwise. But the cap drops the **newest** row, and both specs add the newest row — see VC-5 (dashboard-layout POSTING is not safe with the planned sweep) and VC-6 (PROBIE min−1 is not safe at the overflow). `posting-approver-sod` (b) TITLE_B is safe only with item 39's sweep (46 `E2E-F4-self` rows on the dev DB, all visible to twoHat after the remap); (a) TITLE_A is safe regardless (the residue is self-submitted by the approver, filtered at `:257`).
+3. **Negative controls:** G2 PASS, G3 PASS, G3b PASS (measured: `08-30→03-02`, `08-31→03-03`, `09-01→03-01`). G5 PASS with VC-9. **G10-T3 WEAK** (VC-10). **G10-pickers VACUOUS** (VC-2). **G13 PASS as a text gate but vacuous for four sites** (VC-3). G14 PASS (no `card-scroll` anywhere in `src` except `app.css` today, so it is green now and the named control reds). **G8 VOID as named** (VC-8). G6/G15/G16/G9/G7 PASS.
+4. **Site list: PASS on completeness, two defects in Lane B.** Every hunk of `cbb081b`, `76bd34a` (benefits half), `313dd78`, `dc024fc`, `ef3fb0f` (minus roles) maps to a plan row; no bounded list is missing. All line numbers verified against the current files. Defects: VC-3, VC-4.
+5. **Lane ownership: PASS.** No file in two lanes. `LIST_RENDER_CAP` and the `truncated` snippet live in the 201 file (Lane B only); `DASHBOARD_LIST_CAP` in `dashboard/+page.server.ts` (Lane A only); `.card-scroll` is done. Cross-lane geometry (D2 measures Lane A's panels; D1 counts B/C1/C2 classes) is serialised by the orchestrator running e2e and the scan after the lanes land. Labels are fixed in the plan text, so D2 can write locators in parallel.
+6. **Fixtures:** the manager **does** see the panel — `MANAGER` holds `MANAGE_HR` (`src/lib/rbac.ts:26`), so `canPost` and `canDecidePostings` are true regardless of the mapping, and a mapped department makes the Zzbound rows decidable only by the manager (`recruitment.ts:132-144`) — so they stay off admin's card, which is the point. Note the manager is also an HR-fallback decider, so the manager's card also holds all unmapped residue (46 rows today); G6/G15 still hold. PROBIE trick: holds against today's 337 residue rows but not at the overflow (VC-6). Sweeps: own-prefix only, PASS, with VC-12 on cleanup completeness.
+7. **Contradictions:** VC-4 (history `:1906`), VC-11 (events signature), plain-site rule vs Lane B bare tables (VC-3), item 33's afterAll list vs `f304d35` (VC-12). Section 0 item 3 is already done (`0f806b0` carries the gaps note).
+
+#### Binding execute conditions
+
+| # | Condition | Lane |
+|---|---|---|
+| **VC-1** (blocking) | Wrap the "View all postings" anchor in `{#if data.canPost}`. `/recruitment` requires `MANAGE_HR` (`recruitment/+page.server.ts:17`); `canDecidePostings` is also true for a mapped approver without it (`dashboard/+page.server.ts:118-123`, e.g. `approver@veent.ph`), who would get a 403. Regularizations needs no gate (`canPost`=MANAGE_HR ⊂ VIEW_TEAM, `employees/+page.server.ts:14`). D2 adds to G16: logged in as `USERS.approver` with a mapped posting, the postings region has no `View all postings` link. Record the residual: a non-HR approver with >10 pending drains the queue oldest-first and has no route to row 11+ — add it to `container-bounds-gaps_NOTE_23-09-26.md`. | A, D2 |
+| **VC-2** (blocking) | G10-pickers for salary-grades: `{#each data.grades as g (g.id)}` appears **twice** (`payroll/salary-grades/+page.svelte:62` table, `:182` select). A `toContain` stays green when `:182` is capped. Assert the match count is exactly 2. Run the named control on `:182` and show red. | D1 |
+| **VC-3** (blocking) | Loans `:1105`, cash advances `:1169`, recurring earnings `:1232`, recurring deductions `:1430` are bare `<table>`s with no wrapper. `max-height`/`overflow` do nothing on a table box. Wrap each in a new `<div class="card-scroll">` exactly as `cbb081b` did — the plain-site "put it on the list element" fallback does not apply to tables. G13's count cannot see this; P2 must scroll each of the four at 390 and 1440. | B |
+| **VC-4** (blocking) | History: `:1906` is the **outer** `{#each history as ev}` and gets the cap (`history.slice(0, LIST_RENDER_CAP)`); `.card-scroll` goes on the `<ol>` `:1905`; the nested per-event list is `:1928` (`{#each ev.changes}`) and stays uncapped. Item 18's "`:1906` stays uncapped" is wrong; `cbb081b` capped `:1906`. P2 checks that the timeline dots (`-left-[27px]`) are not clipped by the new scroll box. | B |
+| **VC-5** (blocking) | dashboard-layout POSTING: the `E2E-LAYOUT-posting-` sweep is not enough. After `posting-approver-sod` restores its mapping to HR-fallback, its `E2E-F4-self-*` rows (46 on the dev DB now) sit on admin's card, **older** than POSTING, and under `fullyParallel` `dashboard-layout` usually starts before sod's sweep. Do not sweep another spec's prefix. Instead, after creating POSTING, backdate it below every pending row: `jobPosting.update({ where: { id }, data: { updatedAt: <min pending updatedAt − 1 day> } })` (Prisma honours an explicit `@updatedAt` value), same idea as item 37. Keep the own-prefix sweep. | D2 |
+| **VC-6** (blocking) | PROBIE: use `min(startDate)` **minus 4 days**, not 1. `addUTCMonths` overflow inverts order across the Aug 29-31 → Feb boundary (measured: `2026-08-31→2027-03-03`, `2026-09-01→2027-03-01`), so min−1 loses to the min row in that window. Overflow is at most 3 days. | D2 |
+| **VC-7** | Upcoming Events region: put `role="region"`, `tabindex="0"`, `aria-label="Upcoming events"` and `max-h-80 overflow-y-auto` on a wrapping `<div>`, keep the `<ul>` a list. `role="region"` on the `<ul>` removes its list role and orphans every `<li>` (the `5c939d3` shape). The `svelte-ignore` directive moves with the tabindex. G6/G7 locate the region, then `ul > li`. | A, D2 |
+| **VC-8** (blocking) | G8's named mutation (remove `w-[calc(100vw-2rem)]`) will stay green: the panel is `absolute right-0`, so without a width it shrinks to fit and cannot overflow. G8 must assert `document.documentElement.scrollWidth <= 390` **and** each open region's `getBoundingClientRect()` has `left >= 0` and `right <= innerWidth`. Controls: (a) `w-[calc(100vw-2rem)]`→`w-[calc(100vw+2rem)]` on the postings panel → the region arm reds; (b) `right-0`→`left-0` on it → the `scrollWidth` arm reds. Run both, report red output. If either stays green, that arm is VOID and reported. | D2 |
+| **VC-9** | G5 allowlist: strip **every** occurrence (`split(entry).join('')` or `replaceAll`), not `.replace` (attendance has four `toISOString().slice(0, 10)`). Key the allowlist per file (attendance / audit-log / requests), so an allowlisted string elsewhere is still red. Run controls (a) and (b). | D1 |
+| **VC-10** | G10-T3: `take: pagination.take` appears three times in `attendance/+page.server.ts` (`:87`, `:225`, `:235`), so the `toContain` cannot go red when the members query alone is capped. Assert on the members block: `/const members = await db\.employee\.findMany\(\{[\s\S]*?take: pagination\.take\s*\}\)/`. Control: `:87` → `take: 10` must red **this** assertion, not only the `\d` one. | D1 |
+| **VC-11** | `listUpcomingEvents` is `(organizationId, viewer, asOf = new Date(), limit?)` (`dashboard.ts:449-453`); the route passes `new Date()` then `DASHBOARD_LIST_CAP`, as `5c939d3` did. Public Contracts' `(orgId, opts, limit?)` is shorthand, not the signature. | A |
+| **VC-12** | container-bounds `afterAll` and `beforeAll` sweep must also delete the fixture `postingApprover` row and the fixture department (resolved by name, as `f304d35` did), after the postings. If the marker is per-run unique, `employeeNumber` must carry the run stamp too (`@@unique([organizationId, employeeNumber])`, `schema.prisma:525`), or the sweep must run before any upsert. Every `deleteMany` filters on a fixture prefix; nothing unscoped. | D2 |
+| VC-13 | Add an Events negative control to G6: call `listUpcomingEvents` without the limit → Events count > 10, red. | D2 |
+| VC-14 | Old E4/E7 still bind: no `tabindex="0"` in the five `CONVERTED_ROWS` files; every named mutation is run and its red recorded; a mutation that stays green voids its gate. | all |
+| VC-15 | P2 focus list, in addition to the plan's: onboarding `<ul>` is `columns-1 sm:columns-2` — with a max-height, multicol can spill a third column sideways instead of scrolling; the history dots (VC-4); the four new 201 table wrappers (VC-3). | orchestrator |
+
+Open gaps:
+- Non-HR mapped approver with >10 pending postings has no route to rows past 10 (VC-1): known-gap: documented as NEW PLAN REQUIRED — see backlog/container-bounds-gaps_NOTE_23-09-26.md (add at close).
+- Query cost unchanged for every capped list except Events: known-gap — `query-level-pagination-unbounded-lists_NOTE_03-09-26.md`.
+- G5 cannot see a cap written as `take: SOME_CONSTANT`: known-gap — scan residual, recorded in the phase report.
+- Plain-site geometry has no runtime gate: known-gap — P2 + owner look pass (AC14).
+
+### What This Coverage Does NOT Prove
+
+- **Scans (G5, G10, G13, G14)** prove text, not rendering. G13 counts `card-scroll`; it cannot tell a box that scrolls from a class on a table that ignores it (VC-3 closes the known case). G5 misses a named-constant `take`.
+- **Unit G2/G3/G3b** run on a where→orderBy→take mock, not Postgres. They prove the service sort; they do not prove the route slices after it — only the source and the runtime PROBIE check (VC-6) do.
+- **e2e G6/G7/G8/G9/G15/G16** cover the dashboard at 390 and default desktop width only. They do not cover the other 16 bounded files.
+- **G8** proves one page at one width, and only after VC-8's mutations red.
+- **G11 regressions** are flaky (#287): a green run is not proof; read every red, never re-run blindly.
+- **Nothing** proves 10 or 25 is the right number, or that the query cost fell.
+- **P2/A1/owner pass** are judgment, not repeatable in CI.
+
+Gate: CONDITIONAL (0 unresolved FAILs; 15 execute conditions, VC-1 to VC-6 and VC-8 blocking for their lanes)
+Accepted by: pending — first-pass CONDITIONAL. Concerns by name: VC-1 dead postings link, VC-2 vacuous salary-grade picker gate, VC-3 no-op card-scroll on four bare tables, VC-4 history cap mis-cite, VC-5 POSTING crowded by E2E-F4 residue, VC-6 PROBIE overflow inversion, VC-7 region role on a list, VC-8 void G8 mutation, VC-9 allowlist strip, VC-10 weak T3 needle, VC-11 signature wording, VC-12 fixture cleanup, VC-13 events control, VC-14 carried E4/E7, VC-15 P2 focus. Owner decisions D1/D2/D3 are not reopened: VC-1 gates a link D1 asked for so it only renders where its target loads; VC-7 keeps D1's keyboard region and moves it onto a wrapper.
+
+Autonomous Goal Block: not written to this phase plan — BRANCH B. The umbrella `ui-ux-overhaul-umbrella_PLAN_03-09-26.md` carries `## Stable Program Goal` (line 79).
+
+### Historical record
+
+
+The 03-09-26 contract below stays as the historical record. Every item is marked here; the port
+contract above supersedes it.
 
 | Item | Mark | Reason |
 |---|---|---|
@@ -927,8 +1049,8 @@ this program's autonomous execution.
    `process/features/ui-ux-overhaul/active/ui-ux-overhaul_03-09-26/phase-10-container-bounds_PLAN_03-09-26.md`
 2. **Last completed step:** port revision written (23-09-26). On the branch: `.card-scroll` +
    the scan test (`197cf02`, scan RED 4/30 by design until Lane D1). No Lane A–D2 code yet.
-3. **Validate-contract status:** pending — re-PVL on this port revision. The 03-09-26 contract is
-   historical, with item marks in `## Validate Contract`.
+3. **Validate-contract status:** CONDITIONAL, port contract 23-09-26 in `## Validate Contract`
+   (VC-1..VC-15 bind EXECUTE). The 03-09-26 contract is historical.
 4. **Supporting context loaded:** `process/context/all-context.md`, `process/context/tests/all-tests.md`,
    the reference commits (`git show 5c939d3 854c2b0 5b454a8 cbb081b 76bd34a 313dd78 dc024fc ef3fb0f
    ced04d4 f304d35 c003cc5`), `tests/e2e/dashboard-layout.spec.ts`,
