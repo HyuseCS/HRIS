@@ -5,6 +5,7 @@
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import { regularizationStatus, tenureLabel } from '$lib/utils/dates'
 	import { employmentTypeLabel, contractRenewalStatus } from '$lib/utils/employment'
+	import { labelFor, PAYROLL_RUN_STATUS_LABELS } from '$lib/labels'
 	import AnnouncementItem from '$lib/components/dashboard/AnnouncementItem.svelte'
 	import ActivityIcon from '$lib/components/dashboard/ActivityIcon.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -508,7 +509,7 @@
 									? 'badge-green'
 									: 'badge-yellow'}
 							>
-								{metrics.lastPayrollRun.status}
+								{labelFor(PAYROLL_RUN_STATUS_LABELS, metrics.lastPayrollRun.status)}
 							</span>
 						</p>
 					{:else}
