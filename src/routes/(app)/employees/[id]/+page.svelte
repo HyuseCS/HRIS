@@ -28,6 +28,8 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
+	const LIST_RENDER_CAP = 25
+
 	// The five sections of the 201 file are URL-backed (`?tab=`), so a deep link and the browser's
 	// Back button both work. Panels are always rendered and hidden with the attribute AND the
 	// class — never `{#if}`, which would discard anything typed into an inactive tab's form.
@@ -232,6 +234,14 @@
 	}
 </script>
 
+{#snippet truncated(total: number)}
+	{#if total > LIST_RENDER_CAP}
+		<p class="text-xs text-muted-foreground">
+			Showing the first {LIST_RENDER_CAP} of {total}.
+		</p>
+	{/if}
+{/snippet}
+
 {#snippet actionError(names: string[])}
 	{@const message = errorFor(names)}
 	{#if message}
@@ -303,19 +313,20 @@
 								style="width: {(data.onboarding.doneCount / data.onboarding.total) * 100}%"
 							></div>
 						</div>
-						<ul class="columns-1 gap-x-8 sm:columns-2">
-							{#each data.onboarding.steps as step (step.id)}
-								<li class="mb-2.5 flex items-start gap-2 break-inside-avoid text-sm">
-									{#if step.manual}
-										<!-- Manual step: HR ticks it off (equipment issued, NDA signed, …). #116 -->
-										<form
-											method="POST"
-											action="?/toggleOnboardingStep"
-											use:enhance={toggleOnboardingStep.enhance}
-										>
-											<input type="hidden" name="itemId" value={step.id} />
-											<input type="hidden" name="done" value={(!step.done).toString()} />
-											<!-- Item 34, the plan's fallback path. The target was 16px, under the 24px
+						<div class="card-scroll">
+							<ul class="columns-1 gap-x-8 sm:columns-2">
+								{#each data.onboarding.steps as step (step.id)}
+									<li class="mb-2.5 flex items-start gap-2 break-inside-avoid text-sm">
+										{#if step.manual}
+											<!-- Manual step: HR ticks it off (equipment issued, NDA signed, …). #116 -->
+											<form
+												method="POST"
+												action="?/toggleOnboardingStep"
+												use:enhance={toggleOnboardingStep.enhance}
+											>
+												<input type="hidden" name="itemId" value={step.id} />
+												<input type="hidden" name="done" value={(!step.done).toString()} />
+												<!-- Item 34, the plan's fallback path. The target was 16px, under the 24px
 											     minimum, so it is raised to h-6 w-6. It stays a submit <button> rather
 											     than becoming a real <input type="checkbox">: a checkbox could only
 											     submit via an onchange requestSubmit(), so it would stop working
@@ -323,46 +334,47 @@
 											     aria-pressed already carries the toggle state. The app.css
 											     coarse-pointer 44px floor deliberately excludes checkboxes, so this
 											     is a desktop-size fix, not a change to that floor. -->
-											<button
-												type="submit"
-												disabled={toggleOnboardingStep.busy}
-												aria-pressed={step.done}
-												aria-label="{step.done ? 'Uncheck' : 'Check'} {step.label}"
-												class="flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold transition-colors disabled:pointer-events-none disabled:opacity-50 {step.done
-													? 'bg-green-500 text-white hover:bg-green-600'
-													: 'border border-muted-foreground/40 text-transparent hover:border-primary hover:text-muted-foreground'}"
+												<button
+													type="submit"
+													disabled={toggleOnboardingStep.busy}
+													aria-pressed={step.done}
+													aria-label="{step.done ? 'Uncheck' : 'Check'} {step.label}"
+													class="flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold transition-colors disabled:pointer-events-none disabled:opacity-50 {step.done
+														? 'bg-green-500 text-white hover:bg-green-600'
+														: 'border border-muted-foreground/40 text-transparent hover:border-primary hover:text-muted-foreground'}"
+												>
+													✓
+												</button>
+											</form>
+										{:else}
+											<!-- Not interactive (a derived step), but sized to match the manual one above so
+										     the list does not become a ragged column of two different dots. -->
+											<span
+												class="flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold {step.done
+													? 'bg-green-500 text-white'
+													: 'border border-muted-foreground/40 text-transparent'}"
 											>
 												✓
-											</button>
-										</form>
-									{:else}
-										<!-- Not interactive (a derived step), but sized to match the manual one above so
-										     the list does not become a ragged column of two different dots. -->
-										<span
-											class="flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold {step.done
-												? 'bg-green-500 text-white'
-												: 'border border-muted-foreground/40 text-transparent'}"
-										>
-											✓
-										</span>
-									{/if}
-									<span>
-										<span class={step.done ? 'text-foreground' : 'font-medium text-foreground'}>
-											{step.label}
-										</span>
-										{#if step.manual}
-											<span
-												class="ml-1 rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground"
-												>manual</span
-											>
+											</span>
 										{/if}
-										{#if !step.done}
-											<span class="block text-xs text-muted-foreground">{step.hint}</span>
-										{/if}
-									</span>
-								</li>
-							{/each}
-						</ul>
+										<span>
+											<span class={step.done ? 'text-foreground' : 'font-medium text-foreground'}>
+												{step.label}
+											</span>
+											{#if step.manual}
+												<span
+													class="ml-1 rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground"
+													>manual</span
+												>
+											{/if}
+											{#if !step.done}
+												<span class="block text-xs text-muted-foreground">{step.hint}</span>
+											{/if}
+										</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
 					{/if}
 				</section>
 			{/if}
@@ -890,7 +902,7 @@
 				</h2>
 
 				{#if data.leaveBalances.length}
-					<div class="flex flex-wrap gap-3">
+					<div class="card-scroll flex flex-wrap gap-3">
 						{#each data.leaveBalances as bal (bal.id)}
 							{@const gated =
 								bal.minMonthsOfService > 0 &&
@@ -930,7 +942,7 @@
 				{@render actionError(['addEmergencyContact', 'deleteEmergencyContact'])}
 
 				{#if employee.emergencyContacts.length || legacyEmergencyContact}
-					<div class="rounded-md border">
+					<div class="card-scroll rounded-md border">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
 								<tr>
@@ -1054,7 +1066,7 @@
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 				<h2 class="font-semibold">Benefits</h2>
 				{#if data.benefits.length}
-					<div class="overflow-x-auto rounded-md border">
+					<div class="card-scroll overflow-x-auto rounded-md border">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
 								<tr>
@@ -1102,22 +1114,27 @@
 						<div class="space-y-3">
 							<h3 class="text-sm font-semibold text-muted-foreground">Loans</h3>
 							{#if data.loans.length}
-								<table class="w-full text-sm">
-									<tbody class="divide-y">
-										{#each data.loans as l (l.id)}
-											<tr>
-												<td class="py-1.5">{l.type ?? 'Loan'}</td>
-												<td class="py-1.5 text-right font-mono"
-													>{formatCurrency(Number(l.balance))}<span
-														class="ml-1 text-xs text-muted-foreground"
-														>/ {formatCurrency(Number(l.installment))}·pd</span
-													></td
-												>
-												<td class="py-1.5 text-right"><Badge status={l.status} domain="loan" /></td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
+								<div class="card-scroll">
+									<table class="w-full text-sm">
+										<tbody class="divide-y">
+											{#each data.loans.slice(0, LIST_RENDER_CAP) as l (l.id)}
+												<tr>
+													<td class="py-1.5">{l.type ?? 'Loan'}</td>
+													<td class="py-1.5 text-right font-mono"
+														>{formatCurrency(Number(l.balance))}<span
+															class="ml-1 text-xs text-muted-foreground"
+															>/ {formatCurrency(Number(l.installment))}·pd</span
+														></td
+													>
+													<td class="py-1.5 text-right"
+														><Badge status={l.status} domain="loan" /></td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								{@render truncated(data.loans.length)}
 							{:else}
 								<p class="text-xs text-muted-foreground">No loans on record.</p>
 							{/if}
@@ -1166,22 +1183,27 @@
 						<div class="space-y-3">
 							<h3 class="text-sm font-semibold text-muted-foreground">Cash Advances</h3>
 							{#if data.cashAdvances.length}
-								<table class="w-full text-sm">
-									<tbody class="divide-y">
-										{#each data.cashAdvances as a (a.id)}
-											<tr>
-												<td class="py-1.5">Cash advance</td>
-												<td class="py-1.5 text-right font-mono"
-													>{formatCurrency(Number(a.balance))}<span
-														class="ml-1 text-xs text-muted-foreground"
-														>/ {formatCurrency(Number(a.installment))}·pd</span
-													></td
-												>
-												<td class="py-1.5 text-right"><Badge status={a.status} domain="loan" /></td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
+								<div class="card-scroll">
+									<table class="w-full text-sm">
+										<tbody class="divide-y">
+											{#each data.cashAdvances.slice(0, LIST_RENDER_CAP) as a (a.id)}
+												<tr>
+													<td class="py-1.5">Cash advance</td>
+													<td class="py-1.5 text-right font-mono"
+														>{formatCurrency(Number(a.balance))}<span
+															class="ml-1 text-xs text-muted-foreground"
+															>/ {formatCurrency(Number(a.installment))}·pd</span
+														></td
+													>
+													<td class="py-1.5 text-right"
+														><Badge status={a.status} domain="loan" /></td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								{@render truncated(data.cashAdvances.length)}
 							{:else}
 								<p class="text-xs text-muted-foreground">No cash advances on record.</p>
 							{/if}
@@ -1229,38 +1251,45 @@
 						Incentives lines. Ended items stop from the next payroll run.
 					</p>
 					{#if data.recurringEarnings.length}
-						<table class="w-full text-sm">
-							<tbody class="divide-y">
-								{#each data.recurringEarnings as e (e.id)}
-									<tr>
-										<td class="py-1.5">{e.label}</td>
-										<td class="py-1.5 text-muted-foreground"
-											>{e.kind === 'ALLOWANCE' ? 'Allowance' : 'Incentive'}</td
-										>
-										<td class="py-1.5 text-right font-mono"
-											>{formatCurrency(Number(e.monthlyAmount))}<span
-												class="ml-1 text-xs text-muted-foreground">/mo</span
-											></td
-										>
-										<td class="py-1.5 text-right">
-											{#if e.isActive}
-												<form method="POST" action="?/endEarning" use:enhance={endEarning.enhance}>
-													<input type="hidden" name="id" value={e.id} />
-													<button
-														type="submit"
-														disabled={endEarning.busy}
-														class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-														>{endEarning.busy ? 'Ending…' : 'End'}</button
+						<div class="card-scroll">
+							<table class="w-full text-sm">
+								<tbody class="divide-y">
+									{#each data.recurringEarnings.slice(0, LIST_RENDER_CAP) as e (e.id)}
+										<tr>
+											<td class="py-1.5">{e.label}</td>
+											<td class="py-1.5 text-muted-foreground"
+												>{e.kind === 'ALLOWANCE' ? 'Allowance' : 'Incentive'}</td
+											>
+											<td class="py-1.5 text-right font-mono"
+												>{formatCurrency(Number(e.monthlyAmount))}<span
+													class="ml-1 text-xs text-muted-foreground">/mo</span
+												></td
+											>
+											<td class="py-1.5 text-right">
+												{#if e.isActive}
+													<form
+														method="POST"
+														action="?/endEarning"
+														use:enhance={endEarning.enhance}
 													>
-												</form>
-											{:else}
-												<Badge status="ENDED" tone="gray" />
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+														<input type="hidden" name="id" value={e.id} />
+														<button
+															type="submit"
+															disabled={endEarning.busy}
+															class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+															>{endEarning.busy ? 'Ending…' : 'End'}</button
+														>
+													</form>
+												{:else}
+													<Badge status="ENDED" tone="gray" />
+												{/if}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						{@render truncated(data.recurringEarnings.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recurring allowances or incentives.</p>
 					{/if}
@@ -1427,40 +1456,43 @@
 						items stop from the next payroll run.
 					</p>
 					{#if data.recurringDeductions.length}
-						<table class="w-full text-sm">
-							<tbody class="divide-y">
-								{#each data.recurringDeductions as d (d.id)}
-									<tr>
-										<td class="py-1.5">{d.label ?? d.deductionType.label}</td>
-										<td class="py-1.5 text-muted-foreground">{d.deductionType.code}</td>
-										<td class="py-1.5 text-right font-mono"
-											>{formatCurrency(Number(d.monthlyAmount))}<span
-												class="ml-1 text-xs text-muted-foreground">/mo</span
-											></td
-										>
-										<td class="py-1.5 text-right">
-											{#if d.isActive}
-												<form
-													method="POST"
-													action="?/endDeduction"
-													use:enhance={endDeduction.enhance}
-												>
-													<input type="hidden" name="id" value={d.id} />
-													<button
-														type="submit"
-														disabled={endDeduction.busy}
-														class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
-														>{endDeduction.busy ? 'Ending…' : 'End'}</button
+						<div class="card-scroll">
+							<table class="w-full text-sm">
+								<tbody class="divide-y">
+									{#each data.recurringDeductions.slice(0, LIST_RENDER_CAP) as d (d.id)}
+										<tr>
+											<td class="py-1.5">{d.label ?? d.deductionType.label}</td>
+											<td class="py-1.5 text-muted-foreground">{d.deductionType.code}</td>
+											<td class="py-1.5 text-right font-mono"
+												>{formatCurrency(Number(d.monthlyAmount))}<span
+													class="ml-1 text-xs text-muted-foreground">/mo</span
+												></td
+											>
+											<td class="py-1.5 text-right">
+												{#if d.isActive}
+													<form
+														method="POST"
+														action="?/endDeduction"
+														use:enhance={endDeduction.enhance}
 													>
-												</form>
-											{:else}
-												<Badge status="ENDED" tone="gray" />
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+														<input type="hidden" name="id" value={d.id} />
+														<button
+															type="submit"
+															disabled={endDeduction.busy}
+															class="rounded-md border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50"
+															>{endDeduction.busy ? 'Ending…' : 'End'}</button
+														>
+													</form>
+												{:else}
+													<Badge status="ENDED" tone="gray" />
+												{/if}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						{@render truncated(data.recurringDeductions.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recurring deductions.</p>
 					{/if}
@@ -1781,7 +1813,7 @@
 					{@render actionError(['uploadDocument', 'deleteDocument'])}
 
 					{#if data.documents.length}
-						<div class="overflow-x-auto rounded-md border">
+						<div class="card-scroll overflow-x-auto rounded-md border">
 							<table class="w-full text-sm">
 								<thead class="border-b bg-muted/50">
 									<tr>
@@ -1793,7 +1825,7 @@
 									</tr>
 								</thead>
 								<tbody class="divide-y">
-									{#each data.documents as doc (doc.id)}
+									{#each data.documents.slice(0, LIST_RENDER_CAP) as doc (doc.id)}
 										<tr class="hover:bg-muted/30">
 											<td class="px-3 py-2">{catLabel(doc.category)}</td>
 											<td class="px-3 py-2">
@@ -1823,6 +1855,7 @@
 								</tbody>
 							</table>
 						</div>
+						{@render truncated(data.documents.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No documents uploaded yet.</p>
 					{/if}
@@ -1902,44 +1935,47 @@
 					</h2>
 
 					{#if history.length}
-						<ol class="relative space-y-5 border-l pl-6">
-							{#each history as ev (ev.id)}
-								<li class="relative">
-									<span
-										class="absolute -left-[27px] mt-1 h-3 w-3 rounded-full border-2 border-background {ev.type ===
-										'HIRED'
-											? 'bg-green-500'
-											: 'bg-primary'}"
-									></span>
-									<div class="flex flex-wrap items-baseline justify-between gap-2">
-										<span class="text-sm font-medium">
-											{ev.type === 'HIRED' ? 'Hired / record created' : 'Profile updated'}
-										</span>
-										<span class="text-xs text-muted-foreground">
-											{formatShortDate(ev.date)}
-											<!-- #170: a comp change carries its own effective date (may be backdated). -->
-											{#if ev.effectiveDate}
-												· effective {formatShortDate(ev.effectiveDate)}
-											{/if}
-										</span>
-									</div>
-									{#if ev.changes.length}
-										<ul class="mt-1 space-y-0.5 text-sm text-muted-foreground">
-											{#each ev.changes as c (c.label)}
-												<li>
-													<span class="font-medium text-foreground">{c.label}:</span>
-													{c.from} <span aria-hidden="true">→</span>
-													<span class="text-foreground">{c.to}</span>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-									{#if ev.actorEmail}
-										<p class="mt-1 text-xs text-muted-foreground/70">by {ev.actorEmail}</p>
-									{/if}
-								</li>
-							{/each}
-						</ol>
+						<div class="card-scroll pl-1">
+							<ol class="relative space-y-5 border-l pl-6">
+								{#each history.slice(0, LIST_RENDER_CAP) as ev (ev.id)}
+									<li class="relative">
+										<span
+											class="absolute -left-[27px] mt-1 h-3 w-3 rounded-full border-2 border-background {ev.type ===
+											'HIRED'
+												? 'bg-green-500'
+												: 'bg-primary'}"
+										></span>
+										<div class="flex flex-wrap items-baseline justify-between gap-2">
+											<span class="text-sm font-medium">
+												{ev.type === 'HIRED' ? 'Hired / record created' : 'Profile updated'}
+											</span>
+											<span class="text-xs text-muted-foreground">
+												{formatShortDate(ev.date)}
+												<!-- #170: a comp change carries its own effective date (may be backdated). -->
+												{#if ev.effectiveDate}
+													· effective {formatShortDate(ev.effectiveDate)}
+												{/if}
+											</span>
+										</div>
+										{#if ev.changes.length}
+											<ul class="mt-1 space-y-0.5 text-sm text-muted-foreground">
+												{#each ev.changes as c (c.label)}
+													<li>
+														<span class="font-medium text-foreground">{c.label}:</span>
+														{c.from} <span aria-hidden="true">→</span>
+														<span class="text-foreground">{c.to}</span>
+													</li>
+												{/each}
+											</ul>
+										{/if}
+										{#if ev.actorEmail}
+											<p class="mt-1 text-xs text-muted-foreground/70">by {ev.actorEmail}</p>
+										{/if}
+									</li>
+								{/each}
+							</ol>
+						</div>
+						{@render truncated(history.length)}
 					{:else}
 						<p class="text-xs text-muted-foreground">No recorded changes yet.</p>
 					{/if}
