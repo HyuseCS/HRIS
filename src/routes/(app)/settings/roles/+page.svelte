@@ -177,9 +177,11 @@
 	</PageHeader>
 
 	<Container tone="card" flush toolbar={filter} empty={data.users.length === 0}>
-		<div class="overflow-x-auto">
+		<div class="phone-scroll overflow-x-auto">
 			<table class="w-full min-w-[67rem] table-fixed text-sm sm:min-w-[76rem]">
-				<thead class="border-b bg-muted/50">
+				<thead
+					class="sticky top-0 z-10 border-b bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))]"
+				>
 					<tr>
 						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
 						<th class="w-48 px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>

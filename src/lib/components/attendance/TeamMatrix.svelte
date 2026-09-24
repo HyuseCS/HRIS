@@ -124,7 +124,7 @@
 
 	<!-- Attendance table -->
 	{#if matrix.members.length > 0}
-		<div class="min-h-0 flex-1 overflow-auto">
+		<div class="phone-scroll min-h-0 flex-1 overflow-auto">
 			<table class="w-full text-sm {fill ? 'lg:h-full' : ''}">
 				<thead class="sticky top-0 z-20 border-b bg-card">
 					<tr class="bg-muted/50 {fill ? 'lg:h-[37px]' : ''}">
