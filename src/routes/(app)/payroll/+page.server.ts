@@ -1,7 +1,9 @@
 import { error, fail, isHttpError } from '@sveltejs/kit'
 import { requireAnyCapability, requirePayrollManage } from '$lib/server/rbac'
 import { canAny } from '$lib/rbac'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
+	countPayrollRuns,
 	listPayrollRuns,
 	createPayrollRun,
 	computePayroll
@@ -10,7 +12,7 @@ import { voidRun } from '$lib/server/services/payroll/runs'
 import { z } from 'zod'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	const roles = user.roles
 	// Managers run/override; the sign-off roles (Verifier/Approver) need the list to find
@@ -27,8 +29,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Stream the runs list so the page renders a skeleton while it loads. Finance approvers
 	// (CEO / Super Admin) see every tenant's runs to sign them off (#174); the page labels
 	// the tenant and limits create/compute controls to the viewer's own org.
-	const runs = listPayrollRuns(user.organizationId, roles)
-	return { runs, canManage, canVoid, viewerOrg: user.organizationId }
+	const total = await countPayrollRuns(user.organizationId, roles)
+	const pagination = paginate(url, total, {
+		// ponytail: rowPx/chromePx estimated from sibling list pages, not measured live
+		pageSize: fitPageSize(cookies, { rowPx: 57, chromePx: 258 })
+	})
+	const runs = listPayrollRuns(user.organizationId, roles, {
+		skip: pagination.skip,
+		take: pagination.take
+	})
+	return { runs, pagination, canManage, canVoid, viewerOrg: user.organizationId }
 }
 
 const createSchema = z.object({
