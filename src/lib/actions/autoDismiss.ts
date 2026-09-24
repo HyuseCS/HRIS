@@ -45,7 +45,8 @@ export function autoDismiss(node: HTMLElement, enabled: boolean = true) {
 		stop()
 	}
 	const onFocusOut = (e: FocusEvent) => {
-		if (node.contains(e.relatedTarget as Node | null)) return
+		const related = e.relatedTarget as Node | null
+		if (related !== node && node.contains(related)) return
 		focused = false
 		start()
 	}

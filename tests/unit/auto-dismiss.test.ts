@@ -119,6 +119,20 @@ describe('autoDismiss action', () => {
 		expect(vi.getTimerCount()).toBe(0)
 	})
 
+	it('j: focus moving from a descendant to the node itself resumes; descendant to another descendant stays paused', () => {
+		const node = fakeNode()
+		mount(node)
+		node.dispatchEvent(focusEvent('focusin', inner))
+		node.dispatchEvent(focusEvent('focusout', inner, inner))
+		vi.advanceTimersByTime(60_000)
+		expect(shown(node)).toBe(true)
+		node.dispatchEvent(focusEvent('focusout', inner, node))
+		vi.advanceTimersByTime(DEFAULT_TIMEOUT - 1)
+		expect(shown(node)).toBe(true)
+		vi.advanceTimersByTime(1)
+		expect(shown(node)).toBe(false)
+	})
+
 	it('d: needs both hover and focus released to resume', () => {
 		const node = fakeNode()
 		mount(node)
