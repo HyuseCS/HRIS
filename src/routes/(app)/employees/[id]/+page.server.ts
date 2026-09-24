@@ -3,6 +3,7 @@ import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
 import { ctxOf } from '$lib/server/employee-detail/shared'
 import { assignmentActions } from '$lib/server/employee-detail/assignments'
+import { onboardingActions } from '$lib/server/employee-detail/onboarding'
 import { assertCanTouchEmployee } from '$lib/server/services/employee-access'
 import {
 	getEmployee,
@@ -16,7 +17,7 @@ import {
 import { listPositions } from '$lib/server/services/settings/org'
 import { getLeaveBalances } from '$lib/server/services/leave'
 import { listEnrollmentsForEmployee } from '$lib/server/services/benefits'
-import { getEmployeeOnboarding, setManualCompletion } from '$lib/server/services/onboarding'
+import { getEmployeeOnboarding } from '$lib/server/services/onboarding'
 import { listAssignableBranches, selectableBranches } from '$lib/server/services/branches'
 import { isFoodServiceOrg } from '$lib/orgs'
 import { govIdSchema } from '$lib/utils/gov-ids'
@@ -410,6 +411,7 @@ function scopedToEmployee(actions: Actions): Actions {
 
 export const actions: Actions = scopedToEmployee({
 	...assignmentActions,
+	...onboardingActions,
 	update: async ({ request, locals, params, getClientAddress }) => {
 		const action = 'update'
 		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
@@ -851,30 +853,6 @@ export const actions: Actions = scopedToEmployee({
 			await deleteEmployeeDocument(
 				docId,
 				locals.user!.organizationId,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	// Tick a MANUAL onboarding step on/off for this employee (#116). Derived steps are
-	// read-only — they check themselves off from the record — so only manual items post here.
-	toggleOnboardingStep: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'toggleOnboardingStep'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const data = await request.formData()
-		const itemId = data.get('itemId') as string
-		if (!itemId) return fail(400, { action, error: 'Missing item id.' })
-		const done = data.get('done') === 'true'
-		try {
-			await setManualCompletion(
-				locals.user!.organizationId,
-				itemId,
-				params.id,
-				done,
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
