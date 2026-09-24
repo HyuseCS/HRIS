@@ -12,7 +12,7 @@ hover and focus). Banner gets an opt-in `autoDismiss` prop. Hand-rolled result b
 `use:autoDismiss`. State banners, Q1 warnings and login keep today's markup. A source scan pins every site.
 
 **Date**: 24-09-26
-**Status**: PLANNED — awaiting VALIDATE
+**Status**: CODE DONE — e2e PENDING (owner servers / CI)
 **Complexity**: SIMPLE
 
 ## Overview
@@ -254,10 +254,20 @@ Each area commit reverts on its own. Reverting commit 2 disables Banner opt-in; 
 ## Resume and Execution Handoff
 
 1. Selected plan: `/home/hyuse/Desktop/VeentApps/hris-wt/42/process/general-plans/active/hris-42-banner-auto-dismiss_PLAN_24-09-26.md`
-2. Last completed step: PLAN supplemented with VALIDATE amendments A1-A8 (24-09-26). Nothing executed.
+2. Last completed step: EXECUTE code-done (24-09-26). Commits 1a494cf, 7f75a22, cc680dc, 356a70a, 8bbf00a, 8b5ca8f, d5f2005; the four CI gates green at each. Every negative control reddened on an assertion.
+   - Step 1 re-scan (base f16cee9): no drift against the site list. The grep also lists widget live regions not named in STAYS (DatePicker, TimePicker, PeriodPicker, Toaster, requests/approvals and requests/timesheets selection counts, settings search count, settings/org employee count). They are state, not results, so they stay.
+   - Step 13 final re-scan: 52 files carry `autoDismiss` (Banner.svelte + the 51 EXPECTED files). Every other grep hit is STAYS or one of the widget live regions above.
+   - Unconfirmed e2e list: every assert comes directly after its action. No change.
+   - PENDING (owner servers or CI): the form-errors :90/:218 baseline on unedited code; `tests/e2e/banner-auto-dismiss.spec.ts` run and its fail-first check with `use:autoDismiss` removed; the AC5 at-risk e2e run.
 3. Validate-contract: BLOCKED (first run); A1-A8 are now in the plan body; VALIDATE re-runs from V1.
 4. Context loaded: scratchpad `plan/PLAN-BRIEF.md`, `lane42/research-42.md`; source at worktree HEAD 1e6ece7.
 5. Next: VALIDATE this plan. Then EXECUTE starts at step 1 (re-scan) in `/home/hyuse/Desktop/VeentApps/hris-wt/42`. It adds the `[PONYTAIL]` directive to the execute prompt.
+
+## Deviations
+
+- D1 `close()` order (autoDismiss.ts). The Mechanism spec hands focus back, then hides. The handoff fires `focusout` on the node synchronously, so E3's `node.hidden` guard in `start()` did not see a hidden node and a 6 s timer was left. `close()` now reads `node.contains(document.activeElement)` first, hides (`hidden` + `display:none`), then hands focus back. Case i makes the panel's `focus` spy dispatch that `focusout`; with the spec order it reds (`expected 1 to be +0`).
+- D2 STAYS anchors (banner-auto-dismiss.test.ts Test 2). `stillLive`, `structureError`, `openReviewCount`, `backfillCount`, `templateBackfill`, `actBlockedReason`, `partiallyRestored` and `neverRan` first occur in the script block, so the anchors use the `{#if …` opening (for example `{#if stillLive`). `notice` and `mine?.notice` are as planned.
+- D3 e2e case 2 strips `required` from all three inputs on the Emergency Contacts add form, not only the name input. The browser would otherwise block the submit. The server returns `Name is required.`
 
 ## Validate Contract
 
