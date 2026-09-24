@@ -415,6 +415,7 @@ export async function createEmployee(
 	input: CreateEmployeeInput,
 	ctx: AuditContext
 ) {
+	input = { ...input, email: input.email.toLowerCase() }
 	const existingUser = await db.user.findUnique({ where: { email: input.email } })
 	if (existingUser) error(409, 'Email already in use')
 

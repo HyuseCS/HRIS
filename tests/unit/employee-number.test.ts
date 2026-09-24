@@ -196,3 +196,13 @@ describe('losing the allocation race', () => {
 		)
 	})
 })
+
+describe('email casing', () => {
+	it('lowercases the email for the duplicate check and the new user', async () => {
+		await createEmployee(ORG, { ...input, email: 'New.Hire@X.com' }, ctx)
+		expect(dbMock.user.findUnique).toHaveBeenCalledWith({ where: { email: 'new.hire@x.com' } })
+		expect(dbMock.user.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({ email: 'new.hire@x.com' })
+		})
+	})
+})

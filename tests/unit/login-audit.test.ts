@@ -19,7 +19,7 @@ const { dbMock, writeAuditLog, lucia, recordFailure, recordSuccess, checkRateLim
 			createSessionCookie: vi.fn()
 		},
 		dbMock: {
-			user: { findUnique: vi.fn(), update: vi.fn() },
+			user: { findFirst: vi.fn(), update: vi.fn() },
 			userOrganization: { findUnique: vi.fn() },
 			organization: { findMany: vi.fn() }
 		}
@@ -31,7 +31,7 @@ vi.mock('$lib/server/auth', () => ({ lucia }))
 vi.mock('$lib/server/rate-limit', () => ({ checkRateLimit, recordFailure, recordSuccess }))
 vi.mock('bcrypt', () => ({ default: { compare } }))
 
-const { actions } = await import('../../src/routes/(auth)/login/+page.server')
+const { actions, load } = await import('../../src/routes/(auth)/login/+page.server')
 
 const ORG = 'org-1'
 const USER = {
@@ -42,9 +42,11 @@ const USER = {
 	passwordHash: 'h'
 }
 
-const event = () => {
+const DUMMY_HASH = '$2b$12$Zk.FRyDrUxKCnZx/bFGiIO4y.2eAjBetoJQLGTHPAvKRpwH26Wpwe'
+
+const event = (email = 'a@b.com') => {
 	const body = new FormData()
-	body.set('email', 'a@b.com')
+	body.set('email', email)
 	body.set('password', 'pw')
 	return {
 		request: new Request('http://x/login', { method: 'POST', body }),
@@ -57,7 +59,7 @@ const event = () => {
 beforeEach(() => {
 	vi.clearAllMocks()
 	checkRateLimit.mockReturnValue({ allowed: true, retryAfterMs: 0 })
-	dbMock.user.findUnique.mockResolvedValue(USER)
+	dbMock.user.findFirst.mockResolvedValue(USER)
 	writeAuditLog.mockResolvedValue(undefined)
 	lucia.createSession.mockResolvedValue({ id: 'sess-1' })
 	lucia.createSessionCookie.mockReturnValue({ name: 'auth', value: 'v', attributes: {} })
@@ -87,5 +89,57 @@ describe('login audit writes — class D, outside any transaction', () => {
 		expect(payload).toMatchObject({ action: 'LOGIN', entityType: 'User', entityId: USER.id })
 		expect(client).toBe(dbMock)
 		expect(dbMock.userOrganization.findUnique).not.toHaveBeenCalled()
+	})
+})
+
+describe('login lookup and failure paths', () => {
+	it('looks the email up case-insensitively, as typed', async () => {
+		compare.mockResolvedValue(false)
+
+		await actions.default(event('Mixed@Case.COM'))
+
+		expect(dbMock.user.findFirst).toHaveBeenCalledWith({
+			where: { email: { equals: 'Mixed@Case.COM', mode: 'insensitive' } }
+		})
+	})
+
+	it('runs compare against the dummy hash for an unknown email, 401, no audit', async () => {
+		dbMock.user.findFirst.mockResolvedValue(null)
+		compare.mockResolvedValue(false)
+
+		const result = await actions.default(event())
+
+		expect(compare).toHaveBeenCalledWith('pw', DUMMY_HASH)
+		expect(result).toMatchObject({ status: 401, data: { error: 'Invalid email or password' } })
+		expect(recordFailure).toHaveBeenCalledOnce()
+		expect(writeAuditLog).not.toHaveBeenCalled()
+	})
+
+	it('audits LOGIN_FAILED for an inactive user and creates no session', async () => {
+		dbMock.user.findFirst.mockResolvedValue({ ...USER, isActive: false })
+		compare.mockResolvedValue(true)
+
+		const result = await actions.default(event())
+
+		expect(compare).toHaveBeenCalledWith('pw', USER.passwordHash)
+		expect(result).toMatchObject({ status: 401, data: { error: 'Invalid email or password' } })
+		expect(recordFailure).toHaveBeenCalledOnce()
+		const [, payload, client] = writeAuditLog.mock.calls[0]
+		expect(payload).toMatchObject({ action: 'LOGIN_FAILED', entityType: 'User', entityId: USER.id })
+		expect(client).toBe(dbMock)
+		expect(lucia.createSession).not.toHaveBeenCalled()
+	})
+})
+
+describe('login load — account_disabled flag', () => {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const run = (href: string): any => (load as any)({ locals: { user: null }, url: new URL(href) })
+
+	it('is true when ?error=account_disabled', async () => {
+		expect(await run('http://x/login?error=account_disabled')).toEqual({ accountDisabled: true })
+	})
+
+	it('is false when the param is absent', async () => {
+		expect(await run('http://x/login')).toEqual({ accountDisabled: false })
 	})
 })

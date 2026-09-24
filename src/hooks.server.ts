@@ -42,6 +42,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// #193: an offboarded employee's login is deactivated, so any session they still hold
 	// is blocked here and bounced to the disabled-account screen.
 	if (isSessionBlocked(user)) {
+		if (session) await lucia.invalidateSession(session.id)
+		const blankCookie = lucia.createBlankSessionCookie()
+		event.cookies.set(blankCookie.name, blankCookie.value, {
+			path: '.',
+			...blankCookie.attributes
+		})
 		redirect(302, '/login?error=account_disabled')
 	}
 

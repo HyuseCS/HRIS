@@ -12,8 +12,11 @@ const loginSchema = z.object({
 	password: z.string().min(1)
 })
 
-export const load: PageServerLoad = async ({ locals }) => {
+const DUMMY_HASH = '$2b$12$Zk.FRyDrUxKCnZx/bFGiIO4y.2eAjBetoJQLGTHPAvKRpwH26Wpwe'
+
+export const load: PageServerLoad = async ({ locals, url }) => {
 	if (locals.user) redirect(302, '/dashboard')
+	return { accountDisabled: url.searchParams.get('error') === 'account_disabled' }
 }
 
 export const actions: Actions = {
@@ -37,16 +40,18 @@ export const actions: Actions = {
 			})
 		}
 
-		const user = await db.user.findUnique({ where: { email } })
+		const user = await db.user.findFirst({
+			where: { email: { equals: email, mode: 'insensitive' } }
+		})
 
-		if (!user || !user.isActive) {
+		const validPassword = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
+
+		if (!user) {
 			recordFailure(rateKey)
 			return fail(401, { error: 'Invalid email or password' })
 		}
 
-		const validPassword = await bcrypt.compare(password, user.passwordHash)
-
-		if (!validPassword) {
+		if (!user.isActive || !validPassword) {
 			recordFailure(rateKey)
 			// #5: deliberately NOT transactional — `db`, not a `tx`. No mutation happens on a failed
 			// login, so there is nothing to roll back with; the audit row IS the event.
