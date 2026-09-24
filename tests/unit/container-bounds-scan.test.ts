@@ -100,7 +100,10 @@ describe('the fetch-vs-markup traps hold (G10)', () => {
 	 */
 	const PICKERS: Array<[file: string, each: string]> = [
 		['routes/(app)/dashboard/+page.svelte', '{#each data.awardEmployees as e (e.id)}'],
-		['routes/(app)/employees/[id]/+page.svelte', '{#each data.supervisorOptions as opt (opt.id)}'],
+		[
+			'lib/components/employees/detail/SupervisorsCard.svelte',
+			'{#each data.supervisorOptions as opt (opt.id)}'
+		],
 		['routes/(app)/employees/[id]/+page.svelte', '{#each data.supervisorOptions as s (s.id)}'],
 		['routes/(app)/benefits/+page.svelte', '{#each data.employees as e (e.id)}'],
 		['routes/(app)/settings/posting-approvers/+page.svelte', '{#each data.employees as e (e.id)}'],

@@ -26,6 +26,8 @@
 	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
 	import { resolveTab } from '$lib/components/employees/employee-tabs'
 	import { LIST_RENDER_CAP } from '$lib/components/employees/detail/shared'
+	import EvalTemplateCard from '$lib/components/employees/detail/EvalTemplateCard.svelte'
+	import SupervisorsCard from '$lib/components/employees/detail/SupervisorsCard.svelte'
 	import EmploymentHistoryCard from '$lib/components/employees/detail/EmploymentHistoryCard.svelte'
 	import BenefitsCard from '$lib/components/employees/detail/BenefitsCard.svelte'
 	import LeaveBalancesCard from '$lib/components/employees/detail/LeaveBalancesCard.svelte'
@@ -171,7 +173,6 @@
 	const reveal = submitFeedback({ error: null })
 	const update = submitFeedback({ error: null })
 	const offboard = submitFeedback({ error: null, success: null })
-	const setSupervisors = submitFeedback({ error: null })
 	const deleteEmergencyContact = submitFeedback({ error: null })
 	const addEmergencyContact = submitFeedback({ error: null })
 	const addLoan = submitFeedback({ error: null })
@@ -185,7 +186,6 @@
 	const setAllocation = submitFeedback({ error: null })
 	const changeCompensation = submitFeedback({ error: null })
 	const promote = submitFeedback({ error: null })
-	const assignTemplate = submitFeedback({ error: null })
 	// P0-7: this page has 24 actions and used to have ONE ungated error slot, itself inside a card
 	// that is hidden for an offboarded employee — so a failed document upload or loan add rendered
 	// nowhere at all. Every card now answers only for its own actions.
@@ -524,113 +524,12 @@
 			{/if}
 
 			<!-- Supervisors (#176): primary manager + additional superiors -->
-			<div class="rounded-lg border bg-card p-6 space-y-4">
-				<h2 class="font-semibold">Supervisors</h2>
-				{@render actionError(['setSupervisors'])}
-				<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
-					<dt class="text-muted-foreground">Primary</dt>
-					<dd>
-						<!-- R3: Last, First in a definition list, matching the roster and the picker
-						     eight lines below. Only prose keeps First Last. -->
-						{employee.reportsTo
-							? `${employee.reportsTo.lastName}, ${employee.reportsTo.firstName}`
-							: '—'}
-					</dd>
-					<dt class="text-muted-foreground">Also reports to</dt>
-					<dd>
-						{#if data.additionalSupervisors.length}
-							{data.additionalSupervisors.map((s) => s.name).join(', ')}
-						{:else}
-							<span class="text-muted-foreground">—</span>
-						{/if}
-					</dd>
-				</dl>
-				{#if data.canManage}
-					<form
-						method="POST"
-						action="?/setSupervisors"
-						use:enhance={setSupervisors.enhance}
-						class="space-y-2 border-t pt-3"
-					>
-						<!--
-							Checkboxes, not a multi-select: a `<select multiple>` needs Ctrl/Cmd-click to
-							pick a second name and silently drops the first without it. Same field name,
-							same action — `getAll('supervisorIds')` reads both shapes identically.
-						-->
-						<fieldset class="space-y-2">
-							<legend class="text-xs font-medium text-muted-foreground">
-								Additional supervisors
-							</legend>
-							{#if data.supervisorOptions.length}
-								<div class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-input p-2">
-									{#each data.supervisorOptions as opt (opt.id)}
-										<label class="flex items-center gap-2 text-sm">
-											<input
-												type="checkbox"
-												name="supervisorIds"
-												value={opt.id}
-												checked={data.additionalSupervisors.some((s) => s.id === opt.id)}
-												class="h-4 w-4 rounded border-input"
-											/>
-											{opt.lastName}, {opt.firstName}
-										</label>
-									{/each}
-								</div>
-							{:else}
-								<p class="text-xs text-muted-foreground">No other employees to pick from.</p>
-							{/if}
-						</fieldset>
-						<button
-							type="submit"
-							disabled={setSupervisors.busy}
-							class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-							>{setSupervisors.busy ? 'Saving…' : 'Save supervisors'}</button
-						>
-					</form>
-				{/if}
-			</div>
+			<SupervisorsCard {data} {actionError} />
 
 			<!-- Evaluation template (#178): the explicit assignment is the ONLY source of an
 		     employee's template — it is never inferred from department, position or role (SPEC AC2). -->
 			{#if data.canAssignTemplate}
-				<div class="rounded-lg border bg-card p-6 space-y-4">
-					<h2 class="font-semibold">Evaluation Template</h2>
-					{#if form?.action === 'assignTemplate' && form?.success}
-						<Banner kind="success" message="Saved." />
-					{:else if form?.action === 'assignTemplate' && form?.error}
-						<div
-							class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
-						>
-							{form.error}
-						</div>
-					{/if}
-					<form
-						method="POST"
-						action="?/assignTemplate"
-						use:enhance={assignTemplate.enhance}
-						class="space-y-2"
-					>
-						<label for="assignedTemplateId" class="text-xs font-medium text-muted-foreground"
-							>Assigned template</label
-						>
-						<select
-							id="assignedTemplateId"
-							name="assignedTemplateId"
-							class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-						>
-							<option value="" selected={!data.assignedTemplateId}>— none —</option>
-							{#each data.performanceTemplates as t (t.id)}
-								<option value={t.id} selected={t.id === data.assignedTemplateId}>{t.name}</option>
-							{/each}
-						</select>
-						<button
-							type="submit"
-							disabled={assignTemplate.busy}
-							class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-							>{assignTemplate.busy ? 'Saving…' : 'Save template'}</button
-						>
-					</form>
-				</div>
+				<EvalTemplateCard {data} {form} />
 			{/if}
 
 			<!-- Edit Form (HR-only; the update/offboard actions require HR_ADMIN) -->
