@@ -26,7 +26,18 @@ const EXPECTED: Record<string, number> = {
 	'routes/(app)/payroll/periods/+page.svelte': 1,
 	'routes/(app)/payroll/statutory-rates/+page.svelte': 1,
 	'routes/(app)/payroll/pay-codes/+page.svelte': 1,
-	'routes/(app)/payroll/salary-grades/+page.svelte': 1
+	'routes/(app)/payroll/salary-grades/+page.svelte': 1,
+	'routes/(app)/settings/roles/+page.svelte': 1,
+	'routes/(app)/settings/company/+page.svelte': 2,
+	'routes/(app)/settings/performance/+page.svelte': 2,
+	'routes/(app)/settings/job-boards/+page.svelte': 1,
+	'routes/(app)/settings/leave-types/+page.svelte': 1,
+	'routes/(app)/settings/offboarding/+page.svelte': 1,
+	'routes/(app)/settings/onboarding/+page.svelte': 1,
+	'routes/(app)/settings/posting-approvers/+page.svelte': 1,
+	'routes/(app)/settings/holidays/+page.svelte': 1,
+	'routes/(app)/settings/org/+page.svelte': 1,
+	'routes/(app)/settings/schedules/+page.svelte': 2
 }
 
 const BOTH_ACTIONS = 3

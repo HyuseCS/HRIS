@@ -40,7 +40,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" autoDismiss />
 	{/if}
 
 	<!-- Add manual step -->

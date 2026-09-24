@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -52,6 +53,7 @@
 	     here — a page-top banner cannot say which card it came from. -->
 	{#if form?.error && !form?.field}
 		<div
+			use:autoDismiss
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
@@ -132,7 +134,9 @@
 				<p id="amPmMinGap-error" class="text-xs text-red-600 dark:text-red-400">{gapError}</p>
 			{/if}
 			{#if form?.saved}
-				<p role="status" class="text-xs text-green-600 dark:text-green-400">{form.saved}</p>
+				<p use:autoDismiss role="status" class="text-xs text-green-600 dark:text-green-400">
+					{form.saved}
+				</p>
 			{/if}
 		</div>
 	{/if}
