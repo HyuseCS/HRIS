@@ -3,7 +3,11 @@ import { z } from 'zod'
 import { requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
 import { db } from '$lib/server/db'
-import { advanceApplicant, convertApplicantToEmployee } from '$lib/server/services/recruitment'
+import {
+	advanceApplicant,
+	convertApplicantToEmployee,
+	setJobPostingStatus
+} from '$lib/server/services/recruitment'
 import {
 	getPostingBoards,
 	liveChannels,
@@ -11,6 +15,7 @@ import {
 	setChannel
 } from '$lib/server/services/job-boards'
 import { setFlash } from '$lib/server/flash'
+import type { JobPostingStatus } from '@prisma/client'
 import type { Actions, PageServerLoad } from './$types'
 
 // A robust http(s) check (mirrors the #109 resumeUrl approach) so the board URL field
@@ -105,7 +110,7 @@ export const actions: Actions = {
 		return { action: 'advanceStage', saved: 'Applicant moved.' }
 	},
 
-	updateStatus: async ({ request, locals, params }) => {
+	updateStatus: async ({ request, locals, params, getClientAddress }) => {
 		const user = locals.user!
 		requireAnyCapability(user.roles, 'MANAGE_HR')
 
@@ -117,23 +122,21 @@ export const actions: Actions = {
 			return fail(400, { action: 'updateStatus', error: 'Invalid status' })
 		}
 
-		const posting = await db.jobPosting.findFirst({
-			where: { id: params.id, organizationId: user.organizationId }
-		})
-
-		if (!posting) {
-			return fail(404, { action: 'updateStatus', error: 'Posting not found' })
+		const ctx = {
+			organizationId: user.organizationId,
+			actorId: user.id,
+			actorRoles: user.roles,
+			ipAddress: getClientAddress()
 		}
 
+		let previousStatus: JobPostingStatus
 		try {
-			await db.jobPosting.update({
-				where: { id: params.id },
-				data: {
-					status: status as 'OPEN' | 'CLOSED' | 'DRAFT',
-					...(status === 'OPEN' && !posting.postedAt ? { postedAt: new Date() } : {}),
-					...(status === 'CLOSED' ? { closedAt: new Date() } : {})
-				}
-			})
+			;({ previousStatus } = await setJobPostingStatus(
+				params.id,
+				user.organizationId,
+				status as 'OPEN' | 'CLOSED' | 'DRAFT',
+				ctx
+			))
 		} catch (e) {
 			return failFromError(e)
 		}
@@ -143,9 +146,11 @@ export const actions: Actions = {
 			saved:
 				status === 'CLOSED'
 					? 'Posting closed.'
-					: posting.status === 'DRAFT'
-						? 'Posting published.'
-						: 'Posting reopened.'
+					: status === 'DRAFT'
+						? 'Posting moved back to draft.'
+						: previousStatus === 'DRAFT'
+							? 'Posting published.'
+							: 'Posting reopened.'
 		}
 	},
 
