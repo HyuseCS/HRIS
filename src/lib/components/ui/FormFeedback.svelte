@@ -19,7 +19,7 @@
 {#if mine?.notice}
 	<Banner kind="warning" message={mine.notice} class={className} />
 {:else if mine?.saved}
-	<Banner kind="success" message={mine.saved} class={className} />
+	<Banner kind="success" message={mine.saved} class={className} autoDismiss />
 {:else if mine?.error}
-	<Banner kind="error" message={mine.error} class={className} />
+	<Banner kind="error" message={mine.error} class={className} autoDismiss />
 {/if}
