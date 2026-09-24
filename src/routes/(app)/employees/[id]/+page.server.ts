@@ -4,6 +4,7 @@ import { failFromError } from '$lib/server/form-fail'
 import { ctxOf } from '$lib/server/employee-detail/shared'
 import { assignmentActions } from '$lib/server/employee-detail/assignments'
 import { profileActions } from '$lib/server/employee-detail/profile'
+import { payItemActions } from '$lib/server/employee-detail/pay-items'
 import { emergencyContactActions } from '$lib/server/employee-detail/emergency-contacts'
 import { onboardingActions } from '$lib/server/employee-detail/onboarding'
 import { assertCanTouchEmployee } from '$lib/server/services/employee-access'
@@ -20,30 +21,11 @@ import { listEnrollmentsForEmployee } from '$lib/server/services/benefits'
 import { getEmployeeOnboarding } from '$lib/server/services/onboarding'
 import { listAssignableBranches, selectableBranches } from '$lib/server/services/branches'
 import { isFoodServiceOrg } from '$lib/orgs'
-import { LOAN_TYPES } from '$lib/utils/loan-types'
 import { EMPLOYMENT_TYPES } from '$lib/utils/employment-type'
-import {
-	listLoans,
-	listCashAdvances,
-	createLoan,
-	createCashAdvance
-} from '$lib/server/services/payroll/loans'
-import {
-	listEmployeeEarnings,
-	createEmployeeEarning,
-	endEmployeeEarning
-} from '$lib/server/services/payroll/employee-earnings'
-import {
-	listEmployeeDeductions,
-	createEmployeeDeduction,
-	endEmployeeDeduction
-} from '$lib/server/services/payroll/employee-deductions'
-import {
-	listStatutoryRows,
-	setStatutoryExemption,
-	setEmployerShareExternal,
-	setStatutoryAllocation
-} from '$lib/server/services/payroll/employee-statutory'
+import { listLoans, listCashAdvances } from '$lib/server/services/payroll/loans'
+import { listEmployeeEarnings } from '$lib/server/services/payroll/employee-earnings'
+import { listEmployeeDeductions } from '$lib/server/services/payroll/employee-deductions'
+import { listStatutoryRows } from '$lib/server/services/payroll/employee-statutory'
 import { listSchedules } from '$lib/server/services/attendance/schedules'
 import {
 	listEmployeeDocuments,
@@ -225,38 +207,6 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	}
 }
 
-const loanSchema = z.object({
-	type: z.enum(LOAN_TYPES),
-	principal: z.coerce.number().positive(),
-	installment: z.coerce.number().positive()
-})
-const cashAdvanceSchema = z.object({
-	amount: z.coerce.number().positive(),
-	installment: z.coerce.number().positive()
-})
-const earningSchema = z.object({
-	kind: z.enum(['ALLOWANCE', 'INCENTIVE']),
-	label: z.string().min(1).max(100),
-	monthlyAmount: z.coerce.number().positive()
-})
-const deductionSchema = z.object({
-	deductionTypeId: z.string().min(1),
-	label: z.string().max(100).optional(),
-	monthlyAmount: z.coerce.number().positive()
-})
-const statutoryToggleSchema = z.object({
-	contribution: z.enum(['SSS', 'PHILHEALTH', 'PAGIBIG']),
-	exempt: z.enum(['true', 'false']).transform((v) => v === 'true')
-})
-const employerShareExternalToggleSchema = z.object({
-	contribution: z.enum(['SSS', 'PHILHEALTH', 'PAGIBIG']),
-	external: z.enum(['true', 'false']).transform((v) => v === 'true')
-})
-const statutoryAllocationSchema = z.object({
-	contribution: z.enum(['SSS', 'PHILHEALTH', 'PAGIBIG']),
-	allocation: z.enum(['EVEN', 'FIRST', 'SECOND'])
-})
-
 // #170: an effective-dated salary / pay-type change. Salary is masked (reveal-to-edit), so an empty
 // field means "unchanged", not 0 — same preprocess as the update form. At least one of salary /
 // rateType must actually be supplied; the service enforces the date bounds and the rate/type pairing.
@@ -333,6 +283,7 @@ function scopedToEmployee(actions: Actions): Actions {
 export const actions: Actions = scopedToEmployee({
 	...assignmentActions,
 	...profileActions,
+	...payItemActions,
 	...emergencyContactActions,
 	...onboardingActions,
 	// #170: record an effective-dated salary / pay-type change. Gated on MANAGE_HR, which a MANAGER
@@ -409,194 +360,6 @@ export const actions: Actions = scopedToEmployee({
 			return fail(f.status, { action, ...f.data })
 		}
 		return { action, saved: 'Employee offboarded.' }
-	},
-
-	// ponytail: only the two loan actions were folded into ctxOf — the rest of the inline ctx
-	// literals in this file are audit-only, and converting them would be churn.
-	addLoan: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'addLoan'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-		const parsed = loanSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { action, error: 'Invalid loan details' })
-		try {
-			await createLoan(
-				params.id,
-				user.organizationId,
-				parsed.data,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e) {
-			const f = failFromError(e)
-			return fail(f.status, { action, ...f.data })
-		}
-		return { action, success: true }
-	},
-
-	addCashAdvance: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'addCashAdvance'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-		const parsed = cashAdvanceSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { action, error: 'Invalid cash-advance details' })
-		try {
-			await createCashAdvance(
-				params.id,
-				user.organizationId,
-				parsed.data,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e) {
-			const f = failFromError(e)
-			return fail(f.status, { action, ...f.data })
-		}
-		return { action, success: true }
-	},
-
-	addEarning: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'addEarning'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-		const parsed = earningSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { action, error: 'Invalid recurring earning details' })
-		try {
-			await createEmployeeEarning(params.id, user.organizationId, parsed.data, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			})
-		} catch (e) {
-			const f = failFromError(e)
-			return fail(f.status, { action, ...f.data })
-		}
-		return { action, success: true }
-	},
-
-	endEarning: async ({ request, locals, getClientAddress }) => {
-		const action = 'endEarning'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-		const id = (await request.formData()).get('id') as string
-		if (!id) return fail(400, { action, error: 'Missing earning id' })
-		try {
-			await endEmployeeEarning(id, user.organizationId, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			})
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	addDeduction: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'addDeduction'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-		const parsed = deductionSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { action, error: 'Invalid recurring deduction details' })
-		try {
-			await createEmployeeDeduction(params.id, user.organizationId, parsed.data, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			})
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	endDeduction: async ({ request, locals, getClientAddress }) => {
-		const action = 'endDeduction'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-		const id = (await request.formData()).get('id') as string
-		if (!id) return fail(400, { action, error: 'Missing deduction id' })
-		try {
-			await endEmployeeDeduction(id, user.organizationId, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			})
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	// Exempt/restore an individual employee from a statutory contribution (#173). HR-only, audited.
-	toggleStatutoryExemption: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'toggleStatutoryExemption'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const parsed = statutoryToggleSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { action, error: 'Invalid statutory toggle' })
-		try {
-			await setStatutoryExemption(
-				params.id,
-				locals.user!.organizationId,
-				parsed.data.contribution,
-				parsed.data.exempt,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	// Toggle "employer share paid externally" for one contribution (#173, Feature C). Zeroes the ER
-	// share only; the EE share is still deducted. HR-only, audited.
-	toggleEmployerShareExternal: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'toggleEmployerShareExternal'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const parsed = employerShareExternalToggleSchema.safeParse(
-			Object.fromEntries(await request.formData())
-		)
-		if (!parsed.success) return fail(400, { action, error: 'Invalid statutory toggle' })
-		try {
-			await setEmployerShareExternal(
-				params.id,
-				locals.user!.organizationId,
-				parsed.data.contribution,
-				parsed.data.external,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	// Set which semi-monthly cutoff the EE share is deducted on (#173, Feature E). HR-only, audited.
-	setStatutoryAllocation: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'setStatutoryAllocation'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const parsed = statutoryAllocationSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { action, error: 'Invalid statutory allocation' })
-		try {
-			await setStatutoryAllocation(
-				params.id,
-				locals.user!.organizationId,
-				parsed.data.contribution,
-				parsed.data.allocation,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
 	},
 
 	uploadDocument: async ({ request, locals, params, getClientAddress }) => {

@@ -170,6 +170,9 @@ describe('the plain sites are bounded (G13)', () => {
 		expect(read('lib/components/employees/detail/EmploymentHistoryCard.svelte')).toContain(
 			'history.slice(0, LIST_RENDER_CAP)'
 		)
+		const loans = read('lib/components/employees/detail/LoansCard.svelte')
+		expect(loans).toContain('data.loans.slice(0, LIST_RENDER_CAP)')
+		expect(loans).toContain('data.cashAdvances.slice(0, LIST_RENDER_CAP)')
 	})
 })
 

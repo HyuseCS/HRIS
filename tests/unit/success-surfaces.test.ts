@@ -106,8 +106,11 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'employees/[id] addLoan (DONE map)',
-		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		page: [
+			'routes/(app)/employees/[id]/+page.svelte',
+			'lib/components/employees/detail/LoansCard.svelte'
+		],
+		server: 'lib/server/employee-detail/pay-items.ts',
 		action: 'addLoan',
 		surface: 'inline',
 		expectServerSaved: false,
