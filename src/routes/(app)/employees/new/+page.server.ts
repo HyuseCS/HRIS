@@ -66,6 +66,15 @@ const createSchema = z
 		firstName: z.string().min(1),
 		lastName: z.string().min(1),
 		middleName: z.string().optional(),
+		contactPhone: z
+			.string()
+			.optional()
+			.refine(isValidPhone, phoneError('Phone'))
+			.transform((v) => v || undefined),
+		contactAddress: z
+			.string()
+			.optional()
+			.transform((v) => v || undefined),
 		// #248: deliberately narrower than ASSIGNABLE_ROLES. This form runs under MANAGE_HR, which
 		// MANAGER holds, so anything listed here is an account a MANAGER can mint at that authority
 		// with no CEO involved. Governance, finance and sign-off roles are granted after hire, in
