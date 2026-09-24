@@ -13,10 +13,16 @@ const svelteFiles = (readdirSync(SRC, { recursive: true }) as string[])
 const EXCLUDED = new Set(['lib/components/ui/Banner.svelte'])
 
 const EXPECTED: Record<string, number> = {
-	'lib/components/ui/FormFeedback.svelte': 2
+	'lib/components/ui/FormFeedback.svelte': 2,
+	'lib/components/employees/detail/ChangeSalaryCard.svelte': 2,
+	'lib/components/employees/detail/EvalTemplateCard.svelte': 1,
+	'lib/components/employees/detail/PromoteCard.svelte': 1,
+	'lib/components/employees/detail/UpdateProfileCard.svelte': 1,
+	'routes/(app)/employees/[id]/+page.svelte': 4,
+	'routes/(app)/employees/new/+page.svelte': 1
 }
 
-const BOTH_ACTIONS = 0
+const BOTH_ACTIONS = 2
 
 const STAYS: [string, string][] = [
 	['lib/components/ui/FormFeedback.svelte', 'mine?.notice'],

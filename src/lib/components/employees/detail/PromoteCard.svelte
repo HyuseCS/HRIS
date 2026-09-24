@@ -66,7 +66,7 @@
 	{#if form?.action === 'promote' && form?.notice}
 		<Banner kind="warning" message={form.notice} />
 	{:else if form?.action === 'promote' && form?.success}
-		<Banner kind="success" message="Promotion recorded." />
+		<Banner kind="success" message="Promotion recorded." autoDismiss />
 	{:else if form?.action === 'promote' && form?.error}
 		<div
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"

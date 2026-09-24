@@ -4,6 +4,7 @@
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import Field from '$lib/components/ui/Field.svelte'
 	import { scrollToError } from '$lib/actions/scrollToError'
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { rateBasisOptionsFor, rateBasisCopy, type RateBasis } from '$lib/utils/rate-basis'
 	import type { EmployeeDetailData, EmployeeDetailForm, Revealed } from './shared'
@@ -56,9 +57,10 @@
 	{#if form?.action === 'changeCompensation' && form?.notice}
 		<Banner kind="warning" message={form.notice} />
 	{:else if form?.action === 'changeCompensation' && form?.success}
-		<Banner kind="success" message="Saved." />
+		<Banner kind="success" message="Saved." autoDismiss />
 	{:else if form?.action === 'changeCompensation' && form?.error}
 		<div
+			use:autoDismiss
 			use:scrollToError
 			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
