@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /**
@@ -130,7 +130,6 @@ describe('the fetch-vs-markup traps hold (G10)', () => {
 
 describe('the plain sites are bounded (G13)', () => {
 	const PLAIN_SITES: Array<[file: string, count: number]> = [
-		['routes/(app)/employees/[id]/+page.svelte', 10],
 		['routes/(app)/benefits/+page.svelte', 2],
 		['routes/(app)/performance/+page.svelte', 4],
 		['routes/(app)/payroll/[id]/+page.svelte', 1],
@@ -153,6 +152,14 @@ describe('the plain sites are bounded (G13)', () => {
 
 	it.each(PLAIN_SITES)('%s has card-scroll at least %i times', (file, count) => {
 		expect(read(file).split('card-scroll').length - 1, file).toBeGreaterThanOrEqual(count)
+	})
+
+	it('employees/[id] and its cards have card-scroll at least 10 times', () => {
+		const cards = readdirSync(join(SRC, 'lib/components/employees/detail'))
+			.filter((f) => f.endsWith('.svelte'))
+			.map((f) => `lib/components/employees/detail/${f}`)
+		const source = ['routes/(app)/employees/[id]/+page.svelte', ...cards].map(read).join('\n')
+		expect(source.split('card-scroll').length - 1).toBeGreaterThanOrEqual(10)
 	})
 
 	it('the 201 file render-caps its long lists', () => {

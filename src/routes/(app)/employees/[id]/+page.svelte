@@ -25,11 +25,10 @@
 	import { page } from '$app/stores'
 	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
 	import { resolveTab } from '$lib/components/employees/employee-tabs'
+	import { LIST_RENDER_CAP } from '$lib/components/employees/detail/shared'
 	import { labelFor, EMPLOYMENT_TYPE_LABELS, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
-
-	const LIST_RENDER_CAP = 25
 
 	// The five sections of the 201 file are URL-backed (`?tab=`), so a deep link and the browser's
 	// Back button both work. Panels are always rendered and hidden with the attribute AND the
