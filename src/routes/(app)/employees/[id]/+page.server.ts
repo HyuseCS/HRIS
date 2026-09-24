@@ -4,6 +4,7 @@ import { failFromError } from '$lib/server/form-fail'
 import { ctxOf } from '$lib/server/employee-detail/shared'
 import { assignmentActions } from '$lib/server/employee-detail/assignments'
 import { profileActions } from '$lib/server/employee-detail/profile'
+import { emergencyContactActions } from '$lib/server/employee-detail/emergency-contacts'
 import { onboardingActions } from '$lib/server/employee-detail/onboarding'
 import { assertCanTouchEmployee } from '$lib/server/services/employee-access'
 import {
@@ -19,7 +20,6 @@ import { listEnrollmentsForEmployee } from '$lib/server/services/benefits'
 import { getEmployeeOnboarding } from '$lib/server/services/onboarding'
 import { listAssignableBranches, selectableBranches } from '$lib/server/services/branches'
 import { isFoodServiceOrg } from '$lib/orgs'
-import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { LOAN_TYPES } from '$lib/utils/loan-types'
 import { EMPLOYMENT_TYPES } from '$lib/utils/employment-type'
 import {
@@ -50,7 +50,6 @@ import {
 	saveEmployeeDocument,
 	deleteEmployeeDocument
 } from '$lib/server/services/documents'
-import { addEmergencyContact, deleteEmergencyContact } from '$lib/server/services/emergencyContacts'
 import { listAdditionalSupervisors } from '$lib/server/services/supervisors'
 import { db } from '$lib/server/db'
 import { listTemplates } from '$lib/server/services/performance-templates'
@@ -313,15 +312,6 @@ const promoteSchema = z.object({
 		.transform((v) => (v ? v : undefined))
 })
 
-const emergencyContactSchema = z.object({
-	name: z.string().trim().min(1, 'Name is required.'),
-	relationship: z.string().trim().min(1, 'Relationship is required.'),
-	// #24: required AND format-checked. Every message is written out so the action can surface
-	// zod's first issue verbatim without leaking a raw "String must contain at least 1
-	// character(s)" at the user.
-	phone: z.string().trim().min(1, 'Phone is required.').refine(isValidPhone, phoneError('Phone'))
-})
-
 /**
  * #228: apply the object-level check to EVERY action on this page in one place. Each action here
  * acts on the 201 file identified by `params.id`, so the guard is uniform — and doing it here rather
@@ -343,6 +333,7 @@ function scopedToEmployee(actions: Actions): Actions {
 export const actions: Actions = scopedToEmployee({
 	...assignmentActions,
 	...profileActions,
+	...emergencyContactActions,
 	...onboardingActions,
 	// #170: record an effective-dated salary / pay-type change. Gated on MANAGE_HR, which a MANAGER
 	// holds — the control that stops a MANAGER moving pay directly is `proposeIfRequired`
@@ -599,51 +590,6 @@ export const actions: Actions = scopedToEmployee({
 				locals.user!.organizationId,
 				parsed.data.contribution,
 				parsed.data.allocation,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	addEmergencyContact: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'addEmergencyContact'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const parsed = emergencyContactSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) {
-			// #24: the phone is now format-checked as well as required, so the generic "are required"
-			// text would name the wrong problem. Every field in the schema carries its own message.
-			const message = parsed.error.errors[0]?.message
-			return fail(400, {
-				action,
-				error: message ?? 'Name, relationship, and phone are required.'
-			})
-		}
-		try {
-			await addEmergencyContact(
-				params.id,
-				locals.user!.organizationId,
-				parsed.data,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	deleteEmergencyContact: async ({ request, locals, getClientAddress }) => {
-		const action = 'deleteEmergencyContact'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const contactId = (await request.formData()).get('contactId') as string
-		if (!contactId) return fail(400, { action, error: 'Missing contact id.' })
-		try {
-			await deleteEmergencyContact(
-				contactId,
-				locals.user!.organizationId,
 				ctxOf(locals, getClientAddress())
 			)
 		} catch (e: unknown) {
