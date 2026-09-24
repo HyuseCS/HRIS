@@ -8,7 +8,7 @@ feature: general
 # #27 Semantic colour through tokens — PLAN (SIMPLE)
 
 **Date**: 24-09-26
-**Status**: PLANNED (awaiting VALIDATE)
+**Status**: CODE DONE — G10 screenshots (both themes) and e2e pending
 **Complexity**: SIMPLE
 
 **TL;DR:** Wire `--success`/`--warning` into Tailwind and `.dark`, add `.btn-success`/`.btn-warning` and make `.btn-destructive` solid, give the row classes a matching resting fill, move 16 solid-fill lines (15 buttons) in 7 files onto these classes (ReasonDialog through `tone`), swap ReasonDialog's `confirmClass` for `tone`, and add an amber `warning` toast. The server picks it by returning `kind: 'warning'`. Branch `fix/27-semantic-colour-tokens`, one PR to `staging`.
@@ -244,10 +244,10 @@ One PR to `staging`, titled `#27 Semantic colour through tokens`. The body lists
 ## Resume and Execution Handoff
 
 1. Selected plan: `process/general-plans/active/hris-27-semantic-colour-tokens_PLAN_24-09-26.md`
-2. Last completed: PLAN
-3. Validate-contract: pending
+2. Last completed: EXECUTE, commit 6 (`f8329f9`). All 6 commits green on format:check, lint, check and unit tests. The `employees/[id]` checklist-button follow-up stays deferred (G6 allowlist, by content).
+3. Validate-contract: pass 1, CONDITIONAL; A1-A6 folded into the body and applied during EXECUTE.
 4. Context loaded: scratchpad `CONTEXT.md`, `PLAN-BRIEF.md`, `research-27.md`, issue #27 body, source re-verified at d773e1a
-5. Next: VALIDATE (check PD-1…PD-11), then EXECUTE from S0
+5. Next: with the owner's servers up, run G10 (Playwright screenshots in light and dark of requests/approvals, requests/timesheets, requests/proposals, recruitment/applicant, and one toast of each kind) and the e2e run. Then mark the plan VERIFIED.
 
 ## Validate Contract
 
