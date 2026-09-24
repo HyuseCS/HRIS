@@ -2,6 +2,7 @@
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import Container from '$lib/components/ui/Container.svelte'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import {
@@ -137,47 +138,51 @@
 				>
 					<legend class="float-left mb-4 w-full font-semibold">Personal Information</legend>
 					<div class="grid gap-4 sm:grid-cols-3">
-						<div>
-							<label for="firstName" class="text-sm font-medium"
-								>First Name <span class="text-destructive">*</span></label
-							>
-							<input
-								id="firstName"
-								name="firstName"
-								aria-invalid={invalid('firstName')}
-								required
-								value={form?.values?.firstName ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							{#if form?.fieldErrors?.firstName}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.firstName[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="lastName" class="text-sm font-medium"
-								>Last Name <span class="text-destructive">*</span></label
-							>
-							<input
-								id="lastName"
-								name="lastName"
-								aria-invalid={invalid('lastName')}
-								required
-								value={form?.values?.lastName ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							{#if form?.fieldErrors?.lastName}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.lastName[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="middleName" class="text-sm font-medium">Middle Name</label>
-							<input
-								id="middleName"
-								name="middleName"
-								value={form?.values?.middleName ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
+						<Field
+							label="First Name"
+							id="firstName"
+							required
+							error={form?.fieldErrors?.firstName?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="firstName"
+									name="firstName"
+									required
+									value={form?.values?.firstName ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field
+							label="Last Name"
+							id="lastName"
+							required
+							error={form?.fieldErrors?.lastName?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="lastName"
+									name="lastName"
+									required
+									value={form?.values?.lastName ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field label="Middle Name" id="middleName" error={form?.fieldErrors?.middleName?.[0]}>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="middleName"
+									name="middleName"
+									value={form?.values?.middleName ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
 					</div>
 				</fieldset>
 
@@ -188,25 +193,33 @@
 				>
 					<legend class="float-left mb-4 w-full font-semibold">Contact Information</legend>
 					<div class="grid gap-4 sm:grid-cols-2">
-						<div>
-							<label for="contactPhone" class="text-sm font-medium">Phone</label>
-							<input
-								id="contactPhone"
-								name="contactPhone"
-								type="tel"
-								value={form?.values?.contactPhone ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="contactAddress" class="text-sm font-medium">Address</label>
-							<input
-								id="contactAddress"
-								name="contactAddress"
-								value={form?.values?.contactAddress ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
+						<Field label="Phone" id="contactPhone" error={form?.fieldErrors?.contactPhone?.[0]}>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="contactPhone"
+									name="contactPhone"
+									type="tel"
+									value={form?.values?.contactPhone ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field
+							label="Address"
+							id="contactAddress"
+							error={form?.fieldErrors?.contactAddress?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="contactAddress"
+									name="contactAddress"
+									value={form?.values?.contactAddress ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
 					</div>
 				</fieldset>
 
@@ -217,68 +230,67 @@
 				>
 					<legend class="float-left mb-4 w-full font-semibold">Account</legend>
 					<div class="grid gap-4 sm:grid-cols-2">
-						<div>
-							<label for="email" class="text-sm font-medium"
-								>Email <span class="text-destructive">*</span></label
-							>
-							<input
-								id="email"
-								name="email"
-								aria-invalid={invalid('email')}
-								type="email"
-								required
-								value={form?.values?.email ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							{#if form?.fieldErrors?.email}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.email[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="password" class="text-sm font-medium">Password</label>
-							<input
-								id="password"
-								name="password"
-								type="password"
-								placeholder="Leave blank to auto-generate"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								If left blank, a temporary password will be generated and emailed.
-							</p>
-						</div>
-						<div>
-							<label for="role" class="text-sm font-medium"
-								>Role <span class="text-destructive">*</span></label
-							>
-							<select
-								id="role"
-								name="role"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<!-- Mirrors HIRE_ROLES in $lib/rbac — the server rejects anything else (#248). -->
-								<option value="EMPLOYEE">Employee</option>
-								<option value="MANAGER">Manager</option>
-								<option value="HR_ADMIN">HR Admin</option>
-							</select>
-						</div>
-						<div>
-							<label for="discordId" class="text-sm font-medium">Discord ID</label>
-							<input
-								id="discordId"
-								name="discordId"
-								aria-invalid={invalid('discordId')}
-								value={form?.values?.discordId ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Links this employee to the Discord time-tracking bot. In Discord: Developer Mode →
-								right-click the user → Copy User ID. Optional — can be set later.
-							</p>
-							{#if form?.fieldErrors?.discordId}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.discordId[0]}</p>
-							{/if}
-						</div>
+						<Field label="Email" id="email" required error={form?.fieldErrors?.email?.[0]}>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="email"
+									name="email"
+									type="email"
+									required
+									value={form?.values?.email ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field
+							label="Password"
+							id="password"
+							hint="If left blank, a temporary password will be generated and emailed."
+							error={form?.fieldErrors?.password?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="password"
+									name="password"
+									type="password"
+									placeholder="Leave blank to auto-generate"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field label="Role" id="role" required error={form?.fieldErrors?.role?.[0]}>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="role"
+									name="role"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<!-- Mirrors HIRE_ROLES in $lib/rbac — the server rejects anything else (#248). -->
+									<option value="EMPLOYEE">Employee</option>
+									<option value="MANAGER">Manager</option>
+									<option value="HR_ADMIN">HR Admin</option>
+								</select>
+							{/snippet}
+						</Field>
+						<Field
+							label="Discord ID"
+							id="discordId"
+							hint="Links this employee to the Discord time-tracking bot. In Discord: Developer Mode → right-click the user → Copy User ID. Optional — can be set later."
+							error={form?.fieldErrors?.discordId?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="discordId"
+									name="discordId"
+									value={form?.values?.discordId ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
 					</div>
 				</fieldset>
 
@@ -289,169 +301,186 @@
 				>
 					<legend class="float-left mb-4 w-full font-semibold">Employment Details</legend>
 					<div class="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-						<div>
-							<label for="departmentId" class="text-sm font-medium"
-								>Department <span class="text-destructive">*</span></label
-							>
-							<select
-								id="departmentId"
-								name="departmentId"
-								aria-invalid={invalid('departmentId')}
-								required
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">Select department…</option>
-								{#each data.departments as dept (dept.id)}
-									<option value={dept.id}>{dept.name}</option>
-								{/each}
-							</select>
-							{#if form?.fieldErrors?.departmentId}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.departmentId[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="jobTitle" class="text-sm font-medium"
-								>Job Title <span class="text-destructive">*</span></label
-							>
-							<input
-								id="jobTitle"
-								name="jobTitle"
-								aria-invalid={invalid('jobTitle')}
-								required
-								value={form?.values?.jobTitle ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							{#if form?.fieldErrors?.jobTitle}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.jobTitle[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="employmentType" class="text-sm font-medium"
-								>Employment Type <span class="text-destructive">*</span></label
-							>
-							<select
-								id="employmentType"
-								name="employmentType"
-								bind:value={employmentType}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<!-- New hires start probationary (#136); regularization is automatic at 6 months.
-							     `selected` also repopulates the choice after a failed submit, which the bare
-							     options did not do. -->
-								{#each EMPLOYMENT_TYPES as [val, label] (val)}
-									<option
-										value={val}
-										selected={(form?.values?.employmentType ?? 'PROBATIONARY') === val}
-										>{label}</option
-									>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="startDate" class="text-sm font-medium"
-								>Start Date <span class="text-destructive">*</span></label
-							>
-							<DatePicker
-								id="startDate"
-								name="startDate"
-								aria-invalid={invalid('startDate')}
-								required
-								value={form?.values?.startDate ?? ''}
-								class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							{#if form?.fieldErrors?.startDate}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.startDate[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="rateType" class="text-sm font-medium"
-								>Rate Basis <span class="text-destructive">*</span></label
-							>
-							<select
-								id="rateType"
-								name="rateType"
-								bind:value={rateType}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								{#each rateOptions as opt (opt.value)}
-									<option value={opt.value}>{opt.label}</option>
-								{/each}
-							</select>
-							{#if form?.fieldErrors?.rateType}
-								<p class="mt-1 text-xs text-destructive">{form.fieldErrors.rateType[0]}</p>
-							{/if}
-						</div>
-						<div>
-							<label for="basicMonthlySalary" class="text-sm font-medium"
-								>{rate.label} <span class="text-destructive">*</span></label
-							>
-							<input
-								id="basicMonthlySalary"
-								name="basicMonthlySalary"
-								type="number"
-								min="0"
-								step={rate.step}
-								required
-								value={form?.values?.basicMonthlySalary ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">{rate.hint}</p>
-							{#if form?.fieldErrors?.basicMonthlySalary}
-								<p class="mt-1 text-xs text-destructive">
-									{form.fieldErrors.basicMonthlySalary[0]}
-								</p>
-							{/if}
-						</div>
-						<div>
-							<label for="reportsToId" class="text-sm font-medium">Reports To</label>
-							<select
-								id="reportsToId"
-								name="reportsToId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">None</option>
-								{#each data.employees as emp (emp.id)}
-									<option value={emp.id}>{emp.lastName}, {emp.firstName}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="positionId" class="text-sm font-medium">Position</label>
-							<select
-								id="positionId"
-								name="positionId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">None</option>
-								{#each data.positions as pos (pos.id)}
-									<option value={pos.id} selected={form?.values?.positionId === pos.id}
-										>{pos.title}</option
-									>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="workScheduleId" class="text-sm font-medium">Work Schedule</label>
-							<select
-								id="workScheduleId"
-								name="workScheduleId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">None</option>
-								{#each data.workSchedules as ws (ws.id)}
-									<option
-										value={ws.id}
-										selected={form?.values?.workScheduleId
-											? form.values.workScheduleId === ws.id
-											: ws.isDefault}>{ws.name}</option
-									>
-								{/each}
-							</select>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Attendance derivation uses this schedule — set it now or the new hire's days won't
-								compute until it's assigned.
-							</p>
-						</div>
+						<Field
+							label="Department"
+							id="departmentId"
+							required
+							error={form?.fieldErrors?.departmentId?.[0]}
+						>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="departmentId"
+									name="departmentId"
+									required
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<option value="">Select department…</option>
+									{#each data.departments as dept (dept.id)}
+										<option value={dept.id}>{dept.name}</option>
+									{/each}
+								</select>
+							{/snippet}
+						</Field>
+						<Field
+							label="Job Title"
+							id="jobTitle"
+							required
+							error={form?.fieldErrors?.jobTitle?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="jobTitle"
+									name="jobTitle"
+									required
+									value={form?.values?.jobTitle ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field
+							label="Employment Type"
+							id="employmentType"
+							required
+							error={form?.fieldErrors?.employmentType?.[0]}
+						>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="employmentType"
+									name="employmentType"
+									bind:value={employmentType}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<!-- New hires start probationary (#136); regularization is automatic at 6 months.
+								     `selected` also repopulates the choice after a failed submit, which the bare
+								     options did not do. -->
+									{#each EMPLOYMENT_TYPES as [val, label] (val)}
+										<option
+											value={val}
+											selected={(form?.values?.employmentType ?? 'PROBATIONARY') === val}
+											>{label}</option
+										>
+									{/each}
+								</select>
+							{/snippet}
+						</Field>
+						<Field
+							label="Start Date"
+							id="startDate"
+							required
+							error={form?.fieldErrors?.startDate?.[0]}
+						>
+							{#snippet children(a)}
+								<DatePicker
+									{...a}
+									id="startDate"
+									name="startDate"
+									required
+									value={form?.values?.startDate ?? ''}
+									class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field
+							label="Rate Basis"
+							id="rateType"
+							required
+							error={form?.fieldErrors?.rateType?.[0]}
+						>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="rateType"
+									name="rateType"
+									bind:value={rateType}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									{#each rateOptions as opt (opt.value)}
+										<option value={opt.value}>{opt.label}</option>
+									{/each}
+								</select>
+							{/snippet}
+						</Field>
+						<Field
+							label={rate.label}
+							id="basicMonthlySalary"
+							required
+							hint={rate.hint}
+							error={form?.fieldErrors?.basicMonthlySalary?.[0]}
+						>
+							{#snippet children(a)}
+								<input
+									{...a}
+									id="basicMonthlySalary"
+									name="basicMonthlySalary"
+									type="number"
+									min="0"
+									step={rate.step}
+									required
+									value={form?.values?.basicMonthlySalary ?? ''}
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							{/snippet}
+						</Field>
+						<Field label="Reports To" id="reportsToId" error={form?.fieldErrors?.reportsToId?.[0]}>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="reportsToId"
+									name="reportsToId"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<option value="">None</option>
+									{#each data.employees as emp (emp.id)}
+										<option value={emp.id}>{emp.lastName}, {emp.firstName}</option>
+									{/each}
+								</select>
+							{/snippet}
+						</Field>
+						<Field label="Position" id="positionId" error={form?.fieldErrors?.positionId?.[0]}>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="positionId"
+									name="positionId"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<option value="">None</option>
+									{#each data.positions as pos (pos.id)}
+										<option value={pos.id} selected={form?.values?.positionId === pos.id}
+											>{pos.title}</option
+										>
+									{/each}
+								</select>
+							{/snippet}
+						</Field>
+						<Field
+							label="Work Schedule"
+							id="workScheduleId"
+							hint="Attendance derivation uses this schedule — set it now or the new hire's days won't compute until it's assigned."
+							error={form?.fieldErrors?.workScheduleId?.[0]}
+						>
+							{#snippet children(a)}
+								<select
+									{...a}
+									id="workScheduleId"
+									name="workScheduleId"
+									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<option value="">None</option>
+									{#each data.workSchedules as ws (ws.id)}
+										<option
+											value={ws.id}
+											selected={form?.values?.workScheduleId
+												? form.values.workScheduleId === ws.id
+												: ws.isDefault}>{ws.name}</option
+										>
+									{/each}
+								</select>
+							{/snippet}
+						</Field>
 					</div>
 				</fieldset>
 
@@ -469,66 +498,70 @@
 							<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
 								<legend class="float-left mb-4 w-full font-semibold">Government IDs</legend>
 								<div class="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-									<div>
-										<label for="sssNumber" class="text-sm font-medium">SSS Number</label>
-										<input
-											id="sssNumber"
-											name="sssNumber"
-											aria-invalid={invalid('sssNumber')}
-											value={form?.values?.sssNumber ?? ''}
-											placeholder={GOV_ID_FORMATS.sssNumber.example}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										{#if form?.fieldErrors?.sssNumber}
-											<p class="mt-1 text-xs text-red-400">{form.fieldErrors.sssNumber[0]}</p>
-										{/if}
-									</div>
-									<div>
-										<label for="philhealthNumber" class="text-sm font-medium"
-											>PhilHealth Number</label
-										>
-										<input
-											id="philhealthNumber"
-											name="philhealthNumber"
-											aria-invalid={invalid('philhealthNumber')}
-											value={form?.values?.philhealthNumber ?? ''}
-											placeholder={GOV_ID_FORMATS.philhealthNumber.example}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										{#if form?.fieldErrors?.philhealthNumber}
-											<p class="mt-1 text-xs text-red-400">
-												{form.fieldErrors.philhealthNumber[0]}
-											</p>
-										{/if}
-									</div>
-									<div>
-										<label for="pagibigNumber" class="text-sm font-medium">Pag-IBIG Number</label>
-										<input
-											id="pagibigNumber"
-											name="pagibigNumber"
-											aria-invalid={invalid('pagibigNumber')}
-											value={form?.values?.pagibigNumber ?? ''}
-											placeholder={GOV_ID_FORMATS.pagibigNumber.example}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										{#if form?.fieldErrors?.pagibigNumber}
-											<p class="mt-1 text-xs text-red-400">{form.fieldErrors.pagibigNumber[0]}</p>
-										{/if}
-									</div>
-									<div>
-										<label for="tinNumber" class="text-sm font-medium">TIN Number</label>
-										<input
-											id="tinNumber"
-											name="tinNumber"
-											aria-invalid={invalid('tinNumber')}
-											value={form?.values?.tinNumber ?? ''}
-											placeholder={GOV_ID_FORMATS.tinNumber.example}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										{#if form?.fieldErrors?.tinNumber}
-											<p class="mt-1 text-xs text-red-400">{form.fieldErrors.tinNumber[0]}</p>
-										{/if}
-									</div>
+									<Field
+										label="SSS Number"
+										id="sssNumber"
+										error={form?.fieldErrors?.sssNumber?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="sssNumber"
+												name="sssNumber"
+												value={form?.values?.sssNumber ?? ''}
+												placeholder={GOV_ID_FORMATS.sssNumber.example}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="PhilHealth Number"
+										id="philhealthNumber"
+										error={form?.fieldErrors?.philhealthNumber?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="philhealthNumber"
+												name="philhealthNumber"
+												value={form?.values?.philhealthNumber ?? ''}
+												placeholder={GOV_ID_FORMATS.philhealthNumber.example}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="Pag-IBIG Number"
+										id="pagibigNumber"
+										error={form?.fieldErrors?.pagibigNumber?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="pagibigNumber"
+												name="pagibigNumber"
+												value={form?.values?.pagibigNumber ?? ''}
+												placeholder={GOV_ID_FORMATS.pagibigNumber.example}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="TIN Number"
+										id="tinNumber"
+										error={form?.fieldErrors?.tinNumber?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="tinNumber"
+												name="tinNumber"
+												value={form?.values?.tinNumber ?? ''}
+												placeholder={GOV_ID_FORMATS.tinNumber.example}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
 								</div>
 							</fieldset>
 
@@ -536,40 +569,52 @@
 							<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
 								<legend class="float-left mb-4 w-full font-semibold">Emergency Contact</legend>
 								<div class="grid gap-4 sm:grid-cols-3">
-									<div>
-										<label for="emergencyContactName" class="text-sm font-medium"
-											>Contact Name</label
-										>
-										<input
-											id="emergencyContactName"
-											name="emergencyContactName"
-											value={form?.values?.emergencyContactName ?? ''}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-									</div>
-									<div>
-										<label for="emergencyContactRelation" class="text-sm font-medium"
-											>Relationship</label
-										>
-										<input
-											id="emergencyContactRelation"
-											name="emergencyContactRelation"
-											value={form?.values?.emergencyContactRelation ?? ''}
-											placeholder="e.g. Spouse, Parent"
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-									</div>
-									<div>
-										<label for="emergencyContactPhone" class="text-sm font-medium"
-											>Contact Phone</label
-										>
-										<input
-											id="emergencyContactPhone"
-											name="emergencyContactPhone"
-											value={form?.values?.emergencyContactPhone ?? ''}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-									</div>
+									<Field
+										label="Contact Name"
+										id="emergencyContactName"
+										error={form?.fieldErrors?.emergencyContactName?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="emergencyContactName"
+												name="emergencyContactName"
+												value={form?.values?.emergencyContactName ?? ''}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="Relationship"
+										id="emergencyContactRelation"
+										error={form?.fieldErrors?.emergencyContactRelation?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="emergencyContactRelation"
+												name="emergencyContactRelation"
+												value={form?.values?.emergencyContactRelation ?? ''}
+												placeholder="e.g. Spouse, Parent"
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="Contact Phone"
+										id="emergencyContactPhone"
+										error={form?.fieldErrors?.emergencyContactPhone?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="emergencyContactPhone"
+												name="emergencyContactPhone"
+												value={form?.values?.emergencyContactPhone ?? ''}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
 								</div>
 							</fieldset>
 
@@ -577,56 +622,65 @@
 							<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
 								<legend class="float-left mb-4 w-full font-semibold">Bank / GCash Details</legend>
 								<div class="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-									<div>
-										<label for="bankName" class="text-sm font-medium">Bank</label>
-										<input
-											id="bankName"
-											name="bankName"
-											value={form?.values?.bankName ?? ''}
-											placeholder="e.g. BDO, BPI"
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-									</div>
-									<div>
-										<label for="bankAccountName" class="text-sm font-medium">Account Name</label>
-										<input
-											id="bankAccountName"
-											name="bankAccountName"
-											value={form?.values?.bankAccountName ?? ''}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-									</div>
-									<div>
-										<label for="bankAccountNumber" class="text-sm font-medium">Account Number</label
-										>
-										<input
-											id="bankAccountNumber"
-											name="bankAccountNumber"
-											aria-invalid={invalid('bankAccountNumber')}
-											value={form?.values?.bankAccountNumber ?? ''}
-											placeholder={GOV_ID_FORMATS.bankAccountNumber.example}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										{#if form?.fieldErrors?.bankAccountNumber}
-											<p class="mt-1 text-xs text-destructive">
-												{form.fieldErrors.bankAccountNumber[0]}
-											</p>
-										{/if}
-									</div>
-									<div>
-										<label for="gcashNumber" class="text-sm font-medium">GCash Number</label>
-										<input
-											id="gcashNumber"
-											name="gcashNumber"
-											aria-invalid={invalid('gcashNumber')}
-											value={form?.values?.gcashNumber ?? ''}
-											placeholder={GOV_ID_FORMATS.gcashNumber.example}
-											class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										{#if form?.fieldErrors?.gcashNumber}
-											<p class="mt-1 text-xs text-destructive">{form.fieldErrors.gcashNumber[0]}</p>
-										{/if}
-									</div>
+									<Field label="Bank" id="bankName" error={form?.fieldErrors?.bankName?.[0]}>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="bankName"
+												name="bankName"
+												value={form?.values?.bankName ?? ''}
+												placeholder="e.g. BDO, BPI"
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="Account Name"
+										id="bankAccountName"
+										error={form?.fieldErrors?.bankAccountName?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="bankAccountName"
+												name="bankAccountName"
+												value={form?.values?.bankAccountName ?? ''}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="Account Number"
+										id="bankAccountNumber"
+										error={form?.fieldErrors?.bankAccountNumber?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="bankAccountNumber"
+												name="bankAccountNumber"
+												value={form?.values?.bankAccountNumber ?? ''}
+												placeholder={GOV_ID_FORMATS.bankAccountNumber.example}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
+									<Field
+										label="GCash Number"
+										id="gcashNumber"
+										error={form?.fieldErrors?.gcashNumber?.[0]}
+									>
+										{#snippet children(a)}
+											<input
+												{...a}
+												id="gcashNumber"
+												name="gcashNumber"
+												value={form?.values?.gcashNumber ?? ''}
+												placeholder={GOV_ID_FORMATS.gcashNumber.example}
+												class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+										{/snippet}
+									</Field>
 								</div>
 							</fieldset>
 						</div>
