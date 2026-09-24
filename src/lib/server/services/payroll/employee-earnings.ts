@@ -2,7 +2,7 @@ import { db } from '$lib/server/db'
 import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import type { EmployeeEarningKind } from '@prisma/client'
-import { assertNotSelf, requireEmployee } from '../employee-access'
+import { assertAcceptsNewPay, assertNotSelf, requireEmployee } from '../employee-access'
 import type { AuditContext } from '../types'
 
 /**
@@ -21,7 +21,9 @@ export async function createEmployeeEarning(
 	data: { kind: EmployeeEarningKind; label: string; monthlyAmount: number },
 	ctx: AuditContext
 ) {
-	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
+	const employee = await requireEmployee(employeeId, organizationId)
+	assertNotSelf(ctx.actorId, employee)
+	assertAcceptsNewPay(employee)
 	if (data.monthlyAmount <= 0) error(400, 'Monthly amount must be positive')
 
 	// One transaction: a failed audit write must not leave a recurring allowance standing
