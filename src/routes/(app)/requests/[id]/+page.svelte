@@ -7,6 +7,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const req = $derived(data.request)
@@ -172,7 +173,7 @@
 					<div
 						class="min-w-[130px] rounded-md border p-3 {bal.isRequested
 							? 'border-primary bg-primary/5'
-							: 'bg-background'}"
+							: 'bg-card'}"
 						data-leave-type={bal.name}
 					>
 						<p class="text-xs font-medium text-muted-foreground">{bal.name}</p>
@@ -262,34 +263,36 @@
 		{/if}
 
 		{#if docsEditable}
-			<form
-				method="POST"
-				action="?/uploadDocs"
-				enctype="multipart/form-data"
-				use:enhance={uploadDocs.enhance}
-				class="space-y-2 rounded-lg border bg-muted/30 p-3"
-			>
-				<label for="documents" class="text-xs font-medium">Add documents</label>
-				<div class="flex flex-wrap items-center gap-2">
-					<input
-						id="documents"
-						name="documents"
-						type="file"
-						multiple
-						accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
-						class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium"
-					/>
-					<button
-						type="submit"
-						disabled={uploadDocs.busy}
-						class="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-						>{uploadDocs.busy ? 'Uploading…' : 'Upload'}</button
-					>
-				</div>
-				<p class="text-xs text-muted-foreground">
-					Up to 5 files per request — PDF, PNG, JPEG or WEBP, max 10 MB each.
-				</p>
-			</form>
+			<Container tone="card" fill={false} flush>
+				<form
+					method="POST"
+					action="?/uploadDocs"
+					enctype="multipart/form-data"
+					use:enhance={uploadDocs.enhance}
+					class="space-y-2 p-3"
+				>
+					<label for="documents" class="text-xs font-medium">Add documents</label>
+					<div class="flex flex-wrap items-center gap-2">
+						<input
+							id="documents"
+							name="documents"
+							type="file"
+							multiple
+							accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+							class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium"
+						/>
+						<button
+							type="submit"
+							disabled={uploadDocs.busy}
+							class="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+							>{uploadDocs.busy ? 'Uploading…' : 'Upload'}</button
+						>
+					</div>
+					<p class="text-xs text-muted-foreground">
+						Up to 5 files per request — PDF, PNG, JPEG or WEBP, max 10 MB each.
+					</p>
+				</form>
+			</Container>
 		{/if}
 
 		<!-- #299/AC-5: the audit view. Removed documents are never deleted — the row, its filename

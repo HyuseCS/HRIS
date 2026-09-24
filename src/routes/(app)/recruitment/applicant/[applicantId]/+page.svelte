@@ -10,6 +10,7 @@
 	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	const applicant = $derived(data.applicant)
@@ -140,7 +141,7 @@
 					<div class="space-y-3">
 						{#each applicant.interviews as iv (iv.id)}
 							{@const removeInterview = deleteInterviewGuard(iv.id)}
-							<div class="rounded-md border p-3">
+							<Container tone="card" fill={false} flush bodyClass="p-3">
 								<div class="flex flex-wrap items-center justify-between gap-2">
 									<div class="text-sm">
 										<span class="font-medium">{fmtDateTime(iv.scheduledAt)}</span>
@@ -208,7 +209,7 @@
 										>{iv.feedback ? 'Edit feedback' : 'Add feedback'}</button
 									>
 								{/if}
-							</div>
+							</Container>
 						{/each}
 					</div>
 				{:else}
@@ -298,7 +299,7 @@
 				<h2 class="font-semibold">Job Offer</h2>
 
 				{#if offer}
-					<div class="rounded-md border p-4 space-y-3">
+					<Container tone="card" fill={false} bodyClass="space-y-3">
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							<span class="text-sm font-medium">{offer.jobTitle}</span>
 							<Badge status={offer.status} domain="offer" />
@@ -350,7 +351,7 @@
 								>
 							</form>
 						{/if}
-					</div>
+					</Container>
 
 					{#if offer.status === 'ACCEPTED' && !applicant.convertedEmployee}
 						<form method="POST" action="?/convert" use:enhance={convertApplicant.enhance}>

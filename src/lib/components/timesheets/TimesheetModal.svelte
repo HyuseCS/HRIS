@@ -340,19 +340,19 @@
 		<div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
 			<!-- Summary -->
 			<div class="grid grid-cols-1 gap-3 sm:max-w-lg sm:grid-cols-2 md:grid-cols-4">
-				<div class="rounded-lg border bg-muted/30 px-4 py-2">
+				<div class="rounded-lg border bg-card px-4 py-2">
 					<p class="text-xs text-muted-foreground">Total</p>
 					<p class="font-mono text-lg font-semibold">{total.toFixed(2)}</p>
 				</div>
-				<div class="rounded-lg border bg-muted/30 px-4 py-2">
+				<div class="rounded-lg border bg-card px-4 py-2">
 					<p class="text-xs text-muted-foreground">Regular</p>
 					<p class="font-mono text-lg font-semibold">{totalReg.toFixed(2)}</p>
 				</div>
-				<div class="rounded-lg border bg-muted/30 px-4 py-2">
+				<div class="rounded-lg border bg-card px-4 py-2">
 					<p class="text-xs text-muted-foreground">Overtime</p>
 					<p class="font-mono text-lg font-semibold text-amber-600">{totalOt.toFixed(2)}</p>
 				</div>
-				<div class="rounded-lg border bg-muted/30 px-4 py-2">
+				<div class="rounded-lg border bg-card px-4 py-2">
 					<p class="text-xs text-muted-foreground">Entries</p>
 					<p class="text-lg font-semibold">{canEdit ? entries.length : ts.entries.length}</p>
 				</div>

@@ -318,7 +318,7 @@
 			{/if}
 			<div class="space-y-2">
 				{#each hiredApplicants as applicant (applicant.id)}
-					<div class="flex items-center justify-between rounded-md border px-4 py-2">
+					<div class="flex items-center justify-between rounded-md border bg-card px-4 py-2">
 						<div>
 							<p class="text-sm font-medium">{applicant.firstName} {applicant.lastName}</p>
 							<p class="text-xs text-muted-foreground">{applicant.email}</p>
