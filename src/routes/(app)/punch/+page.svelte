@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { onMount, tick } from 'svelte'
 	import { enhance } from '$app/forms'
@@ -279,7 +280,7 @@
 
 			<div role="alert" class="text-sm">
 				{#if form?.punched}
-					<p class="font-medium text-foreground">
+					<p use:autoDismiss class="font-medium text-foreground">
 						Punched {form.punched === 'IN' ? 'in' : 'out'}{form.hadLocation
 							? ' with your location.'
 							: ' without a location.'}
@@ -289,6 +290,7 @@
 					     the reader cannot see. `text-destructive` fails AA on the dark card (3.44:1);
 					     the red-600/red-400 pair is what the rest of the app already uses. -->
 					<p
+						use:autoDismiss
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 font-medium text-red-600 dark:text-red-400"
 					>
 						Not punched. {form.error}

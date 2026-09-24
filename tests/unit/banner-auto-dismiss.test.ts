@@ -58,10 +58,15 @@ const EXPECTED: Record<string, number> = {
 	'routes/(app)/performance/templates/[id]/+page.svelte': 1,
 	'routes/(app)/requests/[id]/+page.svelte': 2,
 	'routes/(app)/requests/proposals/+page.svelte': 1,
-	'routes/(app)/separations/[id]/+page.svelte': 3
+	'routes/(app)/separations/[id]/+page.svelte': 3,
+	'routes/(app)/dashboard/+page.svelte': 3,
+	'routes/(app)/timesheets/+page.svelte': 2,
+	'lib/components/attendance/AttendanceHrGrid.svelte': 2,
+	'routes/(app)/punch/+page.svelte': 2,
+	'routes/(app)/reports/audit-log/+page.svelte': 1
 }
 
-const BOTH_ACTIONS = 3
+const BOTH_ACTIONS = 4
 
 const STAYS: [string, string][] = [
 	['lib/components/ui/FormFeedback.svelte', 'mine?.notice'],
@@ -120,6 +125,12 @@ describe('#42 action-result banners close by themselves', () => {
 	it('Test 3: use:autoDismiss comes before use:scrollToError on the same element', () => {
 		expect(countAll(/use:scrollToError[^>]*use:autoDismiss/g)).toBe(0)
 		expect(countAll(/use:autoDismiss[^>]*use:scrollToError/g)).toBe(BOTH_ACTIONS)
+	})
+
+	it('Test 5: only the import summary without rejected rows closes', () => {
+		expect(read('lib/components/attendance/AttendanceHrGrid.svelte')).toContain(
+			'use:autoDismiss={res.rejected.length === 0}'
+		)
 	})
 
 	it('Test 4: Banner is opt-in and wires the action', () => {

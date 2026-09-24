@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -297,7 +298,7 @@
 					<!-- Scoped: with the award panel open, a posting failure used to render under
 					     "Give award", where nothing had gone wrong. -->
 					{#if form?.action === 'decidePosting' && form?.error}
-						<Banner kind="error" message={form.error} />
+						<Banner kind="error" message={form.error} autoDismiss />
 					{/if}
 					{#if data.postingsToApprove.length === 0}
 						<p class="text-sm text-muted-foreground">Nothing pending.</p>
@@ -598,7 +599,10 @@
 							use:enhance={giveAward.enhance}
 							class="space-y-2 p-3"
 						>
-							{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
+							{#if form?.action === 'giveAward' && form?.error}<p
+									use:autoDismiss
+									class="text-xs text-red-400"
+								>
 									{form.error}
 								</p>{/if}
 							<div class="grid gap-2 sm:grid-cols-2">
@@ -635,6 +639,7 @@
 							class="space-y-2 p-3"
 						>
 							{#if form?.action === 'postAnnouncement' && form?.error}<p
+									use:autoDismiss
 									class="text-xs text-red-400"
 								>
 									{form.error}

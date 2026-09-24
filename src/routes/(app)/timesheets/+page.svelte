@@ -68,11 +68,11 @@
 	{#if (form?.error && !openTs) || form?.saved || data.isHrAdmin}
 		<div class="flex shrink-0 flex-col gap-3">
 			{#if form?.error && !openTs}
-				<Banner kind="error" message={form.error} />
+				<Banner kind="error" message={form.error} autoDismiss />
 			{/if}
 
 			{#if form?.saved}
-				<Banner kind="success" message={form.saved} />
+				<Banner kind="success" message={form.saved} autoDismiss />
 			{/if}
 
 			{#if data.isHrAdmin}

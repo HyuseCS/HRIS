@@ -87,7 +87,9 @@ test('a refused status change on a posting reports once, as a toast', async ({ p
 	const toast = page.locator('[role="status"] [aria-live="assertive"]')
 	await expect(toast).toHaveText(/Invalid status/)
 	await expect(toast).toHaveCount(1)
-	await expect(page.getByRole('alert').filter({ hasText: /Invalid status/ })).toHaveCount(0)
+	await expect(
+		page.getByRole('alert', { includeHidden: true }).filter({ hasText: /Invalid status/ })
+	).toHaveCount(0)
 })
 
 // The approvals queue had zero coverage at any layer: nothing asserted approveMany or
@@ -215,6 +217,6 @@ test.describe('the approvals queue bulk actions', () => {
 		await expect(toast).toHaveCount(1)
 		// Safe on this route specifically: Banner was the only role="alert" producer here and
 		// phase 04 removed it entirely.
-		await expect(page.getByRole('alert')).toHaveCount(0)
+		await expect(page.getByRole('alert', { includeHidden: true })).toHaveCount(0)
 	})
 })
