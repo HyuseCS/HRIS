@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
 	import { enhance } from '$app/forms'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 	import { LOAN_TYPES } from '$lib/utils/loan-types'
@@ -60,34 +61,49 @@
 				use:enhance={addLoan.enhance}
 				class="flex flex-wrap items-end gap-2"
 			>
-				<select
-					name="type"
-					required
-					class="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
-				>
-					<option value="" disabled selected>Type</option>
-					{#each LOAN_TYPES as t (t)}
-						<option value={t}>{t}</option>
-					{/each}
-				</select>
-				<input
-					name="principal"
-					type="number"
-					min="0"
-					step="500"
-					placeholder="Principal"
-					required
-					class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
-				/>
-				<input
-					name="installment"
-					type="number"
-					min="0"
-					step="100"
-					placeholder="Per period"
-					required
-					class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
-				/>
+				<Field size="compact" label="Type">
+					{#snippet children(a)}
+						<select
+							{...a}
+							name="type"
+							required
+							class="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
+						>
+							<option value="" disabled selected>Type</option>
+							{#each LOAN_TYPES as t (t)}
+								<option value={t}>{t}</option>
+							{/each}
+						</select>
+					{/snippet}
+				</Field>
+				<Field size="compact" label="Principal">
+					{#snippet children(a)}
+						<input
+							{...a}
+							name="principal"
+							type="number"
+							min="0"
+							step="500"
+							placeholder="Principal"
+							required
+							class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
+						/>
+					{/snippet}
+				</Field>
+				<Field size="compact" label="Per period">
+					{#snippet children(a)}
+						<input
+							{...a}
+							name="installment"
+							type="number"
+							min="0"
+							step="100"
+							placeholder="Per period"
+							required
+							class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
+						/>
+					{/snippet}
+				</Field>
 				<button
 					disabled={addLoan.busy}
 					class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
@@ -127,24 +143,34 @@
 				use:enhance={addCashAdvance.enhance}
 				class="flex flex-wrap items-end gap-2"
 			>
-				<input
-					name="amount"
-					type="number"
-					min="0"
-					step="500"
-					placeholder="Amount"
-					required
-					class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
-				/>
-				<input
-					name="installment"
-					type="number"
-					min="0"
-					step="100"
-					placeholder="Per period"
-					required
-					class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
-				/>
+				<Field size="compact" label="Amount">
+					{#snippet children(a)}
+						<input
+							{...a}
+							name="amount"
+							type="number"
+							min="0"
+							step="500"
+							placeholder="Amount"
+							required
+							class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
+						/>
+					{/snippet}
+				</Field>
+				<Field size="compact" label="Per period">
+					{#snippet children(a)}
+						<input
+							{...a}
+							name="installment"
+							type="number"
+							min="0"
+							step="100"
+							placeholder="Per period"
+							required
+							class="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
+						/>
+					{/snippet}
+				</Field>
 				<button
 					disabled={addCashAdvance.busy}
 					class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"

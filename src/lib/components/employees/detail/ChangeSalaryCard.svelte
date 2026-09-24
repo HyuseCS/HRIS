@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { scrollToError } from '$lib/actions/scrollToError'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { rateBasisOptionsFor, rateBasisCopy, type RateBasis } from '$lib/utils/rate-basis'
@@ -66,61 +67,70 @@
 		</div>
 	{/if}
 	<div class="grid gap-3 sm:grid-cols-3">
-		<div>
-			<label for="effectiveDate" class="text-sm font-medium">Effective Date</label>
-			<DatePicker
-				id="effectiveDate"
-				name="effectiveDate"
-				required
-				value={todayInput}
-				min={hireInput}
-				class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-			<p class="mt-1 text-xs text-muted-foreground">
-				When it takes effect. Backdating and future-dating are both allowed.
-			</p>
-		</div>
-		<div>
-			<label for="compRateType" class="text-sm font-medium">Rate Basis</label>
-			<select
-				id="compRateType"
-				name="rateType"
-				bind:value={compRateType}
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				{#each compRateOptions as opt (opt.value)}
-					<option value={opt.value}>{opt.label}</option>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label for="compSalary" class="text-sm font-medium">{compRate.label}</label>
-			<input
-				id="compSalary"
-				name="basicMonthlySalary"
-				type="number"
-				step={compRate.step}
-				min="0"
-				value={revealed?.basicMonthlySalary ?? ''}
-				placeholder={String(employee.basicMonthlySalary ?? '')}
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-			<p class="mt-1 text-xs text-muted-foreground">
-				Masked; reveal above to edit, or leave blank to keep the current amount.
-			</p>
-		</div>
-		<div class="sm:col-span-3">
-			<label for="compNote" class="text-sm font-medium"
-				>Note <span class="text-muted-foreground">(optional)</span></label
-			>
-			<input
-				id="compNote"
-				name="note"
-				maxlength="500"
-				placeholder="e.g. Annual merit increase"
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-		</div>
+		<Field
+			label="Effective Date"
+			id="effectiveDate"
+			hint="When it takes effect. Backdating and future-dating are both allowed."
+		>
+			{#snippet children(a)}
+				<DatePicker
+					{...a}
+					id="effectiveDate"
+					name="effectiveDate"
+					required
+					value={todayInput}
+					min={hireInput}
+					class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
+		<Field label="Rate Basis" id="compRateType">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="compRateType"
+					name="rateType"
+					bind:value={compRateType}
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{#each compRateOptions as opt (opt.value)}
+						<option value={opt.value}>{opt.label}</option>
+					{/each}
+				</select>
+			{/snippet}
+		</Field>
+		<Field
+			label={compRate.label}
+			id="compSalary"
+			hint="Masked; reveal above to edit, or leave blank to keep the current amount."
+		>
+			{#snippet children(a)}
+				<input
+					{...a}
+					id="compSalary"
+					name="basicMonthlySalary"
+					type="number"
+					step={compRate.step}
+					min="0"
+					value={revealed?.basicMonthlySalary ?? ''}
+					placeholder={String(employee.basicMonthlySalary ?? '')}
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
+		<Field label="Note" id="compNote" class="sm:col-span-3">
+			{#snippet suffix()}<span class="text-muted-foreground">(optional)</span>{/snippet}
+			{#snippet children(a)}
+				<input
+					{...a}
+					id="compNote"
+					name="note"
+					maxlength="500"
+					placeholder="e.g. Annual merit increase"
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
 	</div>
 	<button
 		type="submit"
