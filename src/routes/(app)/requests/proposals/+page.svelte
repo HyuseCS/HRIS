@@ -82,7 +82,7 @@
 	{/if}
 
 	{#if form?.success}
-		<Banner kind="success" message={form.success} />
+		<Banner kind={form.kind === 'warning' ? 'warning' : 'success'} message={form.success} />
 	{/if}
 {/snippet}
 

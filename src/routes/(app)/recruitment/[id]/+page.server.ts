@@ -102,7 +102,11 @@ export const actions: Actions = {
 		} catch (e) {
 			return failFromError(e)
 		}
-		return { action: 'advanceStage', saved: 'Applicant moved.' }
+		return {
+			action: 'advanceStage',
+			saved: 'Applicant moved.',
+			kind: parsed.data.stage === 'REJECTED' ? 'warning' : 'success'
+		}
 	},
 
 	updateStatus: async ({ request, locals, params }) => {
