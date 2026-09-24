@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { scrollToError } from '$lib/actions/scrollToError'
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -149,7 +150,7 @@
 		<!-- Addendum §F. This file is the longest page in the app, so a scoped error can land
 		     several screens away from wherever the person pressed Save. The wrapper exists only to
 		     carry the action — Banner is phase 03's component and this phase does not edit it. -->
-		<div use:scrollToError>
+		<div use:autoDismiss use:scrollToError>
 			<Banner kind="error" {message} />
 		</div>
 	{/if}
@@ -173,7 +174,7 @@
 	</PageHeader>
 
 	{#if savedNotice}
-		<Banner kind="success" message={savedNotice} />
+		<Banner kind="success" message={savedNotice} autoDismiss />
 	{/if}
 
 	<EmployeeTabs active={activeTab} />
@@ -311,9 +312,11 @@
 			read. Gated on form.action so it only answers the offboard form.
 		-->
 			{#if form?.action === 'offboard' && form?.saved}
-				<Banner kind="success" class="lg:col-span-2" message={form.saved} />
+				<Banner kind="success" class="lg:col-span-2" message={form.saved} autoDismiss />
 			{:else if form?.action === 'offboard' && form?.error}
 				<div
+					use:autoDismiss
+					role="alert"
 					class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400 lg:col-span-2"
 				>
 					{form.error}

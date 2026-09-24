@@ -49,10 +49,10 @@
 	</PageHeader>
 
 	{#if form?.success}
-		<Banner kind="success" message="Company info saved." class="mx-auto max-w-2xl" />
+		<Banner kind="success" message="Company info saved." class="mx-auto max-w-2xl" autoDismiss />
 	{/if}
 	{#if form?.error}
-		<Banner kind="error" message={form.error} class="mx-auto max-w-2xl" />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-2xl" autoDismiss />
 	{/if}
 
 	<form

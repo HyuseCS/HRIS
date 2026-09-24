@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -57,10 +58,12 @@
 	</PageHeader>
 
 	{#if form?.message}
-		<Banner kind="success" message={form.message} />
+		<Banner kind="success" message={form.message} autoDismiss />
 	{/if}
 	{#if form?.error}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{form.error}

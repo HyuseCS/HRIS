@@ -44,7 +44,7 @@
 	nowhere, which is the lesser harm.
 -->
 	{#if form?.action === 'update' && form?.success}
-		<Banner kind="success" message="Saved." />
+		<Banner kind="success" message="Saved." autoDismiss />
 	{:else if form?.action === 'update' && form?.error}
 		<div
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"

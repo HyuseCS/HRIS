@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -24,6 +25,8 @@
 	     action), so there is no applicant-facing success panel here. -->
 	{#if form?.error}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{form.error}

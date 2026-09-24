@@ -11,7 +11,7 @@ export interface Toast {
 
 /** Most toasts on screen at once. A burst of notifications must not bury the page. */
 const MAX_VISIBLE = 5
-const DEFAULT_TIMEOUT = 6000
+export const DEFAULT_TIMEOUT = 6000
 
 let toasts = $state<Toast[]>([])
 

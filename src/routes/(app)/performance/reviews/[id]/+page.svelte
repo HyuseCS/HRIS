@@ -105,7 +105,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 
 	<!-- Self-assessment — employee-authored, its own column, never inside `answers`. -->

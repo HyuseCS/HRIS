@@ -192,10 +192,10 @@
 		<h2 class="text-lg font-semibold">Supporting documents</h2>
 
 		{#if form?.error}
-			<Banner kind="error" message={form.error} />
+			<Banner kind="error" message={form.error} autoDismiss />
 		{/if}
 		{#if form?.message}
-			<Banner kind="success" message={form.message} />
+			<Banner kind="success" message={form.message} autoDismiss />
 		{/if}
 
 		{#if req.documents.length === 0}

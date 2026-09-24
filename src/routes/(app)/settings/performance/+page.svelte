@@ -31,9 +31,9 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" />
+		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" autoDismiss />
 	{:else if form?.success}
-		<Banner kind="success" message="Review schedule saved." class="mx-auto max-w-3xl" />
+		<Banner kind="success" message="Review schedule saved." class="mx-auto max-w-3xl" autoDismiss />
 	{/if}
 
 	<form

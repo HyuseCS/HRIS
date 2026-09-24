@@ -39,7 +39,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 
 	<!-- Grades -->

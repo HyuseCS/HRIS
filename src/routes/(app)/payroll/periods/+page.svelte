@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
@@ -43,6 +44,7 @@
 
 	{#if form?.error && form.action !== 'open'}
 		<div
+			use:autoDismiss
 			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>

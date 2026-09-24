@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
@@ -37,7 +38,11 @@
 	<!-- Top level, not inside the collapsible create form: enroll and setEnrollmentStatus
 	     are submitted from the plan list below, and their failures must surface too. -->
 	{#if form?.error}
-		<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+		<div
+			use:autoDismiss
+			class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive"
+			role="alert"
+		>
 			{form.error}
 		</div>
 	{/if}

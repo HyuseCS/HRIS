@@ -28,7 +28,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 
 	<div class="card-scroll overflow-x-auto rounded-lg border bg-card">

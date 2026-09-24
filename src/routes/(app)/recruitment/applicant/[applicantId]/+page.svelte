@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
@@ -105,6 +106,8 @@
 
 	{#if form?.error}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-500"
 		>
 			{form.error}

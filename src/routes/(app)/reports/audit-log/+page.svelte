@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Container from '$lib/components/ui/Container.svelte'
 	import Pagination from '$lib/components/Pagination.svelte'
@@ -131,7 +132,7 @@
 	<PageHeader title="Audit Log" />
 
 	{#if failure}
-		<div class="flex shrink-0 flex-col gap-3">
+		<div use:autoDismiss class="flex shrink-0 flex-col gap-3">
 			{@render failureNotice()}
 		</div>
 	{/if}

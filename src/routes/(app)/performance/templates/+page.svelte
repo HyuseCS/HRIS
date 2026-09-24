@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import { enhance } from '$app/forms'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -51,7 +52,11 @@
 	/>
 
 	{#if formError}
-		<div class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+		<div
+			use:autoDismiss
+			class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+			role="alert"
+		>
 			{formError}
 		</div>
 	{/if}

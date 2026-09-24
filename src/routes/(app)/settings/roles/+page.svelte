@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
@@ -46,24 +47,27 @@
 	// on org-wide state, so no client check can predict it, and closing the dialog on it would
 	// leave "did that save?" unanswered on the screen that assigns system authority.
 	const setRoleGuard = (id: string) =>
-		(setRoleGuards[id] ??= createSubmitGuard(() => async ({ update, result }) => {
-			if (result.type === 'failure') {
-				// `error` is the 409's message and the 400's generic line; the 400's precise one
-				// ("A user must keep at least one role.") is the zod message under fieldErrors.
-				const d = result.data as
-					{ error?: string; fieldErrors?: Record<string, string[] | undefined> } | undefined
-				saveError = d?.fieldErrors?.roles?.[0] ?? d?.error ?? 'Those roles could not be saved.'
-				// Pull focus back into the dialog, onto the refusal itself. Save is `disabled` while
-				// the submit is in flight, and disabling the focused element hands focus to <body> — so by the time the refusal
-				// arrives the keyboard is OUTSIDE the modal: Escape no longer closes it and Tab walks
-				// the table underneath. Caught by the batched inspection round on the 409 path.
-				// `tick()` waits for the message element to exist before it can take focus.
-				await tick()
-				errorEl?.focus()
-				return
+		(setRoleGuards[id] ??= createSubmitGuard(() => {
+			saveError = ''
+			return async ({ update, result }) => {
+				if (result.type === 'failure') {
+					// `error` is the 409's message and the 400's generic line; the 400's precise one
+					// ("A user must keep at least one role.") is the zod message under fieldErrors.
+					const d = result.data as
+						{ error?: string; fieldErrors?: Record<string, string[] | undefined> } | undefined
+					saveError = d?.fieldErrors?.roles?.[0] ?? d?.error ?? 'Those roles could not be saved.'
+					// Pull focus back into the dialog, onto the refusal itself. Save is `disabled` while
+					// the submit is in flight, and disabling the focused element hands focus to <body> — so by the time the refusal
+					// arrives the keyboard is OUTSIDE the modal: Escape no longer closes it and Tab walks
+					// the table underneath. Caught by the batched inspection round on the 409 path.
+					// `tick()` waits for the message element to exist before it can take focus.
+					await tick()
+					errorEl?.focus()
+					return
+				}
+				await update()
+				closeEditor()
 			}
-			await update()
-			closeEditor()
 		}))
 
 	// #283: the picker's live selection, per user row.
@@ -383,6 +387,7 @@
 			<div class="space-y-3 border-t px-6 py-4">
 				{#if saveError}
 					<div
+						use:autoDismiss
 						bind:this={errorEl}
 						role="alert"
 						tabindex="-1"

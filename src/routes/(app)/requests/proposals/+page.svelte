@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import { enhance } from '$app/forms'
 	import Eye from 'lucide-svelte/icons/eye'
 	import Banner from '$lib/components/ui/Banner.svelte'
@@ -101,7 +102,7 @@
 	</PageHeader>
 
 	{#if form?.error || form?.success}
-		<div class="flex shrink-0 flex-col gap-3">
+		<div use:autoDismiss class="flex shrink-0 flex-col gap-3">
 			{@render notices()}
 		</div>
 	{/if}

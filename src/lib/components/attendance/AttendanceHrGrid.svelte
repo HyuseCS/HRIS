@@ -14,6 +14,7 @@
 	import TeamMatrix from '$lib/components/attendance/TeamMatrix.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { scrollToError } from '$lib/actions/scrollToError'
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { periodOf, toPeriodInputValue, type PeriodKind } from '$lib/utils/pay-periods'
 	import { manilaShortDay } from '$lib/utils/dates'
@@ -522,6 +523,7 @@
 					     render its message off-screen and read as "nothing happened". -->
 					<div
 						role="alert"
+						use:autoDismiss
 						use:scrollToError
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
 					>
@@ -542,6 +544,7 @@
 					{@const partial = res.applied > 0 && res.rejected.length > 0}
 					<div
 						role="status"
+						use:autoDismiss={res.rejected.length === 0}
 						class="rounded-md border px-3 py-2 text-sm {nothing
 							? 'border-destructive/20 bg-destructive/10 text-red-400'
 							: alreadyImported

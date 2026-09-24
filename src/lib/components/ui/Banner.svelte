@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 
 	// One form-feedback banner for the whole app. The recipe is lifted from
 	// `separations/[id]/+page.svelte`, which already had it right; ~80 hand-rolled copies of it
@@ -27,7 +28,8 @@
 		kind,
 		message,
 		class: className,
-		children
+		children,
+		autoDismiss: dismiss = false
 	}: {
 		kind: 'error' | 'success' | 'warning' | 'info'
 		/** The banner text. Use the `children` snippet instead when the copy needs markup. */
@@ -35,6 +37,7 @@
 		/** Outer spacing/placement only — never colour. A few call sites need `mt-4` or a grid span. */
 		class?: string
 		children?: Snippet
+		autoDismiss?: boolean
 	} = $props()
 
 	// A failure and a caution interrupt a screen reader; a confirmation should not. This is the
@@ -42,7 +45,7 @@
 	const role = $derived(kind === 'error' || kind === 'warning' ? 'alert' : 'status')
 </script>
 
-<div class="{TONE[kind]}{className ? ` ${className}` : ''}" {role}>
+<div class="{TONE[kind]}{className ? ` ${className}` : ''}" {role} use:autoDismiss={dismiss}>
 	{#if children}
 		{@render children()}
 	{:else}

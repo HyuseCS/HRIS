@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -171,6 +172,8 @@
 
 	{#if form?.error}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive"
 		>
 			{form.error}

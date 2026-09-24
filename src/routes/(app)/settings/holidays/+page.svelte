@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
@@ -52,6 +53,7 @@
 
 {#snippet notice()}
 	<div
+		role="alert"
 		class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
 	>
 		{form?.error}
@@ -66,7 +68,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div class="flex shrink-0 flex-col gap-3">
+		<div use:autoDismiss class="flex shrink-0 flex-col gap-3">
 			{@render notice()}
 		</div>
 	{/if}

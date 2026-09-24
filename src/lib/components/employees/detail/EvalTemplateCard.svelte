@@ -13,7 +13,7 @@
 <div class="rounded-lg border bg-card p-6 space-y-4">
 	<h2 class="font-semibold">Evaluation Template</h2>
 	{#if form?.action === 'assignTemplate' && form?.success}
-		<Banner kind="success" message="Saved." />
+		<Banner kind="success" message="Saved." autoDismiss />
 	{:else if form?.action === 'assignTemplate' && form?.error}
 		<div
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"

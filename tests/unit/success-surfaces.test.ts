@@ -82,7 +82,7 @@ const SITES: Row[] = [
 		expectServerSaved: true,
 		present: [
 			'const offboard = submitFeedback({ error: null, success: null })',
-			'{#if form?.action === \'offboard\' && form?.saved} <Banner kind="success" class="lg:col-span-2" message={form.saved} />'
+			'{#if form?.action === \'offboard\' && form?.saved} <Banner kind="success" class="lg:col-span-2" message={form.saved} autoDismiss />'
 		],
 		// Adding offboard to the DONE map would re-create the double from the other direction.
 		absent: ["offboard: '"]
@@ -98,7 +98,7 @@ const SITES: Row[] = [
 		surface: 'inline',
 		expectServerSaved: false,
 		present: [
-			'{#if savedNotice} <Banner kind="success" message={savedNotice} />',
+			'{#if savedNotice} <Banner kind="success" message={savedNotice} autoDismiss />',
 			"setSupervisors: 'Supervisors saved.'",
 			'action="?/setSupervisors"'
 		],
@@ -115,7 +115,7 @@ const SITES: Row[] = [
 		surface: 'inline',
 		expectServerSaved: false,
 		present: [
-			'{#if savedNotice} <Banner kind="success" message={savedNotice} />',
+			'{#if savedNotice} <Banner kind="success" message={savedNotice} autoDismiss />',
 			"addLoan: 'Loan added.'",
 			'action="?/addLoan"'
 		],
@@ -132,7 +132,7 @@ const SITES: Row[] = [
 		surface: 'inline',
 		expectServerSaved: false,
 		present: [
-			'{#if savedNotice} <Banner kind="success" message={savedNotice} />',
+			'{#if savedNotice} <Banner kind="success" message={savedNotice} autoDismiss />',
 			"uploadDocument: 'Document uploaded.'",
 			'action="?/uploadDocument"'
 		],
@@ -290,7 +290,7 @@ const SITES: Row[] = [
 		// `saved`, which is what keeps the toast silent. Do not re-wire this to match the others.
 		expectServerSaved: false,
 		present: [
-			'{#if form?.finalized} <Banner kind="success" message="Separation finalized. The employee is now offboarded and their login is disabled." />'
+			'{#if form?.finalized} <Banner kind="success" message="Separation finalized. The employee is now offboarded and their login is disabled." autoDismiss />'
 		],
 		absent: []
 	},
@@ -302,7 +302,7 @@ const SITES: Row[] = [
 		surface: 'inline',
 		expectServerSaved: false,
 		present: [
-			'{#if form?.undone} <Banner kind="success"> Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the employee\'s login is enabled again. </Banner>'
+			'{#if form?.undone} <Banner kind="success" autoDismiss> Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the employee\'s login is enabled again. </Banner>'
 		],
 		absent: []
 	},
