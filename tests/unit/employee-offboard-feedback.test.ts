@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
@@ -16,19 +16,30 @@ import { resolve } from 'node:path'
  */
 
 const dir = resolve(__dirname, '../../src/routes/(app)/employees/[id]')
-const server = readFileSync(resolve(dir, '+page.server.ts'), 'utf8')
+const server = readFileSync(
+	resolve(__dirname, '../../src/lib/server/employee-detail/profile.ts'),
+	'utf8'
+)
 const template = readFileSync(resolve(dir, '+page.svelte'), 'utf8')
+const cardDir = resolve(__dirname, '../../src/lib/components/employees/detail')
+const templates = [
+	template,
+	...readdirSync(cardDir)
+		.filter((f) => f.endsWith('.svelte'))
+		.sort()
+		.map((f) => readFileSync(resolve(cardDir, f), 'utf8'))
+].join('\n')
 
 describe('employees/[id] offboard feedback (F1)', () => {
 	it('finds the page’s submitFeedback bindings at all — the sweep is not scanning an empty set', () => {
-		const bindings = [...template.matchAll(/const \w+ = submitFeedback\(/g)]
+		const bindings = [...templates.matchAll(/const \w+ = submitFeedback\(/g)]
 		expect(bindings.length).toBeGreaterThanOrEqual(20)
 	})
 
 	it('silences the offboard toast, and only that one', () => {
-		expect(template).toContain('const offboard = submitFeedback({ error: null, success: null })')
+		expect(templates).toContain('const offboard = submitFeedback({ error: null, success: null })')
 		const silenced = [
-			...template.matchAll(/const (\w+) = submitFeedback\([^)]*success: null[^)]*\)/g)
+			...templates.matchAll(/const (\w+) = submitFeedback\([^)]*success: null[^)]*\)/g)
 		]
 		expect(silenced.map((m) => m[1])).toEqual(['offboard'])
 	})

@@ -145,7 +145,11 @@ describe('colour is never the only signal (S6 items 31-33)', () => {
 describe('icon, tab and error affordances (S6 items 35-37)', () => {
 	it('no bare emoji is used as an icon in an app route', () => {
 		const offenders = sourceFiles()
-			.filter((path) => rel(path).startsWith('routes/'))
+			.filter(
+				(path) =>
+					rel(path).startsWith('routes/') ||
+					rel(path).startsWith('lib/components/employees/detail/')
+			)
 			.filter((path) => /\p{Emoji_Presentation}/u.test(readFileSync(path, 'utf8')))
 			.map(rel)
 		expect(offenders).toEqual([])
@@ -190,7 +194,7 @@ describe('icon, tab and error affordances (S6 items 35-37)', () => {
 // ── S6 items 34, 38-40 — per-area affordances ────────────────────────────────
 describe('per-area affordances (S6 items 34, 38-40)', () => {
 	it('the onboarding manual-step control clears the 24px minimum target', () => {
-		const page = read('routes/(app)/employees/[id]/+page.svelte')
+		const page = read('lib/components/employees/detail/OnboardingCard.svelte')
 		// h-6 = 24px. The old control was h-4 (16px).
 		expect(page).toContain("aria-label=\"{step.done ? 'Uncheck' : 'Check'} {step.label}\"")
 		expect(page).not.toContain('mt-0.5 flex h-4 w-4 flex-none')
