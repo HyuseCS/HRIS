@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
 	import { enhance } from '$app/forms'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { EmployeeDetailData } from './shared'
 	import Container from '$lib/components/ui/Container.svelte'
@@ -100,39 +101,45 @@
 			use:enhance={addEmergencyContact.enhance}
 			class="flex flex-wrap items-end gap-2 border-t pt-3"
 		>
-			<div class="grid gap-1">
-				<label for="ec-name" class="text-xs font-medium text-muted-foreground">Name</label>
-				<input
-					id="ec-name"
-					name="name"
-					type="text"
-					required
-					placeholder="Full name"
-					class="h-8 w-44 rounded-md border border-input bg-background px-2 text-xs"
-				/>
-			</div>
-			<div class="grid gap-1">
-				<label for="ec-rel" class="text-xs font-medium text-muted-foreground">Relationship</label>
-				<input
-					id="ec-rel"
-					name="relationship"
-					type="text"
-					required
-					placeholder="e.g. Spouse"
-					class="h-8 w-32 rounded-md border border-input bg-background px-2 text-xs"
-				/>
-			</div>
-			<div class="grid gap-1">
-				<label for="ec-phone" class="text-xs font-medium text-muted-foreground">Phone</label>
-				<input
-					id="ec-phone"
-					name="phone"
-					type="tel"
-					required
-					placeholder="e.g. 0917xxxxxxx"
-					class="h-8 w-40 rounded-md border border-input bg-background px-2 text-xs"
-				/>
-			</div>
+			<Field size="compact" label="Name" id="ec-name">
+				{#snippet children(a)}
+					<input
+						{...a}
+						id="ec-name"
+						name="name"
+						type="text"
+						required
+						placeholder="Full name"
+						class="h-8 w-44 rounded-md border border-input bg-background px-2 text-xs"
+					/>
+				{/snippet}
+			</Field>
+			<Field size="compact" label="Relationship" id="ec-rel">
+				{#snippet children(a)}
+					<input
+						{...a}
+						id="ec-rel"
+						name="relationship"
+						type="text"
+						required
+						placeholder="e.g. Spouse"
+						class="h-8 w-32 rounded-md border border-input bg-background px-2 text-xs"
+					/>
+				{/snippet}
+			</Field>
+			<Field size="compact" label="Phone" id="ec-phone">
+				{#snippet children(a)}
+					<input
+						{...a}
+						id="ec-phone"
+						name="phone"
+						type="tel"
+						required
+						placeholder="e.g. 0917xxxxxxx"
+						class="h-8 w-40 rounded-md border border-input bg-background px-2 text-xs"
+					/>
+				{/snippet}
+			</Field>
 			<button
 				disabled={addEmergencyContact.busy}
 				class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"

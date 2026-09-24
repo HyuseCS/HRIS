@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
 	import { enhance } from '$app/forms'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
@@ -89,28 +90,31 @@
 		use:enhance={uploadDocument.enhance}
 		class="flex flex-wrap items-end gap-2 border-t pt-3"
 	>
-		<div class="grid gap-1">
-			<label for="doc-category" class="text-xs font-medium text-muted-foreground">Category</label>
-			<select
-				id="doc-category"
-				name="category"
-				class="h-8 rounded-md border border-input bg-background px-2 text-xs"
-			>
-				{#each DOC_CATEGORIES as c (c.value)}<option value={c.value}>{c.label}</option>{/each}
-			</select>
-		</div>
-		<div class="grid gap-1">
-			<label for="doc-label" class="text-xs font-medium text-muted-foreground"
-				>Label <span class="text-muted-foreground/70">(optional)</span></label
-			>
-			<input
-				id="doc-label"
-				name="label"
-				type="text"
-				placeholder="e.g. 2026 Contract"
-				class="h-8 w-44 rounded-md border border-input bg-background px-2 text-xs"
-			/>
-		</div>
+		<Field size="compact" label="Category" id="doc-category">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="doc-category"
+					name="category"
+					class="h-8 rounded-md border border-input bg-background px-2 text-xs"
+				>
+					{#each DOC_CATEGORIES as c (c.value)}<option value={c.value}>{c.label}</option>{/each}
+				</select>
+			{/snippet}
+		</Field>
+		<Field size="compact" label="Label" id="doc-label">
+			{#snippet suffix()}<span class="text-muted-foreground/70">(optional)</span>{/snippet}
+			{#snippet children(a)}
+				<input
+					{...a}
+					id="doc-label"
+					name="label"
+					type="text"
+					placeholder="e.g. 2026 Contract"
+					class="h-8 w-44 rounded-md border border-input bg-background px-2 text-xs"
+				/>
+			{/snippet}
+		</Field>
 		<div class="grid gap-1">
 			<label for="doc-file" class="text-xs font-medium text-muted-foreground"
 				>File <span class="text-muted-foreground/70">(PDF/PNG/JPEG, ≤10 MB)</span></label

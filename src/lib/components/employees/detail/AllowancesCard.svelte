@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
 	import { enhance } from '$app/forms'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -64,25 +65,43 @@
 		use:enhance={addEarning.enhance}
 		class="flex flex-wrap items-end gap-2"
 	>
-		<select name="kind" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
-			<option value="ALLOWANCE">Allowance</option>
-			<option value="INCENTIVE">Incentive</option>
-		</select>
-		<input
-			name="label"
-			placeholder="Label (e.g. Meal allowance)"
-			required
-			class="h-8 w-40 rounded-md border border-input bg-background px-2 text-xs"
-		/>
-		<input
-			name="monthlyAmount"
-			type="number"
-			min="0.01"
-			step="100"
-			placeholder="Monthly amount"
-			required
-			class="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
-		/>
+		<Field size="compact" label="Kind">
+			{#snippet children(a)}
+				<select
+					{...a}
+					name="kind"
+					class="h-8 rounded-md border border-input bg-background px-2 text-xs"
+				>
+					<option value="ALLOWANCE">Allowance</option>
+					<option value="INCENTIVE">Incentive</option>
+				</select>
+			{/snippet}
+		</Field>
+		<Field size="compact" label="Label">
+			{#snippet children(a)}
+				<input
+					{...a}
+					name="label"
+					placeholder="Label (e.g. Meal allowance)"
+					required
+					class="h-8 w-40 rounded-md border border-input bg-background px-2 text-xs"
+				/>
+			{/snippet}
+		</Field>
+		<Field size="compact" label="Monthly amount">
+			{#snippet children(a)}
+				<input
+					{...a}
+					name="monthlyAmount"
+					type="number"
+					min="0.01"
+					step="100"
+					placeholder="Monthly amount"
+					required
+					class="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
+				/>
+			{/snippet}
+		</Field>
 		<button
 			disabled={addEarning.busy}
 			class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"

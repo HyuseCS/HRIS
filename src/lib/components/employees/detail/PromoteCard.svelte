@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import {
 		rateBasisOptionsFor,
@@ -74,108 +75,124 @@
 		</div>
 	{/if}
 	<div class="grid gap-3 sm:grid-cols-3">
-		<div>
-			<label for="promoEffectiveDate" class="text-sm font-medium">Effective Date</label>
-			<DatePicker
-				id="promoEffectiveDate"
-				name="effectiveDate"
-				required
-				value={todayInput}
-				min={hireInput}
-				class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-		</div>
-		<div>
-			<label for="promoPosition" class="text-sm font-medium">Position</label>
-			<select
-				id="promoPosition"
-				name="positionId"
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">— unchanged —</option>
-				{#each data.positions as p (p.id)}
-					<option value={p.id} selected={employee.positionId === p.id}>{p.title}</option>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label for="promoJobTitle" class="text-sm font-medium">Job Title</label>
-			<input
-				id="promoJobTitle"
-				name="jobTitle"
-				value={employee.jobTitle}
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-		</div>
-		<div>
-			<label for="promoType" class="text-sm font-medium">Employment Type</label>
-			<select
-				id="promoType"
-				name="employmentType"
-				bind:value={promoType}
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				{#each EMPLOYMENT_TYPE_OPTIONS as [val, label] (val)}
-					<option value={val}>{label}</option>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label for="promoRateType" class="text-sm font-medium">Rate Basis</label>
-			<select
-				id="promoRateType"
-				name="rateType"
-				bind:value={promoRateType}
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				{#each promoRateOptions as opt (opt.value)}
-					<option value={opt.value}>{opt.label}</option>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label for="promoSalary" class="text-sm font-medium">{promoRate.label}</label>
-			<input
-				id="promoSalary"
-				name="basicMonthlySalary"
-				type="number"
-				step={promoRate.step}
-				min="0"
-				value={revealed?.basicMonthlySalary ?? ''}
-				placeholder={String(employee.basicMonthlySalary ?? '')}
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-			<p class="mt-1 text-xs text-muted-foreground">
-				Masked; reveal above to edit, or leave blank to keep the current amount.
-			</p>
-		</div>
-		<div>
-			<label for="promoReportsTo" class="text-sm font-medium">Reports To</label>
-			<select
-				id="promoReportsTo"
-				name="reportsToId"
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">— unchanged —</option>
-				{#each data.supervisorOptions as s (s.id)}
-					<option value={s.id} selected={employee.reportsToId === s.id}
-						>{s.lastName}, {s.firstName}</option
-					>
-				{/each}
-			</select>
-		</div>
-		<div class="sm:col-span-2">
-			<label for="promoNote" class="text-sm font-medium"
-				>Note <span class="text-muted-foreground">(optional)</span></label
-			>
-			<input
-				id="promoNote"
-				name="note"
-				maxlength="500"
-				placeholder="e.g. Promoted to Shift Lead"
-				class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-		</div>
+		<Field label="Effective Date" id="promoEffectiveDate">
+			{#snippet children(a)}
+				<DatePicker
+					{...a}
+					id="promoEffectiveDate"
+					name="effectiveDate"
+					required
+					value={todayInput}
+					min={hireInput}
+					class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
+		<Field label="Position" id="promoPosition">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="promoPosition"
+					name="positionId"
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<option value="">— unchanged —</option>
+					{#each data.positions as p (p.id)}
+						<option value={p.id} selected={employee.positionId === p.id}>{p.title}</option>
+					{/each}
+				</select>
+			{/snippet}
+		</Field>
+		<Field label="Job Title" id="promoJobTitle">
+			{#snippet children(a)}
+				<input
+					{...a}
+					id="promoJobTitle"
+					name="jobTitle"
+					value={employee.jobTitle}
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
+		<Field label="Employment Type" id="promoType">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="promoType"
+					name="employmentType"
+					bind:value={promoType}
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{#each EMPLOYMENT_TYPE_OPTIONS as [val, label] (val)}
+						<option value={val}>{label}</option>
+					{/each}
+				</select>
+			{/snippet}
+		</Field>
+		<Field label="Rate Basis" id="promoRateType">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="promoRateType"
+					name="rateType"
+					bind:value={promoRateType}
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					{#each promoRateOptions as opt (opt.value)}
+						<option value={opt.value}>{opt.label}</option>
+					{/each}
+				</select>
+			{/snippet}
+		</Field>
+		<Field
+			label={promoRate.label}
+			id="promoSalary"
+			hint="Masked; reveal above to edit, or leave blank to keep the current amount."
+		>
+			{#snippet children(a)}
+				<input
+					{...a}
+					id="promoSalary"
+					name="basicMonthlySalary"
+					type="number"
+					step={promoRate.step}
+					min="0"
+					value={revealed?.basicMonthlySalary ?? ''}
+					placeholder={String(employee.basicMonthlySalary ?? '')}
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
+		<Field label="Reports To" id="promoReportsTo">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="promoReportsTo"
+					name="reportsToId"
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<option value="">— unchanged —</option>
+					{#each data.supervisorOptions as s (s.id)}
+						<option value={s.id} selected={employee.reportsToId === s.id}
+							>{s.lastName}, {s.firstName}</option
+						>
+					{/each}
+				</select>
+			{/snippet}
+		</Field>
+		<Field label="Note" id="promoNote" class="sm:col-span-2">
+			{#snippet suffix()}<span class="text-muted-foreground">(optional)</span>{/snippet}
+			{#snippet children(a)}
+				<input
+					{...a}
+					id="promoNote"
+					name="note"
+					maxlength="500"
+					placeholder="e.g. Promoted to Shift Lead"
+					class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+			{/snippet}
+		</Field>
 	</div>
 	<button
 		type="submit"

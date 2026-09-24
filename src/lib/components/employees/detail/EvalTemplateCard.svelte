@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import Banner from '$lib/components/ui/Banner.svelte'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { EmployeeDetailData, EmployeeDetailForm } from './shared'
 
@@ -26,19 +27,21 @@
 		use:enhance={assignTemplate.enhance}
 		class="space-y-2"
 	>
-		<label for="assignedTemplateId" class="text-xs font-medium text-muted-foreground"
-			>Assigned template</label
-		>
-		<select
-			id="assignedTemplateId"
-			name="assignedTemplateId"
-			class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-		>
-			<option value="" selected={!data.assignedTemplateId}>— none —</option>
-			{#each data.performanceTemplates as t (t.id)}
-				<option value={t.id} selected={t.id === data.assignedTemplateId}>{t.name}</option>
-			{/each}
-		</select>
+		<Field size="compact" label="Assigned template" id="assignedTemplateId">
+			{#snippet children(a)}
+				<select
+					{...a}
+					id="assignedTemplateId"
+					name="assignedTemplateId"
+					class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+				>
+					<option value="" selected={!data.assignedTemplateId}>— none —</option>
+					{#each data.performanceTemplates as t (t.id)}
+						<option value={t.id} selected={t.id === data.assignedTemplateId}>{t.name}</option>
+					{/each}
+				</select>
+			{/snippet}
+		</Field>
 		<button
 			type="submit"
 			disabled={assignTemplate.busy}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
 	import { enhance } from '$app/forms'
+	import Field from '$lib/components/ui/Field.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -189,29 +190,44 @@
 			use:enhance={addDeduction.enhance}
 			class="flex flex-wrap items-end gap-2"
 		>
-			<select
-				name="deductionTypeId"
-				required
-				class="h-8 rounded-md border border-input bg-background px-2 text-xs"
-			>
-				{#each data.deductionTypes as t (t.id)}
-					<option value={t.id}>{t.code} — {t.label}</option>
-				{/each}
-			</select>
-			<input
-				name="label"
-				placeholder="Label override (optional)"
-				class="h-8 w-40 rounded-md border border-input bg-background px-2 text-xs"
-			/>
-			<input
-				name="monthlyAmount"
-				type="number"
-				min="0.01"
-				step="100"
-				placeholder="Monthly amount"
-				required
-				class="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
-			/>
+			<Field size="compact" label="Pay code">
+				{#snippet children(a)}
+					<select
+						{...a}
+						name="deductionTypeId"
+						required
+						class="h-8 rounded-md border border-input bg-background px-2 text-xs"
+					>
+						{#each data.deductionTypes as t (t.id)}
+							<option value={t.id}>{t.code} — {t.label}</option>
+						{/each}
+					</select>
+				{/snippet}
+			</Field>
+			<Field size="compact" label="Label (optional)">
+				{#snippet children(a)}
+					<input
+						{...a}
+						name="label"
+						placeholder="Label override (optional)"
+						class="h-8 w-40 rounded-md border border-input bg-background px-2 text-xs"
+					/>
+				{/snippet}
+			</Field>
+			<Field size="compact" label="Monthly amount">
+				{#snippet children(a)}
+					<input
+						{...a}
+						name="monthlyAmount"
+						type="number"
+						min="0.01"
+						step="100"
+						placeholder="Monthly amount"
+						required
+						class="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
+					/>
+				{/snippet}
+			</Field>
 			<button
 				disabled={addDeduction.busy}
 				class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"

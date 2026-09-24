@@ -7,6 +7,7 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import Field from '$lib/components/ui/Field.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
 	import { page } from '$app/stores'
@@ -339,16 +340,18 @@
 					>
 						<h3 class="font-semibold text-destructive">Offboard Employee</h3>
 						<div class="flex items-end gap-4">
-							<div>
-								<label for="endDate" class="text-sm font-medium">Last Day</label>
-								<DatePicker
-									id="endDate"
-									value=""
-									name="endDate"
-									required
-									class="mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								/>
-							</div>
+							<Field label="Last Day" id="endDate">
+								{#snippet children(a)}
+									<DatePicker
+										{...a}
+										id="endDate"
+										value=""
+										name="endDate"
+										required
+										class="mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								{/snippet}
+							</Field>
 							<button
 								type="button"
 								disabled={offboard.busy}
