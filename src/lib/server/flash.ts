@@ -12,7 +12,7 @@ import type { Cookies } from '@sveltejs/kit'
  * JavaScript, it needs no schema change and it does not stick in a bookmarked URL.
  */
 
-export type FlashKind = 'success' | 'info' | 'error'
+export type FlashKind = 'success' | 'info' | 'warning' | 'error'
 
 export interface Flash {
 	/** Nonce — the client dedupes on it, so a cached layout payload cannot re-toast. */
@@ -55,7 +55,7 @@ export function takeFlash(cookies: Cookies): Flash | null {
 
 	return {
 		id,
-		kind: kind === 'error' || kind === 'info' ? kind : 'success',
+		kind: kind === 'error' || kind === 'info' || kind === 'warning' ? kind : 'success',
 		message
 	}
 }

@@ -147,11 +147,7 @@
 	<div class="flex items-center gap-2">
 		<form method="POST" action="?/approveMany" use:enhance={bulkFb.enhance}>
 			<input type="hidden" name="ids" value={selected.join(',')} />
-			<button
-				disabled={busy || !selected.length}
-				class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-				>Approve selected</button
-			>
+			<button disabled={busy || !selected.length} class="btn-success">Approve selected</button>
 		</form>
 		<form bind:this={rejectForm} method="POST" action="?/rejectMany" use:enhance={bulkFb.enhance}>
 			<input type="hidden" name="ids" value={selected.join(',')} />
@@ -160,8 +156,7 @@
 				type="button"
 				disabled={busy || !selected.length}
 				onclick={() => askReason({ kind: 'bulk' })}
-				class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-				>Reject selected</button
+				class="btn-destructive disabled:cursor-not-allowed">Reject selected</button
 			>
 		</form>
 	</div>
@@ -265,15 +260,13 @@
 								name="approved"
 								value="true"
 								disabled={g.busy}
-								class="flex-1 rounded-md bg-green-700 px-2 py-1 text-xs font-medium text-white hover:bg-green-800 disabled:pointer-events-none disabled:opacity-50"
-								>{g.busy ? 'Approving…' : 'Approve'}</button
+								class="flex-1 btn-row-positive">{g.busy ? 'Approving…' : 'Approve'}</button
 							>
 							<button
 								type="button"
 								disabled={singleReject.busy && singleId === ts.id}
 								onclick={() => askReason({ kind: 'single', id: ts.id })}
-								class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-								>Reject</button
+								class="flex-1 btn-row-danger">Reject</button
 							>
 						</form>
 					</li>

@@ -84,6 +84,12 @@ describe('requests/approvals ?/decideRequest success feedback', () => {
 		expect(new Set([approved, rejected, returned]).size).toBe(3)
 	})
 
+	it('marks an approval as success and a rejection or return as a warning', async () => {
+		expect((await decideRequest('APPROVED')).kind).toBe('success')
+		expect((await decideRequest('REJECTED')).kind).toBe('warning')
+		expect((await decideRequest('RETURNED')).kind).toBe('warning')
+	})
+
 	it('rethrows an unexpected service error rather than printing its raw text', async () => {
 		// The raw-message fallback was removed in phase 04: an untyped throw is a bug, not a
 		// message, so it goes to handleError and comes back as a reference the user can quote.
@@ -100,6 +106,11 @@ describe('requests/timesheets ?/review success feedback', () => {
 		expect(approved?.saved).toBeTruthy()
 		expect(rejected?.saved).toBeTruthy()
 		expect(approved.saved).not.toBe(rejected.saved)
+	})
+
+	it('marks an approval as success and a rejection as a warning', async () => {
+		expect((await review(true)).kind).toBe('success')
+		expect((await review(false)).kind).toBe('warning')
 	})
 
 	it('rethrows an unexpected service error rather than printing its raw text', async () => {
@@ -180,5 +191,6 @@ describe('requests/timesheets bulk feedback payloads', () => {
 
 		expect(res?.status).toBeUndefined()
 		expect(res?.saved).toMatch(/, 1 skipped\.$/)
+		expect(res?.kind).toBe('warning')
 	})
 })

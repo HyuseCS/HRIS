@@ -209,6 +209,6 @@ export const actions: Actions = {
 		if (!id) return fail(400, { error: 'Missing proposal id.' })
 
 		await rejectProposal(user.organizationId, id, ctxOf(user, getClientAddress))
-		return { action: 'reject', saved: 'Proposal rejected.' }
+		return { action: 'reject', saved: 'Proposal rejected.', kind: 'warning' }
 	}
 }

@@ -78,7 +78,7 @@ export function submitFeedback(opts: SubmitFeedbackOptions = {}) {
 					opts.success === undefined
 						? savedMessage(result.data)
 						: resolve(opts.success, result.data)
-				if (msg) addToast(msg, { kind: 'success' })
+				if (msg) addToast(msg, { kind: result.data?.kind === 'warning' ? 'warning' : 'success' })
 				if (!after) await o.update()
 			} else if (result.type === 'failure') {
 				const override = resolve(opts.error, result.data)

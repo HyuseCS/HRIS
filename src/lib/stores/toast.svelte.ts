@@ -1,7 +1,7 @@
 // Shared toast store (Svelte 5 runes). Import the functions anywhere; render with
 // <Toaster/> once in the app layout.
 
-export type ToastKind = 'info' | 'success' | 'error'
+export type ToastKind = 'info' | 'success' | 'warning' | 'error'
 export interface Toast {
 	id: string
 	message: string

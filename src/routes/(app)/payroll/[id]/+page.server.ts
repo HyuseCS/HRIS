@@ -193,7 +193,8 @@ export const actions: Actions = {
 		// names the key explicitly rather than shorthand.
 		return {
 			action: 'decide',
-			saved: action === 'approve' ? 'Payroll run signed off.' : 'Run returned to the maker.'
+			saved: action === 'approve' ? 'Payroll run signed off.' : 'Run returned to the maker.',
+			kind: action === 'approve' ? 'success' : 'warning'
 		}
 	}
 }

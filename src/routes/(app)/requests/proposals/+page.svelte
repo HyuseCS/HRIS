@@ -82,7 +82,7 @@
 	{/if}
 
 	{#if form?.success}
-		<Banner kind="success" message={form.success} />
+		<Banner kind={form.kind === 'warning' ? 'warning' : 'success'} message={form.success} />
 	{/if}
 {/snippet}
 
@@ -220,7 +220,7 @@
 								disabled={confirm.busy}
 								aria-label="Confirm and apply the change for {p.target.firstName} {p.target
 									.lastName}"
-								class="flex-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
+								class="flex-1 btn-row-positive"
 								>{confirm.busy ? 'Confirming…' : 'Confirm & apply'}</button
 							>
 							<button
@@ -231,8 +231,7 @@
 									noteTargetId = p.id
 									noteDialogOpen = true
 								}}
-								class="flex-1 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
-								>Reject</button
+								class="flex-1 btn-row-danger">Reject</button
 							>
 						</form>
 					</div>

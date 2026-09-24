@@ -138,7 +138,11 @@ export const actions: Actions = {
 		}
 
 		// The page already renders `form?.saved`; the action just never populated it.
-		return { action: 'review', saved: approved ? 'Timesheet approved.' : 'Timesheet rejected.' }
+		return {
+			action: 'review',
+			saved: approved ? 'Timesheet approved.' : 'Timesheet rejected.',
+			kind: approved ? 'success' : 'warning'
+		}
 	},
 
 	// Bulk approve each selected (submitted) timesheet; non-submitted ones are skipped.
@@ -211,7 +215,8 @@ export const actions: Actions = {
 					'No timesheets were rejected. They may already have been reviewed, or they are not yours to act on.'
 			})
 		return {
-			saved: await reviewedSummary('Rejected', reviewedFor, user.organizationId, done, skipped)
+			saved: await reviewedSummary('Rejected', reviewedFor, user.organizationId, done, skipped),
+			kind: 'warning'
 		}
 	}
 }

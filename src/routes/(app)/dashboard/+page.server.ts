@@ -237,7 +237,8 @@ export const actions: Actions = {
 		// error land under Postings instead of under "Give award".
 		return {
 			action: 'decidePosting',
-			saved: approve ? 'Posting approved.' : 'Posting sent back to draft.'
+			saved: approve ? 'Posting approved.' : 'Posting sent back to draft.',
+			kind: approve ? 'success' : 'warning'
 		}
 	},
 
