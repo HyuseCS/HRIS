@@ -164,6 +164,9 @@ describe('the plain sites are bounded (G13)', () => {
 
 	it('the 201 file render-caps its long lists', () => {
 		expect(read('routes/(app)/employees/[id]/+page.svelte')).toContain('LIST_RENDER_CAP')
+		expect(read('lib/components/employees/detail/EmploymentHistoryCard.svelte')).toContain(
+			'history.slice(0, LIST_RENDER_CAP)'
+		)
 	})
 })
 

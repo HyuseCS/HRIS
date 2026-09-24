@@ -5,7 +5,7 @@
 	import { scrollToError } from '$lib/actions/scrollToError'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
-	import { tenureLabel, tenureRequirement, monthsOfService } from '$lib/utils/dates'
+	import { tenureLabel } from '$lib/utils/dates'
 	import {
 		rateBasisOptionsFor,
 		rateBasisCopy,
@@ -26,7 +26,10 @@
 	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
 	import { resolveTab } from '$lib/components/employees/employee-tabs'
 	import { LIST_RENDER_CAP } from '$lib/components/employees/detail/shared'
-	import { labelFor, EMPLOYMENT_TYPE_LABELS, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
+	import EmploymentHistoryCard from '$lib/components/employees/detail/EmploymentHistoryCard.svelte'
+	import BenefitsCard from '$lib/components/employees/detail/BenefitsCard.svelte'
+	import LeaveBalancesCard from '$lib/components/employees/detail/LeaveBalancesCard.svelte'
+	import { labelFor, EMPLOYMENT_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -893,45 +896,7 @@
 
 			<!-- Leave Balances (#137). Read-only: allocations come from the org's leave-type
 		     defaults at onboarding, and deductions from approved leave requests. -->
-			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
-				<h2 class="font-semibold">
-					Leave Balances
-					<span class="text-xs font-normal text-muted-foreground"
-						>({new Date().getFullYear()}, days)</span
-					>
-				</h2>
-
-				{#if data.leaveBalances.length}
-					<div class="card-scroll flex flex-wrap gap-3">
-						{#each data.leaveBalances as bal (bal.id)}
-							{@const gated =
-								bal.minMonthsOfService > 0 &&
-								monthsOfService(new Date(employee.startDate)) < bal.minMonthsOfService}
-							<div class="min-w-[150px] rounded-lg border bg-background p-4">
-								<p class="text-xs font-medium text-muted-foreground">{bal.name}</p>
-								{#if gated}
-									<p class="mt-1 text-2xl font-bold text-muted-foreground">Locked</p>
-									<p class="text-xs text-muted-foreground">
-										after {tenureRequirement(bal.minMonthsOfService)} of service
-									</p>
-								{:else}
-									<p class="mt-1 text-2xl font-bold">{bal.remaining.toFixed(1)}</p>
-									<p class="text-xs text-muted-foreground">
-										of {bal.allocated.toFixed(0)} allocated
-									</p>
-									<p class="text-xs text-muted-foreground">{bal.used.toFixed(1)} used</p>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<p class="text-sm text-muted-foreground">
-						No leave allocated for {new Date().getFullYear()}. Balances are created at onboarding
-						from the org's
-						<a href="/settings/leave-types" class="text-primary hover:underline">leave types</a>.
-					</p>
-				{/if}
-			</section>
+			<LeaveBalancesCard {data} />
 
 			<!-- Emergency Contacts (visible to any viewer of the 201 file; HR manages) -->
 			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
@@ -1063,45 +1028,7 @@
 		<div class="grid gap-6 lg:grid-cols-2">
 			<!-- Benefits (#198): enrollments on the 201 file, read-only here. HR manages them under
 		     the Benefits section; this just surfaces them alongside the employee's record. -->
-			<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
-				<h2 class="font-semibold">Benefits</h2>
-				{#if data.benefits.length}
-					<div class="card-scroll overflow-x-auto rounded-md border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Plan</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Coverage</th>
-									<th class="px-3 py-2 text-right font-medium text-muted-foreground">EE Cost</th>
-									<th class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y">
-								{#each data.benefits as b (b.id)}
-									<tr class="hover:bg-muted/30 {b.status === 'ACTIVE' ? '' : 'opacity-60'}">
-										<td class="px-3 py-2 font-medium">{b.plan.name}</td>
-										<td class="px-3 py-2 text-muted-foreground"
-											>{labelFor(BENEFIT_PLAN_TYPE_LABELS, b.plan.type)}</td
-										>
-										<td class="px-3 py-2 text-muted-foreground">{b.coverageLevel ?? '—'}</td>
-										<td class="px-3 py-2 text-right">
-											{b.plan.employeeCost != null ? formatCurrency(b.plan.employeeCost) : '—'}
-										</td>
-										<td class="px-3 py-2">
-											<Badge status={b.status} domain="benefitEnrollment" />
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{:else}
-					<p class="text-xs text-muted-foreground">
-						No benefit enrollments. HR manages enrollments under Benefits.
-					</p>
-				{/if}
-			</section>
+			<BenefitsCard {data} />
 
 			{#if canManage}
 				<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
@@ -1925,60 +1852,7 @@
 	>
 		<div class="grid gap-6 lg:grid-cols-2">
 			{#if canManage}
-				<section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
-					<h2 class="font-semibold">
-						Employment History
-						<span class="text-xs font-normal text-muted-foreground"
-							>(promotions, salary, transfers, status — from the audit trail)</span
-						>
-					</h2>
-
-					{#if history.length}
-						<div class="card-scroll pl-1">
-							<ol class="relative space-y-5 border-l pl-6">
-								{#each history.slice(0, LIST_RENDER_CAP) as ev (ev.id)}
-									<li class="relative">
-										<span
-											class="absolute -left-[27px] mt-1 h-3 w-3 rounded-full border-2 border-background {ev.type ===
-											'HIRED'
-												? 'bg-green-500'
-												: 'bg-primary'}"
-										></span>
-										<div class="flex flex-wrap items-baseline justify-between gap-2">
-											<span class="text-sm font-medium">
-												{ev.type === 'HIRED' ? 'Hired / record created' : 'Profile updated'}
-											</span>
-											<span class="text-xs text-muted-foreground">
-												{formatShortDate(ev.date)}
-												<!-- #170: a comp change carries its own effective date (may be backdated). -->
-												{#if ev.effectiveDate}
-													· effective {formatShortDate(ev.effectiveDate)}
-												{/if}
-											</span>
-										</div>
-										{#if ev.changes.length}
-											<ul class="mt-1 space-y-0.5 text-sm text-muted-foreground">
-												{#each ev.changes as c (c.label)}
-													<li>
-														<span class="font-medium text-foreground">{c.label}:</span>
-														{c.from} <span aria-hidden="true">→</span>
-														<span class="text-foreground">{c.to}</span>
-													</li>
-												{/each}
-											</ul>
-										{/if}
-										{#if ev.actorEmail}
-											<p class="mt-1 text-xs text-muted-foreground/70">by {ev.actorEmail}</p>
-										{/if}
-									</li>
-								{/each}
-							</ol>
-						</div>
-						{@render truncated(history.length)}
-					{:else}
-						<p class="text-xs text-muted-foreground">No recorded changes yet.</p>
-					{/if}
-				</section>
+				<EmploymentHistoryCard {history} {truncated} />
 			{/if}
 		</div>
 	</div>
