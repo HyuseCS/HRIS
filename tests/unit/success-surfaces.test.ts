@@ -54,11 +54,13 @@ function actionBlock(source: string, name: string): string | null {
 	return end === -1 ? rest : rest.slice(0, end)
 }
 
+const pageFiles = (row: Row) => (Array.isArray(row.page) ? row.page : [row.page])
+
 const NO_SUCCESS_BANNER = ['kind="success"', '<FormFeedback']
 
 type Row = {
 	site: string
-	page: string
+	page: string | string[]
 	server: string
 	action: string
 	surface: 'toast' | 'inline' | 'documented-double'
@@ -72,7 +74,7 @@ const SITES: Row[] = [
 	{
 		site: 'employees/[id] offboard',
 		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		server: 'lib/server/employee-detail/profile.ts',
 		action: 'offboard',
 		surface: 'inline',
 		// F1: the server DOES return a `saved` string, so the toast is off only because the client
@@ -87,8 +89,11 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'employees/[id] setSupervisors (DONE map)',
-		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		page: [
+			'routes/(app)/employees/[id]/+page.svelte',
+			'lib/components/employees/detail/SupervisorsCard.svelte'
+		],
+		server: 'lib/server/employee-detail/assignments.ts',
 		action: 'setSupervisors',
 		surface: 'inline',
 		expectServerSaved: false,
@@ -101,8 +106,11 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'employees/[id] addLoan (DONE map)',
-		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		page: [
+			'routes/(app)/employees/[id]/+page.svelte',
+			'lib/components/employees/detail/LoansCard.svelte'
+		],
+		server: 'lib/server/employee-detail/pay-items.ts',
 		action: 'addLoan',
 		surface: 'inline',
 		expectServerSaved: false,
@@ -115,8 +123,11 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'employees/[id] uploadDocument (DONE map)',
-		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		page: [
+			'routes/(app)/employees/[id]/+page.svelte',
+			'lib/components/employees/detail/DocumentsCard.svelte'
+		],
+		server: 'lib/server/employee-detail/documents.ts',
 		action: 'uploadDocument',
 		surface: 'inline',
 		expectServerSaved: false,
@@ -339,7 +350,7 @@ const SITES: Row[] = [
 describe('S10 — exactly one success surface per action per page', () => {
 	for (const row of SITES) {
 		it(`${row.site} reports as declared (${row.surface})`, () => {
-			const page = flat(read(row.page))
+			const page = flat(pageFiles(row).map(read).join('\n'))
 			const block = actionBlock(read(row.server), row.action)
 
 			expect(block, `${row.server} no longer declares the ${row.action} form action`).not.toBeNull()
@@ -374,7 +385,8 @@ describe('S10 — the gate is not vacuous', () => {
 
 		for (const row of SITES) {
 			// A row whose files vanished, or that declares nothing, would pass its own `it()` forever.
-			expect(read(row.page).length, `${row.page} is empty`).toBeGreaterThan(1000)
+			for (const file of pageFiles(row))
+				expect(read(file).length, `${file} is empty`).toBeGreaterThan(1000)
 			expect(read(row.server).length, `${row.server} is empty`).toBeGreaterThan(1000)
 			expect(row.present.length, `${row.site} declares no needle`).toBeGreaterThan(0)
 			for (const needle of [...row.present, ...row.absent])
