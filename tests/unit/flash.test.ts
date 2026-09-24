@@ -81,6 +81,12 @@ describe('flash', () => {
 		expect(takeFlash(cookies)).toBeNull()
 	})
 
+	it('keeps the warning kind', () => {
+		const { cookies } = fakeCookies()
+		setFlash(cookies, { kind: 'warning', message: 'Rejected.' })
+		expect(takeFlash(cookies)?.kind).toBe('warning')
+	})
+
 	it('falls back to success for an unknown kind', () => {
 		const { jar, cookies } = fakeCookies()
 		jar.set('flash', JSON.stringify({ id: 'x', kind: 'wat', message: 'Saved.' }))

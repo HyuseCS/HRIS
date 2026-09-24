@@ -167,6 +167,8 @@ describe('money-adjacent actions report their outcome', () => {
 		// A single generic "Done." would pass a weaker assertion while leaving the approver unable
 		// to tell which way the run went.
 		expect(approved.saved).not.toBe(returned.saved)
+		expect(approved.kind).toBe('success')
+		expect(returned.kind).toBe('warning')
 	})
 })
 

@@ -36,7 +36,7 @@
 		   from this in tailwind.config.ts, so buttons and inputs stay proportionally crisper. */
 		--radius: 0.625rem;
 
-		--success: 142 71% 45%;
+		--success: 142 72% 29%;
 		--success-foreground: 0 0% 100%;
 		--warning: 38 92% 50%;
 		--warning-foreground: 0 0% 10%;
@@ -73,6 +73,11 @@
 		--border: 0 0% 18%;
 		--input: 0 0% 43%;
 		--ring: 0 79% 45%;
+
+		--success: 142 72% 29%;
+		--success-foreground: 0 0% 100%;
+		--warning: 38 92% 50%;
+		--warning-foreground: 0 0% 10%;
 	}
 }
 
@@ -211,7 +216,13 @@
 		@apply btn h-9 px-3 hover:bg-accent hover:text-accent-foreground;
 	}
 	.btn-destructive {
-		@apply btn h-9 px-4 bg-destructive/20 text-red-400 hover:bg-destructive/30;
+		@apply btn h-9 px-4 bg-destructive text-destructive-foreground hover:bg-destructive/90;
+	}
+	.btn-success {
+		@apply btn h-9 px-4 bg-success text-success-foreground hover:bg-success/90;
+	}
+	.btn-warning {
+		@apply btn h-9 px-4 bg-warning text-warning-foreground hover:bg-warning/90;
 	}
 
 	/* Compact bordered actions for table rows — theme-aware (dark-mode safe),
@@ -220,13 +231,13 @@
 		@apply inline-flex items-center justify-center rounded-md border border-muted-foreground/30 bg-secondary px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
 	}
 	.btn-row-positive {
-		@apply inline-flex items-center justify-center rounded-md border border-green-700 px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-green-400 dark:text-green-400;
+		@apply inline-flex items-center justify-center rounded-md border border-green-700 bg-green-600/10 px-2.5 py-1 text-xs font-medium text-green-800 transition-colors hover:bg-green-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-green-400 dark:text-green-400;
 	}
 	.btn-row-warning {
-		@apply inline-flex items-center justify-center rounded-md border border-yellow-700 px-2.5 py-1 text-xs font-medium text-yellow-600 transition-colors hover:bg-yellow-600/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-yellow-500 dark:text-yellow-500;
+		@apply inline-flex items-center justify-center rounded-md border border-yellow-700 bg-yellow-600/10 px-2.5 py-1 text-xs font-medium text-yellow-800 transition-colors hover:bg-yellow-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-yellow-500 dark:text-yellow-500;
 	}
 	.btn-row-danger {
-		@apply inline-flex items-center justify-center rounded-md border border-red-600 bg-red-600/10 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-red-400 dark:text-red-400;
+		@apply inline-flex items-center justify-center rounded-md border border-red-600 bg-red-600/10 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-600/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 dark:border-red-400 dark:text-red-400;
 	}
 
 	/* Card — separated by tone and the same border every other panel uses, so the whole app

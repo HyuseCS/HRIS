@@ -217,10 +217,7 @@
 				<button
 					type="submit"
 					disabled={move.busy}
-					class="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50 {target.to ===
-					'REJECTED'
-						? 'bg-red-600 text-white hover:bg-red-700'
-						: 'bg-primary text-primary-foreground hover:bg-primary/90'}"
+					class={target.to === 'REJECTED' ? 'btn-destructive' : 'btn-primary'}
 				>
 					{move.busy ? 'Working…' : target.to === 'REJECTED' ? 'Reject' : 'Confirm move'}
 				</button>

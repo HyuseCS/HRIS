@@ -262,10 +262,7 @@
 									<p class="text-xs text-red-600 dark:text-red-400">{form.error}</p>
 								{/if}
 								<div class="mt-auto flex justify-end pt-2">
-									<button
-										type="submit"
-										disabled={guard.busy}
-										class="btn-row-positive bg-green-600/10 hover:bg-green-600/25"
+									<button type="submit" disabled={guard.busy} class="btn-row-positive"
 										>{guard.busy ? '…' : 'Save'}</button
 									>
 								</div>

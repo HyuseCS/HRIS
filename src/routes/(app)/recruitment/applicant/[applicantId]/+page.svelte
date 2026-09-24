@@ -320,20 +320,14 @@
 								<form method="POST" action="?/respondOffer" use:enhance={acceptOffer.enhance}>
 									<input type="hidden" name="offerId" value={offer.id} />
 									<input type="hidden" name="accepted" value="true" />
-									<button
-										type="submit"
-										disabled={acceptOffer.busy}
-										class="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:pointer-events-none disabled:opacity-50"
+									<button type="submit" disabled={acceptOffer.busy} class="btn-row-positive"
 										>{acceptOffer.busy ? 'Saving…' : 'Mark accepted'}</button
 									>
 								</form>
 								<form method="POST" action="?/respondOffer" use:enhance={declineOffer.enhance}>
 									<input type="hidden" name="offerId" value={offer.id} />
 									<input type="hidden" name="accepted" value="false" />
-									<button
-										type="submit"
-										disabled={declineOffer.busy}
-										class="rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
+									<button type="submit" disabled={declineOffer.busy} class="btn-row-danger"
 										>{declineOffer.busy ? 'Saving…' : 'Mark declined'}</button
 									>
 								</form>

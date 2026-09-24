@@ -148,7 +148,8 @@ export const actions: Actions = {
 					? 'Request approved.'
 					: decision === 'REJECTED'
 						? 'Request rejected.'
-						: 'Request returned to the filer.'
+						: 'Request returned to the filer.',
+			kind: decision === 'APPROVED' ? 'success' : 'warning'
 		}
 	},
 
@@ -188,7 +189,8 @@ export const actions: Actions = {
 		}
 		return {
 			action: 'rejectMany',
-			saved: `Rejected ${done} request${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
+			saved: `Rejected ${done} request${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`,
+			kind: 'warning'
 		}
 	}
 }
