@@ -4,6 +4,7 @@
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatShortDate } from '$lib/utils/format'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import type { EmployeeDetailData } from './shared'
 
 	let { data, actionError }: { data: EmployeeDetailData; actionError: Snippet<[string[]]> } =
@@ -36,7 +37,7 @@
 	{@render actionError(['uploadDocument', 'deleteDocument'])}
 
 	{#if data.documents.length}
-		<div class="card-scroll overflow-x-auto rounded-md border">
+		<Container tone="card" fill={false} flush bodyClass="card-scroll">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -76,7 +77,7 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
+		</Container>
 	{:else}
 		<p class="text-xs text-muted-foreground">No documents uploaded yet.</p>
 	{/if}

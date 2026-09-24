@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { EmployeeDetailData } from './shared'
+	import Container from '$lib/components/ui/Container.svelte'
 
 	let { data, actionError }: { data: EmployeeDetailData; actionError: Snippet<[string[]]> } =
 		$props()
@@ -36,7 +37,7 @@
 	{@render actionError(['addEmergencyContact', 'deleteEmergencyContact'])}
 
 	{#if employee.emergencyContacts.length || legacyEmergencyContact}
-		<div class="card-scroll rounded-md border">
+		<Container tone="card" fill={false} flush bodyClass="card-scroll">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -87,7 +88,7 @@
 					{/if}
 				</tbody>
 			</table>
-		</div>
+		</Container>
 	{:else}
 		<p class="text-xs text-muted-foreground">No emergency contacts on record.</p>
 	{/if}

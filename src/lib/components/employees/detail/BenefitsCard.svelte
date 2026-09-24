@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formatCurrency } from '$lib/utils/format'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { labelFor, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
 	import type { EmployeeDetailData } from './shared'
 
@@ -10,7 +11,7 @@
 <section class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2">
 	<h2 class="font-semibold">Benefits</h2>
 	{#if data.benefits.length}
-		<div class="card-scroll overflow-x-auto rounded-md border">
+		<Container tone="card" fill={false} flush bodyClass="card-scroll">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -39,7 +40,7 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
+		</Container>
 	{:else}
 		<p class="text-xs text-muted-foreground">
 			No benefit enrollments. HR manages enrollments under Benefits.

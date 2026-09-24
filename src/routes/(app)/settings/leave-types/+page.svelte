@@ -3,6 +3,7 @@
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -130,7 +131,7 @@
 		{#if data.leaveTypes.length === 0}
 			<p class="text-sm text-muted-foreground">No leave types yet — add one above.</p>
 		{:else}
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -245,7 +246,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<p class="text-xs text-muted-foreground">
 				Edit a row's fields and press <span class="font-medium">Save</span>. Carry-over max applies
 				only when carry-over is enabled.

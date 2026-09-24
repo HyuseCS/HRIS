@@ -7,6 +7,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { BRANCH_STATUS_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -144,7 +145,7 @@
 				No stores match — add one above or adjust the filters.
 			</p>
 		{:else}
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -252,7 +253,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<p class="text-xs text-muted-foreground">
 				Staff counts link to that store's roster. <a href="/employees" class="underline"
 					>{data.unassigned}</a

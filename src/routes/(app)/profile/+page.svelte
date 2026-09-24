@@ -7,6 +7,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { labelFor, EMPLOYMENT_TYPE_LABELS, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -239,7 +240,7 @@
 			<span class="text-xs text-muted-foreground">Last {data.punchWindowDays} days</span>
 		</div>
 		{#if data.punches.length}
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -258,7 +259,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<p class="text-xs text-muted-foreground">
 				These are your raw clock in/out and break punches. HR aggregates them into your timesheet;
 				if something looks wrong, contact HR.
@@ -277,7 +278,7 @@
 			My Documents
 		</h2>
 		{#if data.documents.length}
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -306,7 +307,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 		{:else}
 			<p class="text-xs text-muted-foreground">
 				No documents on file. HR uploads contracts, IDs, and other records here.
@@ -320,7 +321,7 @@
 			My Benefits
 		</h2>
 		{#if data.benefits.length}
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -351,7 +352,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 		{:else}
 			<p class="text-xs text-muted-foreground">
 				You have no benefit enrollments. HR manages enrollments.
