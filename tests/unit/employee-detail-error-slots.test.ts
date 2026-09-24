@@ -81,7 +81,7 @@ describe('employees/[id] error slots (P0-7)', () => {
 	})
 
 	it('every detail card is imported and rendered by the page', () => {
-		expect(cards.length).toBeGreaterThan(0)
+		expect(cards.length).toBe(17)
 		for (const file of cards) {
 			const name = basename(file, '.svelte')
 			expect(page, `${name} is not imported by the page`).toContain(

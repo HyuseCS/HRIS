@@ -1,12 +1,12 @@
-import { fail, isHttpError } from '@sveltejs/kit'
+import { fail } from '@sveltejs/kit'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { failFromError } from '$lib/server/form-fail'
-import { ctxOf } from '$lib/server/employee-detail/shared'
 import { assignmentActions } from '$lib/server/employee-detail/assignments'
 import { profileActions } from '$lib/server/employee-detail/profile'
 import { compensationActions } from '$lib/server/employee-detail/compensation'
 import { payItemActions } from '$lib/server/employee-detail/pay-items'
 import { emergencyContactActions } from '$lib/server/employee-detail/emergency-contacts'
+import { documentActions } from '$lib/server/employee-detail/documents'
 import { onboardingActions } from '$lib/server/employee-detail/onboarding'
 import { assertCanTouchEmployee } from '$lib/server/services/employee-access'
 import { getEmployee, offboardEmployee, getEmploymentHistory } from '$lib/server/services/employees'
@@ -21,24 +21,11 @@ import { listEmployeeEarnings } from '$lib/server/services/payroll/employee-earn
 import { listEmployeeDeductions } from '$lib/server/services/payroll/employee-deductions'
 import { listStatutoryRows } from '$lib/server/services/payroll/employee-statutory'
 import { listSchedules } from '$lib/server/services/attendance/schedules'
-import {
-	listEmployeeDocuments,
-	saveEmployeeDocument,
-	deleteEmployeeDocument
-} from '$lib/server/services/documents'
+import { listEmployeeDocuments } from '$lib/server/services/documents'
 import { listAdditionalSupervisors } from '$lib/server/services/supervisors'
 import { db } from '$lib/server/db'
 import { listTemplates } from '$lib/server/services/performance-templates'
 import type { Actions, PageServerLoad } from './$types'
-
-const DOC_CATEGORIES = [
-	'CONTRACT',
-	'GOVERNMENT_ID',
-	'RESUME',
-	'PAYROLL_FORM',
-	'EXIT_DOCUMENT',
-	'OTHER'
-] as const
 
 // Onboarding checklist (T178 / FR-071, now HR-configurable per org — #116): the derived
 // steps come straight from the employee's own record so completing the 201 file *is*
@@ -224,6 +211,7 @@ export const actions: Actions = scopedToEmployee({
 	...compensationActions,
 	...payItemActions,
 	...emergencyContactActions,
+	...documentActions,
 	...onboardingActions,
 	offboard: async ({ request, locals, params, getClientAddress }) => {
 		const action = 'offboard'
@@ -245,53 +233,5 @@ export const actions: Actions = scopedToEmployee({
 			return fail(f.status, { action, ...f.data })
 		}
 		return { action, saved: 'Employee offboarded.' }
-	},
-
-	uploadDocument: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'uploadDocument'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-
-		const data = await request.formData()
-		const file = data.get('file')
-		const categoryRaw = data.get('category') as string
-		const label = (data.get('label') as string) || ''
-
-		if (!(file instanceof File) || file.size === 0)
-			return fail(400, { action, error: 'Please choose a file to upload.' })
-		const category = DOC_CATEGORIES.includes(categoryRaw as never)
-			? (categoryRaw as (typeof DOC_CATEGORIES)[number])
-			: 'OTHER'
-		const bytes = Buffer.from(await file.arrayBuffer())
-
-		try {
-			await saveEmployeeDocument(
-				params.id,
-				locals.user!.organizationId,
-				{ category, label, fileName: file.name, mimeType: file.type, bytes },
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
-	},
-
-	deleteDocument: async ({ request, locals, getClientAddress }) => {
-		const action = 'deleteDocument'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const docId = (await request.formData()).get('docId') as string
-		if (!docId) return fail(400, { action, error: 'Missing document id.' })
-		try {
-			await deleteEmployeeDocument(
-				docId,
-				locals.user!.organizationId,
-				ctxOf(locals, getClientAddress())
-			)
-		} catch (e: unknown) {
-			if (isHttpError(e)) return fail(e.status, { action, error: String(e.body.message) })
-			throw e
-		}
-		return { action, success: true }
 	}
 })

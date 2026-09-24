@@ -123,8 +123,11 @@ const SITES: Row[] = [
 	},
 	{
 		site: 'employees/[id] uploadDocument (DONE map)',
-		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		page: [
+			'routes/(app)/employees/[id]/+page.svelte',
+			'lib/components/employees/detail/DocumentsCard.svelte'
+		],
+		server: 'lib/server/employee-detail/documents.ts',
 		action: 'uploadDocument',
 		surface: 'inline',
 		expectServerSaved: false,
