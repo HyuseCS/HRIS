@@ -346,7 +346,7 @@
 							{#each group.roles as r (r)}
 								{@const on = chosen.includes(r)}
 								<label
-									class="flex min-h-11 cursor-pointer select-none items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors {on
+									class="flex min-h-11 cursor-pointer select-none items-start gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors {on
 										? 'border-primary/50'
 										: 'border-border hover:border-foreground/30'} focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background"
 								>

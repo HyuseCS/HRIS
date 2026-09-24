@@ -5,6 +5,7 @@
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 
 	type Employee = { id: string; firstName: string; lastName: string; employeeNumber: string }
 	type Preview = {
@@ -152,7 +153,7 @@
 				</p>
 			</div>
 
-			<div class="overflow-x-auto rounded-lg border bg-background">
+			<Container tone="card" fill={false} flush>
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -181,7 +182,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 
 			{#if preview.warnings.length}
 				<div class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-sm">

@@ -12,7 +12,7 @@
 </script>
 
 <div class={flush ? '' : 'rounded-lg border bg-card'} aria-hidden="true">
-	<div class="flex gap-4 border-b bg-muted/50 px-4 py-3">
+	<div class="flex gap-4 border-b border-border/60 bg-muted/40 px-4 py-3">
 		{#each colList as _, i (i)}
 			<Skeleton class="h-4 flex-1" />
 		{/each}

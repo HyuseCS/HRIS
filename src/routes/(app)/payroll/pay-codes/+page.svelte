@@ -3,6 +3,7 @@
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -44,7 +45,7 @@
 		<!-- Earnings -->
 		<section class="space-y-3 rounded-lg border bg-card p-4">
 			<h2 class="font-semibold">Earnings</h2>
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -86,7 +87,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<form
 				method="POST"
 				action="?/addEarning"
@@ -127,7 +128,7 @@
 		<!-- Deductions -->
 		<section class="space-y-3 rounded-lg border bg-card p-4">
 			<h2 class="font-semibold">Deductions</h2>
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -165,7 +166,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<form
 				method="POST"
 				action="?/addDeduction"

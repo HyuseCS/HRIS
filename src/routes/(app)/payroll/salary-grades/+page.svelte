@@ -4,6 +4,7 @@
 	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -44,7 +45,7 @@
 	<!-- Grades -->
 	<section class="space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Grades</h2>
-		<div class="card-scroll overflow-x-auto rounded-md border">
+		<Container tone="card" fill={false} flush bodyClass="card-scroll">
 			<table class="w-full min-w-max text-sm">
 				<thead class="border-b bg-muted/50">
 					<!-- The name column absorbs the slack (`w-full`) so the money and action
@@ -89,7 +90,7 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
+		</Container>
 		<form
 			method="POST"
 			action="?/addGrade"
@@ -141,7 +142,7 @@
 	<section class="space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Position Grades</h2>
 		{#if data.positions.length}
-			<div class="card-scroll overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<!-- Same column rule as the Grades table above: the title absorbs the
@@ -189,7 +190,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 		{:else}
 			<p class="text-xs text-muted-foreground">
 				No positions defined. Create positions under <a

@@ -4,6 +4,7 @@
 	import FormFeedback from '$lib/components/ui/FormFeedback.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -109,7 +110,7 @@
 
 		<!-- Cutoff Days (only shown for SEMI_MONTHLY) -->
 		{#if payFrequency === 'SEMI_MONTHLY'}
-			<div class="rounded-md border bg-muted/50 p-4 space-y-4">
+			<Container tone="card" fill={false} bodyClass="space-y-4">
 				<h3 class="text-sm font-semibold">Semi-Monthly Cutoff Days</h3>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div class="space-y-2">
@@ -139,7 +140,7 @@
 						<p class="text-xs text-muted-foreground">Day of month for second payroll cutoff</p>
 					</div>
 				</div>
-			</div>
+			</Container>
 		{/if}
 
 		<div class="flex flex-wrap items-center justify-end gap-3 pt-2">

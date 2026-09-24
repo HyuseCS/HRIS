@@ -5,6 +5,7 @@
 	import { scrollToError } from '$lib/actions/scrollToError'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { beforeNavigate, goto } from '$app/navigation'
 	import type { PageData, ActionData } from './$types'
 	import { summarizeChanges, NO_EFFECTIVE_CHANGE } from '$lib/payroll/statutory-change-summary'
@@ -276,7 +277,7 @@
 			<div class="space-y-3">
 				{#each data.pending as p (p.id)}
 					{@const empty = p.changes.length === 1 && p.changes[0] === NO_EFFECTIVE_CHANGE}
-					<div class="rounded-md border bg-muted/30 px-4 py-3">
+					<Container tone="card" fill={false} flush bodyClass="px-4 py-3">
 						<div class="flex items-start justify-between gap-4">
 							<div class="min-w-0 text-sm">
 								<p>
@@ -328,7 +329,7 @@
 								</ConfirmButton>
 							</div>
 						</div>
-					</div>
+					</Container>
 				{/each}
 			</div>
 		</div>

@@ -11,6 +11,7 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Monogram from '$lib/components/people/Monogram.svelte'
 	import HelpTip from '$lib/components/ui/HelpTip.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -590,64 +591,70 @@
 				</div>
 
 				{#if showAward && data.canPost}
-					<form
-						method="POST"
-						action="?/giveAward"
-						use:enhance={giveAward.enhance}
-						class="space-y-2 rounded-md border p-3"
-					>
-						{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
-								{form.error}
-							</p>{/if}
-						<div class="grid gap-2 sm:grid-cols-2">
-							<select name="employeeId" required class="input h-9">
-								<option value="">Select employee…</option>
-								{#each data.awardEmployees as e (e.id)}
-									<option value={e.id}>{e.lastName}, {e.firstName}</option>
-								{/each}
-							</select>
-							<input
-								name="title"
-								placeholder="Award (e.g. Employee of the Month)"
-								required
-								class="input h-9"
-							/>
-						</div>
-						<input name="note" placeholder="Note (optional)" class="input h-9" />
-						<button
-							type="submit"
-							disabled={giveAward.busy}
-							class="btn-primary text-sm disabled:pointer-events-none disabled:opacity-50"
-							>{giveAward.busy ? 'Giving…' : 'Give award'}</button
+					<Container tone="card" fill={false} flush>
+						<form
+							method="POST"
+							action="?/giveAward"
+							use:enhance={giveAward.enhance}
+							class="space-y-2 p-3"
 						>
-					</form>
+							{#if form?.action === 'giveAward' && form?.error}<p class="text-xs text-red-400">
+									{form.error}
+								</p>{/if}
+							<div class="grid gap-2 sm:grid-cols-2">
+								<select name="employeeId" required class="input h-9">
+									<option value="">Select employee…</option>
+									{#each data.awardEmployees as e (e.id)}
+										<option value={e.id}>{e.lastName}, {e.firstName}</option>
+									{/each}
+								</select>
+								<input
+									name="title"
+									placeholder="Award (e.g. Employee of the Month)"
+									required
+									class="input h-9"
+								/>
+							</div>
+							<input name="note" placeholder="Note (optional)" class="input h-9" />
+							<button
+								type="submit"
+								disabled={giveAward.busy}
+								class="btn-primary text-sm disabled:pointer-events-none disabled:opacity-50"
+								>{giveAward.busy ? 'Giving…' : 'Give award'}</button
+							>
+						</form>
+					</Container>
 				{/if}
 
 				{#if showPost && data.canPost}
-					<form
-						method="POST"
-						action="?/postAnnouncement"
-						use:enhance={postAnnouncement.enhance}
-						class="space-y-2 rounded-md border p-3"
-					>
-						{#if form?.action === 'postAnnouncement' && form?.error}<p class="text-xs text-red-400">
-								{form.error}
-							</p>{/if}
-						<input name="title" placeholder="Title" required class="input h-9" />
-						<textarea
-							name="body"
-							rows="2"
-							placeholder="Message to the whole organisation…"
-							required
-							class="input h-auto resize-none py-2"
-						></textarea>
-						<button
-							type="submit"
-							disabled={postAnnouncement.busy}
-							class="btn-primary text-sm disabled:pointer-events-none disabled:opacity-50"
-							>{postAnnouncement.busy ? 'Posting…' : 'Post announcement'}</button
+					<Container tone="card" fill={false} flush>
+						<form
+							method="POST"
+							action="?/postAnnouncement"
+							use:enhance={postAnnouncement.enhance}
+							class="space-y-2 p-3"
 						>
-					</form>
+							{#if form?.action === 'postAnnouncement' && form?.error}<p
+									class="text-xs text-red-400"
+								>
+									{form.error}
+								</p>{/if}
+							<input name="title" placeholder="Title" required class="input h-9" />
+							<textarea
+								name="body"
+								rows="2"
+								placeholder="Message to the whole organisation…"
+								required
+								class="input h-auto resize-none py-2"
+							></textarea>
+							<button
+								type="submit"
+								disabled={postAnnouncement.busy}
+								class="btn-primary text-sm disabled:pointer-events-none disabled:opacity-50"
+								>{postAnnouncement.busy ? 'Posting…' : 'Post announcement'}</button
+							>
+						</form>
+					</Container>
 				{/if}
 
 				{#if hasFeed}

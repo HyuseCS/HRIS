@@ -10,6 +10,8 @@
 		emptyState,
 		tone = 'muted',
 		flush = false,
+		fill = true,
+		bodyClass,
 		class: className
 	}: {
 		toolbar?: Snippet
@@ -19,13 +21,17 @@
 		emptyState?: Snippet
 		tone?: 'muted' | 'card'
 		flush?: boolean
+		fill?: boolean
+		bodyClass?: string
 		class?: string
 	} = $props()
 </script>
 
 <div
 	class={cn(
-		'flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border',
+		fill
+			? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border'
+			: 'flex flex-col overflow-hidden rounded-lg border',
 		tone === 'card' ? 'bg-card' : 'bg-muted/50',
 		className
 	)}
@@ -39,7 +45,7 @@
 	<div
 		class="flex min-h-0 flex-1 flex-col overflow-y-auto {flush ? '' : 'p-4'} {empty && !emptyState
 			? 'items-center justify-center'
-			: ''}"
+			: ''} {bodyClass ?? ''}"
 	>
 		{@render children()}
 		{#if empty && emptyState}

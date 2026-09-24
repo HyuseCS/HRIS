@@ -20,7 +20,7 @@
 				{@const gated =
 					bal.minMonthsOfService > 0 &&
 					monthsOfService(new Date(employee.startDate)) < bal.minMonthsOfService}
-				<div class="min-w-[150px] rounded-lg border bg-background p-4">
+				<div class="min-w-[150px] rounded-lg border bg-card p-4">
 					<p class="text-xs font-medium text-muted-foreground">{bal.name}</p>
 					{#if gated}
 						<p class="mt-1 text-2xl font-bold text-muted-foreground">Locked</p>
