@@ -4,9 +4,9 @@
 	// DEV ONLY — dev-gated (dev && !navigator.webdriver), never ships enabled; remove after the
 	// program's owner test pass
 	import DevLoginSwitcher from '$lib/components/dev/DevLoginSwitcher.svelte'
-	import type { ActionData } from './$types'
+	import type { ActionData, PageData } from './$types'
 
-	let { form }: { form: ActionData } = $props()
+	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let loading = $state(false)
 </script>
 
@@ -27,7 +27,7 @@
 			<p class="mt-1 text-xs text-muted-foreground">Enter your work credentials to continue</p>
 		</div>
 
-		{#if form?.error}
+		{#if form?.error || data.accountDisabled}
 			<!-- Item 40. Two fixes. `role="alert"` because a failed sign-in re-renders in place:
 			     without it a screen-reader user presses Sign in and hears nothing at all. And
 			     `text-red-400` is a dark-mode colour used unconditionally — on the light theme it
@@ -38,7 +38,8 @@
 				role="alert"
 				class="mb-4 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
 			>
-				{form.error}
+				{form?.error ||
+					'Your account has been deactivated. Contact HR if you think this is a mistake.'}
 			</div>
 		{/if}
 
