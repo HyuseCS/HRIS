@@ -44,7 +44,7 @@ const DATA = { kind: 'ALLOWANCE' as const, label: 'Transport', monthlyAmount: 20
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	// `requireEmployee` selects id + userId; `assertNotSelf` compares userId to ctx.actorId.
+	// `requireEmployee` selects id + userId + employmentStatus; `assertNotSelf` compares userId to ctx.actorId.
 	dbMock.employee.findFirst.mockResolvedValue(TARGET)
 	// The pre-read for the end path carries the nested employee `assertNotSelf` is handed.
 	dbMock.employeeEarning.findFirst.mockResolvedValue({

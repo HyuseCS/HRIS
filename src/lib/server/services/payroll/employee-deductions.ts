@@ -3,7 +3,7 @@ import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import { D, q2n, type MoneyLike } from './money'
 import { type PayComponent } from './types'
-import { assertNotSelf, requireEmployee } from '../employee-access'
+import { assertAcceptsNewPay, assertNotSelf, requireEmployee } from '../employee-access'
 import type { AuditContext } from '../types'
 
 /**
@@ -28,7 +28,9 @@ export async function createEmployeeDeduction(
 	data: { deductionTypeId: string; label?: string; monthlyAmount: number },
 	ctx: AuditContext
 ) {
-	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
+	const employee = await requireEmployee(employeeId, organizationId)
+	assertNotSelf(ctx.actorId, employee)
+	assertAcceptsNewPay(employee)
 	if (data.monthlyAmount <= 0) error(400, 'Monthly amount must be positive')
 
 	const type = await db.deductionType.findFirst({
