@@ -290,7 +290,7 @@ const SITES: Row[] = [
 		// `saved`, which is what keeps the toast silent. Do not re-wire this to match the others.
 		expectServerSaved: false,
 		present: [
-			'{#if form?.finalized} <Banner kind="success" message="Separation finalized. The employee is now offboarded and their login is disabled." />'
+			'{#if form?.finalized} <Banner kind="success" message="Separation finalized. The employee is now offboarded and their login is disabled." autoDismiss />'
 		],
 		absent: []
 	},
@@ -302,7 +302,7 @@ const SITES: Row[] = [
 		surface: 'inline',
 		expectServerSaved: false,
 		present: [
-			'{#if form?.undone} <Banner kind="success"> Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the employee\'s login is enabled again. </Banner>'
+			'{#if form?.undone} <Banner kind="success" autoDismiss> Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the employee\'s login is enabled again. </Banner>'
 		],
 		absent: []
 	},

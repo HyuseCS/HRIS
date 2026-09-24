@@ -314,7 +314,7 @@
 		<div class="rounded-lg border bg-card p-4 space-y-3">
 			<h2 class="text-sm font-semibold">Hired Applicants — Convert to Employee</h2>
 			{#if form?.action === 'convert' && form?.error}
-				<Banner kind="error" message={form.error} />
+				<Banner kind="error" message={form.error} autoDismiss />
 			{/if}
 			<div class="space-y-2">
 				{#each hiredApplicants as applicant (applicant.id)}

@@ -141,7 +141,7 @@
 				{guard.busy ? 'Opening…' : 'Open inquiry'}
 			</button>
 			{#if submitted && form?.error}
-				<Banner kind="error" message={form.error} class="min-w-48 flex-1" />
+				<Banner kind="error" message={form.error} class="min-w-48 flex-1" autoDismiss />
 			{/if}
 		</div>
 	</form>

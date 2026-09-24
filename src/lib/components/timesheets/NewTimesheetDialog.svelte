@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import { enhance } from '$app/forms'
 	import { goto } from '$app/navigation'
 	import Dialog from '$lib/components/ui/Dialog.svelte'
@@ -77,6 +78,7 @@
 
 	{#if error}
 		<div
+			use:autoDismiss
 			class="mt-4 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{error}

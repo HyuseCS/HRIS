@@ -37,7 +37,28 @@ const EXPECTED: Record<string, number> = {
 	'routes/(app)/settings/posting-approvers/+page.svelte': 1,
 	'routes/(app)/settings/holidays/+page.svelte': 1,
 	'routes/(app)/settings/org/+page.svelte': 1,
-	'routes/(app)/settings/schedules/+page.svelte': 2
+	'routes/(app)/settings/schedules/+page.svelte': 2,
+	'lib/components/complaints/ComplaintCreateDialog.svelte': 1,
+	'lib/components/recruitment/JobPostingCreateDialog.svelte': 1,
+	'lib/components/separations/SeparationCreateDialog.svelte': 1,
+	'lib/components/timesheets/NewTimesheetDialog.svelte': 1,
+	'routes/(app)/branches/+page.svelte': 1,
+	'routes/(app)/inventory/+page.svelte': 1,
+	'routes/(app)/departments/+page.svelte': 1,
+	'routes/(app)/benefits/+page.svelte': 1,
+	'routes/(app)/inquiries/+page.svelte': 1,
+	'routes/(app)/inquiries/[id]/+page.svelte': 2,
+	'routes/(app)/profile/+page.svelte': 2,
+	'routes/(app)/recruitment/+page.svelte': 2,
+	'routes/(app)/recruitment/[id]/+page.svelte': 1,
+	'routes/(app)/recruitment/[id]/apply/+page.svelte': 1,
+	'routes/(app)/recruitment/applicant/[applicantId]/+page.svelte': 1,
+	'routes/(app)/performance/reviews/[id]/+page.svelte': 1,
+	'routes/(app)/performance/templates/+page.svelte': 1,
+	'routes/(app)/performance/templates/[id]/+page.svelte': 1,
+	'routes/(app)/requests/[id]/+page.svelte': 2,
+	'routes/(app)/requests/proposals/+page.svelte': 1,
+	'routes/(app)/separations/[id]/+page.svelte': 3
 }
 
 const BOTH_ACTIONS = 3

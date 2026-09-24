@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import Container from '$lib/components/ui/Container.svelte'
@@ -91,6 +92,7 @@
 
 	{#if form?.error}
 		<div
+			use:autoDismiss
 			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{form.error}

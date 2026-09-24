@@ -108,7 +108,7 @@
 				>{submitting ? 'Creating…' : 'Start separation'}</button
 			>
 			{#if form?.error}
-				<Banner kind="error" message={form.error} class="min-w-48 flex-1" />
+				<Banner kind="error" message={form.error} class="min-w-48 flex-1" autoDismiss />
 			{/if}
 		</div>
 	</form>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Container from '$lib/components/ui/Container.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -93,7 +94,7 @@
 	{/if}
 
 	{#if form?.message || (form?.error && !showForm)}
-		<div class="flex shrink-0 flex-col gap-3">
+		<div use:autoDismiss class="flex shrink-0 flex-col gap-3">
 			{@render notices()}
 		</div>
 	{/if}

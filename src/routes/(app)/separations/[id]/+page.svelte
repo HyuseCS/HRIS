@@ -61,10 +61,10 @@
 
 <div class="space-y-6">
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 	{#if form?.undone}
-		<Banner kind="success">
+		<Banner kind="success" autoDismiss>
 			Finalization undone. The case is back to {labelFor(SEPARATION_STATUS_LABELS, form.status)} and the
 			employee's login is enabled again.
 		</Banner>
@@ -92,6 +92,7 @@
 		<Banner
 			kind="success"
 			message="Separation finalized. The employee is now offboarded and their login is disabled."
+			autoDismiss
 		/>
 	{/if}
 

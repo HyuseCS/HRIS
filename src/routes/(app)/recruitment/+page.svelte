@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import Container from '$lib/components/ui/Container.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -71,6 +72,7 @@
 
 	{#if form?.success && form.message}
 		<div
+			use:autoDismiss
 			role="status"
 			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400"
 		>
@@ -79,6 +81,7 @@
 	{/if}
 	{#if form?.error && !showCreate}
 		<div
+			use:autoDismiss
 			role="alert"
 			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
 		>

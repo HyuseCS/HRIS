@@ -73,7 +73,7 @@
 		</div>
 		<div class="flex flex-wrap items-center justify-end gap-2">
 			{#if submitted && form?.error}
-				<Banner kind="error" message={form.error} class="min-w-48 flex-1" />
+				<Banner kind="error" message={form.error} class="min-w-48 flex-1" autoDismiss />
 			{/if}
 			<button
 				type="button"
