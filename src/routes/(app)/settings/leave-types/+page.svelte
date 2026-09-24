@@ -130,7 +130,7 @@
 		{#if data.leaveTypes.length === 0}
 			<p class="text-sm text-muted-foreground">No leave types yet — add one above.</p>
 		{:else}
-			<div class="overflow-x-auto rounded-md border">
+			<div class="card-scroll overflow-x-auto rounded-md border">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>

@@ -833,9 +833,11 @@
 		{/if}
 
 		<!-- Single-employee range table -->
-		<div class="overflow-x-auto rounded-lg border bg-card">
+		<div class="phone-scroll overflow-x-auto rounded-lg border bg-card lg:card-scroll">
 			<table class="w-full text-sm">
-				<thead class="border-b bg-muted/50">
+				<thead
+					class="sticky top-0 z-10 border-b bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))]"
+				>
 					<tr>
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">Date</th>
 						<th class="px-3 py-3 text-left font-medium text-muted-foreground">Status</th>

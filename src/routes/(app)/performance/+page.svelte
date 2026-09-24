@@ -212,9 +212,11 @@
 				class={data.reviewsToGive.length ? 'flex-none' : undefined}
 				empty={data.myReviews.length === 0}
 			>
-				<div class="overflow-x-auto">
+				<div class="phone-scroll overflow-x-auto">
 					<table class="w-full text-sm">
-						<thead class="border-b bg-muted/50">
+						<thead
+							class="sticky top-0 z-10 border-b bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))]"
+						>
 							<tr>
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>
 								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Reviewer</th>
@@ -253,9 +255,11 @@
 			<section class="flex min-h-0 flex-1 flex-col gap-3">
 				<h2 class="text-lg font-semibold">Reviews to Complete</h2>
 				<Container tone="card" flush>
-					<div class="overflow-x-auto">
+					<div class="phone-scroll overflow-x-auto">
 						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
+							<thead
+								class="sticky top-0 z-10 border-b bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))]"
+							>
 								<tr>
 									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
 									<th class="px-4 py-3 text-left font-medium text-muted-foreground">Cycle</th>

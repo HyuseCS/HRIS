@@ -11,6 +11,7 @@
 	import { addToast } from '$lib/stores/toast.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -237,6 +238,8 @@
 				</tbody>
 			</table>
 		</div>
+
+		<Pagination meta={data.pagination} />
 	{:catch}
 		<LoadError what="the payroll runs" />
 	{/await}

@@ -71,7 +71,7 @@
 		{#if data.boards.length === 0}
 			<p class="text-sm text-muted-foreground">No boards yet — add one above.</p>
 		{:else}
-			<ul class="divide-y">
+			<ul class="card-scroll divide-y">
 				{#each data.boards as board (board.id)}
 					{@const save = saveGuard(board.id)}
 					{@const toggle = toggleGuard(board.id)}

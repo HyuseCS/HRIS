@@ -65,7 +65,7 @@
 			</form>
 		{/snippet}
 
-		<div class="min-h-0 flex-1 overflow-x-auto">
+		<div class="phone-scroll min-h-0 flex-1 overflow-x-auto">
 			<table class="w-full min-w-max text-sm">
 				<thead class="sticky top-0 z-20 bg-card">
 					<tr class="border-b">

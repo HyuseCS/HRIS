@@ -143,7 +143,12 @@ describe('the plain sites are bounded (G13)', () => {
 		['routes/(app)/settings/posting-approvers/+page.svelte', 1],
 		['routes/(app)/settings/schedules/+page.svelte', 1],
 		['routes/(app)/payroll/pay-codes/+page.svelte', 2],
-		['routes/(app)/payroll/salary-grades/+page.svelte', 2]
+		['routes/(app)/payroll/salary-grades/+page.svelte', 2],
+		['routes/(app)/settings/leave-types/+page.svelte', 1],
+		['routes/(app)/settings/job-boards/+page.svelte', 1],
+		['routes/(app)/settings/onboarding/+page.svelte', 1],
+		['routes/(app)/performance/templates/+page.svelte', 1],
+		['routes/(app)/settings/org-chart/+page.svelte', 2]
 	]
 
 	it.each(PLAIN_SITES)('%s has card-scroll at least %i times', (file, count) => {

@@ -8,6 +8,7 @@
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import OpenPeriodDialog from '$lib/components/payroll/OpenPeriodDialog.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -188,6 +189,8 @@
 				</tbody>
 			</table>
 		</div>
+
+		<Pagination meta={data.pagination} />
 	</section>
 </div>
 

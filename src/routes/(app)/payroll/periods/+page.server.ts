@@ -1,7 +1,9 @@
 import { fail } from '@sveltejs/kit'
 import { z } from 'zod'
 import { canAny, requireAnyCapability, requirePayrollManage } from '$lib/server/rbac'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
+	countPeriods,
 	listPeriods,
 	openPeriod,
 	importAttendance,
@@ -12,10 +14,19 @@ import {
 } from '$lib/server/services/payroll/periods'
 import type { Actions, PageServerLoad, RequestEvent } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	requirePayrollManage(locals.user!.roles)
+	const total = await countPeriods(locals.user!.organizationId)
+	const pagination = paginate(url, total, {
+		// ponytail: rowPx/chromePx estimated from sibling list pages, not measured live
+		pageSize: fitPageSize(cookies, { rowPx: 57, chromePx: 291 })
+	})
 	return {
-		periods: await listPeriods(locals.user!.organizationId),
+		periods: await listPeriods(locals.user!.organizationId, {
+			skip: pagination.skip,
+			take: pagination.take
+		}),
+		pagination,
 		canVoid: canAny(locals.user!.roles, 'OVERRIDE_FINALIZED')
 	}
 }

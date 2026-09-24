@@ -19,7 +19,7 @@ import type { Actions, PageServerLoad } from './$types'
 
 const DASHBOARD_LIST_CAP = 10
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	const orgId = user.organizationId
 	const canPost = canAny(user.roles, 'MANAGE_HR')
@@ -148,7 +148,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		myStatus,
 		awards,
 		awardEmployees,
-		postingsToApprove: allPostingsToApprove.slice(0, DASHBOARD_LIST_CAP),
+		postingsToApprove:
+			!canPost && canDecidePostings && url.searchParams.get('postings') === 'all'
+				? allPostingsToApprove
+				: allPostingsToApprove.slice(0, DASHBOARD_LIST_CAP),
 		postingsToApproveTotal: allPostingsToApprove.length,
 		recentActivity,
 		upcomingEvents,

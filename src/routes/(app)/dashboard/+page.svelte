@@ -358,6 +358,8 @@
 						</ul>
 						{#if data.canPost}
 							<a href="/recruitment" class="btn-row self-start">View all postings</a>
+						{:else if data.postingsToApproveTotal > data.postingsToApprove.length}
+							<a href="/dashboard?postings=all" class="btn-row self-start">Show all postings</a>
 						{/if}
 					{/if}
 				</div>
