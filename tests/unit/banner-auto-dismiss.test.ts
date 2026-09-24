@@ -19,10 +19,17 @@ const EXPECTED: Record<string, number> = {
 	'lib/components/employees/detail/PromoteCard.svelte': 1,
 	'lib/components/employees/detail/UpdateProfileCard.svelte': 1,
 	'routes/(app)/employees/[id]/+page.svelte': 4,
-	'routes/(app)/employees/new/+page.svelte': 1
+	'routes/(app)/employees/new/+page.svelte': 1,
+	'lib/components/payroll/CalculatorPanel.svelte': 1,
+	'routes/(app)/payroll/+page.svelte': 2,
+	'routes/(app)/payroll/[id]/+page.svelte': 1,
+	'routes/(app)/payroll/periods/+page.svelte': 1,
+	'routes/(app)/payroll/statutory-rates/+page.svelte': 1,
+	'routes/(app)/payroll/pay-codes/+page.svelte': 1,
+	'routes/(app)/payroll/salary-grades/+page.svelte': 1
 }
 
-const BOTH_ACTIONS = 2
+const BOTH_ACTIONS = 3
 
 const STAYS: [string, string][] = [
 	['lib/components/ui/FormFeedback.svelte', 'mine?.notice'],

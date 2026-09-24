@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import { enhance } from '$app/forms'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency } from '$lib/utils/format'
@@ -43,9 +44,9 @@
 	// and the toast layer says so.
 	const preview = submitFeedback({
 		success: null,
-		inner:
-			() =>
-			async ({ result: r }) => {
+		inner: () => {
+			error = ''
+			return async ({ result: r }) => {
 				if (r.type === 'success' && r.data?.result) {
 					result = r.data.result as CalcResult
 					error = ''
@@ -55,6 +56,7 @@
 						r.type === 'failure' ? String(r.data?.error ?? 'Preview failed') : 'Preview failed.'
 				}
 			}
+		}
 	})
 	let error = $state('')
 
@@ -83,6 +85,7 @@
 
 {#if error}
 	<div
+		use:autoDismiss
 		class="mb-4 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 	>
 		{error}

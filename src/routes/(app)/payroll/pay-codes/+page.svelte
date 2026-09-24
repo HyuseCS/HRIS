@@ -38,7 +38,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<Banner kind="error" message={form.error} />
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-2">

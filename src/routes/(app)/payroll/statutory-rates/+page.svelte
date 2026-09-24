@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { scrollToError } from '$lib/actions/scrollToError'
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import Container from '$lib/components/ui/Container.svelte'
@@ -263,6 +264,7 @@
 	{#if form?.error}
 		<!-- Addendum §F — long page, error renders above the fold the person is looking at. -->
 		<div
+			use:autoDismiss
 			use:scrollToError
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>

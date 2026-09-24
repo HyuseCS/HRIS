@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
@@ -87,6 +88,7 @@
 
 	{#if form?.error && !showCreate}
 		<div
+			use:autoDismiss
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive"
 		>
 			{form.error}
@@ -101,7 +103,10 @@
 			class="rounded-lg border bg-card p-4 space-y-3"
 		>
 			<h2 class="font-semibold">Create Payroll Run</h2>
-			{#if form?.error}<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{#if form?.error}<div
+					use:autoDismiss
+					class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive"
+				>
 					{form.error}
 				</div>{/if}
 			<PeriodPicker>
