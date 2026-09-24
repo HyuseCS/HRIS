@@ -5,7 +5,6 @@
 	import { scrollToError } from '$lib/actions/scrollToError'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
-	import { tenureLabel } from '$lib/utils/dates'
 	import {
 		rateBasisOptionsFor,
 		rateBasisCopy,
@@ -13,12 +12,10 @@
 		type RateBasis
 	} from '$lib/utils/rate-basis'
 	import { EMPLOYMENT_TYPE_OPTIONS } from '$lib/utils/employment-type'
-	import { isValidGovId, govIdError, type GovIdField } from '$lib/utils/gov-ids'
 	import { LOAN_TYPES } from '$lib/utils/loan-types'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
-	import MaskedField from '$lib/components/ui/MaskedField.svelte'
 	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 	import Badge from '$lib/components/ui/Badge.svelte'
@@ -26,13 +23,16 @@
 	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
 	import { resolveTab } from '$lib/components/employees/employee-tabs'
 	import { LIST_RENDER_CAP } from '$lib/components/employees/detail/shared'
+	import UpdateProfileCard from '$lib/components/employees/detail/UpdateProfileCard.svelte'
+	import DisbursementCard from '$lib/components/employees/detail/DisbursementCard.svelte'
+	import GovIdsCard from '$lib/components/employees/detail/GovIdsCard.svelte'
+	import ProfileCard from '$lib/components/employees/detail/ProfileCard.svelte'
 	import OnboardingCard from '$lib/components/employees/detail/OnboardingCard.svelte'
 	import EvalTemplateCard from '$lib/components/employees/detail/EvalTemplateCard.svelte'
 	import SupervisorsCard from '$lib/components/employees/detail/SupervisorsCard.svelte'
 	import EmploymentHistoryCard from '$lib/components/employees/detail/EmploymentHistoryCard.svelte'
 	import BenefitsCard from '$lib/components/employees/detail/BenefitsCard.svelte'
 	import LeaveBalancesCard from '$lib/components/employees/detail/LeaveBalancesCard.svelte'
-	import { labelFor, EMPLOYMENT_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -41,20 +41,10 @@
 	// class — never `{#if}`, which would discard anything typed into an inactive tab's form.
 	const activeTab = $derived(resolveTab($page.state.tab ?? $page.url.searchParams.get('tab')))
 
-	// Label + field pairs for the Government IDs card, so the display and its format warning
-	// stay in step with the validator's field names.
-	const GOV_ID_ROWS: { field: GovIdField; label: string }[] = [
-		{ field: 'sssNumber', label: 'SSS Number' },
-		{ field: 'philhealthNumber', label: 'PhilHealth No.' },
-		{ field: 'pagibigNumber', label: 'Pag-IBIG No.' },
-		{ field: 'tinNumber', label: 'TIN' }
-	]
 	// Reactive: after a form action re-runs `load`, these must reflect the fresh data
 	// (a plain destructure would stay stale until a full page refresh).
 	const employee = $derived(data.employee)
 	const canManage = $derived(data.canManage)
-	// The schedule an unassigned employee actually falls back to, named from the org's data.
-	const orgDefaultSchedule = $derived(data.schedules?.find((s) => s.isDefault) ?? null)
 	// #111: every sensitive field (gov IDs, salary, bank/GCash) arrives masked from the load.
 	// The full values exist client-side only after the audited ?/reveal action.
 	//
@@ -120,10 +110,6 @@
 			? `${Math.max(1, Math.round(b / 1024))} KB`
 			: `${(b / 1024 / 1024).toFixed(1)} MB`
 
-	// #170: pay is edited only through the dated "Change Salary / Pay Type" form below — the quick-edit
-	// form no longer writes salary/rateType. This read-only display follows the SAVED basis.
-	const savedRate = $derived(rateBasisCopy(employee.rateType as RateBasis))
-
 	// #170: the mid-period change form has its own rate-basis state so its amount label follows the
 	// selected basis and its dropdown offers only bases valid for this employment type (like create).
 	// Initialized from the saved basis; NOT re-synced from `employee` (the [id] route remounts per
@@ -151,19 +137,6 @@
 	const todayInput = new Date().toISOString().slice(0, 10)
 	const hireInput = $derived(new Date(employee.startDate).toISOString().slice(0, 10))
 
-	// Salary-band check: employee inherits their grade via their position (T163).
-	// Grades are monthly bands (#120), so an hourly rate must not be scored against them.
-	const grade = $derived(employee.position?.salaryGrade ?? null)
-	const band = $derived.by(() => {
-		if (employee.rateType !== 'MONTHLY') return null
-		// Salary is masked until the audited reveal — the band can only be scored on the real figure.
-		if (!grade || revealed?.basicMonthlySalary == null) return null
-		const s = Number(revealed.basicMonthlySalary),
-			min = Number(grade.minSalary),
-			max = Number(grade.maxSalary)
-		return { status: s < min ? 'below' : s > max ? 'above' : 'within', min, max, name: grade.name }
-	})
-
 	// #108: every mutating form here is a duplicate-row risk on a double-click — duplicate
 	// contacts, loans, cash advances, recurring earnings/deductions, uploaded documents, or a
 	// second offboard/reveal. One guard per form; the per-row forms share the guard for their
@@ -172,7 +145,6 @@
 	// `error: null`: each card renders its own failure, so an error toast would repeat it. Other
 	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
 	const reveal = submitFeedback({ error: null })
-	const update = submitFeedback({ error: null })
 	const offboard = submitFeedback({ error: null, success: null })
 	const deleteEmergencyContact = submitFeedback({ error: null })
 	const addEmergencyContact = submitFeedback({ error: null })
@@ -294,144 +266,14 @@
 			{/if}
 
 			<!-- Profile Card -->
-			<div class="rounded-lg border bg-card p-6 space-y-4">
-				<h2 class="font-semibold">Profile</h2>
-				<dl class="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
-					<dt class="text-muted-foreground">Employee No.</dt>
-					<dd class="font-medium">{employee.employeeNumber}</dd>
-					<dt class="text-muted-foreground">Email</dt>
-					<dd>{employee.user.email}</dd>
-					<dt class="text-muted-foreground">Department</dt>
-					<dd>{employee.department.name}</dd>
-					<dt class="text-muted-foreground">Job Title</dt>
-					<dd>{employee.jobTitle}</dd>
-					<dt class="text-muted-foreground">Employment Type</dt>
-					<dd>{labelFor(EMPLOYMENT_TYPE_LABELS, employee.employmentType)}</dd>
-					<dt class="text-muted-foreground">Start Date</dt>
-					<dd>{formatShortDate(employee.startDate)}</dd>
-					<dt class="text-muted-foreground">Tenure</dt>
-					<dd>{tenureLabel(employee.startDate, employee.endDate ?? undefined)}</dd>
-					{#if canManage}
-						<dt class="text-muted-foreground">Basic Salary</dt>
-						<dd class="font-medium">
-							{#if revealed?.basicMonthlySalary != null}
-								{formatCurrency(Number(revealed.basicMonthlySalary))}{savedRate.suffix}
-							{:else}
-								{employee.basicMonthlySalary ?? '—'}
-								{#if data.canReveal}
-									<form method="POST" action="?/reveal" use:enhance={reveal.enhance} class="inline">
-										<button
-											type="submit"
-											disabled={reveal.busy}
-											class="ml-1 text-xs font-normal text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
-											title="Revealing sensitive fields is recorded in the audit log"
-											>{reveal.busy ? 'Revealing…' : 'Reveal'}</button
-										>
-									</form>
-								{/if}
-							{/if}
-							{#if band}
-								{#if band.status === 'within'}
-									<span
-										class="ml-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-normal text-green-700 dark:text-green-400"
-										title="Within the {band.name} band">✓ {grade?.name}</span
-									>
-								{:else}
-									<span
-										class="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-700 dark:text-amber-400"
-										title="{band.name}: {formatCurrency(band.min)}–{formatCurrency(band.max)}"
-									>
-										⚠ {band.status === 'below' ? 'Below' : 'Above'}
-										{grade?.name} band
-									</span>
-								{/if}
-							{/if}
-						</dd>
-					{/if}
-					<dt class="text-muted-foreground">Role</dt>
-					<dd>{employee.user.roles.join(', ')}</dd>
-				</dl>
-			</div>
+			<ProfileCard {data} {revealed} {reveal} />
 
 			<!-- Government IDs Card (HR-only) -->
 			{#if canManage}
-				<div class="rounded-lg border bg-card p-6 space-y-4">
-					<div class="flex items-center justify-between gap-3">
-						<h2 class="font-semibold">Government IDs</h2>
-						{#if data.canReveal && !revealed}
-							<form method="POST" action="?/reveal" use:enhance={reveal.enhance}>
-								<button
-									type="submit"
-									disabled={reveal.busy}
-									class="text-xs text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
-									title="Revealing sensitive fields is recorded in the audit log"
-									>{reveal.busy ? 'Revealing…' : 'Reveal IDs'}</button
-								>
-							</form>
-						{/if}
-					</div>
-					<dl class="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
-						{#each GOV_ID_ROWS as row (row.field)}
-							<MaskedField
-								label={row.label}
-								masked={employee[row.field]}
-								value={revealed?.[row.field]}
-								mono
-							>
-								<!-- #191 validates on entry, but values stored before it can be malformed. The
-							     client only holds the masked value, so the flag is shown once revealed —
-							     it is surfaced, never blocking (an unchanged bad ID never stops a save). -->
-								{#if revealed && !isValidGovId(row.field, revealed[row.field])}
-									<span
-										class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-400"
-										title={govIdError(row.field)}>check format</span
-									>
-								{/if}
-							</MaskedField>
-						{/each}
-					</dl>
-				</div>
+				<GovIdsCard {data} {revealed} {reveal} />
 
 				<!-- Disbursement details Card (sensitive, HR-only; numbers masked — #54) -->
-				<div class="rounded-lg border bg-card p-6 space-y-4">
-					<div class="flex items-center justify-between gap-3">
-						<h2 class="font-semibold">
-							Disbursement
-							<span class="text-xs font-normal text-muted-foreground"
-								>(bank / GCash — sensitive)</span
-							>
-						</h2>
-						{#if data.canReveal && !revealed}
-							<form method="POST" action="?/reveal" use:enhance={reveal.enhance}>
-								<button
-									type="submit"
-									disabled={reveal.busy}
-									class="text-xs text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
-									title="Revealing full numbers is recorded in the audit log"
-									>{reveal.busy ? 'Revealing…' : 'Reveal full numbers'}</button
-								>
-							</form>
-						{/if}
-					</div>
-					<dl class="grid grid-cols-2 gap-3 text-sm">
-						<dt class="text-muted-foreground">Bank</dt>
-						<dd>{employee.bankName ?? '—'}</dd>
-						<dt class="text-muted-foreground">Account Name</dt>
-						<dd>{employee.bankAccountName ?? '—'}</dd>
-						<MaskedField
-							label="Account No."
-							masked={employee.bankAccountNumber}
-							value={revealed?.bankAccountNumber}
-							mono
-						/>
-						<MaskedField
-							label="GCash No."
-							masked={employee.gcashNumber}
-							value={revealed?.gcashNumber}
-							mono
-						/>
-					</dl>
-				</div>
+				<DisbursementCard {data} {revealed} {reveal} />
 			{/if}
 
 			<!-- Supervisors (#176): primary manager + additional superiors -->
@@ -445,263 +287,7 @@
 
 			<!-- Edit Form (HR-only; the update/offboard actions require HR_ADMIN) -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
-				<form
-					id="update-profile"
-					method="POST"
-					action="?/update"
-					use:enhance={update.enhance}
-					class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
-				>
-					<h2 class="font-semibold">Update Profile</h2>
-					<!--
-						Three forms on this page can look like the right one for a pay change, and picking
-						the wrong one silently skips the audited career event. Each says what it is for and
-						links the other two.
-					-->
-					<p class="text-sm text-muted-foreground">
-						Corrects personal and contact details. Does not change pay or position — use
-						<a href="?tab=compensation#change-salary" class="text-primary hover:underline"
-							>Change Salary</a
-						>
-						or
-						<a href="?tab=compensation#promote" class="text-primary hover:underline">Promote</a>
-						for those.
-					</p>
-					<!--
-					Gated on form.action: this is the ONLY error slot on a page with 21 actions, so
-					an ungated block painted a failed addLoan (or document delete) into this form.
-					Phase 07 gives every form its own slot; until then an untagged action reports
-					nowhere, which is the lesser harm.
-				-->
-					{#if form?.action === 'update' && form?.success}
-						<Banner kind="success" message="Saved." />
-					{:else if form?.action === 'update' && form?.error}
-						<div
-							class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
-						>
-							{form.error}
-						</div>
-					{/if}
-					<div class="grid gap-3 sm:grid-cols-3">
-						<div>
-							<label for="jobTitle" class="text-sm font-medium">Job Title</label>
-							<input
-								id="jobTitle"
-								name="jobTitle"
-								value={employee.jobTitle}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="departmentId" class="text-sm font-medium">Department</label>
-							<select
-								id="departmentId"
-								name="departmentId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								{#each data.departments as dept (dept.id)}
-									<option value={dept.id} selected={dept.id === employee.departmentId}
-										>{dept.name}</option
-									>
-								{/each}
-							</select>
-						</div>
-						{#if data.showBranches}
-							<div>
-								<label for="branchId" class="text-sm font-medium">Branch</label>
-								<select
-									id="branchId"
-									name="branchId"
-									class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									<option value="">— No branch —</option>
-									{#each data.branches as br (br.id)}
-										<option value={br.id} selected={br.id === employee.branchId}
-											>{br.name}{br.status === 'CLOSED' ? ' (closed)' : ''}</option
-										>
-									{/each}
-								</select>
-								<p class="mt-1 text-xs text-muted-foreground">
-									Which store this employee works out of.
-								</p>
-							</div>
-						{/if}
-						<div class="sm:col-span-3">
-							<label for="companyEmail" class="text-sm font-medium">Company Email</label>
-							<input
-								id="companyEmail"
-								name="companyEmail"
-								type="email"
-								value={employee.companyEmail ?? ''}
-								placeholder="e.g. first.last@company.ph"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Seeded with the hire's working email at onboarding — update it once the real company
-								address is provisioned.
-							</p>
-						</div>
-						<div class="sm:col-span-3">
-							<label for="discordId" class="text-sm font-medium">Discord ID</label>
-							<input
-								id="discordId"
-								name="discordId"
-								value={employee.discordId ?? ''}
-								placeholder="e.g. 123456789012345678 — for the time-tracking bot"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								In Discord: enable Developer Mode → right-click the user → Copy User ID. Leave blank
-								to unlink.
-							</p>
-						</div>
-						<div>
-							<label for="workScheduleId" class="text-sm font-medium">Work Schedule</label>
-							<select
-								id="workScheduleId"
-								name="workScheduleId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<!-- Names the org's actual default rather than a hardcoded shift, so the label
-							     cannot drift from what the attendance engine really applies. -->
-								<option value=""
-									>{orgDefaultSchedule
-										? `Not assigned — follows ${orgDefaultSchedule.name}`
-										: 'Not assigned — no organization default set'}</option
-								>
-								{#each data.schedules as s (s.id)}
-									<option value={s.id} selected={s.id === employee.workScheduleId}>{s.name}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="positionId" class="text-sm font-medium">Position</label>
-							<select
-								id="positionId"
-								name="positionId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">— No position —</option>
-								{#each data.positions as p (p.id)}
-									<option value={p.id} selected={p.id === employee.positionId}>{p.title}</option>
-								{/each}
-							</select>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Sets the pay band used for the salary check above.
-							</p>
-						</div>
-						<div class="sm:col-span-3 border-t pt-3">
-							<h3 class="text-sm font-semibold text-muted-foreground">
-								Government IDs <span class="font-normal">(payroll registration)</span>
-							</h3>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Stored IDs stay masked; reveal above to edit, or leave a field blank to keep the
-								current value.
-							</p>
-						</div>
-						<div>
-							<label for="sssNumber" class="text-sm font-medium">SSS Number</label>
-							<input
-								id="sssNumber"
-								name="sssNumber"
-								value={revealed?.sssNumber ?? ''}
-								placeholder={employee.sssNumber ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="philhealthNumber" class="text-sm font-medium">PhilHealth No.</label>
-							<input
-								id="philhealthNumber"
-								name="philhealthNumber"
-								value={revealed?.philhealthNumber ?? ''}
-								placeholder={employee.philhealthNumber ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="pagibigNumber" class="text-sm font-medium">Pag-IBIG No.</label>
-							<input
-								id="pagibigNumber"
-								name="pagibigNumber"
-								value={revealed?.pagibigNumber ?? ''}
-								placeholder={employee.pagibigNumber ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="tinNumber" class="text-sm font-medium">TIN</label>
-							<input
-								id="tinNumber"
-								name="tinNumber"
-								value={revealed?.tinNumber ?? ''}
-								placeholder={employee.tinNumber ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<!--
-							Emergency contacts are edited in their own section (the `emergencyContacts`
-							relation), not here — three surfaces for one thing is what the audit flagged.
-							`?/update` still accepts the legacy singular fields; this form just stops
-							sending them.
-						-->
-						<div class="sm:col-span-3 border-t pt-3">
-							<h3 class="text-sm font-semibold text-muted-foreground">
-								Disbursement <span class="font-normal">(bank / GCash — sensitive)</span>
-							</h3>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Stored numbers stay masked; leave a field blank to keep the current value.
-							</p>
-						</div>
-						<div>
-							<label for="bankName" class="text-sm font-medium">Bank Name</label>
-							<input
-								id="bankName"
-								name="bankName"
-								value={employee.bankName ?? ''}
-								placeholder="e.g. BDO"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="bankAccountName" class="text-sm font-medium">Account Name</label>
-							<input
-								id="bankAccountName"
-								name="bankAccountName"
-								value={employee.bankAccountName ?? ''}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="bankAccountNumber" class="text-sm font-medium">Bank Account No.</label>
-							<input
-								id="bankAccountNumber"
-								name="bankAccountNumber"
-								value={revealed?.bankAccountNumber ?? ''}
-								placeholder={employee.bankAccountNumber ?? 'Account number'}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="gcashNumber" class="text-sm font-medium">GCash No.</label>
-							<input
-								id="gcashNumber"
-								name="gcashNumber"
-								value={revealed?.gcashNumber ?? ''}
-								placeholder={employee.gcashNumber ?? 'e.g. 0917xxxxxxx'}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-					</div>
-					<div class="flex justify-end">
-						<button
-							type="submit"
-							disabled={update.busy}
-							class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-							>{update.busy ? 'Saving…' : 'Save Changes'}</button
-						>
-					</div>
-				</form>
+				<UpdateProfileCard {data} {form} {revealed} />
 			{/if}
 
 			<!-- Leave Balances (#137). Read-only: allocations come from the org's leave-type
