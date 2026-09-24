@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const css = readFileSync(join(process.cwd(), 'src/app.css'), 'utf8')
+const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+const css = read('src/app.css')
 const tailwind = readFileSync(join(process.cwd(), 'tailwind.config.ts'), 'utf8')
 const toaster = readFileSync(join(process.cwd(), 'src/lib/components/ui/Toaster.svelte'), 'utf8')
 
@@ -176,6 +177,25 @@ describe('semantic colour tokens (src/app.css + tailwind.config.ts)', () => {
 				`t.kind === 'info' ? 'text-muted-foreground hover:text-foreground'`
 			)
 			expect(dismiss().replace(/\{[^}]*\}/g, '')).not.toContain('text-muted-foreground')
+		})
+	})
+
+	describe('ReasonDialog', () => {
+		it('should expose tone and no confirmClass', () => {
+			const dialog = read('src/lib/components/ui/ReasonDialog.svelte')
+			expect(dialog).not.toContain('confirmClass')
+			expect(dialog).toMatch(/tone\?: 'destructive' \| 'warning'/)
+			expect(read('src/routes/(app)/requests/approvals/+page.svelte')).not.toContain('confirmClass')
+		})
+
+		it('should leave no confirmClass anywhere in src', () => {
+			const hits = (
+				readdirSync('src', { recursive: true, withFileTypes: true }) as import('node:fs').Dirent[]
+			)
+				.filter((d) => d.isFile() && /\.(svelte|ts)$/.test(d.name))
+				.map((d) => join(d.parentPath, d.name))
+				.filter((f) => readFileSync(f, 'utf8').includes('confirmClass'))
+			expect(hits).toEqual([])
 		})
 	})
 

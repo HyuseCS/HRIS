@@ -13,8 +13,8 @@
 		placeholder?: string
 		confirmText?: string
 		cancelText?: string
-		/** Confirm button classes — defaults to the destructive red. */
-		confirmClass?: string
+		/** Confirm button colour — defaults to destructive. */
+		tone?: 'destructive' | 'warning'
 		onconfirm?: (_reason: string) => void
 	}
 
@@ -25,7 +25,7 @@
 		placeholder = 'Explain the decision…',
 		confirmText = 'Confirm',
 		cancelText = 'Cancel',
-		confirmClass = 'bg-red-600 text-white hover:bg-red-700',
+		tone = 'destructive',
 		onconfirm
 	}: Props = $props()
 
@@ -75,7 +75,7 @@
 			type="button"
 			onclick={confirm}
 			disabled={reason.trim() === ''}
-			class="rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 {confirmClass}"
+			class="{tone === 'warning' ? 'btn-warning' : 'btn-destructive'} disabled:cursor-not-allowed"
 			>{confirmText}</button
 		>
 	</div>

@@ -432,8 +432,8 @@
 	confirmText={noteTarget?.kind !== 'bulk' && noteTarget?.decision === 'RETURNED'
 		? 'Return'
 		: 'Reject'}
-	confirmClass={noteTarget?.kind !== 'bulk' && noteTarget?.decision === 'RETURNED'
-		? 'bg-orange-700 text-white hover:bg-orange-800'
-		: 'bg-red-600 text-white hover:bg-red-700'}
+	tone={noteTarget?.kind !== 'bulk' && noteTarget?.decision === 'RETURNED'
+		? 'warning'
+		: 'destructive'}
 	onconfirm={submitWithNote}
 />
