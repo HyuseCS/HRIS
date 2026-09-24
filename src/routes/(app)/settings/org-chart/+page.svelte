@@ -125,7 +125,7 @@
 
 		{#if query.trim()}
 			<div class="rounded-lg border bg-card">
-				<ul class="divide-y">
+				<ul class="card-scroll divide-y">
 					{#each matches as m (m.id)}
 						<li class="px-4 py-2">
 							<p class="text-sm font-medium">{m.name}</p>
@@ -141,7 +141,7 @@
 			</div>
 		{:else if roots.length}
 			<div class="rounded-lg border bg-card p-4">
-				<ul class="space-y-1">
+				<ul class="card-scroll space-y-1">
 					{#each roots as root (root.id)}
 						{@render nodeRow(root, [])}
 					{/each}

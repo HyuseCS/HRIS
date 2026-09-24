@@ -109,7 +109,7 @@
 				description="Create the first one above, then compose its categories and criteria."
 			/>
 		{:else}
-			<ul class="divide-y">
+			<ul class="card-scroll divide-y">
 				{#each data.templates as template (template.id)}
 					{@const toggle = toggleGuard(template.id)}
 					<li class="flex flex-wrap items-center gap-3 px-4 py-3">
