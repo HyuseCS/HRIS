@@ -107,7 +107,7 @@ test('AC-17: the two-hat user verifies a request, then cannot approve it', async
 	// The queue offers this actor no control on it, and the badge agrees with the queue.
 	await twoPage.goto('/requests/approvals', { waitUntil: 'domcontentloaded' })
 	await expect(twoPage.getByRole('heading', { name: 'Request Approvals' })).toBeVisible()
-	const barredCard = twoPage.locator('div.rounded-lg.border', { hasText: REQUEST_REASON })
+	const barredCard = twoPage.locator('li.rounded-lg.border', { hasText: REQUEST_REASON })
 	await expect(barredCard).toHaveCount(0)
 	// Badge and list are rendered from the same request, so this comparison is stable under
 	// concurrent specs: the badge counts exactly the list that excludes this request.
@@ -120,7 +120,7 @@ test('AC-17: the two-hat user verifies a request, then cannot approve it', async
 	const apprPage = await apprCtx.newPage()
 	await login(apprPage, USERS.approver)
 	await apprPage.goto('/requests/approvals', { waitUntil: 'domcontentloaded' })
-	const openCard = apprPage.locator('div.rounded-lg.border', { hasText: REQUEST_REASON }).first()
+	const openCard = apprPage.locator('li.rounded-lg.border', { hasText: REQUEST_REASON }).first()
 	await expect(openCard).toBeVisible()
 	await expect(openCard.getByRole('button', { name: 'Approve' })).toBeVisible()
 	await apprCtx.close()
