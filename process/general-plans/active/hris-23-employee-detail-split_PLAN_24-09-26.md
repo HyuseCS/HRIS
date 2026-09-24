@@ -8,7 +8,7 @@ feature: general
 # #23 — Split the employee detail page into cards and action modules
 
 **Date**: 24-09-26
-**Status**: PLANNED
+**Status**: CODE DONE — AC1 (DOM diff) and AC8 (e2e) pending
 **Complexity**: COMPLEX (one plan, 10 commits, one PR)
 **Wave:** 2 — starts only after Wave 1 (#21, #22, #24 part 1) is merged to staging.
 **Branch:** `refactor/23-employee-detail-split` (off updated local `staging`)
@@ -406,9 +406,9 @@ Accepted by: session (orchestrator-directed VALIDATE pass 2, no user menu) — a
 ## Resume and Execution Handoff
 
 1. Selected plan: `process/general-plans/active/hris-23-employee-detail-split_PLAN_24-09-26.md`.
-2. Last completed: PLAN. No code written.
-3. Validate-contract: pending.
+2. Last completed: EXECUTE, commit 10 (`c8570b7`). All 10 commits green on format:check, lint, check and unit tests. Deviation: OnboardingCard wraps its section in `{#if data.onboarding}` (type narrowing does not cross a component boundary); recorded in commit 4.
+3. Validate-contract: pass 2, CONDITIONAL; E1-E10 applied during EXECUTE.
 4. Context loaded: `process/context/all-context.md`, `process/context/tests/all-tests.md`, CONTEXT.md, PLAN-BRIEF.md, research-23.md (scratchpad), issue #23 + owner comment, both route files, the 6 source tripwires + action-tags test, attendance precedent, #22 plan (no employees/[id] change), `package.json`, `.github/workflows/ci.yml`, `playwright.config.ts`, `_dev/login-as`.
-5. Next: VALIDATE this plan. EXECUTE starts at Step 0 only after Wave 1 is merged; resume mid-run by `git log --oneline staging..HEAD` and continuing at the next commit number in the checklist.
+5. Next: with the owner's servers up, run Step 11.5 (DOM before/after snapshot diff, including the form-control state section, and the one-reveal-one-audit-row count) and Step 11.6 (e2e list on the PR head). Then mark the plan VERIFIED.
 
-Next Step: ENTER VALIDATE MODE (vc-validate-agent), then ENTER EXECUTE MODE after Wave 1 merges.
+Next Step: run the pending Step 11.5 and 11.6 proof, then set Status to VERIFIED.
