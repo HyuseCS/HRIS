@@ -316,6 +316,7 @@
 			{:else if form?.action === 'offboard' && form?.error}
 				<div
 					use:autoDismiss
+					role="alert"
 					class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400 lg:col-span-2"
 				>
 					{form.error}

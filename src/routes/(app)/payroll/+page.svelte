@@ -89,6 +89,7 @@
 	{#if form?.error && !showCreate}
 		<div
 			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive"
 		>
 			{form.error}
@@ -105,6 +106,7 @@
 			<h2 class="font-semibold">Create Payroll Run</h2>
 			{#if form?.error}<div
 					use:autoDismiss
+					role="alert"
 					class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive"
 				>
 					{form.error}

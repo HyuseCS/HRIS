@@ -114,6 +114,7 @@
 	{#if form?.error}
 		<div
 			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{typeof form.error === 'string' ? form.error : 'Please fix the errors below.'}

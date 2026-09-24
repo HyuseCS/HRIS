@@ -601,6 +601,7 @@
 						>
 							{#if form?.action === 'giveAward' && form?.error}<p
 									use:autoDismiss
+									role="alert"
 									class="text-xs text-red-400"
 								>
 									{form.error}
@@ -640,6 +641,7 @@
 						>
 							{#if form?.action === 'postAnnouncement' && form?.error}<p
 									use:autoDismiss
+									role="alert"
 									class="text-xs text-red-400"
 								>
 									{form.error}
