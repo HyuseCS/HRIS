@@ -16,7 +16,10 @@ import { resolve } from 'node:path'
  */
 
 const dir = resolve(__dirname, '../../src/routes/(app)/employees/[id]')
-const server = readFileSync(resolve(dir, '+page.server.ts'), 'utf8')
+const server = readFileSync(
+	resolve(__dirname, '../../src/lib/server/employee-detail/profile.ts'),
+	'utf8'
+)
 const template = readFileSync(resolve(dir, '+page.svelte'), 'utf8')
 const cardDir = resolve(__dirname, '../../src/lib/components/employees/detail')
 const templates = [

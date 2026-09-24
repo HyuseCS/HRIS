@@ -1,6 +1,4 @@
-import { fail } from '@sveltejs/kit'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
-import { failFromError } from '$lib/server/form-fail'
 import { assignmentActions } from '$lib/server/employee-detail/assignments'
 import { profileActions } from '$lib/server/employee-detail/profile'
 import { compensationActions } from '$lib/server/employee-detail/compensation'
@@ -9,7 +7,7 @@ import { emergencyContactActions } from '$lib/server/employee-detail/emergency-c
 import { documentActions } from '$lib/server/employee-detail/documents'
 import { onboardingActions } from '$lib/server/employee-detail/onboarding'
 import { assertCanTouchEmployee } from '$lib/server/services/employee-access'
-import { getEmployee, offboardEmployee, getEmploymentHistory } from '$lib/server/services/employees'
+import { getEmployee, getEmploymentHistory } from '$lib/server/services/employees'
 import { listPositions } from '$lib/server/services/settings/org'
 import { getLeaveBalances } from '$lib/server/services/leave'
 import { listEnrollmentsForEmployee } from '$lib/server/services/benefits'
@@ -212,26 +210,5 @@ export const actions: Actions = scopedToEmployee({
 	...payItemActions,
 	...emergencyContactActions,
 	...documentActions,
-	...onboardingActions,
-	offboard: async ({ request, locals, params, getClientAddress }) => {
-		const action = 'offboard'
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-
-		const data = await request.formData()
-		const endDate = new Date(data.get('endDate') as string)
-
-		try {
-			await offboardEmployee(params.id, user.organizationId, endDate, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			})
-		} catch (e) {
-			const f = failFromError(e)
-			return fail(f.status, { action, ...f.data })
-		}
-		return { action, saved: 'Employee offboarded.' }
-	}
+	...onboardingActions
 })

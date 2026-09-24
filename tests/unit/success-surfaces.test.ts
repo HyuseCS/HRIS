@@ -74,7 +74,7 @@ const SITES: Row[] = [
 	{
 		site: 'employees/[id] offboard',
 		page: 'routes/(app)/employees/[id]/+page.svelte',
-		server: 'routes/(app)/employees/[id]/+page.server.ts',
+		server: 'lib/server/employee-detail/profile.ts',
 		action: 'offboard',
 		surface: 'inline',
 		// F1: the server DOES return a `saved` string, so the toast is off only because the client

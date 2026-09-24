@@ -1,7 +1,9 @@
 import { fail } from '@sveltejs/kit'
 import { requireAnyCapability } from '$lib/server/rbac'
+import { failFromError } from '$lib/server/form-fail'
 import {
 	updateEmployee,
+	offboardEmployee,
 	revealEmployeeSensitive,
 	getEmploymentHistory
 } from '$lib/server/services/employees'
@@ -172,5 +174,27 @@ export const profileActions: Actions = {
 			unmask: true
 		})
 		return { action, revealed, history }
+	},
+
+	offboard: async ({ request, locals, params, getClientAddress }) => {
+		const action = 'offboard'
+		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
+		const user = locals.user!
+
+		const data = await request.formData()
+		const endDate = new Date(data.get('endDate') as string)
+
+		try {
+			await offboardEmployee(params.id, user.organizationId, endDate, {
+				organizationId: user.organizationId,
+				actorId: user.id,
+				actorRoles: user.roles,
+				ipAddress: getClientAddress()
+			})
+		} catch (e) {
+			const f = failFromError(e)
+			return fail(f.status, { action, ...f.data })
+		}
+		return { action, saved: 'Employee offboarded.' }
 	}
 }
