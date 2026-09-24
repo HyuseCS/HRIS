@@ -32,13 +32,15 @@
 
 	// A toast floats over arbitrary page content, so unlike `Banner` it cannot use a 10% tint —
 	// whatever is underneath shows through and the text stops being readable. Solid fills, and the
-	// same text steps Banner measured against the 4.5 floor.
+	// token foregrounds measured against the 4.5 floor.
 	const kindClass = (k: string) =>
 		k === 'success'
-			? 'border-green-600/30 bg-green-50 text-green-800 dark:border-green-500/30 dark:bg-green-950 dark:text-green-300'
+			? 'border-success bg-success text-success-foreground'
 			: k === 'error'
-				? 'border-red-600/30 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-950 dark:text-red-300'
-				: 'border-border bg-card text-foreground'
+				? 'border-destructive bg-destructive text-destructive-foreground'
+				: k === 'warning'
+					? 'border-warning bg-warning text-warning-foreground'
+					: 'border-border bg-card text-foreground'
 </script>
 
 <!--
@@ -88,7 +90,9 @@
 				type="button"
 				onclick={() => dismissToast(t.id)}
 				aria-label="Dismiss"
-				class="shrink-0 text-muted-foreground hover:text-foreground">✕</button
+				class="shrink-0 {t.kind === 'info'
+					? 'text-muted-foreground hover:text-foreground'
+					: 'hover:opacity-80'}">✕</button
 			>
 		</div>
 	{/each}

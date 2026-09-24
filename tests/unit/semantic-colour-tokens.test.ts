@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 const css = readFileSync(join(process.cwd(), 'src/app.css'), 'utf8')
 const tailwind = readFileSync(join(process.cwd(), 'tailwind.config.ts'), 'utf8')
+const toaster = readFileSync(join(process.cwd(), 'src/lib/components/ui/Toaster.svelte'), 'utf8')
 
 function block(start: RegExp): string {
 	const match = start.exec(css)
@@ -153,6 +154,29 @@ describe('semantic colour tokens (src/app.css + tailwind.config.ts)', () => {
 				})
 			})
 		}
+	})
+
+	describe('Toaster', () => {
+		const kindClass = () => /const kindClass = [\s\S]*?<\/script>/.exec(toaster)?.[0] ?? ''
+		const dismiss = () =>
+			/aria-label="Dismiss"\s+class="([^"]*)"/.exec(toaster)?.[1]?.replace(/\s+/g, ' ') ?? ''
+
+		it('should keep the info fallback on the card surface', () => {
+			expect(kindClass()).toContain(`: 'border-border bg-card text-foreground'`)
+		})
+
+		it('should paint success, error and warning from their tokens', () => {
+			expect(kindClass()).toMatch(/k === 'success'\s*\?\s*'[^']*\bbg-success\b/)
+			expect(kindClass()).toMatch(/k === 'error'\s*\?\s*'[^']*\bbg-destructive\b/)
+			expect(kindClass()).toMatch(/k === 'warning'\s*\?\s*'[^']*\bbg-warning\b/)
+		})
+
+		it('should give the dismiss button the muted colour on info toasts only', () => {
+			expect(dismiss()).toContain(
+				`t.kind === 'info' ? 'text-muted-foreground hover:text-foreground'`
+			)
+			expect(dismiss().replace(/\{[^}]*\}/g, '')).not.toContain('text-muted-foreground')
+		})
 	})
 
 	it('should map success and warning in tailwind the same way as destructive', () => {

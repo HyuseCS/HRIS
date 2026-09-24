@@ -71,6 +71,38 @@ describe('submitFeedback', () => {
 		expect(getToasts()[0].kind).toBe('success')
 	})
 
+	it('toasts a warning when the action data carries kind warning', async () => {
+		const fb = submitFeedback()
+		const s = await submit(fb, {
+			type: 'success',
+			data: { saved: 'Timesheet rejected.', kind: 'warning' }
+		})
+		await s.settle()
+
+		expect(texts()).toEqual(['Timesheet rejected.'])
+		expect(getToasts()[0].kind).toBe('warning')
+	})
+
+	it('keeps the warning kind when a success option overrides the message', async () => {
+		const fb = submitFeedback({ success: () => 'Request returned.' })
+		const s = await submit(fb, { type: 'success', data: { kind: 'warning' } })
+		await s.settle()
+
+		expect(texts()).toEqual(['Request returned.'])
+		expect(getToasts()[0].kind).toBe('warning')
+	})
+
+	it('toasts success for any data kind other than warning', async () => {
+		for (const kind of ['success', 'error']) {
+			for (const t of [...getToasts()]) dismissToast(t.id)
+			const fb = submitFeedback()
+			const s = await submit(fb, { type: 'success', data: { saved: 'X', kind } })
+			await s.settle()
+
+			expect(getToasts()[0].kind, kind).toBe('success')
+		}
+	})
+
 	it('stays silent for `saved: true`, which carries no message', async () => {
 		const fb = submitFeedback()
 		const s = await submit(fb, { type: 'success', data: { action: 'void', saved: true } })
