@@ -567,11 +567,7 @@
 					<form method="POST" action="?/review" use:enhance={approveFb.enhance}>
 						<input type="hidden" name="id" value={ts.id} />
 						<input type="hidden" name="approved" value="true" />
-						<button
-							disabled={busy}
-							class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-							>Approve</button
-						>
+						<button disabled={busy} class="btn-success">Approve</button>
 					</form>
 				{/if}
 				{#if canSync}
