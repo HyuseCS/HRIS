@@ -8,7 +8,11 @@ feature: none
 # HRIS #20 — Container surfaces (COMPLEX plan, one PR)
 
 **Date**: 24-09-26
-**Status**: PLANNED (awaiting VALIDATE)
+**Status**: MERGED to staging as PR #40 (24-09-26), issue #20 closed by hand. AC-1 through AC-4
+proven by Fully-Automated gates. NOT VERIFIED: AC-5 (multi-role-sod e2e locator fix) and AC-6
+(correct in both themes, screenshots + owner click pass + the 390px sideways-scroll probe) are
+Hybrid/Agent-Probe gates that need the owner's dev server and were never run. Do not treat the
+visual result as confirmed.
 **Complexity**: COMPLEX (one plan, one PR, ~25 files; not a phase program)
 **Branch**: `fix/20-container-surfaces` off updated local `staging`
 **Wave**: 3. Starts only AFTER #23 (employees/[id] split into `src/lib/components/employees/*`) AND #27 (colour tokens) are merged to staging.

@@ -12,7 +12,12 @@ hover and focus). Banner gets an opt-in `autoDismiss` prop. Hand-rolled result b
 `use:autoDismiss`. State banners, Q1 warnings and login keep today's markup. A source scan pins every site.
 
 **Date**: 24-09-26
-**Status**: CODE DONE — e2e PENDING (owner servers / CI)
+**Status**: MERGED to staging as PR #43 (24-09-26), issue #42 closed by hand. CODE DONE — all 7
+commits green on format/lint/check/unit; CodeRabbit finding F1 (focusout descendant→node) and
+`role="alert"` on 18 hand-rolled error blocks were fixed post-merge (`acaa7c4`, `64331d7`). NOT
+VERIFIED: the committed e2e spec (`tests/e2e/banner-auto-dismiss.spec.ts`, AC4/F1 live remount +
+the issue's mouse-click case) and the AC5 regression e2e list both need the owner's dev server or
+a CI e2e run and were never confirmed against this branch tip.
 **Complexity**: SIMPLE
 
 ## Overview

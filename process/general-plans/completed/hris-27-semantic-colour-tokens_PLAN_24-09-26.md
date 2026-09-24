@@ -8,7 +8,11 @@ feature: general
 # #27 Semantic colour through tokens — PLAN (SIMPLE)
 
 **Date**: 24-09-26
-**Status**: CODE DONE — G10 screenshots (both themes) and e2e pending
+**Status**: MERGED to staging as PR #39 (24-09-26), issue #27 closed by hand. CODE DONE — all 6
+commits green on format/lint/check/unit. C1-C5 are proven by Fully-Automated gates (G1-G9, G11).
+NOT VERIFIED: G10 (Playwright screenshots, both themes) is Agent-Probe-only supplementary
+evidence and was never run (needs the owner's dev server) — the tokens/classes/contrast are
+proven by the unit gates regardless.
 **Complexity**: SIMPLE
 
 **TL;DR:** Wire `--success`/`--warning` into Tailwind and `.dark`, add `.btn-success`/`.btn-warning` and make `.btn-destructive` solid, give the row classes a matching resting fill, move 16 solid-fill lines (15 buttons) in 7 files onto these classes (ReasonDialog through `tone`), swap ReasonDialog's `confirmClass` for `tone`, and add an amber `warning` toast. The server picks it by returning `kind: 'warning'`. Branch `fix/27-semantic-colour-tokens`, one PR to `staging`.

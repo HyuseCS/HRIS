@@ -8,7 +8,10 @@ feature: general
 # #22 — No new pay items for OFFBOARDED employees
 
 **Date**: 24-09-26
-**Status**: PLANNED
+**Status**: MERGED to staging as PR #36 (24-09-26), issue #22 closed by hand. All Fully-Automated
+gates (C1-C7, PD-3) passed; no e2e was needed (no UI change). Known-gap: no live click of the 409
+banner on an OFFBOARDED employee's Add Loan form (optional, low value — `failFromError` rendering
+of a 409 is already covered elsewhere). Not re-verified against a live owner session.
 **Complexity**: SIMPLE
 
 TL;DR: Add `employmentStatus` to the shared `requireEmployee` select. Add one exported guard, `assertAcceptsNewPay`, in `employee-access.ts`. Call it in the 4 CREATE functions only, after the existing self/scope checks. It throws `error(409, OFFBOARDED_NO_NEW_PAY)`. Add 409 to the two v1 create routes' apiError list. No UI change. Red-first unit tests.

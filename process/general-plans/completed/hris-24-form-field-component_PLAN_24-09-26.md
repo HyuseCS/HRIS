@@ -8,7 +8,11 @@ feature: general
 # #24 part 2 — shared form field component
 
 **Date**: 24-09-26
-**Status**: PLANNED
+**Status**: MERGED to staging as PR #41 (24-09-26), issue #24 part 2 closed by hand. AC-1, AC-2,
+AC-3, AC-6 proven by Fully-Automated gates. NOT VERIFIED: AC-4 (8-spec e2e list) and AC-5
+(Playwright visual pass of the add-row labels, both themes) are Hybrid/Agent-Probe gates needing
+the owner's dev server and were never run. Follow-up rollout note:
+`process/general-plans/backlog/hris-24-field-rollout_NOTE_24-09-26.md`.
 **Complexity**: SIMPLE
 
 TL;DR: add one `Field.svelte` wrapper (label + hint + error around a child control passed as a snippet). It owns presentation only. Adopt it in `employees/new` and the employee-detail card forms. Give the four unlabelled add-rows visible labels. No server change. No sweep of other pages.
