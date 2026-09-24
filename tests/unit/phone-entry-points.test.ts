@@ -223,6 +223,14 @@ const ENTRY_POINTS: EntryPoint[] = [
 		}
 	},
 	{
+		name: 'employees/new ?/create contactPhone',
+		writer: () => employees.createEmployee,
+		submit: (phone) =>
+			fromFail(() => newEmployeeActions.create(formEvent({ ...newHire(''), contactPhone: phone }))),
+		optional: true,
+		omit: () => fromFail(() => newEmployeeActions.create(formEvent(newHire(''))))
+	},
+	{
 		name: 'profile ?/update contactPhone',
 		writer: () => employees.updateEmployee,
 		submit: (phone) => fromFail(() => profileActions.update(formEvent({ contactPhone: phone })))
@@ -343,6 +351,38 @@ describe.each(ENTRY_POINTS)('$name', (entry) => {
 			expect(entry.writer()).toHaveBeenCalled()
 		})
 	}
+})
+
+describe('employees/new saves contact phone and address (#24)', () => {
+	it('passes contactPhone and contactAddress to createEmployee', async () => {
+		const outcome = await fromFail(() =>
+			newEmployeeActions.create(
+				formEvent({
+					...newHire(''),
+					contactPhone: '09171234567',
+					contactAddress: '12 Rizal St, Makati'
+				})
+			)
+		)
+		expect(outcome).toEqual({ rejected: false, message: '' })
+		expect(employees.createEmployee).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				contactPhone: '09171234567',
+				contactAddress: '12 Rizal St, Makati'
+			}),
+			expect.anything()
+		)
+	})
+
+	it('passes a blank contactPhone and contactAddress as undefined', async () => {
+		const outcome = await fromFail(() =>
+			newEmployeeActions.create(formEvent({ ...newHire(''), contactPhone: '', contactAddress: '' }))
+		)
+		expect(outcome.rejected).toBe(false)
+		expect(employees.createEmployee.mock.calls[0][1].contactPhone).toBeUndefined()
+		expect(employees.createEmployee.mock.calls[0][1].contactAddress).toBeUndefined()
+	})
 })
 
 /**
