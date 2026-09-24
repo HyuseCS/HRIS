@@ -5,13 +5,6 @@
 	import { scrollToError } from '$lib/actions/scrollToError'
 	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import { formatShortDate } from '$lib/utils/format'
-	import {
-		rateBasisOptionsFor,
-		rateBasisCopy,
-		isRateBasisAllowed,
-		type RateBasis
-	} from '$lib/utils/rate-basis'
-	import { EMPLOYMENT_TYPE_OPTIONS } from '$lib/utils/employment-type'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
@@ -22,6 +15,8 @@
 	import EmployeeTabs from '$lib/components/employees/EmployeeTabs.svelte'
 	import { resolveTab } from '$lib/components/employees/employee-tabs'
 	import { LIST_RENDER_CAP } from '$lib/components/employees/detail/shared'
+	import PromoteCard from '$lib/components/employees/detail/PromoteCard.svelte'
+	import ChangeSalaryCard from '$lib/components/employees/detail/ChangeSalaryCard.svelte'
 	import DeductionsCard from '$lib/components/employees/detail/DeductionsCard.svelte'
 	import AllowancesCard from '$lib/components/employees/detail/AllowancesCard.svelte'
 	import LoansCard from '$lib/components/employees/detail/LoansCard.svelte'
@@ -98,28 +93,6 @@
 			? `${Math.max(1, Math.round(b / 1024))} KB`
 			: `${(b / 1024 / 1024).toFixed(1)} MB`
 
-	// #170: the mid-period change form has its own rate-basis state so its amount label follows the
-	// selected basis and its dropdown offers only bases valid for this employment type (like create).
-	// Initialized from the saved basis; NOT re-synced from `employee` (the [id] route remounts per
-	// employee), so a later reprop — e.g. after a salary reveal — can't discard an in-progress pick.
-	// svelte-ignore state_referenced_locally
-	let compRateType = $state<RateBasis>(employee.rateType as RateBasis)
-	const compRate = $derived(rateBasisCopy(compRateType))
-	const compRateOptions = $derived(rateBasisOptionsFor(employee.employmentType))
-	// #222: the promote form carries its own type/basis pair, because a promotion is exactly where the
-	// #189 pairing breaks (a PART_TIME hourly crew member made REGULAR). The dropdown follows the type
-	// picked here, not the saved one, and an now-invalid basis resets — the same guard the create form
-	// applies, and the server validates the resulting pair regardless.
-	// svelte-ignore state_referenced_locally
-	let promoType = $state<string>(employee.employmentType)
-	// svelte-ignore state_referenced_locally
-	let promoRateType = $state<RateBasis>(employee.rateType as RateBasis)
-	const promoRateOptions = $derived(rateBasisOptionsFor(promoType))
-	const promoRate = $derived(rateBasisCopy(promoRateType))
-	$effect(() => {
-		if (!isRateBasisAllowed(promoRateType, promoType)) promoRateType = 'MONTHLY'
-	})
-
 	// Effective date is lower-bounded at the hire date; today is the default. Backdating and
 	// future-dating are both allowed (the cache heals on read — no scheduler).
 	const todayInput = new Date().toISOString().slice(0, 10)
@@ -134,8 +107,6 @@
 	// pages keep the toast — theirs can sit below the fold. Success toasts are unaffected.
 	const reveal = submitFeedback({ error: null })
 	const offboard = submitFeedback({ error: null, success: null })
-	const changeCompensation = submitFeedback({ error: null })
-	const promote = submitFeedback({ error: null })
 	// P0-7: this page has 24 actions and used to have ONE ungated error slot, itself inside a card
 	// that is hidden for an offboarded employee — so a failed document upload or loan add rendered
 	// nowhere at all. Every card now answers only for its own actions.
@@ -299,250 +270,14 @@
 			<!-- #170: effective-dated salary / pay-type change. HR_ADMIN and up; records a history snapshot
 		     and re-derives the current cache. Salary is masked (reveal above to edit). -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
-				<form
-					id="change-salary"
-					method="POST"
-					action="?/changeCompensation"
-					use:enhance={changeCompensation.enhance}
-					class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
-				>
-					<h2 class="font-semibold">
-						Change Salary / Pay Type
-						<span class="text-xs font-normal text-muted-foreground"
-							>(records an effective-dated change; payroll splits a run that straddles it)</span
-						>
-					</h2>
-					<p class="text-sm text-muted-foreground">
-						Records a dated pay change in the employment history. Use
-						<a href="?tab=compensation#promote" class="text-primary hover:underline">Promote</a>
-						if the job title or position is also changing.
-					</p>
-					{#if form?.action === 'changeCompensation' && form?.notice}
-						<Banner kind="warning" message={form.notice} />
-					{:else if form?.action === 'changeCompensation' && form?.success}
-						<Banner kind="success" message="Saved." />
-					{:else if form?.action === 'changeCompensation' && form?.error}
-						<div
-							use:scrollToError
-							role="alert"
-							class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-700 dark:text-red-400"
-						>
-							{form.error}
-						</div>
-					{/if}
-					<div class="grid gap-3 sm:grid-cols-3">
-						<div>
-							<label for="effectiveDate" class="text-sm font-medium">Effective Date</label>
-							<DatePicker
-								id="effectiveDate"
-								name="effectiveDate"
-								required
-								value={todayInput}
-								min={hireInput}
-								class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								When it takes effect. Backdating and future-dating are both allowed.
-							</p>
-						</div>
-						<div>
-							<label for="compRateType" class="text-sm font-medium">Rate Basis</label>
-							<select
-								id="compRateType"
-								name="rateType"
-								bind:value={compRateType}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								{#each compRateOptions as opt (opt.value)}
-									<option value={opt.value}>{opt.label}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="compSalary" class="text-sm font-medium">{compRate.label}</label>
-							<input
-								id="compSalary"
-								name="basicMonthlySalary"
-								type="number"
-								step={compRate.step}
-								min="0"
-								value={revealed?.basicMonthlySalary ?? ''}
-								placeholder={String(employee.basicMonthlySalary ?? '')}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Masked; reveal above to edit, or leave blank to keep the current amount.
-							</p>
-						</div>
-						<div class="sm:col-span-3">
-							<label for="compNote" class="text-sm font-medium"
-								>Note <span class="text-muted-foreground">(optional)</span></label
-							>
-							<input
-								id="compNote"
-								name="note"
-								maxlength="500"
-								placeholder="e.g. Annual merit increase"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-					</div>
-					<button
-						type="submit"
-						disabled={changeCompensation.busy}
-						class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-						>{changeCompensation.busy ? 'Recording…' : 'Record change'}</button
-					>
-				</form>
+				<ChangeSalaryCard {data} {form} {revealed} {todayInput} {hireInput} />
 			{/if}
 
 			<!-- #222: promotion — position, title, reporting line, employment type and pay recorded as ONE
 		     audited career event. Pay and type are effective-dated, so a promotion dated ahead applies
 		     on its date. Empty fields mean "not part of this promotion", never "clear". -->
 			{#if canManage && employee.employmentStatus === 'ACTIVE'}
-				<form
-					id="promote"
-					method="POST"
-					action="?/promote"
-					use:enhance={promote.enhance}
-					class="rounded-lg border bg-card p-6 space-y-4 lg:col-span-2"
-				>
-					<h2 class="font-semibold">
-						Promote
-						<span class="text-xs font-normal text-muted-foreground"
-							>(one audited event — leave anything unchanged blank)</span
-						>
-					</h2>
-					<p class="text-sm text-muted-foreground">
-						Records a dated position or title change, with an optional pay change in the same event.
-						Use
-						<a href="?tab=compensation#change-salary" class="text-primary hover:underline"
-							>Change Salary</a
-						>
-						if only the pay is changing.
-					</p>
-					{#if form?.action === 'promote' && form?.notice}
-						<Banner kind="warning" message={form.notice} />
-					{:else if form?.action === 'promote' && form?.success}
-						<Banner kind="success" message="Promotion recorded." />
-					{:else if form?.action === 'promote' && form?.error}
-						<div
-							class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-red-400"
-						>
-							{form.error}
-						</div>
-					{/if}
-					<div class="grid gap-3 sm:grid-cols-3">
-						<div>
-							<label for="promoEffectiveDate" class="text-sm font-medium">Effective Date</label>
-							<DatePicker
-								id="promoEffectiveDate"
-								name="effectiveDate"
-								required
-								value={todayInput}
-								min={hireInput}
-								class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="promoPosition" class="text-sm font-medium">Position</label>
-							<select
-								id="promoPosition"
-								name="positionId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">— unchanged —</option>
-								{#each data.positions as p (p.id)}
-									<option value={p.id} selected={employee.positionId === p.id}>{p.title}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="promoJobTitle" class="text-sm font-medium">Job Title</label>
-							<input
-								id="promoJobTitle"
-								name="jobTitle"
-								value={employee.jobTitle}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-						<div>
-							<label for="promoType" class="text-sm font-medium">Employment Type</label>
-							<select
-								id="promoType"
-								name="employmentType"
-								bind:value={promoType}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								{#each EMPLOYMENT_TYPE_OPTIONS as [val, label] (val)}
-									<option value={val}>{label}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="promoRateType" class="text-sm font-medium">Rate Basis</label>
-							<select
-								id="promoRateType"
-								name="rateType"
-								bind:value={promoRateType}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								{#each promoRateOptions as opt (opt.value)}
-									<option value={opt.value}>{opt.label}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label for="promoSalary" class="text-sm font-medium">{promoRate.label}</label>
-							<input
-								id="promoSalary"
-								name="basicMonthlySalary"
-								type="number"
-								step={promoRate.step}
-								min="0"
-								value={revealed?.basicMonthlySalary ?? ''}
-								placeholder={String(employee.basicMonthlySalary ?? '')}
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Masked; reveal above to edit, or leave blank to keep the current amount.
-							</p>
-						</div>
-						<div>
-							<label for="promoReportsTo" class="text-sm font-medium">Reports To</label>
-							<select
-								id="promoReportsTo"
-								name="reportsToId"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">— unchanged —</option>
-								{#each data.supervisorOptions as s (s.id)}
-									<option value={s.id} selected={employee.reportsToId === s.id}
-										>{s.lastName}, {s.firstName}</option
-									>
-								{/each}
-							</select>
-						</div>
-						<div class="sm:col-span-2">
-							<label for="promoNote" class="text-sm font-medium"
-								>Note <span class="text-muted-foreground">(optional)</span></label
-							>
-							<input
-								id="promoNote"
-								name="note"
-								maxlength="500"
-								placeholder="e.g. Promoted to Shift Lead"
-								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</div>
-					</div>
-					<button
-						type="submit"
-						disabled={promote.busy}
-						class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-						>{promote.busy ? 'Recording…' : 'Record promotion'}</button
-					>
-				</form>
+				<PromoteCard {data} {form} {revealed} {todayInput} {hireInput} />
 			{/if}
 		</div>
 	</div>

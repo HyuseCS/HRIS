@@ -104,7 +104,10 @@ describe('the fetch-vs-markup traps hold (G10)', () => {
 			'lib/components/employees/detail/SupervisorsCard.svelte',
 			'{#each data.supervisorOptions as opt (opt.id)}'
 		],
-		['routes/(app)/employees/[id]/+page.svelte', '{#each data.supervisorOptions as s (s.id)}'],
+		[
+			'lib/components/employees/detail/PromoteCard.svelte',
+			'{#each data.supervisorOptions as s (s.id)}'
+		],
 		['routes/(app)/benefits/+page.svelte', '{#each data.employees as e (e.id)}'],
 		['routes/(app)/settings/posting-approvers/+page.svelte', '{#each data.employees as e (e.id)}'],
 		['routes/(app)/payroll/salary-grades/+page.svelte', '{#each data.grades as g (g.id)}']
