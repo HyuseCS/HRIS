@@ -8,7 +8,12 @@ feature: general
 # #23 — Split the employee detail page into cards and action modules
 
 **Date**: 24-09-26
-**Status**: CODE DONE — AC1 (DOM diff) and AC8 (e2e) pending
+**Status**: MERGED to staging as PR #38 (24-09-26), issue #23 closed by hand. CODE DONE — all 10
+commits green on format/lint/check/unit at every commit. NOT VERIFIED: AC1 (before/after DOM diff)
+and the 11.6 e2e list both require the owner's dev server and DB and were never run — do not treat
+this refactor as proven behavior-identical. Deviation: `OnboardingCard` wraps its section in its
+own `{#if data.onboarding}` because type narrowing does not cross a component boundary (see
+`process/context/uxui/all-uxui.md`).
 **Complexity**: COMPLEX (one plan, 10 commits, one PR)
 **Wave:** 2 — starts only after Wave 1 (#21, #22, #24 part 1) is merged to staging.
 **Branch:** `refactor/23-employee-detail-split` (off updated local `staging`)

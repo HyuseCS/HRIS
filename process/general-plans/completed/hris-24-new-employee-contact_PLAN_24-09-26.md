@@ -8,7 +8,10 @@ feature: general
 # #24 part 1 remainder — employees/new saves contact phone and address
 
 **Date**: 24-09-26
-**Status**: PLANNED
+**Status**: MERGED to staging as PR #37 (24-09-26), issue #24 part 1 closed by hand. AC1-AC3, AC5
+Fully-Automated gates passed; AC4 (service persistence) confirmed by source read. Known-gap: no
+e2e run of employees/new with contactPhone filled (no spec fills it either way). Not re-verified
+against a live owner session.
 **Complexity**: SIMPLE
 
 TL;DR: `createSchema` in `employees/new/+page.server.ts` has no `contactPhone` / `contactAddress`, so zod drops both. Add two schema lines. The service already writes both. Add one ENTRY_POINTS row and one payload test to `tests/unit/phone-entry-points.test.ts`, red first.

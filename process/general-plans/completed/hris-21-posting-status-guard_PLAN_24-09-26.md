@@ -8,7 +8,9 @@ feature: none
 # HRIS #21 — Job posting status guard (SIMPLE plan)
 
 **Date**: 24-09-26
-**Status**: PLANNED (awaiting VALIDATE)
+**Status**: MERGED to staging as PR #35 (24-09-26), issue #21 closed by hand. All Fully-Automated
+gates (AC1-AC5) and the CI e2e job (AC6) passed on the PR. No live-server proof was required by
+this plan beyond CI. Not re-verified against a live owner session.
 **Complexity**: SIMPLE
 
 TL;DR: move `updateStatus` logic into a new service function `setJobPostingStatus` in

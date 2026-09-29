@@ -3,7 +3,7 @@ name: context:all-cicd
 description: "The three CI jobs, the populated-DB schema check, and the main-only GHCR deploy — the cicd group entrypoint/router"
 keywords: ci, cd, github actions, pipeline, deploy, ghcr, playwright, e2e, gates, lint, typecheck, format, schema upgrade, droplet, ssh, staging, main
 related: [context:all-container, context:all-database]
-date: 17-08-26
+date: 24-09-26
 ---
 
 # CI/CD Context
@@ -95,6 +95,14 @@ Run these before pushing — they are the same gates:
 1. **`Closes #N` never fires.** Every issue closed after a merge here was closed **by hand**.
    Do not rely on the trailer.
 2. **Merging to `staging` does not deploy.** Only `main` triggers the deploy workflow.
+3. **CodeRabbit's automatic review never runs on a PR into `staging`** — CodeRabbit auto-reviews
+   only PRs targeting the repo's default branch, which is `main` here. A "no CodeRabbit comment"
+   or a green CodeRabbit check on a staging-targeted PR is a **skip**, not a pass; do not read it
+   as a clean review (24-09-26).
+4. **A PR stacked on another PR's branch shows a false "Conflicting" state on GitHub** until the
+   base PR merges into `staging` (or the stacked branch is rebased onto post-merge `staging`).
+   This is a GitHub UI artifact of the merge-base diff, not a real conflict — verify by diffing
+   the actual files before treating it as one (24-09-26, parallel worktree lanes with stacked PRs).
 
 ## Known Flakiness
 
