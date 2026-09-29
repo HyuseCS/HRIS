@@ -46,7 +46,7 @@
 	<section class="space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Grades</h2>
 		<Container tone="card" fill={false} flush bodyClass="card-scroll">
-			<table class="w-full min-w-max text-sm">
+			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<!-- The name column absorbs the slack (`w-full`) so the money and action
 					     columns stay hugged to their content instead of being stretched apart
@@ -143,16 +143,14 @@
 		<h2 class="font-semibold">Position Grades</h2>
 		{#if data.positions.length}
 			<Container tone="card" fill={false} flush bodyClass="card-scroll">
-				<table class="w-full min-w-max text-sm">
+				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<!-- Same column rule as the Grades table above: the title absorbs the
 						     slack, the grade picker is pinned right (#142). -->
 						<tr>
 							<th class="w-full px-3 py-2 text-left font-medium text-muted-foreground">Position</th>
 							<!-- Right-aligned so the picker sits against the table edge rather than floating
-							     mid-row (#142). Alignment and slack only: this table is min-w-max, under
-							     which per-column percentage widths (w-[1%]) collapse every column to zero —
-							     verified by screenshot, so size columns here with care. -->
+							     mid-row (#142). -->
 							<th class="px-3 py-2 text-right font-medium text-muted-foreground">Grade</th>
 						</tr>
 					</thead>
