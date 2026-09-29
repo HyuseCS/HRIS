@@ -1,7 +1,7 @@
 // One-off: backfill Notification.kind, and strip the 📢 that announcements used to prefix onto
 // their message text.
 //
-//   pnpm tsx scripts/migrate-notification-kind.ts
+//   bunx tsx scripts/migrate-notification-kind.ts
 //
 // Run this AFTER `prisma db push` adds the column — every existing row lands on the GENERAL
 // default, which would show a bell against a payslip release. The kind is recovered from the

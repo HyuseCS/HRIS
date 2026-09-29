@@ -4,7 +4,7 @@ import { db } from '$lib/server/db'
 import { manilaDayKey } from '$lib/utils/dates'
 import { canAny, requireAnyCapability } from '$lib/server/rbac'
 import { listRecentAnnouncements, createAnnouncement } from '$lib/server/services/announcements'
-import { countPendingApprovals } from '$lib/server/services/approvals'
+import { listPendingApprovals } from '$lib/server/services/approvals'
 import { listRecent } from '$lib/server/services/notifications'
 import { grantAward, listRecentAwards } from '$lib/server/services/awards'
 import {
@@ -17,7 +17,9 @@ import { listPostingsAwaitingApprover, decideJobPosting } from '$lib/server/serv
 import { isHttpError } from '@sveltejs/kit'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+const DASHBOARD_LIST_CAP = 10
+
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	const orgId = user.organizationId
 	const canPost = canAny(user.roles, 'MANAGE_HR')
@@ -26,6 +28,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Since #165 employees don't create timesheets, so the quick action would only send them
 	// to a 403. Same capability the /timesheets create action enforces.
 	const canCreateTimesheet = canAny(user.roles, 'MANAGE_HR')
+	const canApprove = canAny(user.roles, 'APPROVE_REQUESTS')
 
 	// Today's PHT day, stored as the UTC-midnight date key used by AttendanceDay.
 	const todayKey = manilaDayKey(new Date())
@@ -48,7 +51,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// Items awaiting THIS user's decision — requests, timesheets, and payroll runs
 		// (#134) — the same per-user, stage-aware count the sidebar badge uses, so the two
 		// always agree. A payroll run pending sign-off now shows here (previously missing).
-		countPendingApprovals({
+		listPendingApprovals({
 			id: user.id,
 			roles: user.roles,
 			organizationId: orgId
@@ -86,7 +89,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listRecentAwards(orgId),
 		// Side panel. Employment matters (probation reviews, contract ends, other people's
 		// leave) go only to the HR ladder; everyone still sees their own.
-		listUpcomingEvents(orgId, { userId: user.id, canSeeSensitive: canPost })
+		listUpcomingEvents(
+			orgId,
+			{ userId: user.id, canSeeSensitive: canPost },
+			new Date(),
+			DASHBOARD_LIST_CAP
+		)
 	])
 
 	// HR grants awards from the dashboard — roster for the recipient picker.
@@ -99,7 +107,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		: []
 
 	// HR's advance warning of probationary staff coming up for regularization (#168).
-	const regularizations = canPost ? await listUpcomingRegularizations(orgId) : []
+	const allRegularizations = canPost ? await listUpcomingRegularizations(orgId) : []
 
 	// Job postings awaiting this user's approval (#195) — the departments they're the
 	// approver for, plus HR-fallback postings. Needs the viewer's employee id.
@@ -108,37 +116,54 @@ export const load: PageServerLoad = async ({ locals }) => {
 		where: { userId: user.id, organizationId: orgId },
 		select: { id: true }
 	})
-	const postingsToApprove = await listPostingsAwaitingApprover(
+	const allPostingsToApprove = await listPostingsAwaitingApprover(
 		orgId,
 		myEmployee?.id ?? null,
 		roles,
 		user.id
 	)
+	const canDecidePostings =
+		canPost ||
+		(myEmployee != null &&
+			(await db.postingApprover.count({
+				where: { organizationId: orgId, approverId: myEmployee.id }
+			})) > 0)
 
 	// Recent activity — payslip releases, request outcomes, etc. (#169) persisted after the
 	// toast is gone.
-	const recentActivity = await listRecent(user.id, 8)
+	// 25, not 8: this panel is the ONLY way to recover a toast that was missed, and an unread
+	// backlog longer than the list was unrecoverable.
+	const recentActivity = await listRecent(user.id, 25)
 
 	return {
 		canPost,
+		canApprove,
+		canDecidePostings,
 		canViewPayroll,
 		canCreateTimesheet,
 		announcements,
-		regularizations,
+		regularizations: allRegularizations.slice(0, DASHBOARD_LIST_CAP),
+		regularizationsTotal: allRegularizations.length,
 		birthdays,
 		myStatus,
 		awards,
 		awardEmployees,
-		postingsToApprove,
+		postingsToApprove:
+			!canPost && canDecidePostings && url.searchParams.get('postings') === 'all'
+				? allPostingsToApprove
+				: allPostingsToApprove.slice(0, DASHBOARD_LIST_CAP),
+		postingsToApproveTotal: allPostingsToApprove.length,
 		recentActivity,
 		upcomingEvents,
+		pendingItems: pending.items,
 		metrics: {
 			headcount,
 			onLeaveToday,
-			pendingApprovals: pending.total,
-			pendingRequests: pending.requests,
-			pendingTimesheets: pending.timesheets,
-			pendingPayrollRuns: pending.payrollRuns,
+			pendingApprovals: pending.counts.total,
+			pendingRequests: pending.counts.requests,
+			pendingTimesheets: pending.counts.timesheets,
+			pendingPayrollRuns: pending.counts.payrollRuns,
+			pendingProposals: pending.counts.proposals,
 			// Withhold payroll figures from clients that may not view them.
 			lastPayrollRun: canViewPayroll ? lastPayrollRun : null,
 			attendance
@@ -158,7 +183,10 @@ export const actions: Actions = {
 
 		const parsed = announcementSchema.safeParse(Object.fromEntries(await request.formData()))
 		if (!parsed.success)
-			return fail(422, { error: parsed.error.errors[0]?.message ?? 'Invalid input' })
+			return fail(422, {
+				action: 'postAnnouncement',
+				error: parsed.error.errors[0]?.message ?? 'Invalid input'
+			})
 
 		await createAnnouncement(user.organizationId, parsed.data, {
 			organizationId: user.organizationId,
@@ -166,7 +194,7 @@ export const actions: Actions = {
 			actorRoles: user.roles,
 			ipAddress: getClientAddress()
 		})
-		return { posted: true }
+		return { action: 'postAnnouncement', saved: 'Announcement posted.' }
 	},
 
 	// Approve or send back a job posting from the approver's dashboard card (#195).
@@ -177,7 +205,11 @@ export const actions: Actions = {
 		const id = data.get('id') as string
 		const approve = data.get('action') === 'approve'
 		const note = (data.get('note') as string) || undefined
-		if (!id) return fail(400, { error: 'Missing posting id' })
+		if (!id)
+			return fail(400, {
+				action: 'decidePosting',
+				error: 'That job posting is no longer on screen. Reload the page and try again.'
+			})
 
 		const myEmployee = await db.employee.findFirst({
 			where: { userId: user.id, organizationId: user.organizationId },
@@ -197,10 +229,17 @@ export const actions: Actions = {
 				}
 			)
 		} catch (e) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e))
+				return fail(e.status, { action: 'decidePosting', error: String(e.body.message) })
 			throw e
 		}
-		return { postingDecided: true }
+		// `postingDecided` was a dead flag — nothing rendered it. The named action is what lets the
+		// error land under Postings instead of under "Give award".
+		return {
+			action: 'decidePosting',
+			saved: approve ? 'Posting approved.' : 'Posting sent back to draft.',
+			kind: approve ? 'success' : 'warning'
+		}
 	},
 
 	// HR grants an employee award, announced on the dashboard feed (#180).
@@ -211,7 +250,8 @@ export const actions: Actions = {
 		const employeeId = data.get('employeeId') as string
 		const title = (data.get('title') as string) ?? ''
 		const note = (data.get('note') as string) || undefined
-		if (!employeeId || !title.trim()) return fail(422, { error: 'Pick an employee and a title.' })
+		if (!employeeId || !title.trim())
+			return fail(422, { action: 'giveAward', error: 'Pick an employee and a title.' })
 		try {
 			await grantAward(
 				user.organizationId,
@@ -224,9 +264,10 @@ export const actions: Actions = {
 				}
 			)
 		} catch (e) {
-			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
+			if (isHttpError(e))
+				return fail(e.status, { action: 'giveAward', error: String(e.body.message) })
 			throw e
 		}
-		return { awarded: true }
+		return { action: 'giveAward', saved: 'Award given.' }
 	}
 }

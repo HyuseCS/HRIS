@@ -11,6 +11,8 @@ import {
 import { buildApprovalChain } from './routing'
 import { canAny } from '$lib/server/rbac'
 import { computeLeaveTotalDays, assertLeaveBalance, assertLeaveEligibility } from './leave'
+import { resolveInfoUpdateColumn } from './apply'
+import { isValidPhone, phoneError } from '$lib/utils/phone'
 import { evictTombstonedBytes } from './documents'
 import type { AuditContext } from '../types'
 
@@ -26,6 +28,19 @@ export async function createRequest(
 	const parsed = requestSchema.parse(input)
 	const cols = deriveRequestColumns(parsed)
 
+	// #24: an INFO_UPDATE is free-text by design — `field` names the column and `requestedValue`
+	// carries whatever the employee typed — so the phone rule cannot live in the payload schema,
+	// which never knows which column is being changed. It goes here for the same reason the LEAVE
+	// balance gate does: this is the only choke point all three filing paths share. Without it an
+	// employee files "abc" and an approver's click writes it straight to contactPhone.
+	if (
+		parsed.type === 'INFO_UPDATE' &&
+		resolveInfoUpdateColumn(parsed.field) === 'contactPhone' &&
+		!isValidPhone(parsed.requestedValue)
+	) {
+		error(400, phoneError('New phone number'))
+	}
+
 	const employee = await db.employee.findFirst({
 		where: { id: employeeId, organizationId },
 		select: { id: true, reportsToId: true, startDate: true }
@@ -34,8 +49,8 @@ export async function createRequest(
 
 	// LEAVE carries balance semantics: check the type's tenure gate, compute workdays,
 	// verify balance up front, and stash totalDays into the payload so approval can deduct
-	// it later. This is the only choke point all three filing paths (/leave/new, /requests,
-	// and the v1 API) share, so the gate belongs here rather than in any one route.
+	// it later. This is the only choke point both filing paths (/requests and the v1 API)
+	// share, so the gate belongs here rather than in any one route.
 	let payload: Record<string, unknown> = parsed
 	if (parsed.type === 'LEAVE') {
 		await assertLeaveEligibility(organizationId, parsed.leaveTypeId, employee.startDate)
@@ -134,7 +149,7 @@ export async function listRequests(
 			employee: { select: { id: true, firstName: true, lastName: true } },
 			steps: { orderBy: { stageIndex: 'asc' } }
 		},
-		orderBy: { createdAt: 'desc' },
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }

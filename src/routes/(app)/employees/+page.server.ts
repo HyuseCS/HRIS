@@ -1,16 +1,12 @@
 import { requireAnyCapability } from '$lib/server/rbac'
-import { failFromError } from '$lib/server/form-fail'
-import { paginate } from '$lib/server/pagination'
-import { countEmployees, listEmployees, offboardEmployee } from '$lib/server/services/employees'
+import { paginate, fitPageSize } from '$lib/server/pagination'
+import { countEmployees, listEmployees } from '$lib/server/services/employees'
 import { listAssignableBranches } from '$lib/server/services/branches'
-import {
-	assertCanTouchEmployee,
-	listVisibleEmployeeIds
-} from '$lib/server/services/employee-access'
+import { listVisibleEmployeeIds } from '$lib/server/services/employee-access'
 import { isFoodServiceOrg } from '$lib/orgs'
-import type { Actions, PageServerLoad } from './$types'
+import type { PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	// #234: MANAGER ranks level with HR_ADMIN (#133), so the `requireMinRole('HR_ADMIN')` that
 	// used to stand here admitted every manager to the WHOLE roster — the same dead-guard shape
 	// #228 fixed on the 201 page. This check only keeps EMPLOYEE and the off-ladder roles out;
@@ -42,7 +38,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		countEmployees(organizationId, { ...baseFilters, offboarded: true })
 	])
 	const total = tab === 'offboarded' ? offboardedCount : activeCount
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 61, chromePx: 287 })
+	})
 	const employees = listEmployees(
 		organizationId,
 		{ ...baseFilters, offboarded: tab === 'offboarded' },
@@ -62,31 +60,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 }
 
-export const actions: Actions = {
-	// Onboarding lives on the dedicated /employees/new page (full form + Discord ID); this
-	// list page only carries the offboard action for the table rows.
-	offboard: async ({ request, locals, getClientAddress }) => {
-		requireAnyCapability(locals.user!.roles, 'MANAGE_HR')
-		const user = locals.user!
-
-		const data = await request.formData()
-		const id = data.get('id') as string
-		const endDate = new Date(data.get('endDate') as string)
-
-		// #234: the scoped load hides rows, but a form action is reachable by direct POST whatever
-		// the page rendered — so the id has to be checked here, not just filtered upstream. This is
-		// the destructive half of the hole: offboarding was open to any manager, on anyone.
-		await assertCanTouchEmployee(user, id)
-
-		try {
-			await offboardEmployee(id, user.organizationId, endDate, {
-				organizationId: user.organizationId,
-				actorId: user.id,
-				actorRoles: user.roles,
-				ipAddress: getClientAddress()
-			})
-		} catch (e) {
-			return failFromError(e)
-		}
-	}
-}
+// No actions here: the roster table never posted to this route. Offboarding is done from
+// employees/[id] (`?/offboard` on the detail page), which carries its own MANAGE_HR guard and
+// its own assertCanTouchEmployee check.

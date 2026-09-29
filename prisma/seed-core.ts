@@ -331,12 +331,11 @@ async function seedFoodServiceOrg(
 export async function seedProd(db: PrismaClient) {
 	const org = await db.organization.upsert({
 		where: { id: 'org_seed' },
-		// Per-org branding (#135/#139): logo + brand colour. Veent keeps the red palette.
-		update: { name: 'Veent', logoUrl: '/veent-logo.png', themePrimary: '0 79% 45%' },
+		// Per-org branding (#135/#139): brand colour. Veent keeps the red palette.
+		update: { name: 'Veent', themePrimary: '0 79% 45%' },
 		create: {
 			id: 'org_seed',
 			name: 'Veent',
-			logoUrl: '/veent-logo.png',
 			themePrimary: '0 79% 45%',
 			address: 'Makati City, Metro Manila, Philippines'
 		}
@@ -350,7 +349,6 @@ export async function seedProd(db: PrismaClient) {
 		// that took the 'EMP' column default when the column was added.
 		update: {
 			name: 'JoJo Potato',
-			logoUrl: '/jojo-logo.png',
 			themePrimary: '32 95% 44%', // amber
 			address: 'Quezon City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'JJ'
@@ -358,7 +356,6 @@ export async function seedProd(db: PrismaClient) {
 		create: {
 			id: 'org_jojo',
 			name: 'JoJo Potato',
-			logoUrl: '/jojo-logo.png',
 			themePrimary: '32 95% 44%',
 			address: 'Quezon City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'JJ'
@@ -368,7 +365,6 @@ export async function seedProd(db: PrismaClient) {
 		where: { id: 'org_sweetleaf' },
 		update: {
 			name: 'Sweetleaf',
-			logoUrl: '/sweetleaf-logo.png',
 			themePrimary: '142 71% 42%', // green
 			address: 'Pasig City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'SL'
@@ -376,7 +372,6 @@ export async function seedProd(db: PrismaClient) {
 		create: {
 			id: 'org_sweetleaf',
 			name: 'Sweetleaf',
-			logoUrl: '/sweetleaf-logo.png',
 			themePrimary: '142 71% 42%',
 			address: 'Pasig City, Metro Manila, Philippines',
 			employeeNumberPrefix: 'SL'
@@ -797,6 +792,55 @@ export async function seedE2E(db: PrismaClient) {
 			reportsToId: managerEmployee.id,
 			discordId: '123456789012345678'
 		}
+	})
+
+	// Payroll Officer + Finance: the two back-office accounts the dev login switcher offers.
+	// Same shape as the sign-off pair above — single role, roles re-asserted on update so a
+	// drifted row is corrected, and an employee profile so their Profile page resolves.
+	//
+	// Seeded AFTER the roster accounts on purpose. No fixed employee number, and the block must
+	// stay below manager (EMP-003) and employee (EMP-004), which hardcode theirs: on a fresh DB
+	// only EMP-001/002 exist earlier, so auto-assigning here would take 003/004 and the later
+	// upserts would die on the unique index. CI caught exactly that; a populated dev DB hides it.
+	//
+	// The 900 band is NOT reserved either: the app's `nextEmployeeNumber` issues
+	// highest+1, so once EMP-903 exists every employee the app or the E2E suite creates
+	// continues from 904. A hardcoded number here collides with that residue on the
+	// (organizationId, employeeNumber) unique index — on 04-09-26 EMP-904 and EMP-905 were both
+	// held by e2e fixtures. Omitting `number` lets ensureEmployeeProfile take the next free one.
+	const payrollHash = await bcrypt.hash('Payroll@1234', 12)
+	const payrollUser = await db.user.upsert({
+		where: { email: 'payroll@veent.ph' },
+		update: { roles: ['PAYROLL_OFFICER'] },
+		create: {
+			organizationId: org.id,
+			email: 'payroll@veent.ph',
+			passwordHash: payrollHash,
+			roles: ['PAYROLL_OFFICER']
+		}
+	})
+	await ensureEmployeeProfile(db, payrollUser, {
+		firstName: 'Paolo',
+		lastName: 'Payroll',
+		jobTitle: 'Payroll Officer',
+		departmentId: dept.id
+	})
+	const financeHash = await bcrypt.hash('Finance@1234', 12)
+	const financeUser = await db.user.upsert({
+		where: { email: 'finance@veent.ph' },
+		update: { roles: ['FINANCE'] },
+		create: {
+			organizationId: org.id,
+			email: 'finance@veent.ph',
+			passwordHash: financeHash,
+			roles: ['FINANCE']
+		}
+	})
+	await ensureEmployeeProfile(db, financeUser, {
+		firstName: 'Fiona',
+		lastName: 'Finance',
+		jobTitle: 'Finance Officer',
+		departmentId: dept.id
 	})
 
 	// --- Leave balances (current year) so leave-filing E2E validates. Org-wide rather than

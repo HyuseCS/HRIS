@@ -1,6 +1,6 @@
 // One-off: add `time_logs.dedupKey` and its composite unique index (#200).
 //
-//   pnpm tsx scripts/migrate-timelog-dedup-key.ts
+//   bunx tsx scripts/migrate-timelog-dedup-key.ts
 //
 // Run this BEFORE `prisma db push` on any database that already holds punches. Push CAN add both
 // the column and the index, but it refuses to add a unique constraint to a populated table without
@@ -61,7 +61,7 @@ async function main() {
 	)
 
 	console.log(`✔ time_logs.dedupKey and ${INDEX} are in place.`)
-	console.log('  Run `pnpm db:push` next.')
+	console.log('  Run `bun run db:push` next.')
 }
 
 main()

@@ -188,7 +188,7 @@ not a tradeoff.
 6. **The punch page** — honest geolocation copy, split `role="status"`/`role="alert"`, location-failure-never-loses-the-punch carried through UI, copy, and no-JS fallback.
 7. **Decision-ready detail pages** — request detail's attempt-grouped timeline, leave-balance ledger, removed-documents audit panel; approver cards with waiting-time, coverage shortfall, and unverified-doc chips.
 8. **Honest dead-end copy** — "Used by N reviews — deactivate instead of deleting"; the redacted-subject explanation; offboarding/posting-approver setting descriptions.
-9. **The token system** — full HSL set in both themes, pre-paint bootstrap, per-tenant theming, documented micro-decisions (44px coarse-pointer floor).
+9. **The token system** — full HSL set in both themes, pre-paint bootstrap, per-tenant theming, documented micro-decisions (24px coarse-pointer floor).
 10. **Team attendance matrix and the "Exceptions only" filter** — task-shaped density done right.
 
 ---
@@ -258,6 +258,26 @@ every phase with visible change (all except where noted). Phase report written. 
 taken.
 
 ---
+
+### Execution status (updated 04-09-26)
+
+- **Phase 1 (`p0-fixes`): ✅ VERIFIED.** All 13 Manual Verification Checklist items ran live on
+  04-09-26 and passed. Archived to
+  `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`. Two UI defects found and
+  fixed during the pass (`1eabd4e`, `f5f0616`); the "closed by phase 07" regression claim in the
+  original report was checked against `feat/uiux-phase-7`/`feat/uiux-phase-10` and found false —
+  fixed directly instead in `8371cb8`. See its report for full detail.
+- **Phase 2 (`nav-ia`): CODE DONE, still `Keep in active/testing`.** A per-role nav live check ran
+  04-09-26 (HR_ADMIN, MANAGER, one plain-employee account — zero 403s, correct negative control on
+  `/reports/audit-log`), but the plan's own `VERIFIED` bar additionally requires a CEO role pass,
+  screenshots in the phase report, and an `impeccable` audit pass — none of those three ran. Stays
+  in `active/`.
+- **Phase 5 (`destructive-actions`): DONE, closed 17-09-26, PR #14 pending merge.** Archived to
+  `process/features/ui-ux-overhaul/completed/ui-ux-overhaul_03-09-26/`. Covers the owner live pass,
+  remediation A/B, the surfaces/fields/open-period pass, the datepicker rollout, the Container
+  rollout and attendance/team restructure, and the CodeRabbit CLI review remediation (19 confirmed
+  findings fixed). Final gates (17-09-26, at efe96ce): format:check clean; lint 0 errors; svelte-check 0 errors; unit 227 files / 2681 tests passed; e2e 148/148 passed. See
+  `completed/ui-ux-overhaul_03-09-26/phase-05-close_REPORT_17-09-26.md`.
 
 ### Phase 1 — `p0-fixes`
 
@@ -358,7 +378,7 @@ success flags, and add `{:catch}` to all four `{#await}` blocks. Copy the in-rep
 
 ### Phase 5 — `destructive-actions`
 
-**Plan:** `phase-05-destructive-actions_PLAN_03-09-26.md`
+**Plan:** `../../completed/ui-ux-overhaul_03-09-26/phase-05-destructive-actions_PLAN_03-09-26.md`
 
 Apply one confirm rule to the inverted-protection table in §T3: anything irreversible or
 money/person-affecting goes through `ConfirmButton`/`ConfirmDialog` with a consequence-naming
@@ -504,7 +524,7 @@ the overlap visible and sequenced, not to prevent it.
 | 3 | design-system | PLANNED | contract written — **CONDITIONAL** |
 | 4 | feedback-contract | PLANNED | contract written — **CONDITIONAL** |
 | 5 | destructive-actions | PLANNED | contract written — **CONDITIONAL** |
-| 6 | surface-consolidation | PLANNED | contract written — **BLOCKED → supplement in progress** |
+| 6 | surface-consolidation | PLANNED | contract written — **BLOCKED → supplement in progress**. NOTE (18-09-26): this row predates execution and is stale — the phase itself is `DONE (CODE DONE)` per the registry, and the on-branch `dashboard-layout` task (same branch, `feat/uiux-phase-6`, not one of the 8 phase plans) is `VERIFIED` as of 18-09-26. See `phase-blast-radius-registry.md` §"Phase 06" and §"Task — dashboard-layout" and `../dashboard-layout_17-09-26/dashboard-layout_FOLLOWUPS_18-09-26.md`. Full umbrella-table reconciliation against actual execution state is out of scope of this note. |
 | 7 | page-splits | PLANNED | contract written — **CONDITIONAL** |
 | 8 | copy-a11y | PLANNED | contract written — **CONDITIONAL** |
 

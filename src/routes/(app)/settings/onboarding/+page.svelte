@@ -1,5 +1,7 @@
 <script lang="ts">
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -16,42 +18,33 @@
 	const toggleGuard = (id: string) => (toggleGuards[id] ??= createSubmitGuard())
 
 	const inputClass =
-		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+		'h-9 w-full max-w-sm rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
 <svelte:head>
 	<title>Onboarding Checklist — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="min-w-0 flex-1 space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">Onboarding Checklist</h1>
-			<p class="max-w-2xl text-sm text-muted-foreground">
-				The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps
-				tick themselves off from the employee record (position, salary, government IDs, contract…);
-				you can reorder, rename, or hide them but not delete them.
-				<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
-				are ticked off by HR per employee.
-			</p>
-		</div>
-		<div
-			class="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 sm:basis-auto"
-		>
+<div class="space-y-6">
+	<PageHeader title="Onboarding Checklist">
+		{#snippet description()}
+			The steps shown on each employee's 201 file. <span class="font-medium">Derived</span> steps
+			tick themselves off from the employee record (position, salary, government IDs, contract…);
+			you can reorder, rename, or hide them but not delete them.
+			<span class="font-medium">Manual</span> steps (orientation attended, equipment issued, NDA signed…)
+			are ticked off by HR per employee.
+		{/snippet}
+		{#snippet back()}
 			<BackButton fallback="/settings" label="Settings" preferFallback />
-		</div>
-	</div>
+		{/snippet}
+	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} class="mx-auto max-w-4xl" autoDismiss />
 	{/if}
 
 	<!-- Add manual step -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-2xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a manual step</h2>
 		<form
 			method="POST"
@@ -97,7 +90,7 @@
 		{#if data.items.length === 0}
 			<p class="text-sm text-muted-foreground">No steps yet.</p>
 		{:else}
-			<ul class="divide-y">
+			<ul class="card-scroll divide-y">
 				{#each data.items as item, i (item.id)}
 					{@const save = saveGuard(item.id)}
 					{@const toggle = toggleGuard(item.id)}

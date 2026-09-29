@@ -1,6 +1,7 @@
 import { fail, isHttpError, redirect } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { canAny } from '$lib/server/rbac'
+import { paginate } from '$lib/server/pagination'
 import { reviewTimesheet } from '$lib/server/services/timesheets'
 import { canActOnStage, liveChain, timesheetSoD } from '$lib/server/services/approvals'
 import type { Role } from '@prisma/client'
@@ -16,7 +17,7 @@ function canReviewTimesheets(roles: Role[]) {
 	)
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!
 	const roles = user.roles
 	if (!canReviewTimesheets(roles)) redirect(303, '/requests')
@@ -45,7 +46,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			entries: { orderBy: { date: 'asc' } },
 			approvalSteps: true
 		},
-		orderBy: { submittedAt: 'asc' }
+		orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }]
 	})
 
 	const pendingTimesheets = submitted
@@ -61,12 +62,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 				timesheetSoD(user.id, ts.approvalSteps, live.attempt)
 			)
 		})
-		.map(({ approvalSteps, ...ts }) => ({
-			...ts,
-			currentStage: liveChain(approvalSteps)?.currentStep?.stage ?? null
-		}))
+		.map(({ approvalSteps, ...ts }) => {
+			const live = liveChain(approvalSteps)
+			return {
+				...ts,
+				currentStage: live?.currentStep?.stage ?? null,
+				currentStageKind: live?.currentStep?.stageKind ?? null,
+				currentStageRole: live?.currentStep?.role ?? null
+			}
+		})
 
-	return { pendingTimesheets }
+	const pagination = paginate(url, pendingTimesheets.length)
+
+	return {
+		pendingTimesheets: pendingTimesheets.slice(pagination.skip, pagination.skip + pagination.take),
+		pagination
+	}
 }
 
 function ctxOf(event: RequestEvent) {
@@ -77,6 +88,25 @@ function ctxOf(event: RequestEvent) {
 		actorRoles: u.roles,
 		ipAddress: event.getClientAddress()
 	}
+}
+
+async function reviewedSummary(
+	verb: string,
+	employeeIds: string[],
+	organizationId: string,
+	done: number,
+	skipped: number
+) {
+	const named = employeeIds.length
+		? await db.employee.findMany({
+				where: { id: { in: employeeIds.slice(0, 3) }, organizationId },
+				select: { firstName: true, lastName: true }
+			})
+		: []
+	const names = named.map((e) => `${e.firstName} ${e.lastName}`)
+	const more = done - names.length
+	const list = names.length ? ` (${names.join(', ')}${more > 0 ? ` and ${more} more` : ''})` : ''
+	return `${verb} ${done} timesheet${done === 1 ? '' : 's'}${list}${skipped ? `, ${skipped} skipped` : ''}.`
 }
 
 export const actions: Actions = {
@@ -104,8 +134,14 @@ export const actions: Actions = {
 			)
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
+		}
+
+		// The page already renders `form?.saved`; the action just never populated it.
+		return {
+			action: 'review',
+			saved: approved ? 'Timesheet approved.' : 'Timesheet rejected.',
+			kind: approved ? 'success' : 'warning'
 		}
 	},
 
@@ -122,18 +158,25 @@ export const actions: Actions = {
 		if (!ids.length) return fail(400, { error: 'No timesheets selected' })
 
 		const ctx = ctxOf(event)
+		const reviewedFor: string[] = []
 		let done = 0
 		let skipped = 0
 		for (const id of ids) {
 			try {
-				await reviewTimesheet(id, user.organizationId, true, undefined, ctx)
+				const row = await reviewTimesheet(id, user.organizationId, true, undefined, ctx)
 				done++
+				if (row?.employeeId) reviewedFor.push(row.employeeId)
 			} catch {
 				skipped++
 			}
 		}
+		if (done === 0)
+			return fail(400, {
+				error:
+					'No timesheets were approved. They may already have been reviewed, or they are not yours to act on.'
+			})
 		return {
-			saved: `Approved ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
+			saved: await reviewedSummary('Approved', reviewedFor, user.organizationId, done, skipped)
 		}
 	},
 
@@ -154,18 +197,26 @@ export const actions: Actions = {
 		if (reason === '') return fail(400, { error: 'A reason is required to reject.' })
 
 		const ctx = ctxOf(event)
+		const reviewedFor: string[] = []
 		let done = 0
 		let skipped = 0
 		for (const id of ids) {
 			try {
-				await reviewTimesheet(id, user.organizationId, false, reason, ctx)
+				const row = await reviewTimesheet(id, user.organizationId, false, reason, ctx)
 				done++
+				if (row?.employeeId) reviewedFor.push(row.employeeId)
 			} catch {
 				skipped++
 			}
 		}
+		if (done === 0)
+			return fail(400, {
+				error:
+					'No timesheets were rejected. They may already have been reviewed, or they are not yours to act on.'
+			})
 		return {
-			saved: `Rejected ${done} timesheet${done === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.`
+			saved: await reviewedSummary('Rejected', reviewedFor, user.organizationId, done, skipped),
+			kind: 'warning'
 		}
 	}
 }

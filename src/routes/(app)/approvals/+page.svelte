@@ -1,1 +1,1 @@
-<!-- Never rendered: the server load redirects /approvals → /requests (merged page). -->
+<!-- Never rendered: the server load redirects /approvals → /requests/approvals (the approval inbox). -->

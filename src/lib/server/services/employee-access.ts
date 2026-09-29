@@ -17,7 +17,7 @@
  */
 
 import { error } from '@sveltejs/kit'
-import type { Role } from '@prisma/client'
+import type { EmploymentStatus, Role } from '@prisma/client'
 import { db } from '$lib/server/db'
 import { canAny } from '$lib/rbac'
 import { listReportIdsFor } from './supervisors'
@@ -120,6 +120,9 @@ export async function listVisibleEmployeeIds(user: EmployeeAccessActor): Promise
 export const SELF_ACTION_DENIED =
 	'You cannot record pay or employment changes on your own record — ask another admin to do it.'
 
+export const OFFBOARDED_NO_NEW_PAY =
+	'Employee is offboarded — new loans, advances, allowances and deductions cannot be added'
+
 /**
  * Separation of duties: nobody writes their own pay or employment terms.
  *
@@ -137,16 +140,20 @@ export function assertNotSelf(actorUserId: string, target: { userId: string }): 
 }
 
 /**
- * Org-scoped employee lookup returning just what `assertNotSelf` needs. Shared by the pay writers
- * (earnings, deductions, loans), which each carried a byte-identical copy.
+ * Org-scoped employee lookup returning what `assertNotSelf` and `assertAcceptsNewPay` need. Shared
+ * by the pay writers (earnings, deductions, loans), which each carried a byte-identical copy.
  */
 export async function requireEmployee(employeeId: string, organizationId: string) {
 	const e = await db.employee.findFirst({
 		where: { id: employeeId, organizationId },
-		select: { id: true, userId: true }
+		select: { id: true, userId: true, employmentStatus: true }
 	})
 	if (!e) error(404, 'Employee not found')
 	return e
+}
+
+export function assertAcceptsNewPay(target: { employmentStatus: EmploymentStatus }): void {
+	if (target.employmentStatus === 'OFFBOARDED') error(409, OFFBOARDED_NO_NEW_PAY)
 }
 
 /** Throwing form for route guards. 403 — the record may well exist, the actor just can't have it. */

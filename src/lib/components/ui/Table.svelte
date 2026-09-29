@@ -20,7 +20,8 @@
 		emptyDescription,
 		emptyVariant = 'empty',
 		emptyAction,
-		caption
+		caption,
+		bare = false
 	}: {
 		columns: Column[]
 		rows: Row[]
@@ -34,18 +35,20 @@
 		emptyVariant?: 'empty' | 'no-results'
 		emptyAction?: Snippet
 		caption?: string
+		bare?: boolean
 	} = $props()
 
 	const alignClass = (c: Column) =>
 		c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left'
 	// w-[1%] collapses a column to its content under `table-auto`. Paired with whitespace-nowrap
 	// so the content it is sized to cannot wrap and defeat the point.
-	const widthClass = (c: Column) => (c.width === 'min' ? 'w-[1%] whitespace-nowrap' : '')
+	const widthClass = (c: Column) =>
+		c.width === 'min' ? 'w-[1%] whitespace-nowrap' : c.width === 'auto' ? '' : (c.width ?? '')
 	const mobileColumns = $derived(columns.filter((c) => !c.hideOnMobile))
 </script>
 
-{#if rows.length === 0}
-	<div class="rounded-lg bg-card ring-1 ring-black/[0.12] dark:ring-white/10">
+{#if rows.length === 0 && !bare}
+	<div class="rounded-lg border bg-card">
 		<EmptyState
 			variant={emptyVariant}
 			title={emptyTitle}
@@ -57,7 +60,9 @@
 	<!-- Desktop: a real table. Hidden rather than reflowed below sm so the two layouts can each
 	     be laid out properly instead of compromising on one. -->
 	<div
-		class="hidden overflow-x-auto rounded-lg bg-card ring-1 ring-black/[0.12] sm:block dark:ring-white/10"
+		class={bare
+			? 'hidden overflow-x-auto sm:block'
+			: 'hidden overflow-x-auto rounded-lg border bg-card sm:block'}
 	>
 		<table class="w-full text-sm">
 			{#if caption}
@@ -103,12 +108,18 @@
 
 	<!-- Mobile: one card per row, label beside value. Sideways scrolling a six-column table on a
 	     390px screen is technically readable and practically useless. -->
-	<ul class="space-y-2 sm:hidden">
+	<ul
+		class={bare
+			? rows.length === 0
+				? 'hidden'
+				: 'space-y-2 p-3 sm:hidden'
+			: 'space-y-2 sm:hidden'}
+	>
 		{#each rows as row, i (getKey(row, i))}
 			<!-- Deliberately not clickable, unlike the desktop row: a card-shaped button whose
 			     label is its whole contents is poor for screen readers, and every table that uses
 			     row-click also carries an action cell, which the card renders like any other. -->
-			<li class="rounded-lg bg-card p-3 ring-1 ring-black/[0.12] dark:ring-white/10">
+			<li class="rounded-lg border bg-card p-3">
 				<dl class="space-y-1.5">
 					{#each mobileColumns as column (column.key)}
 						<div class="flex items-start justify-between gap-3">

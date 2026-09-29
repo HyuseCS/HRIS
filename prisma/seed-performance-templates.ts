@@ -177,7 +177,7 @@ export function adminStaff(): TemplateStructure {
 async function seed(db: PrismaClient) {
 	const orgs = await db.organization.findMany({ select: { id: true, name: true } })
 	if (orgs.length === 0) {
-		console.error('No organizations found — run `pnpm db:seed` first.')
+		console.error('No organizations found — run `bun run db:seed` first.')
 		process.exitCode = 1
 		return
 	}

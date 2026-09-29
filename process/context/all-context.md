@@ -180,7 +180,7 @@ veent_hris/
 - **Database:** PostgreSQL via Prisma 5.22 — **Postgres 18 locally, Postgres 16 in production compose**
 - **Auth:** Lucia v3 + `@lucia-auth/adapter-prisma`
 - **Validation:** Zod 3
-- **UI:** Tailwind CSS v3 + `bits-ui`, `lucide-svelte`, `layerchart`; Leaflet 1.9 for maps
+- **UI:** Tailwind CSS v3 + `lucide-svelte`, `layerchart`; Leaflet 1.9 for maps (`bits-ui` removed 15-09-26, F11a — 0 imports)
 - **PDF:** pdfkit (payslips)
 - **Testing:** Vitest 2.1 (unit), Playwright 1.49 (e2e)
 - **Package manager:** pnpm 10.33.0 — use `pnpm`, never `npm`

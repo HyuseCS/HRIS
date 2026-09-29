@@ -2,7 +2,7 @@
 // of weekdays, with a deliberate mix of statuses so the Attendance views — and the
 // "Exceptions only" filter (#55) — have realistic data to show.
 //
-//   pnpm tsx scripts/seed-attendance-demo.ts
+//   bunx tsx scripts/seed-attendance-demo.ts
 //
 // Statuses are scattered so that on any given day the team view has a mix (some
 // PRESENT, some LATE/INCOMPLETE/ABSENT/ON_LEAVE) and each employee's range does too.
@@ -74,7 +74,7 @@ function fieldsFor(status: AttendanceStatus, key: string) {
 
 async function main() {
 	const org = await db.organization.findFirst()
-	if (!org) throw new Error('No organization — run `pnpm db:seed` first.')
+	if (!org) throw new Error('No organization — run `bun run db:seed` first.')
 
 	const employees = await db.employee.findMany({
 		where: { organizationId: org.id, employmentStatus: 'ACTIVE' },

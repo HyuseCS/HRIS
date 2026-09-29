@@ -16,7 +16,12 @@ import type { Role } from '@prisma/client'
 
 const { runsMock, payrollMock } = vi.hoisted(() => ({
 	runsMock: { voidRun: vi.fn() },
-	payrollMock: { listPayrollRuns: vi.fn(), createPayrollRun: vi.fn(), computePayroll: vi.fn() }
+	payrollMock: {
+		countPayrollRuns: vi.fn(),
+		listPayrollRuns: vi.fn(),
+		createPayrollRun: vi.fn(),
+		computePayroll: vi.fn()
+	}
 }))
 vi.mock('$lib/server/services/payroll/runs', () => runsMock)
 vi.mock('$lib/server/services/payroll/index', () => payrollMock)
@@ -39,6 +44,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	runsMock.voidRun.mockResolvedValue({ id: 'r1', status: 'VOIDED' })
 	payrollMock.listPayrollRuns.mockReturnValue(Promise.resolve([]))
+	payrollMock.countPayrollRuns.mockResolvedValue(0)
 })
 
 describe('the void action', () => {
@@ -91,10 +97,12 @@ describe('the void action', () => {
 	})
 })
 
+const pageReq = { url: new URL('http://localhost/payroll'), cookies: { get: () => undefined } }
+
 describe('the load function', () => {
 	it('grants canVoid only to a holder of OVERRIDE_FINALIZED', async () => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const ev = (roles: Role[]) => ({ locals: { user: user(roles) } }) as any
+		const ev = (roles: Role[]) => ({ locals: { user: user(roles) }, ...pageReq }) as any
 		// `load`'s declared return widens to `void | …` through SvelteKit's generated types, so read
 		// the field off an explicit shape rather than asserting on the union.
 		const canVoidFor = async (roles: Role[]) =>

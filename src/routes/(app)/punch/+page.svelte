@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { onMount, tick } from 'svelte'
 	import { enhance } from '$app/forms'
 	import PunchMapDialog from '$lib/components/timesheets/PunchMapDialog.svelte'
@@ -197,12 +199,7 @@
 <svelte:head><title>Punch — Veent HRIS</title></svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6">
-	<div>
-		<h1 class="text-2xl font-semibold">Punch</h1>
-		{#if data.linked}
-			<p class="text-sm text-muted-foreground">{data.employeeName}</p>
-		{/if}
-	</div>
+	<PageHeader title="Punch" description={data.linked ? data.employeeName : undefined} />
 
 	{#if !data.linked}
 		<!-- #177 M-7 — rendered inside the app shell, so the nav is still there. -->
@@ -283,7 +280,7 @@
 
 			<div role="alert" class="text-sm">
 				{#if form?.punched}
-					<p class="font-medium text-foreground">
+					<p use:autoDismiss class="font-medium text-foreground">
 						Punched {form.punched === 'IN' ? 'in' : 'out'}{form.hadLocation
 							? ' with your location.'
 							: ' without a location.'}
@@ -293,6 +290,7 @@
 					     the reader cannot see. `text-destructive` fails AA on the dark card (3.44:1);
 					     the red-600/red-400 pair is what the rest of the app already uses. -->
 					<p
+						use:autoDismiss
 						class="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 font-medium text-red-600 dark:text-red-400"
 					>
 						Not punched. {form.error}
@@ -306,7 +304,7 @@
 			{#if data.punches.length === 0}
 				<p class="text-sm text-muted-foreground">No punches recorded in this window.</p>
 			{:else}
-				<ul class="divide-y divide-border rounded-lg border border-border">
+				<ul class="divide-y divide-border rounded-lg border border-border bg-card">
 					{#each data.punches as p (p.id)}
 						<li class="flex flex-wrap items-baseline justify-between gap-2 p-3 text-sm">
 							<span class="font-medium">{p.punchType === 'IN' ? 'Clock in' : 'Clock out'}</span>

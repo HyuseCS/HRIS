@@ -50,12 +50,12 @@ environment — it is the shared key used to sign and verify every punch.
 ## Running
 
 ```bash
-pnpm bot
+bun run bot
 ```
 
 On startup the bot registers `/in` and `/out` to every server it has joined. Members type
 `/in` (optionally `/in 9:00` to backfill), get a private confirmation, and the bot posts the public
-announcement. `pnpm bot` is fine for local development, but for production run it under a process
+announcement. `bun run bot` is fine for local development, but for production run it under a process
 manager so it restarts on crash and on server reboot — see **Production deployment** below.
 
 ## Production deployment
@@ -65,8 +65,8 @@ HMAC-signed HTTP calls to the HRIS — it does **not** listen on any port, so th
 reverse-proxy. Production hardening is therefore just: keep it running, restart it on failure, start
 it on boot, and rotate its logs. Either pm2 or systemd below does this; pick one.
 
-Run the bot from the repo root with the same `.env` used by `pnpm bot`. Ensure `tsx` is installed
-(it is a dev dependency; on a production box run `pnpm install` or install `tsx` globally).
+Run the bot from the repo root with the same `.env` used by `bun run bot`. Ensure `tsx` is installed
+(it is a dev dependency; on a production box run `bun install` or install `tsx` globally).
 
 ### Option A — pm2
 
@@ -78,8 +78,8 @@ module.exports = {
 	apps: [
 		{
 			name: 'veent-hris-bot',
-			script: 'pnpm',
-			args: 'bot',
+			script: 'bun',
+			args: 'run bot',
 			cwd: '/opt/veent-hris', // absolute path to the repo on the server
 			autorestart: true,
 			max_restarts: 10,
@@ -116,7 +116,7 @@ Type=simple
 User=veent
 WorkingDirectory=/opt/veent-hris
 EnvironmentFile=/opt/veent-hris/.env
-ExecStart=/usr/bin/pnpm bot
+ExecStart=/usr/bin/bun run bot
 Restart=on-failure
 RestartSec=5
 # Discord rate-limits reconnect storms; cap restart attempts per window.
@@ -138,8 +138,8 @@ Notes:
 
 - `EnvironmentFile` reads the same `.env` (`DISCORD_BOT_TOKEN`, `HRIS_API_URL`, `TIMELOG_API_SECRET`).
   Keep it `chmod 600` and owned by the service user — it holds the bot token and HMAC secret.
-- If `pnpm` is not on the system `PATH` for the service user, use the absolute path in `ExecStart`
-  (`which pnpm`), or `ExecStart=/usr/bin/node /path/to/tsx scripts/discord-bot.ts`.
+- If `bun` is not on the system `PATH` for the service user, use the absolute path in `ExecStart`
+  (`which bun`), or `ExecStart=/usr/bin/node /path/to/tsx scripts/discord-bot.ts`.
 - After a code update, `sudo systemctl restart veent-hris-bot` (pm2: `pm2 restart veent-hris-bot`).
 
 ### Health & recovery
@@ -192,7 +192,7 @@ later slash commands stay consistent with each other automatically.
 The app has **no scheduler** — nothing inside SvelteKit runs on a timer. Recurring jobs are
 one-shot scripts under `scripts/`, invoked by cron on the droplet.
 
-`scripts/` is baked into the production image and `tsx` survives `pnpm prune --prod`, so any
+`scripts/` is baked into the production image and `tsx` survives the production install, so any
 script here runs in prod unchanged.
 
 > **These crontab entries live outside the repo.** `deploy.yml` does `git reset --hard
@@ -208,7 +208,7 @@ Since #222 it goes through `promoteEmployee`, effective on the day probation act
 so a cron that missed a few nights backdates correctly instead of dating the change to the sweep.
 
 ```text
-0 1 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/promote-probationary.ts >> /var/log/veent-regularize.log 2>&1
+0 1 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app bunx tsx scripts/promote-probationary.ts >> /var/log/veent-regularize.log 2>&1
 ```
 
 Runs 01:00 droplet time. `docker compose run --rm` costs no idle RAM on the 512MB droplet — the
@@ -217,7 +217,7 @@ same pattern the compose header documents for seeding.
 Dry run first when testing (lists who _would_ be promoted, writes nothing):
 
 ```bash
-docker compose run --rm app pnpm exec tsx scripts/promote-probationary.ts --dry-run
+docker compose run --rm app bunx tsx scripts/promote-probationary.ts --dry-run
 ```
 
 Idempotent — the query only matches `PROBATIONARY`, so re-running the same night is a no-op.
@@ -239,7 +239,7 @@ Backup**. This cron entry only _offers_ the script a chance to run each night; t
 exits doing nothing when the org's interval has not elapsed.
 
 ```text
-30 2 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/backup-documents.ts >> /var/log/veent-backup.log 2>&1
+30 2 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app bunx tsx scripts/backup-documents.ts >> /var/log/veent-backup.log 2>&1
 ```
 
 Runs 02:30 droplet time — after the 01:00 regularization sweep, so the two never contend for
@@ -252,13 +252,13 @@ unmounted path is deleted the moment the script finishes.
 Dry run first when testing (lists what _would_ be copied, writes nothing anywhere):
 
 ```bash
-docker compose run --rm app pnpm exec tsx scripts/backup-documents.ts --dry-run
+docker compose run --rm app bunx tsx scripts/backup-documents.ts --dry-run
 ```
 
 Force a run outside the configured interval (still honours the lock and retention):
 
 ```bash
-docker compose run --rm app pnpm exec tsx scripts/backup-documents.ts --force
+docker compose run --rm app bunx tsx scripts/backup-documents.ts --force
 ```
 
 Locally, in **fish** — `VAR=value cmd` is bash-only syntax and fails in fish, so prefix with
@@ -266,7 +266,7 @@ Locally, in **fish** — `VAR=value cmd` is bash-only syntax and fails in fish, 
 any `BACKUP_DIR` line in `.env.dev`:
 
 ```
-env BACKUP_DIR=$PWD/backups pnpm exec dotenv -e .env.dev -- tsx scripts/backup-documents.ts --dry-run
+env BACKUP_DIR=$PWD/backups bunx dotenv -e .env.dev -- tsx scripts/backup-documents.ts --dry-run
 ```
 
 Concurrency-safe: each org is held under a session-level advisory lock for the duration, so a
@@ -310,7 +310,7 @@ night; the script exits doing nothing when the org's interval has not elapsed. A
 config row uses the defaults and is never written to by this script.
 
 ```text
-0 2 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/generate-review-cycles.ts >> /var/log/veent-review-cycles.log 2>&1
+0 2 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app bunx tsx scripts/generate-review-cycles.ts >> /var/log/veent-review-cycles.log 2>&1
 ```
 
 > **`deploy.yml` does NOT create this crontab entry.** As stated for this file as a whole, the
@@ -325,13 +325,13 @@ sweep and the 02:30 document backup, so the three never contend for the 512MB bo
 Dry run first when testing (lists the cycle and reviews it _would_ create, writes nothing):
 
 ```bash
-docker compose run --rm app pnpm exec tsx scripts/generate-review-cycles.ts --dry-run
+docker compose run --rm app bunx tsx scripts/generate-review-cycles.ts --dry-run
 ```
 
 Force a run outside the configured cadence:
 
 ```bash
-docker compose run --rm app pnpm exec tsx scripts/generate-review-cycles.ts --force
+docker compose run --rm app bunx tsx scripts/generate-review-cycles.ts --force
 ```
 
 Idempotent at the **database**, not by the script's own care:
@@ -384,7 +384,7 @@ a row: `PerformanceReview.lastReminderKind` is compared before sending. Escalati
 fires — `due-soon` followed by `overdue` is a different kind.
 
 ```text
-0 */6 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app pnpm exec tsx scripts/send-review-reminders.ts >> /var/log/veent-review-reminders.log 2>&1
+0 */6 * * *  cd ~/repos/Veent_HRIS && docker compose run --rm app bunx tsx scripts/send-review-reminders.ts >> /var/log/veent-review-reminders.log 2>&1
 ```
 
 > **`deploy.yml` does NOT create this crontab entry.** As stated for this file as a whole, the
@@ -399,13 +399,13 @@ Dry run first when testing (prints every reminder it _would_ send, writes nothin
 nothing):
 
 ```bash
-docker compose run --rm app pnpm exec tsx scripts/send-review-reminders.ts --dry-run
+docker compose run --rm app bunx tsx scripts/send-review-reminders.ts --dry-run
 ```
 
 Locally:
 
 ```bash
-pnpm exec dotenv -e .env.dev -- tsx scripts/send-review-reminders.ts --dry-run
+bunx dotenv -e .env.dev -- tsx scripts/send-review-reminders.ts --dry-run
 ```
 
 Unlike `promote-probationary.ts` and `generate-review-cycles.ts`, it writes **no** `AuditLog`
@@ -453,16 +453,16 @@ happens.
 
 ### Type-checking scripts
 
-`pnpm check` does **not** cover `scripts/**` or `prisma/**` — one site has already shipped
+`bun run check` does **not** cover `scripts/**` or `prisma/**` — one site has already shipped
 broken on that assumption (#282). Nothing in this directory is typechecked by the standard
 gate. To check it by hand:
 
 ```bash
 printf '%s' '{"extends":"./.svelte-kit/tsconfig.json","compilerOptions":{"allowJs":true,"checkJs":true,"esModuleInterop":true,"resolveJsonModule":true,"skipLibCheck":true,"strict":true,"moduleResolution":"bundler"},"include":["scripts/**/*.ts","src/**/*.ts"]}' > tsconfig.scripts.json
-pnpm exec svelte-kit sync && pnpm exec tsc --noEmit -p tsconfig.scripts.json
+bunx svelte-kit sync && bunx tsc --noEmit -p tsconfig.scripts.json
 rm tsconfig.scripts.json
 ```
 
-`pnpm exec tsc --noEmit scripts/<file>.ts` on its own does **not** work: passing a file
+`bunx tsc --noEmit scripts/<file>.ts` on its own does **not** work: passing a file
 directly makes tsc ignore `tsconfig.json`, so every `$lib/...` import fails to resolve and the
 errors are noise. The config above is required.

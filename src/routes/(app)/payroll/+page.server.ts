@@ -1,7 +1,9 @@
 import { error, fail, isHttpError } from '@sveltejs/kit'
 import { requireAnyCapability, requirePayrollManage } from '$lib/server/rbac'
 import { canAny } from '$lib/rbac'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
+	countPayrollRuns,
 	listPayrollRuns,
 	createPayrollRun,
 	computePayroll
@@ -10,7 +12,7 @@ import { voidRun } from '$lib/server/services/payroll/runs'
 import { z } from 'zod'
 import type { Actions, PageServerLoad } from './$types'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	const roles = user.roles
 	// Managers run/override; the sign-off roles (Verifier/Approver) need the list to find
@@ -27,8 +29,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Stream the runs list so the page renders a skeleton while it loads. Finance approvers
 	// (CEO / Super Admin) see every tenant's runs to sign them off (#174); the page labels
 	// the tenant and limits create/compute controls to the viewer's own org.
-	const runs = listPayrollRuns(user.organizationId, roles)
-	return { runs, canManage, canVoid, viewerOrg: user.organizationId }
+	const total = await countPayrollRuns(user.organizationId, roles)
+	const pagination = paginate(url, total, {
+		// ponytail: rowPx/chromePx estimated from sibling list pages, not measured live
+		pageSize: fitPageSize(cookies, { rowPx: 57, chromePx: 258 })
+	})
+	const runs = listPayrollRuns(user.organizationId, roles, {
+		skip: pagination.skip,
+		take: pagination.take
+	})
+	return { runs, pagination, canManage, canVoid, viewerOrg: user.organizationId }
 }
 
 const createSchema = z.object({
@@ -43,7 +53,7 @@ export const actions: Actions = {
 
 		const raw = Object.fromEntries(await request.formData())
 		const parsed = createSchema.safeParse(raw)
-		if (!parsed.success) return fail(400, { error: 'Invalid dates' })
+		if (!parsed.success) return fail(400, { error: 'Choose a period start date and end date.' })
 
 		// Service errors (e.g. "run for this period already exists") come back as
 		// HttpErrors — surface them inline instead of blowing up to an error page.
@@ -68,7 +78,10 @@ export const actions: Actions = {
 		requireAnyCapability(user.roles, 'OVERRIDE_FINALIZED')
 
 		const id = String((await request.formData()).get('id') ?? '')
-		if (!id) return fail(400, { error: 'Missing run id' })
+		if (!id)
+			return fail(400, {
+				error: 'That payroll run is no longer on screen. Reload the page and try again.'
+			})
 
 		try {
 			await voidRun(id, user.organizationId, {
@@ -81,6 +94,9 @@ export const actions: Actions = {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
 		}
+
+		// Irreversible and money-moving. Silence here read as a no-op.
+		return { action: 'void', saved: 'Payroll run voided.' }
 	},
 
 	compute: async ({ request, locals, getClientAddress }) => {

@@ -1,8 +1,8 @@
 // One-off: seed a baseline EmployeeEmploymentType row for every existing employee (#222).
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-employee-employment-type-baseline.ts
+//   bunx dotenv -e .env.dev -- tsx scripts/migrate-employee-employment-type-baseline.ts
 //
-// Run AFTER `pnpm db:push` adds the `employee_employment_type_history` table. Promotions record the
+// Run AFTER `bun run db:push` adds the `employee_employment_type_history` table. Promotions record the
 // employment type as an effective-dated snapshot; a baseline row (the current type, effective since
 // the hire's startDate) gives the as-of read a floor.
 //

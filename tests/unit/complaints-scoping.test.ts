@@ -50,10 +50,12 @@ vi.mock('$lib/server/services/employee-access', () => ({
 
 const { listComplaintsForEmployee, listComplaintsForOrg, resolveComplaint, countWaitingInquiries } =
 	await import('$lib/server/services/complaints')
+// The route moved to /inquiries in phase 08; the service module, the Prisma models and the audit
+// entity names still say "complaint", which is why only these two paths changed.
 const { load: listLoad, actions: listActions } =
-	await import('../../src/routes/(app)/complaints/+page.server')
+	await import('../../src/routes/(app)/inquiries/+page.server')
 const { load: threadLoad, actions: threadActions } =
-	await import('../../src/routes/(app)/complaints/[id]/+page.server')
+	await import('../../src/routes/(app)/inquiries/[id]/+page.server')
 
 const ORG = 'org1'
 const ACTOR_USER = 'u-actor'
@@ -102,6 +104,7 @@ const actor = (roles: Role[]) => ({ id: ACTOR_USER, roles, organizationId: ORG }
 const listLoadEvent = (roles: Role[]) =>
 	({
 		locals: { user: { id: ACTOR_USER, organizationId: ORG, roles } },
+		cookies: { get: () => undefined },
 		url: new URL('http://localhost/complaints')
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	}) as any
@@ -332,7 +335,7 @@ describe('complaints list scoping (#112)', () => {
 })
 
 /**
- * `pnpm check` proves `actorRoles` is PRESENT, never that it is COMPLETE — `actorRoles:
+ * `bun run check` proves `actorRoles` is PRESENT, never that it is COMPLETE — `actorRoles:
  * [user.roles[0]]` type-checks perfectly clean. That narrowing is the #247/#272/#275 failure class,
  * and a single-role fixture would hide it, hence the two-hat actor.
  */

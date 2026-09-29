@@ -4,7 +4,7 @@
  * exists (same employee, dates, and leaveTypeId in payload). The legacy table is left
  * intact (dormant) so this is reversible; drop it in a later cleanup after QA.
  *
- * Run: pnpm exec tsx scripts/migrate-leave-to-request.ts
+ * Run: bunx tsx scripts/migrate-leave-to-request.ts
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
 

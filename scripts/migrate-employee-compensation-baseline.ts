@@ -1,8 +1,8 @@
 // One-off: seed a baseline EmployeeCompensation row for every existing employee (#170/#171).
 //
-//   pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-employee-compensation-baseline.ts
+//   bunx dotenv -e .env.dev -- tsx scripts/migrate-employee-compensation-baseline.ts
 //
-// Run AFTER `pnpm db:push` adds the `employee_compensation_history` table. The mid-period payroll
+// Run AFTER `bun run db:push` adds the `employee_compensation_history` table. The mid-period payroll
 // resolver reads comp "as of date X" from this table; a baseline row (the current salary/rateType,
 // effective since the hire's startDate) gives it a floor so unfinalized past runs resolve correctly.
 //

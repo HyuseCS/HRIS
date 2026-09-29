@@ -74,7 +74,6 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 		return { ok: true }
@@ -93,7 +92,6 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 		return { finalized: true }
@@ -119,7 +117,6 @@ export const actions: Actions = {
 			return { undone: true, ...result }
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
 	}

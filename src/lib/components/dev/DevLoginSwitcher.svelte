@@ -28,6 +28,7 @@
 			org: 'Veent',
 			accounts: [
 				{ label: 'Super Admin', email: 'admin@veent.ph' },
+				{ label: 'HR Admin', email: 'hr@veent.ph' },
 				{ label: 'Manager (HR)', email: 'manager@veent.ph' },
 				{ label: 'Verifier', email: 'verifier@veent.ph' },
 				{ label: 'Approver', email: 'approver@veent.ph' },

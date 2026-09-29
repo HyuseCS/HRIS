@@ -36,7 +36,7 @@ export const actions: Actions = {
 		const data = await request.formData()
 		const departmentId = data.get('departmentId') as string
 		const approverId = data.get('approverId') as string
-		if (!departmentId) return fail(400, { error: 'Missing department' })
+		if (!departmentId) return fail(400, { error: 'Choose a department.' })
 		// An empty approver clears the mapping (falls back to HR).
 		try {
 			if (!approverId) {

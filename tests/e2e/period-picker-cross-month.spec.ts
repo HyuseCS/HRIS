@@ -9,7 +9,7 @@ import { login, USERS } from './helpers'
  * does either. The mount that matters most is `/payroll/periods`, which is the only one that
  * OVERRIDES both field names (`startName="start" endName="end"`) to match the zod schema in
  * `payroll/periods/+page.server.ts` (`start` / `end`). Nothing type-checks that pairing: rename a
- * prop on either side and every unit test, `pnpm check` and `pnpm lint` stay green while the form
+ * prop on either side and every unit test, `bun run check` and `bun run lint` stay green while the form
  * silently posts fields the action cannot parse. These assertions are the only thing that notices.
  *
  * Read-only by construction. No test here submits, so the suite writes nothing to the database.
@@ -28,9 +28,15 @@ const START = '2026-12-26'
 const END = '2027-01-10'
 const PREVIEW = 'Dec 26 – Jan 10, 2027 (16 days) · statutory and loans prorated to 52% of a month'
 
-/** Switch the picker to Custom range and fill the cross-month range. Asserts no inline refusal. */
-async function fillCrossMonth(page: Page) {
-	await page.getByRole('button', { name: 'Custom range' }).click()
+/**
+ * Switch the picker to Custom range and fill the cross-month range. Asserts no inline refusal.
+ *
+ * `compact` mounts (the New Timesheet dialog) render the four kinds as a select rather than a
+ * segmented control — the buttons need ~545px and do not fit in a modal.
+ */
+async function fillCrossMonth(page: Page, compact = false) {
+	if (compact) await page.getByLabel('Period').selectOption('CUSTOM')
+	else await page.getByRole('button', { name: 'Custom range' }).click()
 	await page.getByLabel('Start date').fill(START)
 	await page.getByLabel('End date').fill(END)
 	await expect(page.locator('#pp-custom-error')).toHaveCount(0)
@@ -60,9 +66,11 @@ test('the /payroll/periods picker posts the RENAMED start/end fields for a cross
 	await login(page, USERS.admin)
 	await page.goto('/payroll/periods', { waitUntil: 'domcontentloaded' })
 	await page.getByRole('button', { name: 'Open Period' }).click()
+	const dialog = page.getByRole('dialog', { name: 'Open a Payroll Period' })
+	await expect(dialog).toBeVisible()
 	await fillCrossMonth(page)
 
-	const form = page.locator('form[action="?/open"]')
+	const form = dialog.locator('form[action="?/open"]')
 	await expect(form.locator('p[aria-live="polite"]')).toHaveText(PREVIEW)
 
 	// The whole point of this test. `openSchema` in `payroll/periods/+page.server.ts` parses
@@ -77,11 +85,27 @@ test('the /payroll/periods picker posts the RENAMED start/end fields for a cross
 	await expect(form.locator('input[name="periodEnd"]')).toHaveCount(0)
 })
 
+test('the /payroll/periods Open Period dialog closes on Escape and returns focus to its trigger', async ({
+	page
+}) => {
+	await login(page, USERS.admin)
+	await page.goto('/payroll/periods', { waitUntil: 'domcontentloaded' })
+	const trigger = page.getByRole('button', { name: 'Open Period' })
+	await trigger.click()
+	const dialog = page.getByRole('dialog', { name: 'Open a Payroll Period' })
+	await expect(dialog).toBeVisible()
+
+	await page.keyboard.press('Escape')
+
+	await expect(dialog).toHaveCount(0)
+	await expect(trigger).toBeFocused()
+})
+
 test('the /timesheets New Timesheet dialog accepts a cross-month range', async ({ page }) => {
 	await login(page, USERS.admin)
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 	await page.getByRole('button', { name: 'New Timesheet' }).click()
-	await fillCrossMonth(page)
+	await fillCrossMonth(page, true)
 
 	const form = page.locator('form[action="/timesheets?/create"]')
 	await expect(form.locator('p[aria-live="polite"]')).toHaveText(PREVIEW)

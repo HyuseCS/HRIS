@@ -167,7 +167,8 @@ test('employee sees only their own attendance, with no correction controls', asy
 
 	// No way to reach another employee's records: no picker, no team view, no matrix link.
 	await expect(page.getByLabel('Employee')).toHaveCount(0)
-	await expect(page.getByRole('link', { name: 'Whole team (day)' })).toHaveCount(0)
+	await expect(page.getByRole('link', { name: 'Whole team', exact: true })).toHaveCount(0)
+	await expect(page.getByRole('link', { name: 'Show one day', exact: true })).toHaveCount(0)
 	await expect(page.getByRole('link', { name: 'By employee' })).toHaveCount(0)
 	await expect(page.getByRole('link', { name: /Multi-day matrix/ })).toHaveCount(0)
 

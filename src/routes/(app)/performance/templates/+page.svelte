@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { enhance } from '$app/forms'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -43,24 +45,28 @@
 	<title>Evaluation Templates — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Evaluation Templates"
 		description="The evaluation forms HR issues. Each one prints the categories, criteria, rating scale and signing order you compose here."
 	/>
 
 	{#if formError}
-		<div class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+		<div
+			use:autoDismiss
+			class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+			role="alert"
+		>
 			{formError}
 		</div>
 	{/if}
 
 	{#if data.backfillCount > 0}
-		<p class="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm">
+		<Banner kind="warning">
 			{data.backfillCount} active
 			{data.backfillCount === 1 ? 'employee has' : 'employees have'} no assigned template. This is a readiness
 			note, not a blocker.
-		</p>
+		</Banner>
 	{/if}
 
 	<!-- Create -->
@@ -108,7 +114,7 @@
 				description="Create the first one above, then compose its categories and criteria."
 			/>
 		{:else}
-			<ul class="divide-y">
+			<ul class="card-scroll divide-y">
 				{#each data.templates as template (template.id)}
 					{@const toggle = toggleGuard(template.id)}
 					<li class="flex flex-wrap items-center gap-3 px-4 py-3">
@@ -149,10 +155,10 @@
 								greyed-out control would be a permanently dead affordance HR keeps retrying; the
 								reason and the alternative are written out instead.
 							-->
-							<span class="px-3 py-1.5 text-xs text-muted-foreground">
+							<p class="w-full text-xs text-muted-foreground">
 								Used by {template.reviewCount}
 								{template.reviewCount === 1 ? 'review' : 'reviews'} — deactivate instead of deleting
-							</span>
+							</p>
 						{:else}
 							<ConfirmButton
 								action="?/deleteTemplate"

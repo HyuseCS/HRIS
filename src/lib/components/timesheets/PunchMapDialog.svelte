@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fade, scale } from 'svelte/transition'
+	import Dialog from '$lib/components/ui/Dialog.svelte'
 	// Stylesheet only — no `window` access, so unlike the library itself this is SSR-safe at
 	// module scope. The pin is an SVG circleMarker, so Leaflet's marker PNGs are never needed
 	// and their broken-default-path problem never arises.
@@ -48,26 +48,13 @@
 	const MAX_FIT_ZOOM = 17
 
 	let mapEl = $state<HTMLDivElement>()
-	let cardEl = $state<HTMLElement>()
 	let tilesFailed = $state(false)
 
-	// What had focus when the modal opened — the "View on map" trigger for a keyboard user. Closing
-	// must hand focus back to it; without this the caret lands on <body> and the reader restarts
-	// from the top of the page.
-	let lastFocused: HTMLElement | null = null
-
+	// Focusing the panel on open and handing focus back to the "View on map" trigger on close are
+	// both Dialog's job now.
 	function close() {
 		punch = null
-		lastFocused?.focus()
-		lastFocused = null
 	}
-
-	// Focus the card on open so Escape is handled here rather than bubbling away.
-	$effect(() => {
-		if (!punch) return
-		lastFocused = document.activeElement as HTMLElement | null
-		cardEl?.focus()
-	})
 
 	/**
 	 * Build the map once the container exists, and tear it down when the modal closes — Leaflet
@@ -129,95 +116,41 @@
 			map?.remove()
 		}
 	})
-
-	// `aria-modal` tells a screen reader the rest of the page is inert; it does NOT stop Tab from
-	// walking out of the dialog into the page behind it. This does.
-	const FOCUSABLE =
-		'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			e.stopPropagation()
-			close()
-			return
-		}
-		if (e.key !== 'Tab' || !cardEl) return
-
-		// Rebuilt per keypress rather than cached: Leaflet adds its attribution links after the
-		// dialog mounts, so a list taken on open would miss them.
-		const items = [...cardEl.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-			(el) => el.offsetParent !== null
-		)
-		if (items.length === 0) {
-			e.preventDefault()
-			cardEl.focus()
-			return
-		}
-
-		const first = items[0]
-		const last = items[items.length - 1]
-		const active = document.activeElement
-		// The card itself holds focus on open, so Shift+Tab from there wraps to the end.
-		if (e.shiftKey && (active === first || active === cardEl)) {
-			e.preventDefault()
-			last.focus()
-		} else if (!e.shiftKey && active === last) {
-			e.preventDefault()
-			first.focus()
-		}
-	}
 </script>
 
 {#if punch}
-	<div
-		class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-		onclick={close}
-		role="presentation"
-		transition:fade={{ duration: 100 }}
-	>
-		<div
-			bind:this={cardEl}
-			class="w-full max-w-lg rounded-xl border bg-card p-4 shadow-2xl focus:outline-none"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={onKeydown}
-			role="dialog"
-			aria-modal="true"
-			aria-label="Punch location"
-			tabindex="-1"
-			transition:scale={{ duration: 120, start: 0.96 }}
-		>
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<h2 class="text-base font-semibold">Punch location</h2>
-					<p class="text-xs text-muted-foreground">{punch.at}</p>
-				</div>
-				<button
-					type="button"
-					onclick={close}
-					class="rounded-md border px-3 py-1 text-sm hover:bg-accent">Close</button
-				>
+	<Dialog open onclose={close} title="Punch location" size="lg" padding="sm" zIndex={60}>
+		<div class="flex items-start justify-between gap-4">
+			<div>
+				<h2 class="text-base font-semibold">Punch location</h2>
+				<p class="text-xs text-muted-foreground">{punch.at}</p>
 			</div>
-
-			<div
-				bind:this={mapEl}
-				data-testid="punch-map"
-				data-lat={punch.latitude}
-				data-lon={punch.longitude}
-				class="mt-3 h-72 w-full overflow-hidden rounded-md border border-border bg-muted"
-			></div>
-
-			{#if tilesFailed}
-				<p class="mt-2 text-xs text-muted-foreground">
-					The map could not load. The reading is still recorded.
-				</p>
-			{/if}
-
-			<!-- The accuracy qualifier stays with the reading — a pin is not an exact position. -->
-			<p class="mt-2 text-xs text-muted-foreground">
-				{punch.locationAccuracyM === null
-					? 'Accuracy unknown — the pin may be off.'
-					: `Accurate to about ±${Math.round(punch.locationAccuracyM)} m — the shaded circle is that margin.`}
-			</p>
+			<button
+				type="button"
+				onclick={close}
+				class="rounded-md border px-3 py-1 text-sm hover:bg-accent">Close</button
+			>
 		</div>
-	</div>
+
+		<div
+			bind:this={mapEl}
+			data-testid="punch-map"
+			data-lat={punch.latitude}
+			data-lon={punch.longitude}
+			class="mt-3 h-72 w-full overflow-hidden rounded-md border border-border bg-muted"
+		></div>
+
+		{#if tilesFailed}
+			<p class="mt-2 text-xs text-muted-foreground">
+				The map could not load. The reading is still recorded.
+			</p>
+		{/if}
+
+		<!-- The accuracy qualifier stays with the reading — a pin is not an exact position. -->
+		<p class="mt-2 text-xs text-muted-foreground">
+			{punch.locationAccuracyM === null
+				? 'Accuracy unknown — the pin may be off.'
+				: `Accurate to about ±${Math.round(punch.locationAccuracyM)} m — the shaded circle is that margin.`}
+		</p>
+	</Dialog>
 {/if}

@@ -3,7 +3,7 @@ import { seedE2E } from './seed-core'
 
 // Full demo roster for the Playwright suite (and local development): the production
 // baseline plus manager / employee / verifier / approver accounts and the employee's
-// leave balances. Run with `pnpm db:seed:e2e` before the E2E suite.
+// leave balances. Run with `bun run db:seed:e2e` before the E2E suite.
 const db = new PrismaClient()
 
 seedE2E(db)

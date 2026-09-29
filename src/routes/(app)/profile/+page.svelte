@@ -1,8 +1,15 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { formatDate, formatCurrency } from '$lib/utils/format'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import { labelFor, EMPLOYMENT_TYPE_LABELS, BENEFIT_PLAN_TYPE_LABELS } from '$lib/labels'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 
@@ -30,20 +37,16 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="page-header">
-		<h1 class="page-title">My Profile</h1>
-	</div>
+	<PageHeader title="My Profile" />
 
 	{#if form?.success}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400"
-		>
-			Profile updated successfully.
-		</div>
+		<Banner kind="success" message="Profile updated successfully." autoDismiss />
 	{/if}
 
 	{#if form?.error}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
@@ -74,7 +77,9 @@
 					</div>
 					<div>
 						<dt class="text-xs text-muted-foreground">Employment Type</dt>
-						<dd class="mt-0.5 text-sm font-medium">{emp.employmentType.replace(/_/g, ' ')}</dd>
+						<dd class="mt-0.5 text-sm font-medium">
+							{labelFor(EMPLOYMENT_TYPE_LABELS, emp.employmentType)}
+						</dd>
 					</div>
 				</div>
 				<div class="grid grid-cols-2 gap-4">
@@ -101,9 +106,7 @@
 					<div>
 						<dt class="text-xs text-muted-foreground">Status</dt>
 						<dd class="mt-0.5">
-							<span class="badge-{emp.employmentStatus === 'ACTIVE' ? 'green' : 'gray'}">
-								{emp.employmentStatus}
-							</span>
+							<Badge status={emp.employmentStatus} domain="employment" />
 						</dd>
 					</div>
 				</div>
@@ -179,16 +182,31 @@
 						</div>
 					</div>
 
-					<div class="space-y-1.5">
-						<label for="contactPhone" class="text-xs font-medium text-muted-foreground">Phone</label
-						>
-						<input
-							id="contactPhone"
-							name="contactPhone"
-							type="tel"
-							value={emp.contactPhone ?? ''}
-							class="input"
-						/>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-1.5">
+							<label for="contactPhone" class="text-xs font-medium text-muted-foreground"
+								>Phone</label
+							>
+							<input
+								id="contactPhone"
+								name="contactPhone"
+								type="tel"
+								value={emp.contactPhone ?? ''}
+								class="input"
+							/>
+						</div>
+
+						<div class="space-y-1.5">
+							<label for="dateOfBirth" class="text-xs font-medium text-muted-foreground"
+								>Date of Birth</label
+							>
+							<DatePicker
+								id="dateOfBirth"
+								name="dateOfBirth"
+								value={emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0, 10) : ''}
+								class="input w-full"
+							/>
+						</div>
 					</div>
 
 					<div class="space-y-1.5">
@@ -201,19 +219,6 @@
 							rows="2"
 							class="input h-auto resize-none py-2">{emp.contactAddress ?? ''}</textarea
 						>
-					</div>
-
-					<div class="space-y-1.5">
-						<label for="dateOfBirth" class="text-xs font-medium text-muted-foreground"
-							>Date of Birth</label
-						>
-						<input
-							id="dateOfBirth"
-							name="dateOfBirth"
-							type="date"
-							value={emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().slice(0, 10) : ''}
-							class="input"
-						/>
 					</div>
 
 					<div class="pt-2">
@@ -238,7 +243,7 @@
 			<span class="text-xs text-muted-foreground">Last {data.punchWindowDays} days</span>
 		</div>
 		{#if data.punches.length}
-			<div class="overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -257,7 +262,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<p class="text-xs text-muted-foreground">
 				These are your raw clock in/out and break punches. HR aggregates them into your timesheet;
 				if something looks wrong, contact HR.
@@ -276,7 +281,7 @@
 			My Documents
 		</h2>
 		{#if data.documents.length}
-			<div class="overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -305,7 +310,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 		{:else}
 			<p class="text-xs text-muted-foreground">
 				No documents on file. HR uploads contracts, IDs, and other records here.
@@ -319,7 +324,7 @@
 			My Benefits
 		</h2>
 		{#if data.benefits.length}
-			<div class="overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -334,7 +339,9 @@
 						{#each data.benefits as b (b.id)}
 							<tr class="hover:bg-muted/30 {b.status === 'ACTIVE' ? '' : 'opacity-60'}">
 								<td class="px-3 py-2 font-medium">{b.plan.name}</td>
-								<td class="px-3 py-2 text-muted-foreground">{b.plan.type.replace('_', ' ')}</td>
+								<td class="px-3 py-2 text-muted-foreground"
+									>{labelFor(BENEFIT_PLAN_TYPE_LABELS, b.plan.type)}</td
+								>
 								<td class="px-3 py-2 text-muted-foreground">{b.coverageLevel ?? '—'}</td>
 								<td class="px-3 py-2 text-right"
 									>{b.plan.employeeCost != null
@@ -342,20 +349,13 @@
 										: '—'}</td
 								>
 								<td class="px-3 py-2">
-									<span
-										class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {b.status ===
-										'ACTIVE'
-											? 'bg-green-500/15 text-green-400'
-											: b.status === 'WAIVED'
-												? 'bg-yellow-500/15 text-yellow-400'
-												: 'bg-gray-500/15 text-gray-400'}">{b.status}</span
-									>
+									<Badge status={b.status} domain="benefitEnrollment" />
 								</td>
 							</tr>
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 		{:else}
 			<p class="text-xs text-muted-foreground">
 				You have no benefit enrollments. HR manages enrollments.

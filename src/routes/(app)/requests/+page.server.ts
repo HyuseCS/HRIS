@@ -1,6 +1,6 @@
 import { fail, isHttpError } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
-import { paginate } from '$lib/server/pagination'
+import { fitPageSize, paginate } from '$lib/server/pagination'
 import {
 	createRequest,
 	countRequests,
@@ -10,8 +10,10 @@ import {
 	deleteRequest
 } from '$lib/server/services/requests'
 import { uploadsFromForm, saveRequestDocuments } from '$lib/server/services/requests/documents'
+import { getLeaveBalances } from '$lib/server/services/leave'
 import { meetsLeaveTenure } from '$lib/server/services/requests/leave'
 import { requestSchema } from '$lib/server/schemas/requests'
+import { manilaDayKey } from '$lib/utils/dates'
 import type { Actions, PageServerLoad } from './$types'
 
 /**
@@ -31,7 +33,7 @@ function findSelfEmployee(user: { id: string; organizationId: string }) {
 
 // Self-service: the current user's own requests. Approvals live under
 // /requests/timesheets and /requests/approvals.
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const user = locals.user!
 	const myEmployee = await findSelfEmployee(user)
 
@@ -40,7 +42,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		? { organizationId: user.organizationId, employeeId: myEmployee.id }
 		: null
 	const total = listParams ? await countRequests(listParams) : 0
-	const pagination = paginate(url, total)
+	const pagination = paginate(url, total, {
+		pageSize: fitPageSize(cookies, { rowPx: 51, chromePx: 191 })
+	})
 
 	const [requests, leaveTypes] = await Promise.all([
 		listParams
@@ -53,8 +57,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		})
 	])
 
+	const year = Number(manilaDayKey(new Date()).slice(0, 4))
+	const balancesFor = async (y: number) =>
+		myEmployee
+			? (await getLeaveBalances(myEmployee.id, y)).map((b) => ({
+					...b,
+					allocated: Number(b.allocated),
+					used: Number(b.used),
+					remaining: Number(b.remaining)
+				}))
+			: []
+	const [thisYear, nextYear] = await Promise.all([balancesFor(year), balancesFor(year + 1)])
+
 	return {
 		requests,
+		balancesByYear: { [year]: thisYear, [year + 1]: nextYear },
 		// Tenure-gated types are greyed out in the file form; createRequest is the real
 		// enforcement point (#137). Without an employee record nothing is filable anyway.
 		leaveTypes: leaveTypes.map((lt) => ({
@@ -148,11 +165,9 @@ export const actions: Actions = {
 					error: String(e.body.message),
 					values: raw as Record<string, string>
 				})
-			if (e instanceof Error)
-				return fail(400, { error: e.message, values: raw as Record<string, string> })
 			throw e
 		}
-		return { message: 'Request submitted.' }
+		return { saved: 'Request submitted.' }
 	},
 
 	cancel: async ({ request, locals, getClientAddress }) => {
@@ -172,10 +187,9 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
-		return { message: 'Request cancelled.' }
+		return { saved: 'Request cancelled.' }
 	},
 
 	resubmit: async ({ request, locals, getClientAddress }) => {
@@ -195,9 +209,8 @@ export const actions: Actions = {
 			})
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
-			if (e instanceof Error) return fail(400, { error: e.message })
 			throw e
 		}
-		return { message: 'Request re-submitted.' }
+		return { saved: 'Request re-submitted.' }
 	}
 }

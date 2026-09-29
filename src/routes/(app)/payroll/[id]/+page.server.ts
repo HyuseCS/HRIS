@@ -103,11 +103,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	}
 }
 
-// `finite()` matters as much as `min(0)`: z.coerce.number() turns "" into 0 and
-// "abc" into NaN, and NaN would otherwise satisfy a bare number() check.
+// `finite()` matters as much as `min(0)`: z.coerce.number() turns "" into 0 (so blanks are
+// removed before coercing) and "abc" into NaN, and NaN would otherwise satisfy a bare number() check.
 const overrideSchema = z.object({
 	entryId: z.string().min(1),
-	netPay: z.coerce.number().finite().min(0),
+	netPay: z.preprocess(
+		(v) => (v == null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
+		z.coerce.number().finite().min(0)
+	),
 	note: z.string().trim().min(1)
 })
 
@@ -143,6 +146,8 @@ export const actions: Actions = {
 			note,
 			ctxOf(locals, getClientAddress())
 		)
+
+		return { action: 'override', saved: 'Net pay overridden.' }
 	},
 
 	// Recompute this run in place (e.g. after assigning recurring earnings or
@@ -168,7 +173,7 @@ export const actions: Actions = {
 		requireAnyCapability(user.roles, 'APPROVE_REQUESTS')
 
 		const parsed = decideSchema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid decision' })
+		if (!parsed.success) return fail(400, { error: 'Choose Approve or Reject.' })
 		const { action, note } = parsed.data
 
 		try {
@@ -182,6 +187,14 @@ export const actions: Actions = {
 		} catch (e: unknown) {
 			if (isHttpError(e)) return fail(e.status, { error: String(e.body.message) })
 			throw e
+		}
+
+		// Final payroll sign-off. `action` is already bound above to the decision verb, so this
+		// names the key explicitly rather than shorthand.
+		return {
+			action: 'decide',
+			saved: action === 'approve' ? 'Payroll run signed off.' : 'Run returned to the maker.',
+			kind: action === 'approve' ? 'success' : 'warning'
 		}
 	}
 }

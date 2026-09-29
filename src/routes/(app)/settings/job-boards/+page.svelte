@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -21,7 +22,7 @@
 	<title>Job Boards — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Job Boards"
 		description="The sites HR can mark a posting as published to (JobStreet, Indeed, LinkedIn…). Track where a role went on each posting's page. Deactivate a board to hide it from new postings without losing where past roles were advertised."
@@ -32,15 +33,11 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} class="mx-auto max-w-3xl" autoDismiss />
 	{/if}
 
 	<!-- Add -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-3xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Add a board</h2>
 		<form
 			method="POST"
@@ -69,12 +66,12 @@
 	</section>
 
 	<!-- List -->
-	<section class="space-y-3 rounded-lg border bg-card p-4">
+	<section class="mx-auto max-w-3xl space-y-3 rounded-lg border bg-card p-4">
 		<h2 class="font-semibold">Boards</h2>
 		{#if data.boards.length === 0}
 			<p class="text-sm text-muted-foreground">No boards yet — add one above.</p>
 		{:else}
-			<ul class="divide-y">
+			<ul class="card-scroll divide-y">
 				{#each data.boards as board (board.id)}
 					{@const save = saveGuard(board.id)}
 					{@const toggle = toggleGuard(board.id)}

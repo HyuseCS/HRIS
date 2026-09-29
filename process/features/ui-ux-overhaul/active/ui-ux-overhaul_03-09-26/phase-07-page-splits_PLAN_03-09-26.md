@@ -277,7 +277,7 @@ Commit after each section (S1–S7). Run that section's test gate before the com
 - [ ] B4. **Supervisors: `<select multiple size=4>` → checkbox list.** Same `name="supervisorIds"`,
       same `?/setSupervisors` action, same submit guard. A scrollable `<fieldset>` with a
       `<legend>`, one checkbox + `<label>` per option, `max-h-48 overflow-y-auto`. Delete the
-      "Ctrl/Cmd-click to select multiple" hint. Checkboxes are excluded from the 44px coarse-pointer
+      "Ctrl/Cmd-click to select multiple" hint. Checkboxes are excluded from the 24px coarse-pointer
       floor on purpose (`app.css`) — do not add a size override.
 - [ ] B5. **Reveal survives save (SC-2).** In the page component, replace
       `const revealed = $derived(form?.revealed ?? null)` with a `$state` holding the last revealed
@@ -347,7 +347,7 @@ Commit after each section (S1–S7). Run that section's test gate before the com
       B5's `$state` change. This is gate G6.
 - [ ] D4. Onboarding manual-step checkbox (People finding): the 16px `✓` text-glyph button is
       sub-24px. Replace with a real `<button>` carrying an accessible name
-      (`aria-label="Mark {step} complete"`), letting the existing coarse-pointer 44px floor apply.
+      (`aria-label="Mark {step} complete"`), letting the existing coarse-pointer 24px floor apply.
       Same `?/toggleOnboardingStep` action.
 - [ ] D5. Gate: `pnpm check` + `pnpm test`. Commit.
 

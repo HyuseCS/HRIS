@@ -1,22 +1,77 @@
 <script lang="ts">
-	import { getToasts, dismissToast } from '$lib/stores/toast.svelte'
+	import {
+		getToasts,
+		dismissToast,
+		dismissAllToasts,
+		pauseToasts,
+		resumeToasts
+	} from '$lib/stores/toast.svelte'
 
 	const toasts = $derived(getToasts())
+	let region = $state<HTMLElement>()
 
+	// Hover-to-pause is attached imperatively, not as `onmouseenter`: a toast card is a static
+	// element, and declaring mouse handlers on one earns an a11y warning that would be wrong to
+	// silence — the keyboard equivalent already lives on the region as focusin/focusout.
+	const onEnter = () => pauseToasts('hover')
+	const onLeave = () => resumeToasts('hover')
+	function pausable(node: HTMLElement) {
+		node.addEventListener('mouseenter', onEnter)
+		node.addEventListener('mouseleave', onLeave)
+		return {
+			destroy() {
+				node.removeEventListener('mouseenter', onEnter)
+				node.removeEventListener('mouseleave', onLeave)
+				// An unmounting node fires neither mouseleave nor focusout, and both flags are module
+				// state that only a resume clears — skip this and the toaster stays paused for good.
+				onLeave()
+				if (!region?.contains(document.activeElement)) resumeToasts('focus')
+			}
+		}
+	}
+
+	// A toast floats over arbitrary page content, so unlike `Banner` it cannot use a 10% tint —
+	// whatever is underneath shows through and the text stops being readable. Solid fills, and the
+	// token foregrounds measured against the 4.5 floor.
 	const kindClass = (k: string) =>
 		k === 'success'
-			? 'border-green-500/30 bg-green-500/10 text-green-300'
+			? 'border-success bg-success text-success-foreground'
 			: k === 'error'
-				? 'border-red-500/30 bg-red-500/10 text-red-300'
-				: 'border-border bg-card text-foreground'
+				? 'border-destructive bg-destructive text-destructive-foreground'
+				: k === 'warning'
+					? 'border-warning bg-warning text-warning-foreground'
+					: 'border-border bg-card text-foreground'
 </script>
 
+<!--
+	role="status" (not alert) — the container is persistent, so an assertive container would
+	re-announce on every mutation. aria-atomic="false" is required: role="status" implies
+	aria-atomic="true", which would read the WHOLE stack out again each time one toast arrives.
+-->
 <div
+	bind:this={region}
+	role="status"
+	aria-live="polite"
+	aria-atomic="false"
 	class="pointer-events-none fixed right-4 top-4 z-[100] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
+	onfocusin={() => pauseToasts('focus')}
+	onfocusout={() => resumeToasts('focus')}
 >
+	<!-- A stack this deep is hard to clear one ✕ at a time. -->
+	{#if toasts.length > 2}
+		<button
+			type="button"
+			onclick={dismissAllToasts}
+			use:pausable
+			class="pointer-events-auto self-end rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
+			>Dismiss all</button
+		>
+	{/if}
 	{#each toasts as t (t.id)}
 		<div
-			class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg backdrop-blur {kindClass(
+			aria-live={t.kind === 'error' ? 'assertive' : undefined}
+			use:pausable
+			class="pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg {kindClass(
 				t.kind
 			)}"
 		>
@@ -35,7 +90,9 @@
 				type="button"
 				onclick={() => dismissToast(t.id)}
 				aria-label="Dismiss"
-				class="shrink-0 text-muted-foreground hover:text-foreground">✕</button
+				class="shrink-0 {t.kind === 'info'
+					? 'text-muted-foreground hover:text-foreground'
+					: 'hover:opacity-80'}">✕</button
 			>
 		</div>
 	{/each}

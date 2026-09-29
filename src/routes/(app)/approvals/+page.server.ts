@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 
-// Approvals were merged into the unified "Requests/Approvals" page at /requests.
+// The approval inbox lives at /requests/approvals; /requests is the user's own filings.
 export const load: PageServerLoad = () => {
-	redirect(308, '/requests')
+	redirect(308, '/requests/approvals')
 }

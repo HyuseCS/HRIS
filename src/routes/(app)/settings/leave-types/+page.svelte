@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
 
@@ -20,14 +22,14 @@
 	const toggleGuard = (id: string) => (toggleGuards[id] ??= createSubmitGuard())
 
 	const inputClass =
-		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+		'h-9 w-full max-w-sm rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
 <svelte:head>
 	<title>Leave Types — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Leave Types"
 		description="Master data for the leave/request flow: name, whether it's paid, the default yearly allocation, and carry-over policy. Deactivate a type to hide it from new requests without affecting existing balances."
@@ -38,11 +40,7 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 
 	<!-- Add -->
@@ -133,7 +131,7 @@
 		{#if data.leaveTypes.length === 0}
 			<p class="text-sm text-muted-foreground">No leave types yet — add one above.</p>
 		{:else}
-			<div class="overflow-x-auto rounded-md border">
+			<Container tone="card" fill={false} flush bodyClass="card-scroll">
 				<table class="w-full min-w-max text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -248,7 +246,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 			<p class="text-xs text-muted-foreground">
 				Edit a row's fields and press <span class="font-medium">Save</span>. Carry-over max applies
 				only when carry-over is enabled.

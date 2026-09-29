@@ -17,7 +17,7 @@ See the override block at the top of that file; do not activate or suggest it un
 - Prisma 5 + PostgreSQL 18 (Docker `veent-db-5434` on host networking, veent/veent, db=`veent_hris`, port 5434 — inside the container too, so `docker exec … psql -p 5434`). Start it with `./start.sh`; env lives in `.env.dev`, there is no `.env`.
 - Lucia v3 + `@lucia-auth/adapter-prisma` for session auth
 - Tailwind CSS v3 with HSL design tokens (`src/app.css`)
-- pnpm 10 as package manager — use `pnpm` not `npm`
+- bun 1.4 as package manager — use `bun` not `npm`; run scripts with `bun run <script>`, never bare `bun <script>` (bun shadows `test`/`build` with its own builtins)
 
 ## Key constraints
 

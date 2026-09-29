@@ -6,15 +6,15 @@
 // there is no route to the prod database from a laptop:
 //
 //   ssh <droplet> && cd ~/repos/Veent_HRIS
-//   docker compose exec app pnpm prod-delete employee <employeeId>
+//   docker compose exec app bun run prod-delete employee <employeeId>
 //
 // Locally it works the same way against whatever DATABASE_URL is set (dev DB, a restored
-// dump); `pnpm prod-delete …` is the local form.
+// dump); `bun run prod-delete …` is the local form.
 //
-//   pnpm prod-delete employee <employeeId>          # dry run — counts every row it would delete
-//   pnpm prod-delete employee <employeeId> --execute --confirm=EMP-0042 --actor=hr@veent.ph
-//   pnpm prod-delete payroll-run <runId>
-//   pnpm prod-delete payroll-run <runId> --execute --confirm=2026-07-01..2026-07-15 --actor=hr@veent.ph
+//   bun run prod-delete employee <employeeId>          # dry run — counts every row it would delete
+//   bun run prod-delete employee <employeeId> --execute --confirm=EMP-0042 --actor=hr@veent.ph
+//   bun run prod-delete payroll-run <runId>
+//   bun run prod-delete payroll-run <runId> --execute --confirm=2026-07-01..2026-07-15 --actor=hr@veent.ph
 //
 // Rails, in the order you meet them:
 //   1. Dry run is the default. Nothing is written without --execute.
@@ -79,8 +79,8 @@ const confirm = flag('confirm')
 const actorEmail = flag('actor')
 
 const USAGE = `Usage:
-  pnpm prod-delete employee <employeeId> [--execute --confirm=<employeeNumber> --actor=<email>]
-  pnpm prod-delete payroll-run <runId>   [--execute --confirm=<periodStart..periodEnd> --actor=<email>]`
+  bun run prod-delete employee <employeeId> [--execute --confirm=<employeeNumber> --actor=<email>]
+  bun run prod-delete payroll-run <runId>   [--execute --confirm=<periodStart..periodEnd> --actor=<email>]`
 
 function die(message: string): never {
 	console.error(`\n✗ ${message}\n`)
@@ -182,7 +182,7 @@ async function deleteEmployee(employeeId: string) {
 	// must go, tombstoned or not. The null filter is NOT cosmetic here: removeFiles() is typed
 	// `string[]` and the private deleteStoredFile above calls path.resolve(UPLOAD_DIR, storageKey),
 	// which throws `TypeError: The "path" argument must be of type string` on a null — mid-purge, on
-	// the droplet. `pnpm check` does not read scripts/, so nothing in the pipeline would flag it.
+	// the droplet. `bun run check` does not read scripts/, so nothing in the pipeline would flag it.
 	const storageKeys = [...employeeDocs, ...requestDocs]
 		.map((d) => d.storageKey)
 		.filter((k): k is string => k !== null)
@@ -294,7 +294,7 @@ async function deleteEmployee(employeeId: string) {
 	if (!execute) {
 		console.log(
 			`\nDry run — nothing was deleted. To go ahead:\n` +
-				`  pnpm prod-delete employee ${employeeId} --execute --confirm=${employee.employeeNumber} --actor=<email>\n`
+				`  bun run prod-delete employee ${employeeId} --execute --confirm=${employee.employeeNumber} --actor=<email>\n`
 		)
 		return
 	}
@@ -410,7 +410,7 @@ async function deletePayrollRun(runId: string) {
 	if (!execute) {
 		console.log(
 			`\nDry run — nothing was deleted. To go ahead:\n` +
-				`  pnpm prod-delete payroll-run ${runId} --execute --confirm=${token} --actor=<email>\n`
+				`  bun run prod-delete payroll-run ${runId} --execute --confirm=${token} --actor=<email>\n`
 		)
 		return
 	}

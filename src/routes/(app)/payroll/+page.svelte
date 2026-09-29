@@ -1,12 +1,18 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { formatCurrency, formatShortDate } from '$lib/utils/format'
 	import PeriodPicker from '$lib/components/ui/PeriodPicker.svelte'
 	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
+	import LoadError from '$lib/components/ui/LoadError.svelte'
 	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import { addToast } from '$lib/stores/toast.svelte'
 	import type { PageData, ActionData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
@@ -52,8 +58,10 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Payroll Runs</h1>
+	<PageHeader title="Payroll Runs" />
+
+	<!-- The run actions sit above the list they add to, not on the title row. -->
+	<div class="flex items-center justify-end">
 		{#if data.canManage}
 			<div class="flex items-center gap-2">
 				<a
@@ -80,6 +88,8 @@
 
 	{#if form?.error && !showCreate}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive"
 		>
 			{form.error}
@@ -91,30 +101,33 @@
 			method="POST"
 			action="?/create"
 			use:enhance={create.enhance}
-			class="rounded-lg border p-4 space-y-3"
+			class="rounded-lg border bg-card p-4 space-y-3"
 		>
 			<h2 class="font-semibold">Create Payroll Run</h2>
-			{#if form?.error}<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{#if form?.error}<div
+					use:autoDismiss
+					role="alert"
+					class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive"
+				>
 					{form.error}
 				</div>{/if}
-			<!-- #163: wide enough that Month, Year and all four period buttons sit on one row
-			     and the two date fields keep their two-column grid instead of stacking. -->
-			<div class="max-w-4xl">
-				<PeriodPicker />
-			</div>
-			<div class="flex items-center gap-2">
-				<button
-					type="submit"
-					disabled={create.busy}
-					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-					>{create.busy ? 'Creating…' : 'Create'}</button
-				>
-				<button
-					type="button"
-					onclick={() => (showCreate = false)}
-					class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
-				>
-			</div>
+			<PeriodPicker>
+				{#snippet actions()}
+					<div class="flex gap-2">
+						<button
+							type="button"
+							onclick={() => (showCreate = false)}
+							class="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button
+						>
+						<button
+							type="submit"
+							disabled={create.busy}
+							class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+							>{create.busy ? 'Creating…' : 'Create'}</button
+						>
+					</div>
+				{/snippet}
+			</PeriodPicker>
 		</form>
 	{/if}
 
@@ -124,7 +137,7 @@
 		<!-- A finance approver (CEO / Super Admin) sees runs from every tenant (#174); the
 		     Tenant column and per-row org label only appear once runs span more than one org. -->
 		{@const crossTenant = runs.some((r) => r.organizationId !== data.viewerOrg)}
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -148,28 +161,25 @@
 							{#if crossTenant}
 								<td class="px-4 py-3 text-muted-foreground">{run.organization?.name ?? '—'}</td>
 							{/if}
-							<td class="px-4 py-3 text-right font-mono"
+							<td class="px-4 py-3 text-right font-mono tabular-nums"
 								>{formatCurrency(Number(run.totalGross))}</td
 							>
-							<td class="px-4 py-3 text-right font-mono text-muted-foreground"
+							<td class="px-4 py-3 text-right font-mono tabular-nums text-muted-foreground"
 								>{formatCurrency(Number(run.totalDeductions))}</td
 							>
-							<td class="px-4 py-3 text-right font-mono font-medium"
+							<td class="px-4 py-3 text-right font-mono font-medium tabular-nums"
 								>{formatCurrency(Number(run.totalNet))}</td
 							>
 							<td class="px-4 py-3">
-								<span
-									class={run.status === 'APPROVED'
-										? 'badge-green'
-										: run.status === 'COMPUTED'
-											? 'badge-blue'
-											: run.status === 'VOIDED'
-												? 'badge-red'
-												: 'badge-gray'}
-								>
-									{run.status}
-									{#if run.hasOverride}<span class="ml-1 text-yellow-500">*</span>{/if}
-								</span>
+								<Badge status={run.status} domain="payrollRun" />
+								<!-- The asterisk is colour and glyph only, which is no signal at all to a screen
+								     reader or to anyone who cannot pick out the yellow. The sr-only text is the
+								     real announcement; the title serves a sighted person who does not know what
+								     the asterisk means. -->
+								{#if run.hasOverride}<span
+										class="ml-1 text-yellow-600 dark:text-yellow-500"
+										title="This run has a manual override">*</span
+									><span class="sr-only">, has a manual override</span>{/if}
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex items-center justify-end gap-2">
@@ -209,8 +219,11 @@
 											title="Void this payroll run?"
 											message="The run is marked VOIDED and any amortization it collected is credited back. This cannot be undone, and the same exact period cannot be created again."
 											confirmText="Void run"
+											successMessage="Payroll run for {formatShortDate(
+												run.periodStart
+											)} – {formatShortDate(run.periodEnd)} voided."
 											triggerLabel="Void"
-											triggerClass="btn-row text-destructive"
+											triggerClass="btn-row-danger"
 										>
 											<input type="hidden" name="id" value={run.id} />
 										</ConfirmButton>
@@ -224,13 +237,17 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan={crossTenant ? 7 : 6} class="px-4 py-8 text-center text-muted-foreground"
-								>No payroll runs yet</td
+							<td colspan={crossTenant ? 7 : 6} class="p-0"
+								><EmptyState title="No payroll runs yet" /></td
 							>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+
+		<Pagination meta={data.pagination} />
+	{:catch}
+		<LoadError what="the payroll runs" />
 	{/await}
 </div>

@@ -1,7 +1,7 @@
 // One-off: collapse the scalar `User.role` into the `User.roles` set, and replace the scalar
 // `AuditLog.actorRole` with an `actorRoles` array (#282).
 //
-//   pnpm tsx scripts/migrate-user-role-to-roles.ts
+//   bunx tsx scripts/migrate-user-role-to-roles.ts
 //
 // Run this BEFORE `prisma db push` on any database that already holds data. Push can add
 // `audit_logs.actorRoles`, but it cannot copy the old column's values into it — a column added
@@ -170,7 +170,7 @@ async function main() {
 	await migrateUsers()
 	await migrateAuditLogs()
 	await dropScalarColumns()
-	console.log('  Run `pnpm db:push` next.')
+	console.log('  Run `bun run db:push` next.')
 }
 
 main()

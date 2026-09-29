@@ -1,5 +1,7 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
@@ -15,7 +17,7 @@
 	<title>Posting Approvers — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Posting Approvers"
 		description="Job postings must be approved before they go live. Choose who signs off each department's postings (for example, the Senior Developer for Software Developers). Departments left unset fall back to HR."
@@ -26,14 +28,10 @@
 	</PageHeader>
 
 	{#if form?.error}
-		<div
-			class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400"
-		>
-			{form.error}
-		</div>
+		<Banner kind="error" message={form.error} autoDismiss />
 	{/if}
 
-	<div class="overflow-x-auto rounded-lg border">
+	<div class="card-scroll overflow-x-auto rounded-lg border bg-card">
 		<table class="w-full text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -57,7 +55,7 @@
 								<input type="hidden" name="departmentId" value={row.departmentId} />
 								<select
 									name="approverId"
-									class="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+									class="h-9 w-full max-w-md rounded-md border border-input bg-background px-2 text-sm"
 								>
 									<option value="">— HR (fallback) —</option>
 									{#each data.employees as e (e.id)}
@@ -76,11 +74,7 @@
 						</td>
 					</tr>
 				{:else}
-					<tr
-						><td colspan="3" class="px-4 py-8 text-center text-muted-foreground"
-							>No departments yet</td
-						></tr
-					>
+					<tr><td colspan="3" class="p-0"><EmptyState title="No departments yet" /></td></tr>
 				{/each}
 			</tbody>
 		</table>

@@ -1,5 +1,45 @@
 # Backlog
 
+## recruitment-detail-banner-dedupe follow-ups
+
+### Run the two unrun e2e specs and `pnpm check` for the banner-dedupe + board-tile work
+
+- **Priority**: Medium
+- **Problem**: `tests/e2e/form-errors.spec.ts` (new `updateStatus` toast case) and
+  `tests/e2e/job-board-tracking.spec.ts` (reworked after the per-posting tile UI replaced the row
+  UI it drove) are both committed but never executed. `pnpm check` was also never run this session.
+  All three need the owner's dev server down first.
+- **Root cause**: the session ran entirely against a live dev server on 5173; `pnpm check` runs
+  `svelte-kit sync` and stops it, and the e2e tier needs its own build+preview.
+- **Fix options**: with the dev server down, run `pnpm check`, then
+  `CI=1 pnpm exec dotenv -e .env.dev -- playwright test form-errors job-board-tracking`; fix
+  whatever the reworked job-board spec's new tile locators surface.
+- **Source**: `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/recruitment-detail-banner-dedupe_PLAN_10-09-26.md`
+
+### R2 convert-banner regression check has no fixture
+
+- **Priority**: Low (accepted residual, not a regression)
+- **Problem**: The plan's R2 live-probe (does the `convert` banner still render after the
+  `updateStatus` banner was deleted) is `BLOCKED — no fixture`. Neither `prisma/seed-core.ts` nor
+  `scripts/seed-uiux-demo.ts` seeds a hired applicant, and the plan explicitly forbids fabricating
+  one. Static proof stands in its place: the `convert` block (page line ~227) is untouched by the
+  diff.
+- **Root cause**: no seed fixture reaches the `hiredApplicants.length > 0` branch.
+- **Fix options**: add a hired-applicant fixture to `scripts/seed-uiux-demo.ts` (or a dedicated e2e
+  seed) the next time recruitment's "Hired Applicants" card needs real test coverage.
+- **Source**: `process/general-plans/completed/recruitment-detail-banner-dedupe_10-09-26/recruitment-detail-banner-dedupe_PLAN_10-09-26.md`, Validate Contract "Open gaps"
+
+### F1 — the notifications surface should be a toast, not a banner
+
+- **Priority**: Low
+- **Problem**: Owner finding from this session: "the notifs is using a banner, should use a Toast."
+  The specific surface (which page/component) was never identified during this session.
+- **Root cause**: not investigated — parked as a finding, not a scoped task.
+- **Fix options**: next UI/UX pass should grep for the notifications banner, confirm which route
+  owns it, and scope a plan the same shape as this one (delete banner, confirm `submitFeedback` or
+  equivalent already toasts).
+- **Source**: owner feedback during `feat/uiux-phase-4` session, 10-09-26.
+
 ## #278 follow-ups
 
 ### Add `finance@veent.ph` and `payroll@veent.ph` to `tests/e2e/helpers.ts` `USERS`
@@ -12,6 +52,11 @@
 - **Fix options**: add both entries to `USERS` with their seeded credentials; broadens several
   existing specs' reach cheaply. Deferred out of #278's scope by that plan's own Notes section.
 - **Source**: `process/general-plans/active/payslip-draft-visibility-278_PLAN_10-08-26.md`
+- **CORRECTION 04-09-26**: this entry's premise is wrong. `grep -rn "payroll@veent.ph\|finance@veent.ph" prisma/`
+  returns zero hits — neither account exists in `prisma/seed-core.ts` or any other seed script.
+  The `DevLoginSwitcher` buttons for both roles 404 on a fresh dev DB. See
+  `process/features/ui-ux-overhaul/backlog/dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md`
+  for the confirmed state and fix.
 
 ### Repo-wide sweep for guard message strings with no test reference
 
@@ -43,3 +88,64 @@
   user decision; the compensating control is that Doors A and C already pin gate order.
 - **Source**: `process/general-plans/active/payslip-draft-visibility-278_PLAN_10-08-26.md`, Validate
   Contract "Open gaps"
+
+## e2e: two specs share `jp_seed_demo`, so the suite flakes under local parallel workers
+
+`tests/e2e/job-board-tracking.spec.ts` and `tests/e2e/form-errors.spec.ts` both drive the
+`jp_seed_demo` posting. `playwright.config.ts` sets `fullyParallel: true` with
+`workers: process.env.CI ? 1 : undefined`, so **CI runs serial and is green (141 passed)**, while a
+bare local `pnpm test:e2e` runs them concurrently and job-board-tracking fails.
+
+Reproduce: `pnpm test:e2e` flakes; `CI=1 pnpm test:e2e` passes; the spec passes alone.
+
+Fix by giving one of the two its own posting fixture rather than sharing the seeded one. Until
+then, run the suite locally with `CI=1`.
+
+Recorded 2026-09-10.
+
+## e2e: `attendance-save-timesheet-custom-range` fails, and predates this branch
+
+`tests/e2e/attendance-save-timesheet-custom-range.spec.ts:89` expects
+`Timesheet saved (7 days).` and the toast never appears. **Confirmed pre-existing**: it fails
+identically in a worktree checked out at `d4c8e41`, before any of this session's commits. No
+timesheet rows exist in the dev database, so it is not overlap residue.
+
+Recorded 2026-09-10.
+
+## e2e: `timesheet-punch` looks its draft row up on page 1 of a paginated queue
+
+`tests/e2e/timesheet-punch.spec.ts:104` aggregates **last week's** punches into a DRAFT timesheet,
+reloads `/timesheets`, and finds the row by employee name. `/timesheets` paginates at
+`pageSize = 10` (`src/lib/server/pagination.ts:39`) ordered `periodStart: 'desc'`
+(`src/lib/server/services/timesheets.ts:88`), and the seed now holds 15 `SUBMITTED` timesheets with
+newer periods. A last-week draft therefore sorts to position 12 of 14 in the admin team queue —
+**page 2** — and the reload, which passes no `teamPage` param, reads page 1 and matches 0 rows.
+
+The aggregate itself works; line 96 asserts its `Aggregated 7.00 hrs across 1 day` banner and
+passes. Only the row lookup fails.
+
+**Not branch-specific.** Found on `feat/uiux-phase-5` after its rebase onto staging, but every code
+path involved is byte-identical to `origin/staging` — that branch's diff touches no timesheet file.
+`3aa9fb7` taught several specs to follow the paginated queue; this one was missed.
+
+**Fix shape**: follow `3aa9fb7` — filter the queue down to the row (`?q=`) rather than paging to it,
+and never assert a row's presence off an unfiltered page 1. Re-running the spec is also not
+idempotent: a leftover draft for the same week leaves `Aggregate week` disabled, so it then fails
+earlier at line 89. Clear the spec's own draft before a re-run.
+
+Recorded 2026-09-11.
+
+## F11a follow-ups (analog TimePicker)
+
+Four stubs filed as separate NOTE files, all recorded 2026-09-15, source:
+`process/general-plans/completed/f11a-analog-time-picker_15-09-26/f11a-analog-time-picker_PLAN_15-09-26.md` §13:
+
+- `timepicker-screen-reader-verification_NOTE_15-09-26.md` — no SR harness to verify the popover's
+  `aria-live` announcement text (Low)
+- `component-render-test-harness_NOTE_15-09-26.md` — `@testing-library/svelte` installed but unused;
+  vitest is `environment: node` (Medium)
+- `applicant-interview-time-no-timezone_NOTE_15-09-26.md` — recruitment applicant server builds
+  `new Date()` with no `+08:00` suffix, pre-existing (High-ish, deploy-timezone dependent)
+- `timepicker-interview-submit-path-untested_NOTE_15-09-26.md` — the P5 probe never submitted a real
+  interview (sends email), so the typed-time-to-stored-value round trip is unproven for that one call
+  site (Low)

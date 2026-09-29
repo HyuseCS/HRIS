@@ -77,7 +77,7 @@ test('happy path: employee → HR make → verifier → approver → APPROVED', 
 
 	await aPage.goto(`/requests/${id}`, { waitUntil: 'domcontentloaded' })
 	const text = await aPage.locator('body').innerText()
-	expect(text).toMatch(/APPROVED/)
+	expect(text).toMatch(/approved/i)
 	expect(text).toMatch(/Filed/)
 	expect(text).toMatch(/Verified/)
 	await aCtx.close()
@@ -102,7 +102,7 @@ test('reject at verify returns the request to the maker', async ({ browser }) =>
 
 	await vPage.goto(`/requests/${id}`, { waitUntil: 'domcontentloaded' })
 	const text = await vPage.locator('body').innerText()
-	expect(text).toMatch(/RETURNED/)
+	expect(text).toMatch(/RETURNED/i)
 	expect(text).toMatch(/missing manager sign-off/)
 	await vCtx.close()
 })

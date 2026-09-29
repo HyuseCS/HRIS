@@ -2,8 +2,8 @@
 // PROBATIONARY employees to REGULAR once 6 whole calendar months of service have
 // elapsed, and notifies that org's HR.
 //
-//   pnpm tsx scripts/promote-probationary.ts --dry-run   # list who would be promoted
-//   pnpm tsx scripts/promote-probationary.ts             # promote + notify
+//   bunx tsx scripts/promote-probationary.ts --dry-run   # list who would be promoted
+//   bunx tsx scripts/promote-probationary.ts             # promote + notify
 //
 // Runs nightly from the droplet crontab (see scripts/README.md) — it is NOT scheduled
 // from inside the app, which has no scheduler.
@@ -40,7 +40,7 @@ async function main() {
 	})
 	if (!systemUser) {
 		console.error(
-			`No ${SYSTEM_EMAIL} user found — the audit trail needs it. Run \`pnpm db:seed\` first.`
+			`No ${SYSTEM_EMAIL} user found — the audit trail needs it. Run \`bun run db:seed\` first.`
 		)
 		process.exit(1)
 	}

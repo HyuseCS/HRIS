@@ -53,6 +53,7 @@ const STRANGER = 'stranger-emp'
 const event = (roles: Role[], employeeId?: string) =>
 	({
 		locals: { user: { id: ACTOR_USER, organizationId: ORG, roles } },
+		cookies: { get: () => undefined },
 		url: { searchParams: new URLSearchParams(employeeId ? { employeeId } : {}) }
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	}) as any
@@ -169,6 +170,7 @@ describe('GET /api/v1/requests', () => {
 const loadEvent = (roles: Role[]) =>
 	({
 		locals: { user: { id: ACTOR_USER, organizationId: ORG, roles } },
+		cookies: { get: () => undefined },
 		url: new URL('http://localhost/leave')
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	}) as any

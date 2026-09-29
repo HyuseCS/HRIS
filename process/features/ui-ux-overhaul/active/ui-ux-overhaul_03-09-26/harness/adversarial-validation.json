@@ -1,0 +1,55 @@
+{
+  "section": "phase-05-remediation-A S2",
+  "scenarios": [
+    {
+      "scenario": "The migration overwrites an org that deliberately customized its own tax table, silently destroying HR's configuration.",
+      "ruled_out": true,
+      "rationale": "The guard requires an EXACT match on both the 2018 rate vector and the floor vector before any write. Exercised live: bending one bracket's rate to 0.18 made the row skip and be reported by id. Any customization anywhere in rates or floors takes the row out of scope."
+    },
+    {
+      "scenario": "The guard is written against baseTax, so the drifted org_seed row — the one that most needs migrating — is the one it skips.",
+      "ruled_out": true,
+      "rationale": "This is exactly why the guard is on rate+floor. Verified in the run: all three rows matched and moved, including the row whose baseTax had drifted."
+    },
+    {
+      "scenario": "A second run double-applies or corrupts already-migrated rows.",
+      "ruled_out": true,
+      "rationale": "Run 2 reported 0 rows. Already-2023 rows fail the 2018 vector match, so they are never written. The read-back after three runs is identical to the read-back after one."
+    },
+    {
+      "scenario": "The persisted table diverges from the engine's, so the DB and the fallback compute different tax.",
+      "ruled_out": true,
+      "rationale": "The script writes taxBracketsToWire(BIR_MONTHLY_TAX_TABLE) — the engine constant itself, through the engine's own wire converter. It does not restate the table. Divergence would require the import to break, which pnpm test covers."
+    },
+    {
+      "scenario": "The Infinity top ceiling is written as Infinity, becomes null-or-NaN in JSONB, and the top bracket stops matching — high earners compute zero or wrong tax.",
+      "ruled_out": true,
+      "rationale": "taxBracketsToWire converts Infinity to null before the write. Read-back confirms the ceiling vector ends in null, which statutoryRatesFromConfig revives to Infinity — a path already covered by an existing unit test."
+    },
+    {
+      "scenario": "The suite is green because the expectations were pasted from vitest's 'received' output, so the tests can no longer fail and a wrong table would look correct.",
+      "ruled_out": true,
+      "rationale": "Every changed literal has a hand derivation from the 2023 table written into the phase report before the edit. Independently: the D1 proof was captured RED against the 2018 table, and a permanent 2018 negative control asserts the drift as a fact so the proof cannot become vacuous."
+    },
+    {
+      "scenario": "The DERIVED_PARITY override was repointed to a new drifted figure, so the suite is green while D1 did nothing.",
+      "ruled_out": true,
+      "rationale": "grep for DERIVED_PARITY, 66348 and 66347 across tests/ and src/ returns nothing. The identifier is gone, the loop iterates PARITY, and the block now asserts the whole derived table equals the whole seeded table — strictly stronger than the six-salary loop it replaces."
+    },
+    {
+      "scenario": "The change under-deducts tax, exposing employees to a year-end liability.",
+      "ruled_out": true,
+      "rationale": "It moves tax DOWN because the 2018 table over-deducted (20% vs 15% in the second bracket and so on up). The 2023 table is the one legally in force; the previous behaviour was the defect."
+    },
+    {
+      "scenario": "The half-period figure was rounded by eye, putting a centavo per employee per cutoff on the wrong side.",
+      "ruled_out": true,
+      "rationale": "1,097.55 x 0.5 = 548.775 exactly, quantized once by q2n = toDecimalPlaces(2, ROUND_HALF_UP) at calculator.ts:226, giving 548.78. The rule was read from the source, not assumed. The 2018 figure needed no rounding at all, so this is a new quantization event and was treated as one."
+    },
+    {
+      "scenario": "A concurrent agent's uncommitted work is swept into this commit, or destroyed by it.",
+      "ruled_out": true,
+      "rationale": "Plan B's attendance work sat STAGED in the index at session start despite the handoff claiming a clean tree. A path-limited `git commit -- <paths>` was used instead of any form of `git add -A`, committing only the nine named paths from the working tree and leaving every other index entry intact. That owner committed their own work separately as 5905669; git show --stat confirms the two commits share no file."
+    }
+  ]
+}

@@ -1,15 +1,26 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
+	import TimePicker from '$lib/components/ui/TimePicker.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
 	let showCreate = $state(false)
+	let start = $state('08:00')
+	let end = $state('17:00')
 
 	// #108: a double-click would create a duplicate work schedule.
-	const createSchedule = createSubmitGuard()
+	const createSchedule = createSubmitGuard(() => async ({ result, update }) => {
+		await update()
+		if (result.type === 'success') {
+			start = '08:00'
+			end = '17:00'
+		}
+	})
 	// #162: same guard on the threshold form — a double submit writes (and audits) it twice.
 	const saveAmPmGap = createSubmitGuard()
 
@@ -42,6 +53,8 @@
 	     here — a page-top banner cannot say which card it came from. -->
 	{#if form?.error && !form?.field}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-400"
 		>
 			{form.error}
@@ -49,7 +62,7 @@
 	{/if}
 
 	<!-- #190: org-wide master switch. ANDs with each schedule's own flag in the table below. -->
-	<div class="flex items-center justify-between gap-4 rounded-lg border p-4">
+	<div class="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
 		<div>
 			<p class="text-sm font-medium">Track tardiness organization-wide</p>
 			<p class="text-xs text-muted-foreground">
@@ -59,10 +72,15 @@
 		</div>
 		<form method="POST" action="?/toggleOrgTardiness" use:enhance>
 			<input type="hidden" name="enabled" value={(!data.orgTracksTardiness).toString()} />
+			<!-- An On/Off pill IS a switch; announcing it as a plain button loses the state entirely,
+			     and "On" on its own never says what is on. -->
 			<button
 				type="submit"
-				class="rounded-full px-3 py-1 text-xs font-medium {data.orgTracksTardiness
-					? 'bg-green-500/15 text-green-400'
+				role="switch"
+				aria-checked={data.orgTracksTardiness}
+				aria-label="Track tardiness for this organization"
+				class="rounded-full px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {data.orgTracksTardiness
+					? 'bg-green-500/15 text-green-800 hover:bg-green-500/25 dark:text-green-400'
 					: 'bg-muted text-muted-foreground'}">{data.orgTracksTardiness ? 'On' : 'Off'}</button
 			>
 		</form>
@@ -73,7 +91,7 @@
 		     below are a convenience, NOT the validation — the action re-checks the bounds server-side
 		     and must keep doing so even though the input appears to limit them. -->
 		{@const gapError = form?.field === 'minutes' ? form.error : undefined}
-		<div class="space-y-3 rounded-lg border p-4">
+		<div class="space-y-3 rounded-lg border bg-card p-4">
 			<div>
 				<p class="text-sm font-medium">AM / PM break length</p>
 				<!-- The columns this controls are labelled PM In / PM Out, so the copy says
@@ -117,7 +135,9 @@
 				<p id="amPmMinGap-error" class="text-xs text-red-600 dark:text-red-400">{gapError}</p>
 			{/if}
 			{#if form?.saved}
-				<p role="status" class="text-xs text-green-600 dark:text-green-400">{form.saved}</p>
+				<p use:autoDismiss role="status" class="text-xs text-green-600 dark:text-green-400">
+					{form.saved}
+				</p>
 			{/if}
 		</div>
 	{/if}
@@ -127,7 +147,7 @@
 			method="POST"
 			action="?/create"
 			use:enhance={createSchedule.enhance}
-			class="rounded-lg border p-4 space-y-4"
+			class="rounded-lg border bg-card p-4 space-y-4"
 		>
 			<h2 class="font-semibold">New Work Schedule</h2>
 			<div class="grid gap-3 sm:grid-cols-4">
@@ -143,22 +163,20 @@
 				</div>
 				<div>
 					<label for="start" class="text-sm font-medium">Start</label>
-					<input
+					<TimePicker
 						id="start"
 						name="start"
-						type="time"
-						value="08:00"
+						bind:value={start}
 						required
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 					/>
 				</div>
 				<div>
 					<label for="end" class="text-sm font-medium">End</label>
-					<input
+					<TimePicker
 						id="end"
 						name="end"
-						type="time"
-						value="17:00"
+						bind:value={end}
 						required
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
 					/>
@@ -222,7 +240,7 @@
 				>
 			</div>
 		</div>
-		<div class="overflow-x-auto rounded-lg border">
+		<div class="card-scroll overflow-x-auto rounded-lg border bg-card">
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">
 					<tr>
@@ -240,7 +258,7 @@
 							<td class="px-4 py-3 font-medium"
 								>{s.name}
 								{#if s.isDefault}<span
-										class="ml-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-400"
+										class="ml-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-800 dark:text-green-400"
 										>default</span
 									>{/if}</td
 							>
@@ -258,12 +276,15 @@
 									<input type="hidden" name="enabled" value={(!s.trackTardiness).toString()} />
 									<button
 										type="submit"
+										role="switch"
+										aria-checked={s.trackTardiness}
+										aria-label="Track tardiness for {s.name}"
 										disabled={!data.orgTracksTardiness}
 										title={data.orgTracksTardiness
 											? 'Toggle tardiness tracking for this schedule'
 											: 'Turn on the org-wide setting in Company Info first'}
-										class="rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 {s.trackTardiness
-											? 'bg-green-500/15 text-green-400'
+										class="rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {s.trackTardiness
+											? 'bg-green-500/15 text-green-800 hover:bg-green-500/25 dark:text-green-400'
 											: 'bg-muted text-muted-foreground'}">{s.trackTardiness ? 'On' : 'Off'}</button
 									>
 								</form>
@@ -272,9 +293,11 @@
 						</tr>
 					{:else}
 						<tr
-							><td colspan="5" class="px-4 py-8 text-center text-muted-foreground"
-								>No schedules yet. Until one is marked the organization default, unassigned
-								employees fall back to Mon–Fri 8:00–17:00.</td
+							><td colspan="5" class="p-0"
+								><EmptyState
+									title="No schedules yet"
+									description="Until one is marked the organization default, unassigned employees fall back to Mon–Fri 8:00–17:00."
+								/></td
 							></tr
 						>
 					{/each}

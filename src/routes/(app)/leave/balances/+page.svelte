@@ -1,4 +1,11 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import BackButton from '$lib/components/ui/BackButton.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import HelpTip from '$lib/components/ui/HelpTip.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
+	import Pagination from '$lib/components/Pagination.svelte'
 	import { goto } from '$app/navigation'
 	import { monthsOfService, tenureRequirement } from '$lib/utils/dates'
 	import type { PageData } from './$types'
@@ -13,121 +20,145 @@
 	}
 
 	const colCount = $derived(3 + data.leaveTypes.length)
+	const filtered = $derived(!!(data.search || data.departmentId))
 </script>
 
 <svelte:head>
 	<title>Leave Balances — Veent HRIS</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div>
-		<a href="/leave" class="text-sm text-muted-foreground hover:text-foreground">← Leave</a>
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">Leave Balances</h1>
-		<p class="text-sm text-muted-foreground">
-			Remaining / allocated days per active employee for {data.year}.
-		</p>
-	</div>
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	<PageHeader title="Leave Balances">
+		{#snippet badge()}
+			<HelpTip label="About leave balances">
+				Remaining / allocated days per active employee for {data.year}.
+			</HelpTip>
+		{/snippet}
+		{#snippet back()}
+			<BackButton fallback="/leave" label="Leave" />
+		{/snippet}
+	</PageHeader>
 
-	<form method="GET" class="flex flex-wrap gap-2">
-		<input
-			name="search"
-			value={data.search}
-			placeholder="Search by name or employee number…"
-			class="flex h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		/>
-		<select
-			name="department"
-			aria-label="Department"
-			class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		>
-			<option value="">All departments</option>
-			{#each data.departments as d (d.id)}
-				<option value={d.id} selected={data.departmentId === d.id}>{d.name}</option>
-			{/each}
-		</select>
-		<input type="hidden" name="year" value={data.year} />
-		<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent">Filter</button
-		>
-	</form>
-
-	<div class="overflow-x-auto rounded-lg border">
-		<table class="w-full min-w-max text-sm">
-			<thead class="border-b bg-muted/50">
-				<tr>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
-					<th class="px-4 py-3 text-left font-medium text-muted-foreground">Department</th>
-					{#each data.leaveTypes as lt (lt.id)}
-						<th class="px-4 py-3 text-right font-medium text-muted-foreground">
-							{lt.name}
-							{#if lt.minMonthsOfService > 0}
-								<span
-									class="block text-xs font-normal opacity-70"
-									title="Requires {tenureRequirement(lt.minMonthsOfService)} of service"
-								>
-									after {tenureRequirement(lt.minMonthsOfService)}
-								</span>
-							{/if}
-						</th>
+	<Container tone="card" flush>
+		{#snippet toolbar()}
+			<form method="GET" class="flex flex-wrap gap-2">
+				<SearchInput
+					name="search"
+					value={data.search}
+					placeholder="Search by name or employee number…"
+					class="flex h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+				<select
+					name="department"
+					aria-label="Department"
+					class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<option value="">All departments</option>
+					{#each data.departments as d (d.id)}
+						<option value={d.id} selected={data.departmentId === d.id}>{d.name}</option>
 					{/each}
-					<th class="px-4 py-3 text-right font-medium text-muted-foreground">Total left</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y">
-				{#each data.rows as row (row.id)}
-					<tr
-						class="cursor-pointer hover:bg-muted/30"
-						role="link"
-						tabindex="0"
-						data-employee={row.employeeNumber}
-						onclick={() => goto(`/employees/${row.id}`)}
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault()
-								goto(`/employees/${row.id}`)
-							}
-						}}
-					>
-						<td class="px-4 py-3">
-							<div class="font-medium">{row.name}</div>
-							<div class="text-xs text-muted-foreground">{row.employeeNumber}</div>
-						</td>
-						<td class="px-4 py-3 text-muted-foreground">{row.department}</td>
-						{#each row.cells as cell, i (data.leaveTypes[i].id)}
-							{@const gated = locked(row.startDate, data.leaveTypes[i].minMonthsOfService)}
-							<td class="px-4 py-3 text-right">
-								{#if !cell}
-									<span class="text-muted-foreground" title="No balance allocated for {data.year}"
-										>—</span
-									>
-								{:else if gated}
-									<span class="text-muted-foreground" title="Not yet eligible">Locked</span>
-								{:else}
-									<span class="font-medium">{cell.remaining.toFixed(1)}</span>
-									<span class="text-xs text-muted-foreground">/ {cell.allocated.toFixed(0)}</span>
-								{/if}
-							</td>
+				</select>
+				<input type="hidden" name="year" value={data.year} />
+				<button type="submit" class="rounded-md border px-3 py-1 text-sm hover:bg-accent"
+					>Filter</button
+				>
+			</form>
+		{/snippet}
+
+		<div class="phone-scroll min-h-0 flex-1 overflow-x-auto">
+			<table class="w-full min-w-max text-sm">
+				<thead class="sticky top-0 z-20 bg-card">
+					<tr class="border-b">
+						<th
+							class="sticky left-0 z-30 border-r bg-card bg-[image:linear-gradient(hsl(var(--muted)/0.5),hsl(var(--muted)/0.5))] px-4 py-3 text-left font-medium text-muted-foreground"
+							>Employee</th
+						>
+						<th class="bg-muted/50 px-4 py-3 text-left font-medium text-muted-foreground"
+							>Department</th
+						>
+						{#each data.leaveTypes as lt (lt.id)}
+							<th
+								class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground"
+								title={lt.minMonthsOfService > 0
+									? `Requires ${tenureRequirement(lt.minMonthsOfService)} of service`
+									: undefined}>{lt.name}</th
+							>
 						{/each}
-						<td class="px-4 py-3 text-right font-medium">
-							{row.cells
-								.reduce(
-									(sum, cell, i) =>
-										sum +
-										(cell && !locked(row.startDate, data.leaveTypes[i].minMonthsOfService)
-											? cell.remaining
-											: 0),
-									0
-								)
-								.toFixed(1)}
-						</td>
-					</tr>
-				{:else}
-					<tr>
-						<td colspan={colCount} class="px-4 py-8 text-center text-muted-foreground"
-							>No employees found</td
+						<th class="bg-muted/50 px-4 py-3 text-right font-medium text-muted-foreground"
+							>Total left</th
 						>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+				</thead>
+				<tbody class="divide-y">
+					{#each data.rows as row (row.id)}
+						<!-- R1: the real link lives in the name cell; the whole-row click is a mouse
+						     convenience only. -->
+						<tr
+							class="group cursor-pointer hover:bg-muted/30"
+							data-employee={row.employeeNumber}
+							onclick={(e) => {
+								if ((e.target as HTMLElement).closest('a, button, input, label, form')) return
+								goto(`/employees/${row.id}`)
+							}}
+						>
+							<td
+								class="sticky left-0 z-10 border-r bg-card px-4 py-2 group-hover:bg-[image:linear-gradient(hsl(var(--muted)/0.3),hsl(var(--muted)/0.3))]"
+							>
+								<a
+									href="/employees/{row.id}"
+									class="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									>{row.name}</a
+								>
+								<div class="text-xs text-muted-foreground">{row.employeeNumber}</div>
+							</td>
+							<td class="px-4 py-2 text-muted-foreground">{row.department}</td>
+							{#each row.cells as cell, i (data.leaveTypes[i].id)}
+								{@const gated = locked(row.startDate, data.leaveTypes[i].minMonthsOfService)}
+								<td class="px-4 py-2 text-right tabular-nums">
+									{#if !cell}
+										<span class="text-muted-foreground" title="No balance allocated for {data.year}"
+											>—</span
+										>
+									{:else if gated}
+										<span class="text-muted-foreground" title="Not yet eligible">Locked</span>
+									{:else}
+										<span class="font-medium">{cell.remaining.toFixed(1)}</span>
+										<span class="text-xs text-muted-foreground">/ {cell.allocated.toFixed(0)}</span>
+									{/if}
+								</td>
+							{/each}
+							<td class="px-4 py-2 text-right font-medium tabular-nums">
+								{row.cells
+									.reduce(
+										(sum, cell, i) =>
+											sum +
+											(cell && !locked(row.startDate, data.leaveTypes[i].minMonthsOfService)
+												? cell.remaining
+												: 0),
+										0
+									)
+									.toFixed(1)}
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td colspan={colCount} class="p-0"
+								><EmptyState
+									variant={filtered ? 'no-results' : 'empty'}
+									title="No employees found"
+									description={filtered
+										? 'No employee matches your search or department filter.'
+										: undefined}
+								/></td
+							>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		{#snippet footer()}
+			<Pagination meta={data.pagination} />
+		{/snippet}
+	</Container>
 </div>

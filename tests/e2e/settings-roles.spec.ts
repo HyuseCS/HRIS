@@ -26,7 +26,7 @@ test('the picker prefills every held role, and the table lists the same set', as
 	const ceoCtx = await browser.newContext()
 	const ceoPage = await ceoCtx.newPage()
 	await login(ceoPage, USERS.ceo)
-	await ceoPage.goto('/settings/roles', { waitUntil: 'domcontentloaded' })
+	await ceoPage.goto(`/settings/roles?q=${TWO_HAT}`, { waitUntil: 'domcontentloaded' })
 
 	const twoHatRow = ceoPage.locator('tr', { hasText: TWO_HAT })
 	// The cell is a read display: pills, and no control of any kind.
@@ -71,7 +71,10 @@ test('the picker prefills every held role, and the table lists the same set', as
 
 	// The CEO's own row cannot be edited (no self-role-change), so it offers no control at all —
 	// but it still renders its roles.
-	const ownRow = ceoPage.locator('tr', { hasText: USERS.ceo.email })
+	await ceoPage.goto(`/settings/roles?q=${USERS.ceo.email}`, { waitUntil: 'domcontentloaded' })
+	const ownRow = ceoPage
+		.locator('tr')
+		.filter({ has: ceoPage.getByText(USERS.ceo.email, { exact: true }) })
 	await expect(ownRow.getByText('CEO', { exact: true })).toBeVisible()
 	await expect(ownRow.getByRole('button', { name: 'Edit roles' })).toHaveCount(0)
 	await ceoCtx.close()
@@ -81,7 +84,7 @@ test('the picker prefills every held role, and the table lists the same set', as
 	const adminCtx = await browser.newContext()
 	const adminPage = await adminCtx.newPage()
 	await login(adminPage, USERS.admin)
-	await adminPage.goto('/settings/roles', { waitUntil: 'domcontentloaded' })
+	await adminPage.goto(`/settings/roles?q=${TWO_HAT}`, { waitUntil: 'domcontentloaded' })
 
 	const twoHatReadOnly = adminPage.locator('tr', { hasText: TWO_HAT })
 	await expect(twoHatReadOnly.getByRole('button', { name: 'Edit roles' })).toHaveCount(0)

@@ -28,7 +28,8 @@ export const actions: Actions = {
 	preview: async ({ request, locals }) => {
 		requirePayrollManage(locals.user!.roles)
 		const parsed = schema.safeParse(Object.fromEntries(await request.formData()))
-		if (!parsed.success) return fail(400, { error: 'Invalid input' })
+		if (!parsed.success)
+			return fail(400, { error: 'Enter a basic rate and a period before calculating.' })
 		const d = parsed.data
 
 		// #275, the page twin of the v1 calculator endpoint: the employee id comes from the form, and

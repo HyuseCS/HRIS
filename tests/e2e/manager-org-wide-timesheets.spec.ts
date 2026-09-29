@@ -76,7 +76,7 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	await login(page, USERS.manager)
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 
-	const dialog = page.getByRole('dialog', { name: 'New timesheet' })
+	const dialog = page.getByRole('dialog', { name: 'New Timesheet' })
 	await expect(async () => {
 		await page.getByRole('button', { name: 'New Timesheet' }).click()
 		await expect(dialog).toBeVisible({ timeout: 1000 })
@@ -90,13 +90,13 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	await dialog.locator('#nt-employee').selectOption(empValue as string)
 	await dialog.locator('#pp-month').selectOption({ label: monthName })
 	await dialog.locator('#pp-year').selectOption({ label: String(year) })
-	await dialog.getByRole('button', { name: 'Whole month' }).click()
+	await dialog.locator('#pp-kind').selectOption('WHOLE_MONTH')
 	await dialog.getByRole('button', { name: 'Create timesheet' }).click()
 
 	await page.waitForURL('**/timesheets')
 	const row = page
 		.locator('tr', { hasText: 'HR, Hannah' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: '0.00 hrs' })
 	await expect(row).toHaveCount(1)
 
@@ -108,7 +108,9 @@ test('a manager creates and syncs a timesheet for someone who is not their direc
 	}).toPass({ timeout: 15000 })
 	await modal.getByRole('button', { name: 'Sync from attendance' }).click()
 
-	await expect(page.getByText(/Synced \d+ days? from attendance/)).toBeVisible()
+	// Scoped to <main>: phase 04 also toasts this message, and a page-wide locator now matches
+	// both the page banner and the toast.
+	await expect(page.getByRole('main').getByText(/Synced \d+ days? from attendance/)).toBeVisible()
 	await expect(page.getByText('You can only review items for your direct reports')).toHaveCount(0)
 })
 
@@ -117,7 +119,7 @@ test('a manager can delete that timesheet too', async ({ page }) => {
 	await login(page, USERS.manager)
 	await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
 
-	const row = page.locator('tr', { hasText: 'HR, Hannah' }).filter({ hasText: 'DRAFT' })
+	const row = page.locator('tr', { hasText: 'HR, Hannah' }).filter({ hasText: /draft/i })
 	const modal = page.getByRole('dialog', { name: 'Timesheet review' })
 	await expect(async () => {
 		await row.first().click()

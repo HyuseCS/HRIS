@@ -16,7 +16,7 @@ import type { Role } from '@prisma/client'
  *
  * The message is asserted, not just the status. All four routes can also refuse at
  * `requirePayrollManage`, and a status-only assertion would let the wrong layer answer — the trap
- * `proposal-queue.test.ts` documents. Note the routes re-map only 400/404, so a 403 from the
+ * `proposal-queue.test.ts` documents. Note the routes re-map only 400/404/409, so a 403 from the
  * service propagates as a thrown HttpError rather than a Response; SvelteKit renders it in
  * production, but a direct handler call rejects.
  */
@@ -49,6 +49,7 @@ const { POST: createCaRoute } =
 	await import('../../src/routes/api/v1/payroll/cash-advances/+server')
 const { PATCH: updateCaRoute } =
 	await import('../../src/routes/api/v1/payroll/cash-advances/[id]/+server')
+const { OFFBOARDED_NO_NEW_PAY } = await import('$lib/server/services/employee-access')
 
 const ACTOR_USER = 'user-actor'
 const ORG = 'org1'
@@ -74,6 +75,11 @@ const event = (roles: Role[], body: unknown, id?: string) =>
 const LOAN_BODY = { employeeId: STRANGER.id, principal: 50000, installment: 5000 }
 const CA_BODY = { employeeId: STRANGER.id, amount: 10000, installment: 2000 }
 const PATCH_BODY = { installment: 999 }
+
+const strangerOffboarded = () =>
+	dbMock.employee.findFirst.mockImplementation(({ where }) =>
+		Promise.resolve(where.userId ? SELF : { ...STRANGER, employmentStatus: 'OFFBOARDED' })
+	)
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -110,6 +116,14 @@ describe('POST /api/v1/payroll/loans', () => {
 		expect(res.status).toBe(201)
 		expect(tx.loan.create).toHaveBeenCalled()
 	})
+
+	it('answers 409 in the apiError shape for an OFFBOARDED employee, and writes nothing', async () => {
+		strangerOffboarded()
+		const res = await createLoanRoute(event(['MANAGER', 'FINANCE'], LOAN_BODY))
+		expect(res.status).toBe(409)
+		expect(await res.json()).toEqual({ error: OFFBOARDED_NO_NEW_PAY })
+		expect(tx.loan.create).not.toHaveBeenCalled()
+	})
 })
 
 describe('PATCH /api/v1/payroll/loans/[id]', () => {
@@ -141,6 +155,14 @@ describe('POST /api/v1/payroll/cash-advances', () => {
 		const res = await createCaRoute(event(['MANAGER', 'FINANCE'], CA_BODY))
 		expect(res.status).toBe(201)
 		expect(tx.cashAdvance.create).toHaveBeenCalled()
+	})
+
+	it('answers 409 in the apiError shape for an OFFBOARDED employee, and writes nothing', async () => {
+		strangerOffboarded()
+		const res = await createCaRoute(event(['MANAGER', 'FINANCE'], CA_BODY))
+		expect(res.status).toBe(409)
+		expect(await res.json()).toEqual({ error: OFFBOARDED_NO_NEW_PAY })
+		expect(tx.cashAdvance.create).not.toHaveBeenCalled()
 	})
 })
 

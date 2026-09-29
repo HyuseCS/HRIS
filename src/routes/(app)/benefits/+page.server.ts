@@ -108,7 +108,9 @@ export const actions: Actions = {
 		const id = data.get('id') as string
 		const status = data.get('status') as 'ACTIVE' | 'WAIVED' | 'TERMINATED'
 		if (!id || !['ACTIVE', 'WAIVED', 'TERMINATED'].includes(status))
-			return fail(400, { error: 'Invalid status change' })
+			return fail(400, {
+				error: "That status change is not allowed from the plan's current status."
+			})
 
 		try {
 			await updateEnrollmentStatus(

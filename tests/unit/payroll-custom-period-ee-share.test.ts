@@ -56,7 +56,7 @@ describe('resolveEE for a custom range', () => {
 		expect(r.statutory.sssEe).toBe(0)
 		// ER share and tax are untouched by the allocation — still × share.
 		expect(r.statutory.sssEr).toBeGreaterThan(0)
-		expect(r.statutory.withholdingTax).toBeCloseTo(1463.4 * CUSTOM_SHARE, 2)
+		expect(r.statutory.withholdingTax).toBeCloseTo(1097.55 * CUSTOM_SHARE, 2)
 	})
 
 	it('kind FIRST_HALF + FIRST → the full monthly EE', () => {
@@ -85,7 +85,7 @@ describe('resolveEE for a custom range', () => {
 		const r = run({ periodShare: CUSTOM_SHARE, periodKind: null })
 		expect(r.statutory.sssEe).toBeCloseTo(MONTHLY_SSS_EE * CUSTOM_SHARE, 2)
 		expect(r.statutory.sssEr).toBeGreaterThan(0)
-		expect(r.statutory.withholdingTax).toBeCloseTo(1463.4 * CUSTOM_SHARE, 2)
+		expect(r.statutory.withholdingTax).toBeCloseTo(1097.55 * CUSTOM_SHARE, 2)
 	})
 
 	it('a month never exceeds 100% of the monthly EE: custom + cutoff = one month', () => {

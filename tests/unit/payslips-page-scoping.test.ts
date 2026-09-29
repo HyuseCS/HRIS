@@ -30,6 +30,7 @@ let selfRow: { id: string } | null = null
 const event = () =>
 	({
 		locals: { user: { id: 'user-1', roles: ['EMPLOYEE'], organizationId: ORG } },
+		cookies: { get: () => undefined },
 		url: new URL('http://localhost/payslips')
 	}) as never
 

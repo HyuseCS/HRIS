@@ -12,9 +12,9 @@
  * This mirrors tests/e2e/payroll-lock-idempotency.spec.ts, which seeds for the
  * same reason.
  *
- *   pnpm tsx scripts/probe-d10-void-divergence.ts seed
- *   pnpm tsx scripts/probe-d10-void-divergence.ts report
- *   pnpm tsx scripts/probe-d10-void-divergence.ts cleanup
+ *   bunx tsx scripts/probe-d10-void-divergence.ts seed
+ *   bunx tsx scripts/probe-d10-void-divergence.ts report
+ *   bunx tsx scripts/probe-d10-void-divergence.ts cleanup
  *
  * Lock and void happen over HTTP between seed and report, so the real service
  * path runs — not a re-implementation of it here.

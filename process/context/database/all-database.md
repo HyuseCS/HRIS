@@ -128,3 +128,15 @@ Update this group when:
 - **The audit-log report's `entityTypes` allow-list is hand-maintained and untyped** — see
   `process/context/auth/all-auth.md` Canonical Notes. Any new audited Prisma model must be added
   there manually; nothing in the schema or the type system enforces it.
+- **`payroll@veent.ph` and `finance@veent.ph` do NOT exist in `prisma/seed-core.ts`**, even though
+  `src/lib/components/dev/DevLoginSwitcher.svelte` offers quick-login buttons for both (confirmed
+  04-09-26, `grep -rn "payroll@veent.ph\|finance@veent.ph" prisma/` returns zero hits). Clicking
+  either button 404s on a freshly seeded DB. Backlog:
+  `process/features/ui-ux-overhaul/backlog/dev-seed-missing-finance-payroll-accounts_NOTE_04-09-26.md`.
+- **A seeded account's role can drift and survive reseeds.** `seedE2E`'s upserts commonly use
+  `update: {}` (e.g. `employee@veent.ph`), so if a row's role is ever changed by hand or by test
+  activity, a plain reseed will NOT correct it back — only `create` sets `roles`. Confirmed 04-09-26
+  when `employee@veent.ph` held `PAYROLL_OFFICER` in the dev DB despite the seed file specifying
+  `roles: ['EMPLOYEE']`. Do not assume a seeded account's role matches the seed source without
+  checking the live row. Backlog:
+  `process/features/ui-ux-overhaul/backlog/employee-veent-ph-role-drift_NOTE_04-09-26.md`.

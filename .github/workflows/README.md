@@ -6,12 +6,12 @@
 
 Runs the cheap checks with no database:
 
-| Step         | Command             | What it enforces                           |
-| ------------ | ------------------- | ------------------------------------------ |
-| Format check | `pnpm format:check` | `prettier --check .` (style is consistent) |
-| Lint         | `pnpm lint`         | `eslint .` (no unused code, no undefined)  |
-| Typecheck    | `pnpm check`        | `svelte-kit sync && svelte-check`          |
-| Unit tests   | `pnpm test`         | `vitest run` (DB-free unit suite)          |
+| Step         | Command                | What it enforces                           |
+| ------------ | ---------------------- | ------------------------------------------ |
+| Format check | `bun run format:check` | `prettier --check .` (style is consistent) |
+| Lint         | `bun run lint`         | `eslint .` (no unused code, no undefined)  |
+| Typecheck    | `bun run check`        | `svelte-kit sync && svelte-check`          |
+| Unit tests   | `bun run test`         | `vitest run` (DB-free unit suite)          |
 
 ## `e2e` (Postgres service + Playwright)
 
@@ -19,7 +19,7 @@ Spins up an ephemeral `postgres:16` service, provisions + seeds it, then runs th
 suite (which boots the app itself via `playwright.config.ts`'s `webServer`):
 
 ```
-prisma generate → prisma db push → pnpm db:seed → playwright install chromium → pnpm test:e2e
+prisma generate → prisma db push → bun run db:seed → playwright install chromium → bun run test:e2e
 ```
 
 No repository secrets are required — the DB is throwaway and the app secrets are fixed CI dummies
@@ -29,9 +29,9 @@ No repository secrets are required — the DB is throwaway and the app secrets a
 
 ```bash
 # with the local Postgres running (see CLAUDE.md / .env.example)
-pnpm db:push        # provision schema
-pnpm db:seed        # seed the demo org + users (global-setup needs employee@veent.ph)
-pnpm test:e2e       # Playwright runs `pnpm build` + `pnpm preview`, then the suite (#287)
+bun run db:push     # provision schema
+bun run db:seed     # seed the demo org + users (global-setup needs employee@veent.ph)
+bun run test:e2e    # Playwright runs `bun run build` + `bun run preview`, then the suite (#287)
 ```
 
 `test:e2e` runs Playwright under `dotenv -e .env.dev`, because `global-setup.ts` opens its own

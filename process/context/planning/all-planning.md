@@ -3,7 +3,7 @@ name: context:all-planning
 description: "Plan naming, storage routing, SIMPLE vs COMPLEX calibration, and the plan conventions this repo actually follows — the planning group entrypoint/router"
 keywords: plan, planning, prd, spec, riper, plan file, naming, slug, archive, active, backlog, completed, feature folder, phase program, umbrella, validate contract
 related: [context:all-tests]
-date: 24-08-26
+date: 10-09-26
 ---
 
 # Planning Context
@@ -84,6 +84,13 @@ Rules of thumb from this repo's history:
   with opposite answers; #298's issue text carries its own deferral reasoning.
 - **Merges go to `staging`, so `Closes #N` never fires.** Plans should say the issue is closed by
   hand.
+- **A plan can contradict its own acceptance criteria — check for that before EXECUTE.** In the
+  10-09-26 feedback plan, §3 step 3 said "keep the `form` prop", while acceptance criterion 12 said
+  "lint green after every section". Deleting the banners orphaned the prop, so both could not hold.
+  VALIDATE caught it and resolved it with a binding execute-agent instruction (an override that
+  names which clause loses) rather than a plan rewrite — and the predicted lint cascade then fired
+  twice during execution, exactly as written. When a plan says "keep X" and also says "the gate
+  must be green", trace whether the change makes X dead.
 - **A VALIDATE BLOCKED verdict is usually an environment-baseline miss, not a reasoning error.**
   #112's first VALIDATE pass returned BLOCKED on three findings and every one was a surface the
   plan had never opened at all: `pnpm format:check` already failing on a file the plan listed as

@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import EmptyState from '$lib/components/ui/EmptyState.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -84,8 +88,20 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Departments</h1>
+	<PageHeader title="Departments" />
+
+	{#if form?.error}
+		<div
+			use:autoDismiss
+			role="alert"
+			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
+		>
+			{form.error}
+		</div>
+	{/if}
+
+	<!-- The create toggle sits directly above the form it opens and the list it adds to. -->
+	<div class="flex justify-end">
 		<button
 			onclick={() => {
 				showCreate = !showCreate
@@ -97,54 +113,48 @@
 		</button>
 	</div>
 
-	{#if form?.error}
-		<div
-			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
-		>
-			{form.error}
-		</div>
-	{/if}
-
 	<!-- Inline create form -->
 	{#if showCreate}
-		<form
-			method="POST"
-			action="?/create"
-			use:enhance={create.enhance}
-			class="flex items-center gap-3 rounded-md border bg-muted/50 p-4"
-		>
-			<!-- The form only mounts on user action, so focusing it is expected. -->
-			<!-- svelte-ignore a11y_autofocus -->
-			<input
-				name="name"
-				bind:value={newName}
-				placeholder="Department name…"
-				required
-				autofocus
-				class="flex h-9 w-64 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			/>
-			<button
-				type="submit"
-				disabled={create.busy}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+		<Container tone="card" fill={false} flush>
+			<form
+				method="POST"
+				action="?/create"
+				use:enhance={create.enhance}
+				class="flex items-center gap-3 p-4"
 			>
-				{create.busy ? 'Creating…' : 'Create'}
-			</button>
-			<button
-				type="button"
-				onclick={() => {
-					showCreate = false
-					newName = ''
-				}}
-				class="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-			>
-				Cancel
-			</button>
-		</form>
+				<!-- The form only mounts on user action, so focusing it is expected. -->
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					name="name"
+					bind:value={newName}
+					placeholder="Department name…"
+					required
+					autofocus
+					class="flex h-9 w-64 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				/>
+				<button
+					type="submit"
+					disabled={create.busy}
+					class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+				>
+					{create.busy ? 'Creating…' : 'Create'}
+				</button>
+				<button
+					type="button"
+					onclick={() => {
+						showCreate = false
+						newName = ''
+					}}
+					class="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+				>
+					Cancel
+				</button>
+			</form>
+		</Container>
 	{/if}
 
 	<!-- Departments table -->
-	<div class="overflow-x-auto rounded-md border">
+	<div class="card-scroll overflow-x-auto rounded-md border bg-card">
 		<table class="w-full min-w-max text-sm">
 			<thead class="border-b bg-muted/50">
 				<tr>
@@ -310,8 +320,8 @@
 					{/if}
 				{:else}
 					<tr>
-						<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-							No departments yet. Add one to get started.
+						<td colspan="4" class="p-0">
+							<EmptyState title="No departments yet" description="Add one to get started." />
 						</td>
 					</tr>
 				{/each}

@@ -9,6 +9,8 @@
 // Counting first lets an out-of-range ?page= clamp to the real last page instead
 // of serving an empty page.
 
+import type { Cookies } from '@sveltejs/kit'
+
 export interface Pagination {
 	/** 1-based current page, clamped to [1, totalPages]. */
 	page: number
@@ -60,4 +62,30 @@ export function paginate(
 		param,
 		label: `${start}–${end} of ${total}`
 	}
+}
+
+export interface FitOptions {
+	/** Height of one row in CSS px, measured live on the page. */
+	rowPx: number
+	/** Everything on the page that is not rows, in CSS px: innerHeight minus the scrolling region's clientHeight, plus a sticky/in-region thead if it eats row space. */
+	chromePx: number
+	/** Used when the cookie is absent or unparsable. */
+	fallback?: number
+	min?: number
+	max?: number
+	/** Grid pages: columns for the viewport width; rows-that-fit × cols. Default () => 1. */
+	cols?: (vw: number) => number
+}
+
+export function fitPageSize(
+	cookies: Cookies,
+	{ rowPx, chromePx, fallback = 10, min = 5, max = 50, cols = () => 1 }: FitOptions
+): number {
+	const m = /^(\d+)x(\d+)$/.exec(cookies.get('vp') ?? '')
+	if (!m) return fallback
+
+	const vw = Number(m[1])
+	const vh = Number(m[2])
+	const rows = Math.floor((vh - chromePx) / rowPx)
+	return Math.max(min, Math.min(max, rows * cols(vw)))
 }

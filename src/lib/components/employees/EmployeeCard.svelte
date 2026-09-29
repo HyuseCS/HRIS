@@ -10,26 +10,13 @@
 		user: { email: string }
 	}
 
+	import Badge from '$lib/components/ui/Badge.svelte'
+
 	let { employee }: { employee: Employee } = $props()
 
 	const initials = $derived(
 		`${employee.firstName.charAt(0)}${employee.lastName.charAt(0)}`.toUpperCase()
 	)
-
-	const statusClass = $derived(() => {
-		switch (employee.employmentStatus) {
-			case 'ACTIVE':
-				return 'bg-green-500/15 text-green-400'
-			case 'OFFBOARDED':
-				return 'bg-gray-500/15 text-gray-400'
-			case 'PROBATIONARY':
-				return 'bg-yellow-500/15 text-yellow-400'
-			case 'RESIGNED':
-				return 'bg-red-500/15 text-red-400'
-			default:
-				return 'bg-gray-500/15 text-gray-400'
-		}
-	})
 </script>
 
 <a
@@ -63,9 +50,9 @@
 			<div class="text-xs text-muted-foreground mt-0.5">{employee.user.email}</div>
 		</div>
 
-		<!-- Status badge -->
-		<span class="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {statusClass()}">
-			{employee.employmentStatus}
+		<!-- Status badge. The wrapper keeps the flex-child `shrink-0` the pill carried before. -->
+		<span class="shrink-0">
+			<Badge status={employee.employmentStatus} domain="employment" />
 		</span>
 	</div>
 </a>

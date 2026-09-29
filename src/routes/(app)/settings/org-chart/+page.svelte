@@ -1,7 +1,9 @@
 <script lang="ts">
+	import SearchInput from '$lib/components/ui/SearchInput.svelte'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import type { PageData } from './$types'
+	import { labelFor, EMPLOYMENT_STATUS_LABELS } from '$lib/labels'
 
 	let { data }: { data: PageData } = $props()
 
@@ -66,8 +68,8 @@
 					{n.name}
 					{#if n.employmentStatus !== 'ACTIVE'}
 						<span
-							class="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-							>{n.employmentStatus}</span
+							class="ml-1 rounded-full bg-foreground/15 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+							>{labelFor(EMPLOYMENT_STATUS_LABELS, n.employmentStatus)}</span
 						>
 					{/if}
 				</p>
@@ -115,15 +117,15 @@
 				>
 			</div>
 		</div>
-		<input
+		<SearchInput
 			bind:value={query}
 			placeholder="Search people…"
 			class="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		/>
 
 		{#if query.trim()}
-			<div class="rounded-lg border">
-				<ul class="divide-y">
+			<div class="rounded-lg border bg-card">
+				<ul class="card-scroll divide-y">
 					{#each matches as m (m.id)}
 						<li class="px-4 py-2">
 							<p class="text-sm font-medium">{m.name}</p>
@@ -138,8 +140,8 @@
 				</ul>
 			</div>
 		{:else if roots.length}
-			<div class="rounded-lg border p-4">
-				<ul class="space-y-1">
+			<div class="rounded-lg border bg-card p-4">
+				<ul class="card-scroll space-y-1">
 					{#each roots as root (root.id)}
 						{@render nodeRow(root, [])}
 					{/each}

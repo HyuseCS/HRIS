@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, selectTenant, USERS } from './helpers'
+import { login, USERS } from './helpers'
 
 // Quickstart: RBAC / auth — "employee cannot access another employee's data",
 // login works, protected routes require a session.
@@ -13,8 +13,6 @@ test.describe('Authentication & access control', () => {
 
 	test('invalid credentials are rejected', async ({ page }) => {
 		await page.goto('/login', { waitUntil: 'domcontentloaded' })
-		// #135: pick the tenant first, then submit a bad password.
-		await selectTenant(page, 'Veent')
 		await page.getByLabel('Email').fill(USERS.admin.email)
 		await page.getByLabel('Password').fill('definitely-wrong')
 		await page.getByRole('button', { name: 'Sign In' }).click()
@@ -22,16 +20,13 @@ test.describe('Authentication & access control', () => {
 		await expect(page).toHaveURL(/\/login/)
 	})
 
-	// #135: a correct credential paired with the wrong tenant must fail identically to
-	// a bad password — login never reveals which org an account belongs to.
-	test('valid credentials against the wrong tenant are rejected', async ({ page }) => {
+	// The login page must name no tenant to an anonymous visitor: the credential form is
+	// there with no interaction, and no seeded org name is on the page.
+	test('the login page lists no organization', async ({ page }) => {
 		await page.goto('/login', { waitUntil: 'domcontentloaded' })
-		await selectTenant(page, 'JoJo Potato')
-		await page.getByLabel('Email').fill(USERS.admin.email)
-		await page.getByLabel('Password').fill(USERS.admin.password)
-		await page.getByRole('button', { name: 'Sign In' }).click()
-		await expect(page.getByText('Invalid email or password')).toBeVisible()
-		await expect(page).toHaveURL(/\/login/)
+		await expect(page.getByLabel('Email')).toBeVisible()
+		await expect(page.getByText('JoJo Potato')).toHaveCount(0)
+		await expect(page.getByText('Sweetleaf')).toHaveCount(0)
 	})
 
 	test('valid credentials sign in and reach the dashboard', async ({ page }) => {

@@ -98,7 +98,7 @@ test('happy path: compute (make) → verify → approve → APPROVED', async ({ 
 
 	await aPage.goto(`/payroll/${id}`, { waitUntil: 'domcontentloaded' })
 	const text = await aPage.locator('body').innerText()
-	expect(text).toMatch(/APPROVED/)
+	expect(text).toMatch(/approved/i)
 	expect(text).toMatch(/Prepared/) // MAKE stage
 	expect(text).toMatch(/Verified/)
 	expect(text).toMatch(/Approved/)

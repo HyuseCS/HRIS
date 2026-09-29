@@ -9,7 +9,10 @@ phase: "02"
 # Phase 02 — Navigation + Information Architecture
 
 **Date**: 03-09-26
-**Status**: ACTIVE — planned, not started
+**Status**: CODE DONE, `Keep in active/testing` (updated 04-09-26). Code + full CI gate set +
+23 unit tests done. A partial per-role live check ran 04-09-26 (HR_ADMIN, MANAGER, plain employee —
+zero 403s) but this plan's `VERIFIED` bar also needs a CEO role pass, screenshots, and an
+`impeccable` audit — none of those ran. See `phase-02-nav-ia_REPORT_03-09-26.md`.
 **Complexity**: COMPLEX (phase 02 of a phase program)
 **Feature**: ui-ux-overhaul
 

@@ -12,6 +12,7 @@ import {
 	assertCanModifyTimesheet
 } from '$lib/server/services/timesheets'
 import { paginate } from '$lib/server/pagination'
+import { setFlash } from '$lib/server/flash'
 import {
 	previewTimeLogAggregation,
 	aggregateTimeLogsToTimesheet
@@ -59,6 +60,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		: null
 	const mineTotal = mineParams ? await countTimesheets(mineParams) : 0
 	const minePagination = paginate(url, mineTotal, { param: 'myPage' })
+	const mineDrafts =
+		mineParams && isManager ? await countTimesheets({ ...mineParams, status: 'DRAFT' }) : 0
 	const myTimesheets = mineParams
 		? listTimesheets(mineParams, { skip: minePagination.skip, take: minePagination.take })
 		: Promise.resolve([])
@@ -92,6 +95,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		myTimesheets,
 		teamTimesheets,
 		minePagination,
+		mineDrafts,
 		teamPagination,
 		myEmployeeId: myEmployee?.id,
 		isManager,
@@ -281,6 +285,9 @@ export const actions: Actions = {
 		} catch (e) {
 			return toFail(e)
 		}
+		// This action redirects to the page it was posted from, which discards `form` — so the
+		// page's own banner can never fire for it. The flash is the only way to say anything.
+		setFlash(event.cookies, { kind: 'success', message: 'Draft timesheet created.' })
 		redirect(303, '/timesheets')
 	},
 

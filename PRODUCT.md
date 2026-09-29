@@ -40,7 +40,7 @@ reconciled, documents filed — without leaving the app or keeping a parallel sp
 ## Capabilities and Constraints
 
 - SvelteKit 2 + Svelte 5 runes, Prisma + PostgreSQL, Lucia v3 sessions, Tailwind v3 with HSL
-  design tokens in `src/app.css`. pnpm. No Redis.
+  design tokens in `src/app.css`. bun. No Redis.
 - Multi-tenant: every read and write is scoped by `organizationId`.
 - Sensitive fields (salary, government IDs) are masked at the service layer and revealed only
   through an audited action.

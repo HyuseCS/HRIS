@@ -6,7 +6,7 @@ import { login, USERS } from './helpers'
 // conversion, same form/action underneath). Toggled twice to leave state as found.
 test('pay-code toggle submits from its bordered button', async ({ page }) => {
 	await login(page, USERS.admin)
-	await page.goto('/settings/pay-codes', { waitUntil: 'domcontentloaded' })
+	await page.goto('/payroll/pay-codes', { waitUntil: 'domcontentloaded' })
 	await page.waitForLoadState('networkidle') // hydrate so enhance intercepts the submit
 
 	const firstRowToggle = () =>

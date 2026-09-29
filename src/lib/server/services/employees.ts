@@ -207,7 +207,7 @@ export async function listEmployees(
 			branch: { select: { id: true, name: true } },
 			user: { select: { email: true, roles: true, isActive: true } }
 		},
-		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+		orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }
@@ -415,6 +415,7 @@ export async function createEmployee(
 	input: CreateEmployeeInput,
 	ctx: AuditContext
 ) {
+	input = { ...input, email: input.email.toLowerCase() }
 	const existingUser = await db.user.findUnique({ where: { email: input.email } })
 	if (existingUser) error(409, 'Email already in use')
 

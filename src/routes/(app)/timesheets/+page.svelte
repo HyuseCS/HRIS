@@ -1,14 +1,12 @@
 <script lang="ts">
-	import { enhance } from '$app/forms'
-	import type { SubmitFunction } from '@sveltejs/kit'
-	import { slide } from 'svelte/transition'
-	import { formatShortDate } from '$lib/utils/format'
-	import TableSkeleton from '$lib/components/ui/TableSkeleton.svelte'
-	import Pagination from '$lib/components/Pagination.svelte'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
+	import Banner from '$lib/components/ui/Banner.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 	import TimesheetModal from '$lib/components/timesheets/TimesheetModal.svelte'
 	import NewTimesheetDialog from '$lib/components/timesheets/NewTimesheetDialog.svelte'
 	import AggregatePanel from '$lib/components/timesheets/AggregatePanel.svelte'
-	import ConfirmButton from '$lib/components/ui/ConfirmButton.svelte'
+	import Tabs from '$lib/components/ui/Tabs.svelte'
+	import TimesheetListTab from '$lib/components/timesheets/TimesheetListTab.svelte'
 	import type { PageData, ActionData } from './$types'
 
 	let { data, form }: { data: PageData; form: ActionData } = $props()
@@ -18,223 +16,95 @@
 	// /timesheets is read/modify only — the modal runs in "edit" mode (no approve/reject).
 	type Timesheet = Awaited<PageData['myTimesheets']>[number]
 	let openTs = $state<Timesheet | null>(null)
-	let busy = $state(false)
 
-	// ─── Bulk selection ─────────────────────────────────────────────────────────
-	// Managers see two tables (their own timesheets vs. the team's); each keeps its own
-	// selection so a bulk action only ever touches the section it was triggered from.
-	type Kind = 'mine' | 'team'
-	let selectedMine = $state<string[]>([])
-	let selectedTeam = $state<string[]>([])
-	const selOf = (kind: Kind) => (kind === 'team' ? selectedTeam : selectedMine)
-	function setSel(kind: Kind, v: string[]) {
-		if (kind === 'team') selectedTeam = v
-		else selectedMine = v
-	}
-	function toggle(kind: Kind, id: string) {
-		const cur = selOf(kind)
-		setSel(kind, cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])
-	}
-	function toggleAll(kind: Kind, ids: string[], on: boolean) {
-		setSel(kind, on ? ids : [])
-	}
-	// Clear that section's selection after a successful bulk delete/submit.
-	const clearOnSuccess =
-		(kind: Kind): SubmitFunction =>
-		() => {
-			busy = true
-			return async ({ result, update }) => {
-				await update()
-				busy = false
-				if (result.type === 'success') setSel(kind, [])
-			}
-		}
-
-	function openReview(ts: Timesheet) {
-		openTs = ts
-	}
-
-	// Theme-aware status pills (dark-mode safe) — see the .badge-* classes in app.css.
-	const statusClass: Record<string, string> = {
-		APPROVED: 'badge-green',
-		REJECTED: 'badge-red',
-		SUBMITTED: 'badge-blue',
-		DRAFT: 'badge-gray'
-	}
-	const btnPrimary =
-		'rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
+	const tabs: { key: string; label: string; short: string; count: string; tone?: 'warning' }[] =
+		$derived([
+			...(data.isManager
+				? [
+						{
+							key: 'team',
+							label: 'Team Timesheets',
+							short: 'Team',
+							count: String(data.teamPagination.total)
+						}
+					]
+				: []),
+			...(data.myEmployeeId
+				? [
+						{
+							key: 'mine',
+							label: 'My Timesheets',
+							short: 'Mine',
+							count: data.mineDrafts
+								? `${data.mineDrafts} draft`
+								: String(data.minePagination.total),
+							tone: data.mineDrafts ? ('warning' as const) : undefined
+						}
+					]
+				: [])
+		])
+	// svelte-ignore state_referenced_locally
+	let activeTab = $state(data.isManager ? 'team' : 'mine')
 </script>
 
 <svelte:head>
 	<title>Timesheets — Veent HRIS</title>
 </svelte:head>
 
-{#snippet section(title: string, rows: Timesheet[], kind: Kind, showEmployee: boolean)}
-	{@const ids = rows.map((t) => t.id)}
-	{@const selectedIds = selOf(kind)}
-	{@const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id))}
-	{@const cols = (showEmployee ? 4 : 3) + (data.canModify ? 1 : 0)}
-	<section class="space-y-3">
-		<h2 class="text-lg font-semibold">{title}</h2>
-
-		<!-- Bulk actions for this section; appear when its rows are selected -->
-		{#if data.canModify && selectedIds.length}
-			<div
-				class="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-2"
-				transition:slide={{ duration: 120 }}
-			>
-				<span class="text-sm font-medium">{selectedIds.length} selected</span>
-				<div class="flex items-center gap-2">
-					<button
-						onclick={() => setSel(kind, [])}
-						class="mr-1 text-sm text-muted-foreground hover:underline">Clear</button
-					>
-					{#if kind === 'mine'}
-						<form method="POST" action="?/submitMany" use:enhance={clearOnSuccess('mine')}>
-							<input type="hidden" name="ids" value={selectedIds.join(',')} />
-							<button disabled={busy} class={btnPrimary}>Submit selected</button>
-						</form>
-						<ConfirmButton
-							action="?/deleteMany"
-							title="Delete selected timesheets?"
-							message="Draft and rejected timesheets you own will be permanently deleted; submitted and approved ones are skipped."
-							triggerLabel="Delete selected"
-							triggerClass="rounded-md border border-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50"
-							disabled={busy}
-							submit={clearOnSuccess('mine')}
-						>
-							<input type="hidden" name="ids" value={selectedIds.join(',')} />
-						</ConfirmButton>
-					{:else}
-						<ConfirmButton
-							action="?/deleteMany"
-							title="Delete selected timesheets?"
-							message="{selectedIds.length} timesheet{selectedIds.length === 1
-								? ''
-								: 's'} will be permanently deleted."
-							triggerLabel="Delete selected"
-							triggerClass="rounded-md border border-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:opacity-50"
-							disabled={busy}
-							submit={clearOnSuccess('team')}
-						>
-							<input type="hidden" name="ids" value={selectedIds.join(',')} />
-						</ConfirmButton>
-					{/if}
-				</div>
-			</div>
-		{/if}
-
-		<div class="overflow-x-auto rounded-lg border">
-			<!-- table-fixed with shared column widths so the right-anchored Total Hours
-			     and Status columns line up between the My/Team tables even though only
-			     the Team table has an Employee column. -->
-			<table class="w-full min-w-[44rem] table-fixed text-sm">
-				<thead class="border-b bg-muted/50">
-					<tr>
-						{#if data.canModify}
-							<th class="w-12 px-4 py-3">
-								<input
-									type="checkbox"
-									checked={allSelected}
-									onchange={(e) => toggleAll(kind, ids, e.currentTarget.checked)}
-									aria-label="Select all"
-									class="align-middle"
-								/>
-							</th>
-						{/if}
-						{#if showEmployee}
-							<th class="w-56 px-4 py-3 text-left font-medium text-muted-foreground">Employee</th>
-						{/if}
-						<th class="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
-						<th class="w-40 px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
-							>Total Hours</th
-						>
-						<th class="w-32 px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y">
-					{#each rows as ts (ts.id)}
-						<tr
-							onclick={() => openReview(ts)}
-							onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openReview(ts)}
-							tabindex="0"
-							class={`cursor-pointer hover:bg-muted/30 focus:bg-muted/40 focus:outline-none ${selectedIds.includes(ts.id) ? 'bg-primary/5' : ''}`}
-						>
-							{#if data.canModify}
-								<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-									<input
-										type="checkbox"
-										checked={selectedIds.includes(ts.id)}
-										onchange={() => toggle(kind, ts.id)}
-										aria-label="Select timesheet"
-										class="align-middle"
-									/>
-								</td>
-							{/if}
-							{#if showEmployee}
-								<td class="truncate px-4 py-3">{ts.employee.lastName}, {ts.employee.firstName}</td>
-							{/if}
-							<td class="px-4 py-3 whitespace-nowrap"
-								>{formatShortDate(ts.periodStart)} – {formatShortDate(ts.periodEnd)}</td
-							>
-							<td class="px-4 py-3">{Number(ts.totalHours).toFixed(2)} hrs</td>
-							<td class="px-4 py-3"
-								><span class={statusClass[ts.status] ?? 'badge-gray'}>{ts.status}</span></td
-							>
-						</tr>
-					{:else}
-						<tr>
-							<td colspan={cols} class="px-4 py-8 text-center text-muted-foreground"
-								>No timesheets found</td
-							>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	</section>
-{/snippet}
-
-<div class="space-y-8">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold tracking-tight">Timesheets</h1>
-		{#if data.canCreate}
-			<button
-				onclick={() => (showCreate = true)}
-				class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-			>
-				New Timesheet
-			</button>
-		{/if}
-	</div>
-
-	{#if form?.saved}
-		<div
-			class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-2 text-sm text-green-600"
+<div class="flex min-h-[calc(100dvh-6rem)] flex-col gap-6 lg:h-[calc(100dvh-4rem)] lg:min-h-0">
+	{#snippet newTimesheet()}
+		<button
+			onclick={() => (showCreate = true)}
+			class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
 		>
-			{form.saved}
+			New Timesheet
+		</button>
+	{/snippet}
+	<PageHeader title="Timesheets" back={data.canCreate ? newTimesheet : undefined} />
+
+	<!-- 14 server `fail()` sites are reachable with the modal CLOSED, and the modal owns the only
+	     other error slot on this page — so with it shut the failure rendered nowhere. Gated on
+	     `openTs` so an open modal still shows the message once, in place. -->
+	{#if (form?.error && !openTs) || form?.saved || data.isHrAdmin}
+		<div class="flex shrink-0 flex-col gap-3">
+			{#if form?.error && !openTs}
+				<Banner kind="error" message={form.error} autoDismiss />
+			{/if}
+
+			{#if form?.saved}
+				<Banner kind="success" message={form.saved} autoDismiss />
+			{/if}
+
+			{#if data.isHrAdmin}
+				<AggregatePanel employees={data.employees} />
+			{/if}
 		</div>
 	{/if}
 
-	{#if data.isHrAdmin}
-		<AggregatePanel employees={data.employees} />
-	{/if}
-
-	{#if data.myEmployeeId}
-		{#await data.myTimesheets}
-			<TableSkeleton rows={5} cols={data.isManager ? 4 : 3} />
-		{:then mine}
-			{@render section('My Timesheets', mine, 'mine', false)}
-			<Pagination meta={data.minePagination} />
-		{/await}
-	{/if}
-	{#if data.isManager}
-		{#await data.teamTimesheets}
-			<TableSkeleton rows={5} cols={4} />
-		{:then team}
-			{@render section('Team Timesheets', team, 'team', true)}
-			<Pagination meta={data.teamPagination} />
-		{/await}
+	{#if tabs.length}
+		<Container tone="card" flush>
+			<Tabs {tabs} bind:active={activeTab} label="Timesheets" param="tab" bare>
+				{#snippet panel(key)}
+					{#if key === 'team'}
+						<TimesheetListTab
+							rows={data.teamTimesheets}
+							pagination={data.teamPagination}
+							kind="team"
+							canModify={data.canModify}
+							onopen={(ts) => (openTs = ts)}
+						/>
+					{:else}
+						<TimesheetListTab
+							rows={data.myTimesheets}
+							pagination={data.minePagination}
+							kind="mine"
+							canModify={data.canModify}
+							onopen={(ts) => (openTs = ts)}
+						/>
+					{/if}
+				{/snippet}
+			</Tabs>
+		</Container>
 	{/if}
 	{#if !data.myEmployeeId && !data.isManager}
 		<p class="text-sm text-muted-foreground">No employee profile found.</p>
@@ -248,7 +118,6 @@
 	isHrAdmin={data.isHrAdmin}
 	canModify={data.canModify}
 	myEmployeeId={data.myEmployeeId}
-	{form}
 />
 
 {#if data.canCreate}

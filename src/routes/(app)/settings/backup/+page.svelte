@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Banner from '$lib/components/ui/Banner.svelte'
 	import { enhance } from '$app/forms'
 	import BackButton from '$lib/components/ui/BackButton.svelte'
 	import PageHeader from '$lib/components/ui/PageHeader.svelte'
@@ -7,6 +8,7 @@
 	import { addToast } from '$lib/stores/toast.svelte'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData } from './$types'
+	import Badge from '$lib/components/ui/Badge.svelte'
 
 	// No `form` prop: the save result is handled in the submit callback below, so nothing on
 	// this page reads `ActionData`.
@@ -20,7 +22,7 @@
 	// page with `effect_update_depth_exceeded`. Written that way the save succeeded (HTTP 200,
 	// row committed) while the toast never rendered and the console filled with errors.
 	const save = createSubmitGuard(() => async ({ update, result }) => {
-		await update()
+		await update({ reset: false })
 		if (result.type === 'success') addToast('Backup schedule saved.', { kind: 'success' })
 		else if (result.type === 'failure') {
 			const d = result.data as { error?: string } | undefined
@@ -65,15 +67,6 @@
 		return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`
 	}
 
-	// PARTIAL is yellow, never green: the run kept real files, but some could not be copied,
-	// and reading that as success is the exact lie the status exists to prevent.
-	const badgeFor: Record<string, string> = {
-		SUCCESS: 'badge-green',
-		PARTIAL: 'badge-yellow',
-		FAILED: 'badge-red',
-		RUNNING: 'badge-blue'
-	}
-
 	const columns: Column[] = [
 		{ key: 'startedAt', label: 'Started', width: 'min' },
 		{ key: 'status', label: 'Status', width: 'min' },
@@ -94,7 +87,7 @@
 	<title>Document Backup — Veent HRIS</title>
 </svelte:head>
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="space-y-6">
 	<PageHeader
 		title="Document Backup"
 		description="Copies every employee 201 file and request attachment to a second location on a schedule."
@@ -104,14 +97,15 @@
 		{/snippet}
 	</PageHeader>
 
-	<div class="card">
+	<div class="card mx-auto max-w-4xl">
 		<dl class="grid gap-4 sm:grid-cols-3">
 			<div class="space-y-1">
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
 				<dd>
-					<span class={data.config.enabled ? 'badge-green' : 'badge-gray'}>
-						{data.config.enabled ? 'On' : 'Off'}
-					</span>
+					<Badge
+						status={data.config.enabled ? 'On' : 'Off'}
+						tone={data.config.enabled ? 'green' : 'gray'}
+					/>
 				</dd>
 			</div>
 			<div class="space-y-1">
@@ -135,17 +129,20 @@
 		</dl>
 
 		{#if neverRan}
-			<p
-				class="mt-4 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400"
-			>
+			<Banner kind="warning" class="mt-4">
 				Backups are switched on but none has run yet. They are started by a nightly job on the
 				server, not by this app — if nothing appears after tonight, ask your administrator to
 				confirm the <code class="font-mono text-xs">backup-documents</code> schedule is installed.
-			</p>
+			</Banner>
 		{/if}
 	</div>
 
-	<form method="POST" action="?/save" use:enhance={save.enhance} class="card space-y-5">
+	<form
+		method="POST"
+		action="?/save"
+		use:enhance={save.enhance}
+		class="card mx-auto max-w-4xl space-y-5"
+	>
 		<label class="flex items-start gap-3">
 			<input
 				type="checkbox"
@@ -204,7 +201,7 @@
 					id="destinationKind"
 					name="destinationKind"
 					bind:value={destinationKind}
-					class="input"
+					class="input max-w-sm"
 				>
 					<option value="LOCAL">Server disk</option>
 					<option value="S3">S3-compatible storage</option>
@@ -233,7 +230,7 @@
 				{#if column.key === 'startedAt'}
 					{fmt(row.startedAt)}
 				{:else if column.key === 'status'}
-					<span class={badgeFor[row.status] ?? 'badge-gray'}>{row.status}</span>
+					<Badge status={row.status} domain="backupRun" />
 				{:else if column.key === 'files'}
 					<span class="text-sm">
 						{row.fileCount} copied

@@ -18,7 +18,9 @@ export default [
 			'dist/',
 			'.claude/',
 			'.agents/',
-			'process/'
+			'process/',
+			'playwright-report/',
+			'test-results/'
 		]
 	},
 	js.configs.recommended,

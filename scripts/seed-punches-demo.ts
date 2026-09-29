@@ -2,10 +2,10 @@
 // organization, across the last ~2 weeks of weekdays, with a deliberate mix of shift
 // shapes so attendance derivation has realistic raw data to work from.
 //
-//   pnpm tsx scripts/seed-punches-demo.ts            # seed 12 weekdays, all orgs
-//   pnpm tsx scripts/seed-punches-demo.ts --days=20  # a longer window
-//   pnpm tsx scripts/seed-punches-demo.ts --org=Veent
-//   pnpm tsx scripts/seed-punches-demo.ts --clear    # remove previously seeded punches
+//   bunx tsx scripts/seed-punches-demo.ts            # seed 12 weekdays, all orgs
+//   bunx tsx scripts/seed-punches-demo.ts --days=20  # a longer window
+//   bunx tsx scripts/seed-punches-demo.ts --org=Veent
+//   bunx tsx scripts/seed-punches-demo.ts --clear    # remove previously seeded punches
 //
 // This is the companion to seed-attendance-demo.ts, which writes AttendanceDay rows
 // directly. That script's own caveat is that its employees have no punches, so clicking
@@ -21,7 +21,7 @@
 // tests/e2e/timesheet-punch.spec.ts punches employee@veent.ph on a day in the PREVIOUS
 // PHT week and asserts the week aggregates to exactly "7.00 hrs across 1 day". Demo
 // punches in that window make the week total more than that and the spec fails. Run
-// `--clear` before `pnpm test:e2e` to take the seeded punches back out.
+// `--clear` before `bun run test:e2e` to take the seeded punches back out.
 
 import { PrismaClient, type PunchType } from '@prisma/client'
 
@@ -90,7 +90,7 @@ async function main() {
 		throw new Error(
 			orgName
 				? `No organization named "${orgName}".`
-				: 'No organizations — run `pnpm db:seed` first.'
+				: 'No organizations — run `bun run db:seed` first.'
 		)
 	}
 
@@ -173,7 +173,9 @@ async function main() {
 		if (n) console.log(`    ${o.name}: ${n} employee(s)`)
 	}
 	console.log('  Open /attendance (or /team) to derive them — no manual step needed.')
-	console.log('  Run with --clear before `pnpm test:e2e` (see the note at the top of this file).')
+	console.log(
+		'  Run with --clear before `bun run test:e2e` (see the note at the top of this file).'
+	)
 }
 
 main()

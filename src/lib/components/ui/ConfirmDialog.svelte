@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fade, scale } from 'svelte/transition'
+	import Dialog from './Dialog.svelte'
 
 	interface Props {
 		open: boolean
@@ -7,6 +7,8 @@
 		message?: string
 		confirmText?: string
 		cancelText?: string
+		/** Colour of the confirm button. `neutral` for routine saves that cannot be undone. */
+		tone?: 'destructive' | 'neutral'
 		onconfirm?: () => void
 	}
 
@@ -16,10 +18,9 @@
 		message = '',
 		confirmText = 'Delete',
 		cancelText = 'Cancel',
+		tone = 'destructive',
 		onconfirm
 	}: Props = $props()
-
-	let cardEl = $state<HTMLElement>()
 
 	function cancel() {
 		open = false
@@ -28,57 +29,26 @@
 		open = false
 		onconfirm?.()
 	}
-
-	// Focus the dialog on open so Escape is handled here (and stopped from bubbling to a
-	// parent modal's window handler — keeps nested modals from both closing at once).
-	$effect(() => {
-		if (open) cardEl?.focus()
-	})
-
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			e.stopPropagation()
-			cancel()
-		}
-	}
 </script>
 
-{#if open}
-	<div
-		class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-		onclick={cancel}
-		role="presentation"
-		transition:fade={{ duration: 100 }}
-	>
-		<div
-			bind:this={cardEl}
-			class="w-full max-w-sm rounded-xl border bg-card p-6 shadow-2xl focus:outline-none"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={onKeydown}
-			role="alertdialog"
-			aria-modal="true"
-			aria-label={title}
-			tabindex="-1"
-			transition:scale={{ duration: 120, start: 0.96 }}
+<Dialog bind:open {title} role="alertdialog" size="sm" zIndex={60}>
+	<h2 class="text-lg font-semibold">{title}</h2>
+	{#if message}
+		<p class="mt-2 whitespace-pre-line text-sm text-muted-foreground">{message}</p>
+	{/if}
+	<div class="mt-6 flex justify-end gap-2">
+		<button
+			type="button"
+			onclick={cancel}
+			class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">{cancelText}</button
 		>
-			<h2 class="text-lg font-semibold">{title}</h2>
-			{#if message}
-				<p class="mt-2 text-sm text-muted-foreground">{message}</p>
-			{/if}
-			<div class="mt-6 flex justify-end gap-2">
-				<button
-					type="button"
-					onclick={cancel}
-					class="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-					>{cancelText}</button
-				>
-				<button
-					type="button"
-					onclick={confirm}
-					class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-					>{confirmText}</button
-				>
-			</div>
-		</div>
+		<button
+			type="button"
+			onclick={confirm}
+			class="rounded-md px-4 py-2 text-sm font-medium {tone === 'neutral'
+				? 'bg-foreground text-background hover:bg-foreground/90'
+				: 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}"
+			>{confirmText}</button
+		>
 	</div>
-{/if}
+</Dialog>

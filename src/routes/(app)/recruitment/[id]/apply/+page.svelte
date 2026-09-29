@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { autoDismiss } from '$lib/actions/autoDismiss'
+	import PageHeader from '$lib/components/ui/PageHeader.svelte'
 	import { enhance } from '$app/forms'
 	import { createSubmitGuard } from '$lib/utils/submit-guard.svelte'
 	import type { PageData, ActionData } from './$types'
@@ -14,17 +16,17 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-6 py-8">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">Add applicant to {data.posting.title}</h1>
-		{#if data.posting.department}
-			<p class="text-sm text-muted-foreground">{data.posting.department?.name}</p>
-		{/if}
-	</div>
+	<PageHeader
+		title="Add applicant to {data.posting.title}"
+		description={data.posting.department?.name}
+	/>
 
 	<!-- HR-only form: a successful add redirects to the posting board (see the
 	     action), so there is no applicant-facing success panel here. -->
 	{#if form?.error}
 		<div
+			use:autoDismiss
+			role="alert"
 			class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive"
 		>
 			{form.error}
@@ -32,8 +34,8 @@
 	{/if}
 
 	<form method="POST" action="?/apply" use:enhance={apply.enhance} class="space-y-6">
-		<fieldset class="rounded-md border p-4 space-y-4">
-			<legend class="px-1 text-sm font-semibold">Personal Information</legend>
+		<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+			<legend class="float-left mb-4 w-full font-semibold">Personal Information</legend>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div>
 					<label for="firstName" class="text-sm font-medium">
@@ -85,8 +87,8 @@
 			</div>
 		</fieldset>
 
-		<fieldset class="rounded-md border p-4 space-y-4">
-			<legend class="px-1 text-sm font-semibold">Application Details</legend>
+		<fieldset class="rounded-lg border bg-card p-6 space-y-4 [&>legend+*]:clear-left">
+			<legend class="float-left mb-4 w-full font-semibold">Application Details</legend>
 			<div class="space-y-4">
 				<div>
 					<label for="resumeUrl" class="text-sm font-medium">Resume URL</label>
@@ -99,7 +101,8 @@
 						class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					/>
 					<p class="mt-1 text-xs text-muted-foreground">
-						Link to your resume (Google Drive, Dropbox, etc.)
+						<!-- HR fills this form in on the applicant's behalf, so the copy is third person. -->
+						Link to the applicant's resume (Google Drive, Dropbox, etc.)
 					</p>
 				</div>
 				<div>

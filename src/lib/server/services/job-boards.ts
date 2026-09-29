@@ -261,3 +261,54 @@ export async function setChannel(
 		)
 	})
 }
+
+/**
+ * Drop a board from a posting. A live board keeps its advertising history — it flips to
+ * TAKEN_DOWN so the #117 takedown list still sees it; anything else is deleted outright.
+ */
+export async function removeChannel(
+	organizationId: string,
+	jobPostingId: string,
+	jobBoardId: string,
+	ctx: AuditContext
+) {
+	const posting = await db.jobPosting.findFirst({
+		where: { id: jobPostingId, organizationId },
+		select: { id: true }
+	})
+	if (!posting) error(404, 'Job posting not found')
+	const board = await db.jobBoard.findFirst({
+		where: { id: jobBoardId, organizationId },
+		select: { id: true }
+	})
+	if (!board) error(404, 'Job board not found')
+
+	await db.$transaction(async (tx) => {
+		const existing = await tx.jobPostingChannel.findUnique({
+			where: { jobPostingId_jobBoardId: { jobPostingId, jobBoardId } },
+			select: { id: true, status: true }
+		})
+		if (!existing) return
+
+		const takedown = existing.status === 'POSTED'
+		if (takedown) {
+			await tx.jobPostingChannel.update({
+				where: { id: existing.id },
+				data: { status: 'TAKEN_DOWN', takenDownAt: new Date() }
+			})
+		} else {
+			await tx.jobPostingChannel.delete({ where: { id: existing.id } })
+		}
+
+		await writeAuditLog(
+			ctx,
+			{
+				action: takedown ? 'UPDATE' : 'DELETE',
+				entityType: 'JobPostingChannel',
+				entityId: `${jobPostingId}:${jobBoardId}`,
+				newValue: takedown ? { posted: false, url: null } : { removed: true }
+			},
+			tx
+		)
+	})
+}

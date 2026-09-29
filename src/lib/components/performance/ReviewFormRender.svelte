@@ -2,6 +2,7 @@
 	import type { TemplateSection, TemplateStructure } from '$lib/server/performance/types'
 	import { answerDraft, type AnswerDraft } from './answer-draft'
 	import type { ErrorAt } from './rows'
+	import Container from '$lib/components/ui/Container.svelte'
 
 	/**
 	 * The evaluation form, rendered from a `TemplateStructure`. ONE component, TWO modes (#178).
@@ -165,14 +166,19 @@
 	<!-- Rating scale — printed above the sections, exactly as on the paper form. -->
 	<section class="space-y-2">
 		<h3 class="text-sm font-semibold">Rating Scale</h3>
-		<ul class="divide-y rounded-md border text-sm">
-			{#each structure.ratingScale.rows as row (row.value)}
-				<li class="flex gap-3 px-3 py-1.5">
-					<span class="w-6 shrink-0 font-medium tabular-nums">{row.value}</span>
-					<span class="text-muted-foreground">{row.description}</span>
-				</li>
-			{/each}
-		</ul>
+		<Container tone="card" fill={false} flush>
+			<ul class="divide-y text-sm">
+				<!-- Keyed by index, not row.value: two unedited "Add row" clicks both mint the same
+			     value and a duplicate key kills the preview. Rows are display-only here and are
+			     only ever appended or removed at the end, so the index is stable enough. -->
+				{#each structure.ratingScale.rows as row, i (i)}
+					<li class="flex gap-3 px-3 py-1.5">
+						<span class="w-6 shrink-0 font-medium tabular-nums">{row.value}</span>
+						<span class="text-muted-foreground">{row.description}</span>
+					</li>
+				{/each}
+			</ul>
+		</Container>
 	</section>
 
 	<!--
@@ -185,7 +191,7 @@
 		and picks the band. `maximum` below is printed and range-checked on the server, never added.
 	-->
 	{#each structure.sections as section, si (section.id)}
-		<section class="space-y-2 rounded-lg border p-3">
+		<section class="space-y-2 rounded-lg border bg-card p-3">
 			<div class="flex flex-wrap items-baseline justify-between gap-2">
 				<h3 class="text-sm font-semibold">
 					{si + 1}. {section.name || 'Untitled category'}

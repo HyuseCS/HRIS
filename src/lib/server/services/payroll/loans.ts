@@ -3,7 +3,12 @@ import { writeAuditLog } from '$lib/server/audit'
 import { error } from '@sveltejs/kit'
 import type { LoanStatus } from '@prisma/client'
 import { canAny } from '$lib/rbac'
-import { assertCanTouchEmployee, assertNotSelf, requireEmployee } from '../employee-access'
+import {
+	assertAcceptsNewPay,
+	assertCanTouchEmployee,
+	assertNotSelf,
+	requireEmployee
+} from '../employee-access'
 import type { AuditContext } from '../types'
 
 /**
@@ -34,8 +39,9 @@ async function assertMayWriteLoan(
 	employeeId: string,
 	organizationId: string,
 	ctx: AuditContext
-): Promise<void> {
-	assertNotSelf(ctx.actorId, await requireEmployee(employeeId, organizationId))
+): Promise<Awaited<ReturnType<typeof requireEmployee>>> {
+	const employee = await requireEmployee(employeeId, organizationId)
+	assertNotSelf(ctx.actorId, employee)
 	if (!canAny(ctx.actorRoles, 'VIEW_PAY_ORGWIDE')) {
 		// ponytail: `roles` is a no-op here today — the arm above already admits every
 		// ADMINISTER_HR_ORGWIDE holder, so the delegation can only ever see an actor who holds
@@ -46,6 +52,7 @@ async function assertMayWriteLoan(
 			employeeId
 		)
 	}
+	return employee
 }
 
 export function listLoans(employeeId: string, organizationId: string) {
@@ -68,7 +75,7 @@ export async function createLoan(
 	data: { type?: string; principal: number; installment: number },
 	ctx: AuditContext
 ) {
-	await assertMayWriteLoan(employeeId, organizationId, ctx)
+	assertAcceptsNewPay(await assertMayWriteLoan(employeeId, organizationId, ctx))
 	if (data.installment <= 0 || data.principal <= 0)
 		error(400, 'Principal and installment must be positive')
 
@@ -133,7 +140,7 @@ export async function createCashAdvance(
 	data: { amount: number; installment: number },
 	ctx: AuditContext
 ) {
-	await assertMayWriteLoan(employeeId, organizationId, ctx)
+	assertAcceptsNewPay(await assertMayWriteLoan(employeeId, organizationId, ctx))
 	if (data.installment <= 0 || data.amount <= 0)
 		error(400, 'Amount and installment must be positive')
 

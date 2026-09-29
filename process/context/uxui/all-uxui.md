@@ -1,9 +1,9 @@
 ---
 name: context:all-uxui
 description: "Svelte 5 runes, the HSL token system, button/dialog conventions, and the accessibility floors — the uxui group entrypoint/router"
-keywords: ui, ux, svelte, runes, component, tailwind, design tokens, dark mode, dialog, modal, button, form, accessibility, a11y, touch target, focus trap, table, snippet, layout
+keywords: ui, ux, svelte, runes, component, tailwind, design tokens, dark mode, dialog, modal, button, form, accessibility, a11y, touch target, focus trap, table, snippet, layout, toast, banner, feedback, aria-live, error surface
 related: [context:all-auth]
-date: 17-08-26
+date: 24-09-26
 ---
 
 # UX/UI Context
@@ -51,17 +51,41 @@ enough to be worth stating first.
 src/lib/components/
   ui/          shared primitives: ConfirmDialog, ReasonDialog, Table, Toaster,
                PageHeader, EmptyState, Skeleton, TableSkeleton, MaskedField,
-               BackButton, ConfirmButton, PeriodPicker
-  charts/  dashboard/  dev/  employees/  leave/  payroll/  recruitment/  timesheets/
+               BackButton, ConfirmButton, PeriodPicker, Container, Field
+  charts/  dashboard/  dev/  leave/  payroll/  recruitment/  timesheets/
+  employees/detail/  one component per card of the employee detail page
+               (#23, 24-09-26) — server-side action modules live at
+               src/lib/server/employee-detail/, one module per card group
+  actions/     Svelte actions: scrollToError, autoDismiss (#42, 24-09-26 —
+               see Feedback Surfaces below)
   Pagination.svelte
 ```
 
+- `ui/Container.svelte` takes `fill?: boolean` (default `true`, keeps it stretching to fill a
+  flex-column parent) and `bodyClass?: string` (appended to the inner scroll body, e.g.
+  `bodyClass="card-scroll"` for a height-capped list). `fill={false}` makes it sit inline instead
+  — use this to wrap a bordered content panel (a form, `<details>`, or a hand-rolled table
+  wrapper) in the canonical `border bg-card` surface without it stretching. `tone` still defaults
+  to `'muted'`; pass `tone="card"` explicitly for a visible card surface (#20, 24-09-26).
+- `ui/Field.svelte` is a label+hint+error wrapper around a control passed as a `children` snippet
+  (`{ id, 'aria-invalid', 'aria-describedby' }` spread onto the control). It owns presentation
+  only — server zod stays the source of truth. Use it for any new labelled form control; do not
+  hand-write the label/error/aria wiring. `size="compact"` for dense card-form labels. See
+  `process/general-plans/backlog/hris-24-field-rollout_NOTE_24-09-26.md` for pages not yet
+  migrated (#24, 24-09-26).
+
 ## Styling
 
-- Tailwind CSS v3 with **43 HSL custom properties** defined in `src/app.css`
+- Tailwind CSS v3 with HSL custom properties defined in `src/app.css`
 - Dark mode via `html.dark` plus `color-scheme`; both themes must be styled
 - Token names follow shadcn conventions: `--background`, `--foreground`, `--primary`,
-  `--muted`, `--accent`, `--destructive`, `--border`, `--ring`, `--card`
+  `--muted`, `--accent`, `--destructive`, `--border`, `--ring`, `--card`, and (since #27,
+  24-09-26) `--success`/`--success-foreground`, `--warning`/`--warning-foreground` — fill
+  tokens with a solid `text-*-foreground` on top, all measured ≥4.5:1. `.btn-success` /
+  `.btn-warning` sit next to `.btn-primary`/`.btn-destructive`. The `.btn-row-*` family
+  (`positive`/`warning`/`danger`) is a resting `/10` fill + `/20` hover, NOT the same tokens —
+  a single fill token cannot also be readable as row text on both a light card and dark
+  background, so the rows keep tuned raw Tailwind hue steps instead.
 
 ## Buttons — Know This Before "Fixing" Them
 
@@ -79,14 +103,157 @@ the #302 UI audit.
 
 ## Accessibility Floors Already In Place
 
-- **Touch targets:** a `@media (pointer: coarse)` block in `src/app.css` sets a 44px floor on
-  BOTH axes for `button`, `[role=button]`, `select`, `textarea`, and non-hidden inputs.
-  Checkbox/radio are excluded on purpose — they are square, and a one-axis floor deforms them.
-  Mouse/desktop density is untouched.
+- **Touch targets:** a `@media (pointer: coarse)` block in `src/app.css` sets a 24px floor on
+  BOTH axes for `button`, `[role=button]`, `select`, `textarea`, checkboxes/inputs (radio still
+  excluded — it's the one control this floor doesn't apply to, on purpose, per the #a11y-approvals
+  fix), and the `.btn-row`/`.btn-row-positive`/`.btn-row-warning`/`.btn-row-danger` anchor classes
+  specifically (a bare `a` selector was rejected — it would also floor prose links). Mouse/desktop
+  density is untouched. Verify a touch-target CSS change live under `pointer: coarse` emulation —
+  a box can measure 24px because the control was naturally that wide, not because the rule fired.
+- **Contrast:** "go one shade darker" is not a fix — compute the ratio. `orange-500 → orange-600`
+  still failed AA at 3.56:1 on the approvals Return button; only `orange-700` (5.18:1) cleared it.
+  When auditing a row of sibling controls (e.g. 3 filled buttons), **measure every one of them
+  individually** — a partial sweep reads as a complete one. The approvals audit measured Return
+  (2.80:1) and Reject (4.83:1) but never measured Approve, which was silently failing at 3.30:1
+  and only surfaced later, during planning, when replacement shades were being computed.
+- **Contrast checkers must composite alpha.** A translucent fill (`bg-foreground/15`) and
+  translucent text (`text-muted-foreground` at partial opacity) resolve to the same raw luminance
+  if you don't composite each over its actual backdrop first — an uncomposited check silently
+  returns a meaningless ratio (observed: 1.0) instead of failing loudly. Always composite against
+  the real rendered background before computing WCAG contrast.
 - **Dialogs:** the house pattern is a hand-rolled modal, not native `<dialog>`. See
   `ui/ConfirmDialog.svelte` and `timesheets/PunchMapDialog.svelte`. A dialog is expected to:
   close on backdrop click and Escape, take focus on open, **trap Tab and Shift+Tab inside itself**,
   and **restore focus to the trigger** on close. `aria-modal` alone does not trap Tab.
+- **Skip links and focus order must be verified against a production build, not just `pnpm dev`.**
+  `DevLoginSwitcher.svelte` renders a real focusable floating button ahead of the skip link
+  whenever `dev && !navigator.webdriver` — true in exactly the environment (`pnpm dev`, live
+  browser) a focus-order check would naturally run in. The fix verified correctly only against
+  `pnpm build && node build/index.js`. Name the build mode explicitly in any focus-order
+  verification step; a claim proven in dev can be false in prod, and vice versa.
+
+## Feedback Surfaces — One Message Per Action
+
+The phase-04 rule, applied six times now: **one message per action, whichever surface sits
+NEAREST THE BUTTON.** It is not "delete the banner" — both directions have shipped:
+
+- `661719d`, `1a17ebd`, `a4b3dcd` — the message sat in a page header or scrolled off the top of a
+  `size="full"` dialog while the button was in the footer. Banner/strip deleted, toast kept.
+- `0a2f11d` — the inline error sat physically ON the row beside its own button. Inline kept, toast
+  suppressed with `submitFeedback({ error: null })`.
+
+**Before suppressing a toast, prove the replacement surface exists — don't assume it.** Two
+feedback defects landed in one PR (`3aa9fb7`, PR #13, 10-09-26) from the same move: deciding a
+form's feedback on the reasoning that a page-local surface handles it, without checking that
+surface was actually wired for that action. `attendance ?/saveTimesheet` took `success: null` and
+had no banner at all, so a successful save said nothing. The dashboard's `decideGuard` was NOT
+suppressed and duplicated its own scoped banner. Grep the page for the `actionError`/scoped-banner
+call site for that specific action name before adding or trusting a `{ success: null }` /
+`{ error: null }` override — see `removing-a-banner-can-silence-errors` for the inverse mistake
+(deleting a shared surface without checking who still relies on it).
+
+**The `error` option only covers `fail()`. A thrown `error()` always toasts.** The same PR's review
+called `employees/[id]`'s audited `reveal` a silent failure because it carries `error: null` and
+sits in zero `actionError` lists. It is not. `submitFeedback`'s `error` option is read only on
+`result.type === 'failure'`, which is what a `fail()` return produces; `?/reveal` has no `fail()`
+call, and `requireAnyCapability`'s `error(403)` arrives as `result.type === 'error'`, a branch that
+toasts `FRIENDLY_ERROR` unconditionally. Before calling an `error: null` guard silent, check
+whether its action returns `fail()` at all — and remember that the `error()` path can only ever say
+"Something went wrong", so it tells a denial and a crash apart for nobody.
+
+Selector facts, and they decide whether any assertion means anything:
+
+- **`getByRole('alert')` matches the `Banner` component ONLY**, for `kind="error"` and
+  `kind="warning"` (`Banner.svelte:42`). The toast is not `role="alert"`.
+- The toast region is `div[role="status"]` (`Toaster.svelte:48`).
+- **Success toasts carry NO `aria-live`.** `Toaster.svelte:64` sets `aria-live="assertive"` only
+  when `kind === 'error'`; every other kind gets `undefined`. So a probe selecting
+  `[role="status"] [aria-live]` sees **error toasts only** and reports zero for every success
+  toast that is plainly on screen. Distrust a "no toast" result from that selector before
+  reporting it as a product failure (hit 10-09-26; the agent correctly re-checked instead of
+  filing a bug).
+- Hand-rolled `bg-destructive` strips carry **no ARIA role at all** — they match neither locator.
+  Assert on their class scoped to a container, never on a role.
+
+A rejection currently reports through the `saved` key (`?/review`, and recruitment's
+`Posting sent back to draft.`), so `submitFeedback` dispatches `kind: 'success'` and announces a
+rejection in **green**. Owner ruling owed —
+`process/features/ui-ux-overhaul/backlog/rejection-toast-is-green_NOTE_10-09-26.md`.
+
+**Toast/banner `kind` now includes `'warning'` (#27, 24-09-26).** An action opts a result into it
+by returning `kind: 'warning'` next to `saved`/`error` in its action data; `submitFeedback` reads
+`result.data?.kind === 'warning'` independent of the message, so a client-side `success:`
+override function does not bypass it. Used for rejections, returns and send-backs. Toaster paints
+it as a solid amber fill from the `--warning` token; it inherits `aria-live="polite"` (it confirms
+an action the user asked for, so it must not interrupt).
+
+**Action-result banners auto-dismiss after the toast timeout (#42, 24-09-26).** `src/lib/actions/
+autoDismiss.ts` is a Svelte action, opt-in via `Banner`'s `autoDismiss?: boolean` prop (default
+`false`) or `use:autoDismiss` on a hand-rolled result block. It reuses the toast
+`DEFAULT_TIMEOUT` (now exported from `src/lib/stores/toast.svelte.ts`), pauses on hover or on a
+DESCENDANT holding focus (never on focus landing on the banner node itself — `scrollToError`'s
+own `.focus()` does NOT pause it), and hides via `hidden` + inline `display:none`. State banners
+(`LoadError`, "you must act" notices) do not opt in and never close on their own. If
+`use:autoDismiss` sits on the same element as `use:scrollToError`, `autoDismiss` MUST come first
+in source order (actions run in source order; `scrollToError` focuses synchronously).
+
+## Svelte 5 Binding Gotchas
+
+- **`bind:indeterminate` cannot target a `$derived` (read-only) value.** Even though the binding
+  itself is supported by the installed Svelte version, `bind:indeterminate={someDerivedValue}`
+  fails at lint time (`Cannot bind to constant`). Fall back to `bind:this` on the element plus an
+  `$effect` that sets `.indeterminate` imperatively.
+- **A native checkbox click flips its own `.checked` DOM property before `onchange` fires.** This
+  can leave a one-way `checked={someState}` binding stale: if the state diff sees no change,
+  Svelte won't re-sync the DOM, and the box can render checked when its bound state says it isn't
+  (or vice versa). If you're setting `.indeterminate` imperatively in an `$effect`, set `.checked`
+  imperatively in the same effect and drop the declarative `checked={...}` attribute — don't mix
+  imperative and declarative sync on the same control.
+- Controls with internal DOM state (indeterminate, checked, open/closed) need a **live
+  state-transition walk** — click through every state in a real browser — not just a render check.
+  Both bugs above were found only by clicking through empty→some→all→empty in a live browser; a
+  static read of the source or a single render assertion would have missed both.
+- **A Playwright check that clicks before hydration settles proves nothing.** A select-all test
+  (`/requests/approvals`) called `.check()` and then asserted the post-click state — Svelte
+  repropped `checked={picked}` from a stale one-way binding and silently undid the click, and the
+  test passed anyway because it never looked at the PRE-click state to confirm the click had any
+  effect. The control that actually caught the real bug (F15, PR #13) asserted the state
+  immediately BEFORE the click too, so a no-op click shows up as "nothing changed" instead of
+  reading as a pass. Assert before and after, not just after.
+- **A control that mirrors an `<input>`'s bound `value` into local `$state` text is not what gets
+  posted on Enter.** `TimePicker.svelte` (`src/lib/components/ui/`) writes its bound `value` on
+  every `input` event, but a form submit reads the input's live DOM text, and Enter never fires a
+  `blur` to normalize that text first (`.fill()` in Playwright doesn't blur either — same gap).
+  Fix: add a `formdata` listener on `input.form` (`e.formData.set(name, value)`) — SvelteKit's
+  `enhance` builds its `FormData` from `new FormData(form, submitter)`, which fires `formdata`, so
+  this always runs before the network call. Native `type="time"`/`type="date"` never had this gap
+  because the browser owns the value; any custom text-based replacement for one does.
+- **An `inline-flex` wrapper around an `<input class="w-full">` silently shrinks the input**, because
+  flex items default to `min-width: auto` / content-based sizing inside an inline-flex row. If a
+  shared control's wrapper needs to support a `w-full` call site, make the wrapper itself
+  `flex`/block when it holds one (e.g. `[&:has(>input.w-full)]:flex`), not just `inline-flex`.
+- **`tailwind-merge`/`cn()` lets a later call-site class override an earlier structural one** (e.g.
+  call-site `px-3` silently dropping a component's own `pr-7` icon padding). If a class must always
+  win, merge it *after* the call-site class inside `cn()`, not before.
+- **`{#if}` type narrowing in a parent does not cross a component boundary.** Passing a
+  narrowed value as a prop to a child component does not carry the narrowing with it inside the
+  child's own script — the child must re-derive or re-check the same condition itself (hit during
+  #23's employee-detail split: `OnboardingCard` needed its own `{#if data.onboarding}` even
+  though the page already gated on it).
+- **SvelteKit's `applyAction` sets `form` to `null`, then (after a tick) to the new result** —
+  so any `{#if form?.x}` block is unmounted and remounted per submit, not just re-rendered. This
+  is why a mount-triggered effect (e.g. an auto-dismiss timer) re-arms itself on every new
+  result, and why a `$derived` read from `form` at a fixed key is safe across repeated submits
+  with the same message — the surrounding block gets a fresh node each time.
+- **Deleting the `enhance` import breaks `use:enhance={someGuard.enhance}` silently.** The
+  directive name `use:enhance` resolves to the *imported* SvelteKit action; `someGuard` (e.g. a
+  `submitFeedback()` guard) is only the argument passed to it. If the import is removed but a bare
+  `use:enhance` directive is left behind pointing at a guard's `.enhance` property, the form still
+  submits but nothing about the result — success or failure — reaches the user; there is no error,
+  no type-check failure, and no visual break. It looks exactly like the toast/banner bug being
+  fixed. Grep every `use:enhance` call site in a component before removing or moving an `enhance`
+  import near it (`b026395`, 10-09-26 — a stage-move form left on a bare `use:enhance` after a
+  UI sweep missed a child component).
 
 ## Verification Expectation
 

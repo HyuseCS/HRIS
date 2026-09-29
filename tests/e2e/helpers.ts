@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from '@playwright/test'
+import { expect, type Browser, type Locator, type Page } from '@playwright/test'
 
 export const USERS = {
 	admin: { email: 'admin@veent.ph', password: 'Admin@1234' },
@@ -6,6 +6,7 @@ export const USERS = {
 	// Settings cards. Seeded by seedProd; see prisma/seed-core.ts.
 	hr: { email: 'hr@veent.ph', password: 'Hr@1234' },
 	manager: { email: 'manager@veent.ph', password: 'Manager@1234' },
+	payroll: { email: 'payroll@veent.ph', password: 'Payroll@1234' },
 	employee: { email: 'employee@veent.ph', password: 'Employee@1234' },
 	// Maker-checker sign-off accounts (#134).
 	verifier: { email: 'verifier@veent.ph', password: 'Verifier@1234' },
@@ -25,35 +26,51 @@ export const USERS = {
 // seed's Discord id and stays isolated from real Discord accounts.
 export const E2E_DISCORD_ID = 'e2e-punch-elena'
 
-/**
- * Pick a tenant on the two-step Avipa login (#135) and wait for the credential form.
- * Revealing the form is client-side, so the tenant click must land after hydration —
- * retry the click until the Email field appears (same pattern as the timesheet review
- * modal below), otherwise a pre-hydration click is silently dropped.
- */
-export async function selectTenant(page: Page, org: string) {
-	const tenant = page.getByRole('button', { name: org, exact: true })
-	const email = page.getByLabel('Email')
-	await expect(async () => {
-		await tenant.click()
-		await expect(email).toBeVisible({ timeout: 1000 })
-	}).toPass({ timeout: 15000 })
-}
-
 /** Log in through the real login form and wait for the dashboard. */
-export async function login(page: Page, user: { email: string; password: string }, org = 'Veent') {
+export async function login(page: Page, user: { email: string; password: string }) {
 	// domcontentloaded (not the default 'load') so we don't block on external font/webfont
 	// requests that may never settle in sandboxed/offline runners.
 	await page.goto('/login', { waitUntil: 'domcontentloaded' })
-	// Two-step Avipa login (#135): pick the tenant to reveal the credential form. All
-	// seed test accounts live in `Veent`, so callers rarely override `org`.
-	await selectTenant(page, org)
 	await page.getByLabel('Email').fill(user.email)
 	await page.getByLabel('Password').fill(user.password)
 	await page.getByRole('button', { name: 'Sign In' }).click()
 	// domcontentloaded here too — waitForURL's default 'load' hangs the same way.
 	await page.waitForURL('**/dashboard', { waitUntil: 'domcontentloaded' })
 	await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+	// Rows-per-page is computed server-side from the `vp` viewport cookie the app layout
+	// writes on hydration. Waiting for it here keeps every later list navigation deterministic
+	// instead of racing the fallback page size.
+	await expect
+		.poll(async () => (await page.context().cookies()).some((c) => c.name === 'vp'))
+		.toBe(true)
+}
+
+/**
+ * Locate one review card in the /requests/timesheets queue, walking `Next →` until it is
+ * found. The queue paginates at 10 and is ordered `submittedAt asc`, so a freshly seeded
+ * fixture is the newest row and lands on the LAST page — not page 1.
+ */
+export async function findTimesheetCard(
+	page: Page,
+	hoursLabel: string,
+	employeeName = 'Employee, Elena'
+): Promise<Locator> {
+	await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
+	// The walk always advances 1 → 2 → 3…, so the next page number is known; waiting on a
+	// bare /page=\d+/ would match the page already in the URL and return before the nav lands.
+	for (let next = 2; ; next++) {
+		const card = page
+			.locator('[role="button"]', { hasText: employeeName })
+			.filter({ hasText: hoursLabel })
+		if (await card.count()) return card
+		const link = page.getByRole('link', { name: 'Next →' })
+		// The bound is on NAVIGATING, not on looking: checking it after the click would leave the
+		// last page fetched and never examined, and report a miss for a card that is there.
+		if (next > 20 || !(await link.count())) break
+		await link.click()
+		await page.waitForURL(new RegExp(`[?&]page=${next}(&|$)`), { waitUntil: 'domcontentloaded' })
+	}
+	throw new Error(`no timesheet card matching ${hoursLabel} on any page`)
 }
 
 /**
@@ -66,10 +83,7 @@ export async function verifyAndApproveTimesheet(browser: Browser, hoursLabel: st
 		const ctx = await browser.newContext()
 		const page = await ctx.newPage()
 		await login(page, user)
-		await page.goto('/requests/timesheets', { waitUntil: 'domcontentloaded' })
-		const card = page
-			.locator('[role="button"]', { hasText: 'Employee, Elena' })
-			.filter({ hasText: hoursLabel })
+		const card = await findTimesheetCard(page, hoursLabel)
 		await expect(card).toBeVisible()
 		const dialog = page.getByRole('dialog', { name: 'Timesheet review' })
 		await expect(async () => {
@@ -77,7 +91,15 @@ export async function verifyAndApproveTimesheet(browser: Browser, hoursLabel: st
 			await expect(dialog).toBeVisible({ timeout: 1000 })
 		}).toPass({ timeout: 15000 })
 		await dialog.getByRole('button', { name: 'Approve' }).click()
+		// Page-local: proves the card left THIS page. Once the queue paginates that is no longer
+		// the same claim as leaving the queue, so re-walk every page and require the helper's
+		// named miss — a card that merely moved pages would resolve here instead.
 		await expect(card).toHaveCount(0)
+		const afterApproval = await findTimesheetCard(page, hoursLabel).then(
+			() => 'the card is still in the queue',
+			(e: Error) => e.message
+		)
+		expect(afterApproval).toMatch(/no timesheet card matching/)
 		await ctx.close()
 	}
 }

@@ -26,7 +26,7 @@ export async function listJobPostings(
 			department: { select: { name: true } },
 			_count: { select: { applicants: true } }
 		},
-		orderBy: { createdAt: 'desc' },
+		orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
 		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }
@@ -125,6 +125,43 @@ export async function submitJobPostingForApproval(
 	}
 
 	return updated
+}
+
+export async function setJobPostingStatus(
+	id: string,
+	organizationId: string,
+	status: 'OPEN' | 'CLOSED' | 'DRAFT',
+	ctx: AuditContext
+): Promise<{ previousStatus: JobPostingStatus }> {
+	const jp = await db.jobPosting.findFirst({ where: { id, organizationId } })
+	if (!jp) error(404, 'Job posting not found')
+	if (jp.status === 'PENDING_APPROVAL')
+		error(400, 'This posting is awaiting approval. Use the approval decision instead.')
+	if (jp.status === status) error(400, 'The posting is already in that status.')
+
+	await db.$transaction(async (tx) => {
+		await tx.jobPosting.update({
+			where: { id },
+			data: {
+				status,
+				...(status === 'OPEN' && !jp.postedAt ? { postedAt: new Date() } : {}),
+				...(status === 'CLOSED' ? { closedAt: new Date() } : {})
+			}
+		})
+		await writeAuditLog(
+			ctx,
+			{
+				action: 'UPDATE',
+				entityType: 'JobPosting',
+				entityId: id,
+				oldValue: { status: jp.status },
+				newValue: { status }
+			},
+			tx
+		)
+	})
+
+	return { previousStatus: jp.status }
 }
 
 // Whether `actor` may decide the posting: the department's designated approver, or — only when

@@ -69,7 +69,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		return json({ data: loan }, { status: 201 })
 	} catch (e: unknown) {
 		const err = e as { status?: number; body?: { message?: string } }
-		if (err?.status && [400, 404].includes(err.status))
+		if (err?.status && [400, 404, 409].includes(err.status))
 			return apiError(err.status, err.body?.message ?? 'Error')
 		throw e
 	}

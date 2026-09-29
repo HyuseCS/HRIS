@@ -379,7 +379,10 @@ describe('?/reject', () => {
 				{ proposalId: 'p1', note: 'not budgeted this quarter' }
 			)
 		)
-		expect(res).toEqual({ success: 'Proposal rejected and the initiator notified.' })
+		expect(res).toEqual({
+			success: 'Proposal rejected and the initiator notified.',
+			kind: 'warning'
+		})
 		// The claim runs inside `db.$transaction` with its audit, so `tx` is the client under test.
 		expect(tx.actionProposal.updateMany).toHaveBeenCalledWith({
 			where: { id: 'p1', organizationId: 'org1', status: 'PENDING' },

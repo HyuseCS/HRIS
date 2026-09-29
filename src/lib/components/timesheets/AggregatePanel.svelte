@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
+	import { submitFeedback } from '$lib/utils/submit-feedback.svelte'
 	import type { SubmitFunction } from '@sveltejs/kit'
 	import { slide } from 'svelte/transition'
 	import { formatShortDate } from '$lib/utils/format'
+	import DatePicker from '$lib/components/ui/DatePicker.svelte'
+	import Container from '$lib/components/ui/Container.svelte'
 
 	type Employee = { id: string; firstName: string; lastName: string; employeeNumber: string }
 	type Preview = {
@@ -51,7 +54,7 @@
 	}
 
 	// Capture the preview payload into local state on success; clear it on failure. Keep inputs.
-	const capturePreview: SubmitFunction = () => {
+	const capturePreviewInner: SubmitFunction = () => {
 		busy = true
 		return async ({ result, update }) => {
 			await update({ reset: false })
@@ -59,13 +62,16 @@
 			preview = result.type === 'success' ? ((result.data?.preview as Preview) ?? null) : null
 		}
 	}
-	const keepInputs: SubmitFunction = () => {
+	const keepInputsInner: SubmitFunction = () => {
 		busy = true
 		return async ({ update }) => {
 			await update({ reset: false })
 			busy = false
 		}
 	}
+	// Both callbacks swallowed `result.type === 'error'` entirely — the panel just sat there.
+	const capturePreview = submitFeedback({ success: null, inner: capturePreviewInner })
+	const keepInputs = submitFeedback({ inner: keepInputsInner })
 
 	const canRun = $derived(Boolean(employeeId) && Boolean(weekOf))
 	// Only commit what was actually previewed: the preview must match the current selection.
@@ -76,16 +82,17 @@
 		'h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 </script>
 
-<section class="space-y-3 rounded-lg border bg-muted/20 p-4">
+<section class="space-y-3 rounded-lg border bg-card p-4">
 	<div>
-		<h2 class="text-lg font-semibold">Aggregate from time logs</h2>
+		<h2 class="text-lg font-semibold">Aggregate from time logs — one week</h2>
 		<p class="text-sm text-muted-foreground">
-			Preview a week of an employee's Discord punches, then roll them into a draft timesheet.
+			Preview one whole week (Monday to Sunday, Manila time) of an employee's Discord punches, then
+			roll them into a draft timesheet. Pick any day in the week you want.
 		</p>
 	</div>
 
 	<div class="flex flex-wrap items-end gap-3">
-		<div class="min-w-56 flex-1">
+		<div class="min-w-56 max-w-lg flex-1">
 			<label for="agg-employee" class="text-sm font-medium">Employee</label>
 			<select
 				id="agg-employee"
@@ -101,16 +108,15 @@
 		</div>
 		<div>
 			<label for="agg-week" class="text-sm font-medium">Week (any day in it)</label>
-			<input
+			<DatePicker
 				id="agg-week"
-				type="date"
 				bind:value={weekOf}
 				oninput={clearPreview}
 				class="mt-1 {inputClass}"
 			/>
 		</div>
 
-		<form method="POST" action="?/previewAggregate" use:enhance={capturePreview}>
+		<form method="POST" action="?/previewAggregate" use:enhance={capturePreview.enhance}>
 			<input type="hidden" name="employeeId" value={employeeId} />
 			<input type="hidden" name="weekOf" value={weekOf} />
 			<button
@@ -119,7 +125,7 @@
 				>Preview</button
 			>
 		</form>
-		<form method="POST" action="?/aggregate" use:enhance={keepInputs}>
+		<form method="POST" action="?/aggregate" use:enhance={keepInputs.enhance}>
 			<input type="hidden" name="employeeId" value={employeeId} />
 			<input type="hidden" name="weekOf" value={weekOf} />
 			<button
@@ -147,7 +153,7 @@
 				</p>
 			</div>
 
-			<div class="overflow-x-auto rounded-lg border bg-background">
+			<Container tone="card" fill={false} flush>
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
 						<tr>
@@ -176,7 +182,7 @@
 						{/each}
 					</tbody>
 				</table>
-			</div>
+			</Container>
 
 			{#if preview.warnings.length}
 				<div class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-sm">

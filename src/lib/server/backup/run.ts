@@ -17,7 +17,7 @@ import {
 // Orchestration: collect → copy → manifest → status → prune → notify.
 //
 // This file lives in src/lib (not scripts/) because it must be importable by tests —
-// `pnpm check` does not even cover scripts/**. scripts/backup-documents.ts is a thin arg
+// `bun run check` does not even cover scripts/**. scripts/backup-documents.ts is a thin arg
 // parse and org loop over what is here.
 //
 // NOTHING here writes, renames or unlinks anything under UPLOAD_DIR. The only call into

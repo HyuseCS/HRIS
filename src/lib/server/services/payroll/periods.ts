@@ -34,11 +34,19 @@ async function requirePeriod(id: string, organizationId: string) {
 	return period
 }
 
-export async function listPeriods(organizationId: string) {
+export async function countPeriods(organizationId: string) {
+	return db.payrollPeriod.count({ where: { organizationId } })
+}
+
+export async function listPeriods(
+	organizationId: string,
+	pageArgs?: { skip: number; take: number }
+) {
 	return db.payrollPeriod.findMany({
 		where: { organizationId },
 		include: { runs: { select: { id: true, status: true, totalNet: true } } },
-		orderBy: { startDate: 'desc' }
+		orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }
 

@@ -1,0 +1,84 @@
+{
+  "section": "phase-05-remediation-A S2",
+  "date": "2026-09-11",
+  "steps": [
+    {
+      "step": "Baseline gate set before any edit",
+      "command": "pnpm test",
+      "result": "PASS",
+      "notes": "2468 passed across 211 files, exit 0. format:check clean; lint 0 errors / 1 pre-existing warning (CalculatorWindow.svelte:82)."
+    },
+    {
+      "step": "D1 proof — deriveTaxBrackets on the shipped 2023 table reproduces its own published baseTax",
+      "command": "pnpm vitest run tests/unit/ph-statutory.test.ts",
+      "result": "PASS",
+      "notes": "Asserts both the shipped table's baseTax and the literal [0,0,1875,8541.8,33541.8,183541.8], plus excessOver."
+    },
+    {
+      "step": "NEGATIVE CONTROL — the same D1 proof against the 2018 table",
+      "command": "table stashed to 2018, pnpm vitest run tests/unit/ph-statutory.test.ts -t 'derived baseTax equals', table restored",
+      "result": "FAIL (expected, and required)",
+      "notes": "Red with expected 10833.33/40833.33/200833.33 vs received 10833.5/40833.5/200833.5 — the exact drift. Proves the gate can go red and is not vacuous."
+    },
+    {
+      "step": "PERMANENT NEGATIVE CONTROL — the 2018 rate vector derives the drift, asserted as a fact",
+      "command": "pnpm vitest run tests/unit/ph-statutory.test.ts",
+      "result": "PASS",
+      "notes": "Second case in the same file asserts [0,0,2500,10833.5,40833.5,200833.5] and not.toEqual the shipped baseTax, so the first case cannot quietly become vacuous."
+    },
+    {
+      "step": "DERIVED_PARITY collapse — the override is deleted, not repointed",
+      "command": "grep -rn 'DERIVED_PARITY|66348|66347' tests/ src/",
+      "result": "PASS",
+      "notes": "No match. The identifier is gone, the loop iterates PARITY directly, and a stronger whole-table assertion (seededDerivedRow.taxBrackets toEqual seededRow.taxBrackets) replaces it. The stale :301-305 comment describing the drift was rewritten."
+    },
+    {
+      "step": "Pre-migration DB read — all three orgs on the 2018 table",
+      "command": "docker exec -i veent-db-5434 psql -p 5434 -U veent -d veent_hris -tAc \"select \\\"organizationId\\\", jsonb_path_query_array(\\\"taxBrackets\\\",'$[*].rate'), jsonb_path_query_array(\\\"taxBrackets\\\",'$[*].floor'), jsonb_path_query_array(\\\"taxBrackets\\\",'$[*].baseTax') from statutory_rate_configs order by 1;\"",
+      "result": "PASS",
+      "notes": "org_jojo, org_seed, org_sweetleaf all [0,0.2,0.25,0.3,0.32,0.35] / [0,20833,33333,66667,166667,666667] / [0,0,2500,10833.33,40833.33,200833.33] — identical, confirming S1's restore."
+    },
+    {
+      "step": "Migration run 1",
+      "command": "pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-bir-tax-table-2023.ts",
+      "result": "PASS",
+      "notes": "Moved the BIR table 2018 -> 2023 on 3 config row(s)."
+    },
+    {
+      "step": "Migration run 2 — idempotency",
+      "command": "pnpm exec dotenv -e .env.dev -- tsx scripts/migrate-bir-tax-table-2023.ts",
+      "result": "PASS",
+      "notes": "0 config row(s), no skip lines. AC-S2.3 met."
+    },
+    {
+      "step": "Post-migration DB read-back",
+      "command": "same psql query plus the ceiling vector",
+      "result": "PASS",
+      "notes": "All three orgs [0,0.15,0.2,0.25,0.3,0.35] / [0,0,1875,8541.8,33541.8,183541.8], ceilings [20833,33332,66666,166666,666666,null]. The open top ceiling persists as null, the wire shape the resolver revives to Infinity. AC-S2.4 met."
+    },
+    {
+      "step": "BOUNDARY CASE — the customized-org skip branch, which the validate-contract recorded as shipping unexercised",
+      "command": "snapshot org_sweetleaf taxBrackets to a file; jsonb_set bracket 1 rate to 0.18; run the migration; restore from the snapshot",
+      "result": "PASS",
+      "notes": "Reported '0 config row(s)' and 'skipped org_sweetleaf (cmszfa155002a117498gtdzso) — rates are not the 2018 vector'. Row restored byte for byte and a further run is silent. The skip branch no longer ships unexercised."
+    },
+    {
+      "step": "Full CI gate set in CI order",
+      "command": "pnpm format:check && pnpm lint && pnpm check && pnpm test",
+      "result": "PASS",
+      "notes": "format clean; lint 0 errors / 1 warning (same pre-existing CalculatorWindow.svelte:82); check 1127 files 0 errors 1 warning; test 2474 passed across 212 files. The +1 file / +3 tests beyond S2's own +3 belong to a concurrent plan-B attendance commit (5905669), accounted for in the phase report."
+    },
+    {
+      "step": "AC-P7 — no explanatory comments added",
+      "command": "git diff -U0 -- src/ tests/ | grep -E '^\\+\\s*(//|/\\*|<!--)'",
+      "result": "PASS",
+      "notes": "Six added comment lines, all edits to PRE-EXISTING comments whose figures or claims this change invalidated, including the :301-305 rewrite the contract mandates. No net new explanatory comment."
+    },
+    {
+      "step": "AC-P6 — no attendance file touched",
+      "command": "git show --stat HEAD",
+      "result": "PASS",
+      "notes": "Nine files, none under attendance. A concurrent agent's staged attendance work was left untouched by using a path-limited git commit; that owner committed it separately as 5905669."
+    }
+  ]
+}

@@ -19,7 +19,6 @@ import { login } from './helpers'
 test.describe.configure({ mode: 'serial' })
 
 const CREW = { email: 'benjie@jojo.ph', password: 'Employee@1234' }
-const TENANT = 'JoJo Potato'
 
 // Cagayan de Oro — where the seeded JoJo stores are.
 const FIX = { latitude: 8.4772, longitude: 124.6459 }
@@ -69,7 +68,7 @@ async function slowGeolocation(context: BrowserContext) {
 
 async function openPunchPage(context: BrowserContext): Promise<Page> {
 	const page = await context.newPage()
-	await login(page, CREW, TENANT)
+	await login(page, CREW)
 	await page.goto('/punch', { waitUntil: 'domcontentloaded' })
 	await expect(page.getByRole('heading', { name: 'Punch', exact: true })).toBeVisible()
 	// Wait for hydration. A pre-hydration click submits the form natively and punches WITHOUT a
@@ -101,7 +100,7 @@ test('a granted location is captured, and a second tap inside the capture window
 	// `data-ready` says the handler is live; `data-busy` says a punch is in flight — which now
 	// starts at the tap, so this is true long before the form is submitted.
 	await expect(page.locator('form[data-busy="true"]')).toBeVisible()
-	const status = page.getByRole('status')
+	const status = page.locator('main').getByRole('status')
 	await expect(status).toContainText(/Finding your location/)
 	const punchOut = page.getByRole('button', { name: 'Punch Out' })
 	await expect(punchOut).toBeDisabled()
@@ -172,7 +171,7 @@ test('a denied permission still records the punch, driven by keyboard alone', as
 	// The punch is the assertion that matters. The location copy varies by browser (denied vs
 	// no fix), so assert that it is one of the punch-anyway states rather than pinning one.
 	await expect(page.getByRole('alert')).toContainText(/Punched out without a location\./)
-	await expect(page.getByRole('status')).toContainText(/punching without it\./)
+	await expect(page.locator('main').getByRole('status')).toContainText(/punching without it\./)
 
 	const row = page.getByRole('listitem').filter({ hasText: 'Clock out' }).first()
 	await expect(row).toContainText('No location recorded')

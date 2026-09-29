@@ -244,12 +244,10 @@ describe('/separations — create action (#305)', () => {
 			data: { error: 'An open separation case already exists for this employee' }
 		})
 
-		// A plain Error carries no status, so the route floors it at 400 rather than 500ing.
+		// A plain Error carries no status, so it is unexpected: the route rethrows it rather than
+		// printing its raw text to the user. handleError turns it into "Something went wrong. (Ref: …)".
 		svc.createSeparation.mockRejectedValueOnce(new Error('something else broke'))
-		await expect(listActions.create!(formEvent(valid))).resolves.toMatchObject({
-			status: 400,
-			data: { error: 'something else broke' }
-		})
+		await expect(listActions.create!(formEvent(valid))).rejects.toThrow('something else broke')
 	})
 })
 

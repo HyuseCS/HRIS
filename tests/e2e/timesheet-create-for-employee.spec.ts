@@ -71,7 +71,7 @@ test.afterAll(dropFixture)
 
 /** Open the dialog, retrying until hydration lands (a pre-hydration click is dropped). */
 async function openDialog(page: import('@playwright/test').Page) {
-	const dialog = page.getByRole('dialog', { name: 'New timesheet' })
+	const dialog = page.getByRole('dialog', { name: 'New Timesheet' })
 	await expect(async () => {
 		await page.getByRole('button', { name: 'New Timesheet' }).click()
 		await expect(dialog).toBeVisible({ timeout: 1000 })
@@ -104,7 +104,7 @@ test('HR creates a timesheet for another employee in a period with no punches', 
 
 	await dialog.locator('#pp-month').selectOption({ label: monthName })
 	await dialog.locator('#pp-year').selectOption({ label: String(year) })
-	await dialog.getByRole('button', { name: 'Whole month' }).click()
+	await dialog.locator('#pp-kind').selectOption('WHOLE_MONTH')
 	await create.click()
 
 	// Redirects back to /timesheets, where the new DRAFT sits under the chosen employee in
@@ -112,7 +112,7 @@ test('HR creates a timesheet for another employee in a period with no punches', 
 	await page.waitForURL('**/timesheets')
 	const row = page
 		.locator('tr', { hasText: 'Employee, Elena' })
-		.filter({ hasText: 'DRAFT' })
+		.filter({ hasText: /draft/i })
 		.filter({ hasText: '0.00 hrs' })
 	await expect(row).toHaveCount(1)
 
@@ -195,7 +195,7 @@ test('creating the same period twice surfaces the conflict in the dialog', async
 	await dialog.locator('#nt-employee').selectOption(empValue as string)
 	await dialog.locator('#pp-month').selectOption({ label: monthName })
 	await dialog.locator('#pp-year').selectOption({ label: String(year) })
-	await dialog.getByRole('button', { name: 'Whole month' }).click()
+	await dialog.locator('#pp-kind').selectOption('WHOLE_MONTH')
 	await dialog.getByRole('button', { name: 'Create timesheet' }).click()
 
 	// 409 from createTimesheet, rendered in place rather than throwing the user out.

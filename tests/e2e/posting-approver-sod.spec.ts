@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { PrismaClient } from '@prisma/client'
 import { login, USERS } from './helpers'
 
 /**
@@ -20,6 +21,21 @@ const TITLE_A = `E2E-F4-mapped-${Date.now()}`
 const TITLE_B = `E2E-F4-self-${Date.now()}`
 
 test.describe.configure({ mode: 'serial' })
+
+test.beforeAll(async () => {
+	// Sweep the residue of EVERY earlier run before filing this run's postings. The self-submitted
+	// posting (b) is undecidable by design, so it stays PENDING forever, and the app has no delete
+	// path — the afterAll below documents that. Harmless while the dashboard card was unbounded;
+	// phase 10 capped that card at 10 oldest-first, so 86 accumulated E2E-F4 rows crowded this
+	// run's posting clean off it. Prisma-level fixture cleanup is the same house pattern as
+	// pagination.spec.ts and container-bounds.spec.ts.
+	const db = new PrismaClient()
+	try {
+		await db.jobPosting.deleteMany({ where: { title: { startsWith: 'E2E-F4-' } } })
+	} finally {
+		await db.$disconnect()
+	}
+})
 
 /** Set (or clear, with '') the department's posting approver as CEO. */
 async function mapApprover(page: Page, approverLabel: string) {
@@ -57,6 +73,18 @@ async function createAndSubmit(page: Page, title: string) {
 	await expect(page.locator('tr', { hasText: title })).toContainText(/PENDING|Pending/i)
 }
 
+async function openPostings(page: Page) {
+	const button = page
+		.getByRole('main')
+		.getByRole('button', { name: /postings awaiting your approval$/ })
+	await expect(button).toBeVisible()
+	const panel = page.getByRole('region', { name: 'Postings awaiting your approval' })
+	await expect(async () => {
+		await button.click()
+		await expect(panel).toBeVisible({ timeout: 1000 })
+	}).toPass({ timeout: 15000 })
+}
+
 /** The posting-approval card on the dashboard, scoped to one posting. */
 function approvalCard(page: Page, title: string) {
 	return page
@@ -82,6 +110,7 @@ test('(a) a mapped department is decidable only by its designated approver', asy
 
 	// HR can no longer approve it — this is the behaviour that changed.
 	await hr.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(hr)
 	await expect(approvalCard(hr, TITLE_A)).toHaveCount(0)
 
 	// NEGATIVE CONTROL: the designated approver CAN. Without this, the assertion above would
@@ -90,6 +119,7 @@ test('(a) a mapped department is decidable only by its designated approver', asy
 	const ap = await apCtx.newPage()
 	await login(ap, USERS.approver)
 	await ap.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(ap)
 	await expect(approvalCard(ap, TITLE_A)).toHaveCount(1)
 	await approvalCard(ap, TITLE_A).getByRole('button', { name: 'Approve' }).click()
 	await expect(approvalCard(ap, TITLE_A)).toHaveCount(0)
@@ -108,7 +138,7 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 
 	// Give the approver an HR hat so she can create postings at all — the two-role state this
 	// whole PR exists to make possible.
-	await ceo.goto('/settings/roles', { waitUntil: 'domcontentloaded' })
+	await ceo.goto(`/settings/roles?q=${USERS.approver.email}`, { waitUntil: 'domcontentloaded' })
 	// NB: 'approver@veent.ph' is a substring of 'verifier.approver@veent.ph', so a plain hasText
 	// row filter matches two rows. Anchor on the exact cell text instead.
 	const apRow = ceo
@@ -152,6 +182,7 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 
 	// She cannot decide it, despite being the designated approver.
 	await ap.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(ap)
 	await expect(approvalCard(ap, TITLE_B)).toHaveCount(0)
 
 	// And nobody rescues it — D9 is deliberate: no HR-steps-in fallback. The posting is stuck
@@ -160,9 +191,11 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 	const hr = await hrCtx.newPage()
 	await login(hr, USERS.hr)
 	await hr.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(hr)
 	await expect(approvalCard(hr, TITLE_B)).toHaveCount(0)
 
 	await ceo.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(ceo)
 	await expect(approvalCard(ceo, TITLE_B)).toHaveCount(0)
 
 	// The escape hatch the 403 names: remap the department, and it becomes decidable again.
@@ -171,6 +204,7 @@ test('(b) the designated approver cannot decide a posting they submitted themsel
 	const th = await thCtx.newPage()
 	await login(th, USERS.twoHat)
 	await th.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+	await openPostings(th)
 	await expect(approvalCard(th, TITLE_B)).toHaveCount(1)
 
 	await ceoCtx.close()
@@ -185,7 +219,7 @@ test.afterAll(async ({ browser }) => {
 	const page = await ctx.newPage()
 	await login(page, USERS.ceo)
 	await mapApprover(page, '')
-	await page.goto('/settings/roles', { waitUntil: 'domcontentloaded' })
+	await page.goto(`/settings/roles?q=${USERS.approver.email}`, { waitUntil: 'domcontentloaded' })
 	// Restore the role set through the v1 endpoint rather than the UI. Driving cleanup through
 	// the picker means racing hydration and enhance round-trips for something that is not under
 	// test, and it failed that way twice — reporting an afterAll fault against a test body that
@@ -203,10 +237,10 @@ test.afterAll(async ({ browser }) => {
 	})
 	expect(res.ok(), `role restore failed: ${res.status()} ${await res.text()}`).toBe(true)
 
-	// KNOWN RESIDUE: the two postings this spec files are NOT removed. Nothing in the app deletes
-	// a job posting — no form action, no v1 route — so there is no honest way to clean them from a
-	// UI-driven spec. They are uniquely named (E2E-F4-*, timestamped), so they never collide with
-	// a later run; they simply accumulate in the dev database. Clear them by hand when it matters:
-	//   delete from job_postings where title like 'E2E-F4%';
+	// KNOWN RESIDUE: the two postings this spec files are NOT removed here. Nothing in the app
+	// deletes a job posting — no form action, no v1 route — so a UI-driven teardown cannot clean
+	// them. They are uniquely named (E2E-F4-*, timestamped), so they never collide with a later
+	// run; the beforeAll above sweeps them at Prisma level on the NEXT run instead, which also
+	// covers runs that die before any teardown.
 	await ctx.close()
 })

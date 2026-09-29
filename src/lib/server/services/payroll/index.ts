@@ -843,11 +843,20 @@ export function payrollOrgFilter(organizationId: string, roles?: Role[]) {
 	return roles && canAny(roles, 'APPROVE_FINANCE') ? {} : { organizationId }
 }
 
-export async function listPayrollRuns(organizationId: string, roles?: Role[]) {
+export async function countPayrollRuns(organizationId: string, roles?: Role[]) {
+	return db.payrollRun.count({ where: payrollOrgFilter(organizationId, roles) })
+}
+
+export async function listPayrollRuns(
+	organizationId: string,
+	roles?: Role[],
+	pageArgs?: { skip: number; take: number }
+) {
 	return db.payrollRun.findMany({
 		where: payrollOrgFilter(organizationId, roles),
-		orderBy: { periodStart: 'desc' },
-		include: { organization: { select: { name: true } } }
+		orderBy: [{ periodStart: 'desc' }, { id: 'desc' }],
+		include: { organization: { select: { name: true } } },
+		...(pageArgs && { skip: pageArgs.skip, take: pageArgs.take })
 	})
 }
 

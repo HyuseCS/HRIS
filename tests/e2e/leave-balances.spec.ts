@@ -58,7 +58,7 @@ test.describe('Leave balances', () => {
 			})
 
 			await login(page, USERS.employee)
-			await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+			await page.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 			await page.waitForLoadState('networkidle')
 
 			const sil = page.locator('#leaveTypeId option', { hasText: 'Service Incentive Leave' })
@@ -73,6 +73,14 @@ test.describe('Leave balances', () => {
 		}
 	})
 
+	test('the retired /leave/new redirects onto the canonical requests form', async ({ page }) => {
+		await login(page, USERS.employee)
+		await page.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+
+		await expect(page).toHaveURL(/\/requests\?new=leave$/)
+		await expect(page.getByRole('dialog', { name: 'New Request' })).toBeVisible()
+	})
+
 	test('the 201 file shows the employee leave ledger', async ({ page }) => {
 		await login(page, USERS.admin)
 		await page.goto('/leave/balances?search=EMP-004', { waitUntil: 'domcontentloaded' })
@@ -80,7 +88,7 @@ test.describe('Leave balances', () => {
 		// <a href> underneath — so a click that lands before hydration is silently DROPPED and the
 		// wait below then hangs for the full 120s. That is what made this spec fail only under a
 		// loaded parallel run. Retry the click until the URL actually moves; same idiom as
-		// `selectTenant` in helpers.ts.
+		// `verifyAndApproveTimesheet` in helpers.ts.
 		// domcontentloaded, not waitForURL's default 'load': helpers.ts documents that external
 		// font requests never settle in a sandboxed runner, so 'load' times out on a navigation
 		// that already happened.
@@ -108,17 +116,18 @@ test.describe('Leave balances', () => {
 		const filer = await filerCtx.newPage()
 		try {
 			await login(filer, USERS.employee)
-			await filer.goto('/leave/new', { waitUntil: 'domcontentloaded' })
+			await filer.goto('/requests?new=leave', { waitUntil: 'domcontentloaded' })
 			await filer.waitForLoadState('networkidle')
 
-			const leaveType = filer.getByLabel('Leave Type')
+			const dialog = filer.getByRole('dialog', { name: 'New Request' })
+			const leaveType = dialog.getByLabel('Leave type')
 			await leaveType.selectOption({ label: 'Sick Leave' })
 			await expect(leaveType).not.toHaveValue('')
 			const day = nextWeekdayISO()
-			await filer.getByLabel('Start Date').fill(day)
-			await filer.getByLabel('End Date').fill(day)
-			await filer.getByRole('button', { name: 'Submit Request' }).click()
-			await filer.waitForURL('**/leave')
+			await dialog.locator('#startDate').fill(day)
+			await dialog.locator('#endDate').fill(day)
+			await dialog.getByRole('button', { name: 'Submit request' }).click()
+			await expect(dialog).toBeHidden()
 		} finally {
 			await filerCtx.close()
 		}
@@ -128,8 +137,16 @@ test.describe('Leave balances', () => {
 		try {
 			await login(reviewer, USERS.admin)
 			await reviewer.goto('/leave', { waitUntil: 'domcontentloaded' })
-			await reviewer.locator('tbody tr', { hasText: 'Sick Leave' }).first().click()
-			await reviewer.waitForURL(/\/requests\/[^/]+$/)
+			// #287: a click before hydration is silently dropped — retry until the URL moves,
+			// same idiom as the 201-file test above.
+			const sickRow = reviewer.locator('tbody tr', { hasText: 'Sick Leave' }).first()
+			await expect(async () => {
+				await sickRow.click()
+				await reviewer.waitForURL(/\/requests\/[^/]+$/, {
+					waitUntil: 'domcontentloaded',
+					timeout: 2000
+				})
+			}).toPass({ timeout: 30_000 })
 
 			const requested = reviewer.locator('[data-leave-type="Sick Leave"]')
 			await expect(requested).toBeVisible()

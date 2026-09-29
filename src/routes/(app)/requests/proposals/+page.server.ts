@@ -214,7 +214,7 @@ export const actions: Actions = {
 		} catch (e) {
 			return failFromError(e)
 		}
-		return { success: 'Proposal rejected and the initiator notified.' }
+		return { success: 'Proposal rejected and the initiator notified.', kind: 'warning' as const }
 	},
 
 	revealAmount: async ({ request, locals, getClientAddress }) => {

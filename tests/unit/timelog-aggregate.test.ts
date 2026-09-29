@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { pairPunchesToDailyHours, type PunchLite } from '$lib/server/services/timelog'
-import { manilaDayKey, manilaWeekStart } from '$lib/utils/dates'
+import { manilaDayKey, manilaWeekEnd, manilaWeekStart } from '$lib/utils/dates'
 
 // Helper: build a punch from a UTC ISO string.
 const p = (punchType: 'IN' | 'OUT', iso: string): PunchLite => ({
@@ -21,6 +21,15 @@ describe('manila timezone helpers (UTC+8)', () => {
 		expect(manilaWeekStart(new Date('2026-07-08T05:00:00Z')).toISOString()).toBe(
 			'2026-07-05T16:00:00.000Z'
 		)
+	})
+
+	it.each([
+		['Sunday 23:30 PHT', '2026-07-12T15:30:00Z', '2026-07-06', '2026-07-12'],
+		['Monday 00:30 PHT', '2026-07-12T16:30:00Z', '2026-07-13', '2026-07-19'],
+		['Monday 07:59 PHT', '2026-07-12T23:59:00Z', '2026-07-13', '2026-07-19']
+	])('keys the PHT week at %s', (_label, iso, monday, sunday) => {
+		expect(manilaDayKey(manilaWeekStart(new Date(iso)))).toBe(monday)
+		expect(manilaDayKey(manilaWeekEnd(new Date(iso)))).toBe(sunday)
 	})
 })
 
