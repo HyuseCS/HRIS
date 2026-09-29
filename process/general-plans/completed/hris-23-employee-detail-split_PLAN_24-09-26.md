@@ -9,9 +9,11 @@ feature: general
 
 **Date**: 24-09-26
 **Status**: MERGED to staging as PR #38 (24-09-26), issue #23 closed by hand. CODE DONE — all 10
-commits green on format/lint/check/unit at every commit. NOT VERIFIED: AC1 (before/after DOM diff)
-and the 11.6 e2e list both require the owner's dev server and DB and were never run — do not treat
-this refactor as proven behavior-identical. Deviation: `OnboardingCard` wraps its section in its
+commits green on format/lint/check/unit at every commit. VERIFIED 29-09-26 by a live pass on
+staging a98b6d4, accepted by the owner in place of the before/after DOM diff (owner had already
+click-tested the page): all 5 tabs render for HR on an ACTIVE and an OFFBOARDED employee and for
+`manager@veent.ph` on a direct report; one Reveal click wrote exactly one VIEW audit row (1 → 2);
+an emergency contact with phone `abc` showed the server error and wrote no row. Deviation: `OnboardingCard` wraps its section in its
 own `{#if data.onboarding}` because type narrowing does not cross a component boundary (see
 `process/context/uxui/all-uxui.md`).
 **Complexity**: COMPLEX (one plan, 10 commits, one PR)
